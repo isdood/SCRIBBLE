@@ -12,6 +12,9 @@ pic8259 = "0.10.1"
 pc-keyboard = "0.5.0"
 linked_list_allocator = "0.10.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+lazy = "0.5.3"
+static = "0.0.4"
+bootimage = "0.10.3"
 
 [package.metadata.bootimage]
 run-command = ["qemu-system-x86_64", "-drive", "format=raw,file={}"]
