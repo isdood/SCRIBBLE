@@ -9,7 +9,6 @@ extern crate alloc;
 
 use x86_64::VirtAddr;
 use core::panic::PanicInfo;
-use vga_buffer::Color;
 
 pub mod vga_buffer;
 pub mod interrupts;
@@ -52,21 +51,21 @@ macro_rules! serial_println {
 
 // Keep only this single init function
 pub fn init(boot_info: &'static bootloader::BootInfo) {
-    println_colored!(Color::LightGreen, "=== Scribble OS ===");
+    println!("=== Scribble OS ===");
     println!();
 
-    println_colored!(Color::Yellow, "Initializing GDT...");
+    println!("Initializing GDT...");
     gdt::init();
 
-    println_colored!(Color::Yellow, "Initializing IDT...");
+    println!("Initializing IDT...");
     interrupts::init_idt();
 
-    println_colored!(Color::Yellow, "Initializing PIC...");
+    println!("Initializing PIC...");
     unsafe {
         interrupts::PICS.lock().initialize();
     }
 
-    println_colored!(Color::Yellow, "Initializing memory management...");
+    println!("Initializing memory management...");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe {
@@ -78,7 +77,7 @@ pub fn init(boot_info: &'static bootloader::BootInfo) {
 
     keyboard::init();
 
-    println_colored!(Color::LightGreen, "System initialization complete!");
+    println!("System initialization complete!");
 }
 
 pub fn hlt_loop() -> ! {

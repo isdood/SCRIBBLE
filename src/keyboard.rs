@@ -3,9 +3,7 @@ use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::print_colored;
-use crate::println;
-use crate::vga_buffer::THEME;
+use crate::{print, println};
 
 const QUEUE_SIZE: usize = 100;
 
@@ -79,12 +77,12 @@ fn process_keyboard() {
             if let Some(key) = keyboard.process_keyevent(key_event) {
                 match key {
                     DecodedKey::Unicode(character) => {
-                        // Use THEME.user_input instead of Color::White
-                        print_colored!(THEME.user_input, "{}", character)
+                        // Use standard print macro
+                        print!("{}", character)
                     },
                     DecodedKey::RawKey(key) => {
-                        // Use THEME.user_input instead of Color::White
-                        print_colored!(THEME.user_input, "{:?}", key)
+                        // Use standard print macro
+                        print!("{:?}", key)
                     },
                 }
             }

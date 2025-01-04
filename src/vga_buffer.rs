@@ -56,29 +56,6 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ColorTheme {
-    pub text: Color,
-    pub heading: Color,
-    pub background: Color,
-    pub user_input: Color,
-}
-
-lazy_static! {
-    pub static ref THEME: ColorTheme = ColorTheme {
-        text: Color::Brown,
-        heading: Color::LightGreen,
-        background: Color::Black,
-        user_input: Color::White,
-    };
-
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        color_code: ColorCode::new(THEME.text, THEME.background),
-                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
-}
-
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
@@ -143,26 +120,11 @@ impl fmt::Write for Writer {
     }
 }
 
-#[macro_export]
-macro_rules! print_colored {
-    ($color:expr, $($arg:tt)*) => ({
-        use core::fmt::Write;
-        use x86_64::instructions::interrupts;
-        interrupts::without_interrupts(|| {
-            let mut writer = $crate::vga_buffer::WRITER.lock();
-            writer.set_color($color, $crate::vga_buffer::THEME.background);
-            writer.write_fmt(format_args!($($arg)*)).unwrap();
-            // Remove this line to prevent immediate color reset
-            // writer.set_color($crate::vga_buffer::THEME.text, $crate::vga_buffer::THEME.background);
-        });
-    });
-}
-
-#[macro_export]
-macro_rules! println_colored {
-    ($color:expr, $($arg:tt)*) => ({
-        $crate::print_colored!($color, $($arg)*);
-        $crate::print_colored!($color, "\n");  // Use print_colored instead of print
+lazy_static! {
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        color_code: ColorCode::new(Color::White, Color::Black), // Set default text color to white
+                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
 
