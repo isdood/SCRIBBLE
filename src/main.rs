@@ -19,10 +19,4 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     hlt_loop();
 }
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
-    hlt_loop();
-}
-
 // Remove the duplicate panic handler since it's already defined in lib.rs
