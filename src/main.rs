@@ -3,7 +3,7 @@
 #![no_main]
 
 use bootloader::{entry_point, BootInfo};
-use scribble::{println, hlt_loop};
+use scribble::{print, println, hlt_loop};  // Added print macro import
 
 // Define the entry point using bootloader's macro
 entry_point!(kernel_main);
