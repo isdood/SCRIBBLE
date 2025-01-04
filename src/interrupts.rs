@@ -75,6 +75,17 @@ extern "x86-interrupt" fn double_fault_handler(
             );
         }
 
+        let mut port = Port::new(0x60);  // Keep the mut keyword
+
+        let scancode: u8 = unsafe { port.read() };
+        crate::keyboard::add_scancode(scancode);
+
+        unsafe {
+            PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
+        }
+    }
+
         let port = Port::new(0x60);  // Removed mut as it's not needed
 
         let scancode: u8 = unsafe { port.read() };
