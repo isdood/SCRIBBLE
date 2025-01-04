@@ -1,7 +1,6 @@
 // src/lib.rs
 #![no_std]
-#![no_main]
-#![feature(abi_x86_interrupt)]  // Add this line to enable x86-interrupt ABI
+#![feature(abi_x86_interrupt)]
 
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
@@ -15,10 +14,7 @@ pub mod memory;
 pub mod allocator;
 pub mod keyboard;
 
-// Remove the incorrect re-export
-// pub use vga_buffer::{print, println};
-
-// Define the macros here instead
+// Macros for printing
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -30,6 +26,7 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
+// The main initialization function
 pub fn init(boot_info: &'static BootInfo) {
     use crate::interrupts::PICS;
 
@@ -59,7 +56,7 @@ pub fn init(boot_info: &'static BootInfo) {
 
     // PIC initialization
     set_color(Color::Magenta, Color::Black);
-    print!("Configuring PIC... ");
+    print!("Setting up PIC... ");
     unsafe { PICS.lock().initialize() };
     set_color(Color::White, Color::Black);
     println!("OK");
@@ -88,34 +85,18 @@ pub fn init(boot_info: &'static BootInfo) {
     x86_64::instructions::interrupts::enable();
     set_color(Color::White, Color::Black);
     println!("OK");
-
-    // Final messages
-    set_color(Color::Yellow, Color::Blue);
-    println!("\nSystem initialization complete!");
-    println!("Welcome to Scribble OS!");
-
-    set_color(Color::Green, Color::Black);
-    println!("\nType something to test the keyboard...");
-    print!("Ready for input > ");
 }
 
-#[export_name = "hlt_loop"]
+// Utility function for halting
 pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
     }
 }
 
-// Add panic handler
+// Panic handler
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     println!("{}", info);
-    loop {}
-}
-
-// Add entry point attribute
-#[no_mangle]
-pub extern "C" fn _start(boot_info: &'static BootInfo) -> ! {
-    init(boot_info);
-    loop {}
+    hlt_loop();
 }

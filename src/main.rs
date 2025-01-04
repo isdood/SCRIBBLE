@@ -5,13 +5,15 @@
 use bootloader::{entry_point, BootInfo};
 use scribble::{println, hlt_loop};
 
+// Define the entry point using bootloader's macro
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     scribble::init(boot_info);
 
     println!("\nWelcome to Scribble OS!");
+    println!("Type something to test the keyboard...");
+    print!("Ready for input > ");
 
-    // Loop indefinitely
     hlt_loop();
 }
