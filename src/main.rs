@@ -2,8 +2,7 @@
 #![no_main]
 
 use bootloader::{entry_point, BootInfo};
-use core::panic::PanicInfo;
-use scribble::{init, println, hlt_loop};  // Add init to the imports
+use scribble::{println, hlt_loop};
 
 entry_point!(kernel_main);
 
@@ -11,7 +10,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("Booting Scribble OS...");
 
     // Initialize the system
-    init(boot_info);  // Use the imported init function
+    scribble::init(boot_info);
 
     println!("Boot sequence complete!");
     println!("Welcome to Scribble OS!");
@@ -20,8 +19,4 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     hlt_loop()
 }
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("PANIC: {}", info);
-    hlt_loop();
-}
+// Remove the duplicate panic handler since it's already defined in lib.rs
