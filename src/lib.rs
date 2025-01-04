@@ -1,3 +1,4 @@
+// lib.rs
 #![no_std]
 #![feature(custom_test_frameworks)]
 #![feature(abi_x86_interrupt)]
@@ -6,6 +7,10 @@
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
+
+use x86_64::VirtAddr;
+use core::panic::PanicInfo;
+use bootloader::BootInfo;
 
 pub mod vga_buffer;
 pub mod interrupts;
@@ -20,7 +25,6 @@ fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
     panic!("allocation error: {:?}", layout)
 }
 
-// Print macros
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -32,7 +36,6 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
-// Serial print macros
 #[macro_export]
 macro_rules! serial_print {
     ($($arg:tt)*) => ($crate::serial::_print(format_args!($($arg)*)));
@@ -46,14 +49,61 @@ macro_rules! serial_println {
         concat!($fmt, "\n"), $($arg)*));
 }
 
+// Make init function public and export it
+pub fn init(boot_info: &'static BootInfo) {
+    use x86_64::instructions::interrupts;
+
+    println!("=== Scribble OS ===");
+    println!("Initializing system...");
+
+    println!("Loading GDT...");
+    gdt::init();
+
+    println!("Setting up IDT...");
+    interrupts::init_idt();
+
+    println!("Configuring PIC...");
+    unsafe {
+        interrupts::PICS.lock().initialize();
+    }
+
+    println!("Setting up memory management...");
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    let mut frame_allocator = unsafe {
+        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
+    };
+
+    println!("Initializing heap...");
+    allocator::init_heap(&mut mapper, &mut frame_allocator)
+    .expect("heap initialization failed");
+
+    println!("Initializing keyboard...");
+    keyboard::initialize();
+
+    println!("System initialization complete!");
+}
+
 pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
     }
 }
 
-// Color manager module
-pub mod color_manager;
+#[cfg(test)]
+fn test_runner(tests: &[&dyn Fn()]) {
+    serial_println!("Running {} tests", tests.len());
+    for test in tests {
+        test();
+    }
+}
+
+#[cfg(not(test))]
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    println!("{}", info);
+    hlt_loop();
+}
 
 #[cfg(test)]
 #[panic_handler]
@@ -73,7 +123,6 @@ pub enum QemuExitCode {
 
 pub fn exit_qemu(exit_code: QemuExitCode) {
     use x86_64::instructions::port::Port;
-
     unsafe {
         let mut port = Port::new(0xf4);
         port.write(exit_code as u32);

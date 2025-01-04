@@ -2,16 +2,16 @@
 #![no_main]
 
 use bootloader::{entry_point, BootInfo};
-use scribble::{println, hlt_loop};
 use core::panic::PanicInfo;
+use scribble::{init, println, hlt_loop};  // Add init to the imports
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("Booting Scribble OS...");
 
-    // Initialize core system components
-    scribble::init(boot_info);
+    // Initialize the system
+    init(boot_info);  // Use the imported init function
 
     println!("Boot sequence complete!");
     println!("Welcome to Scribble OS!");
