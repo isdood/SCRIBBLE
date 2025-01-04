@@ -13,8 +13,8 @@ mod memory;
 mod allocator;
 mod keyboard;
 
-// Re-export macros
-pub use crate::{print, println};
+// Remove the redundant re-export since the macros are already exported at crate root
+// pub use crate::{print, println};  // Remove this line
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -27,7 +27,6 @@ pub fn init(boot_info: &'static BootInfo) {
     use crate::interrupts::{init_idt, PICS};
     use crate::vga_buffer::{Color, set_color, clear_screen};
     use x86_64::VirtAddr;
-    use core::result::Result::Err;
 
     // Clear the screen first
     clear_screen();
