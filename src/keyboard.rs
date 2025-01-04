@@ -35,3 +35,6 @@ fn handle_keyevent(key: DecodedKey) {
         }
     }
 }
+
+pub fn initialize() {
+}
