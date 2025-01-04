@@ -69,12 +69,13 @@ impl Writer {
 
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            b'\n' => self.move_to_next_line(),
+            b'\n' => self.new_line(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
-                    self.move_to_next_line();
+                    self.new_line();
                 }
 
+                // Always write at the bottom of the screen
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
@@ -89,13 +90,15 @@ impl Writer {
         }
     }
 
-    fn move_to_next_line(&mut self) {
+    fn new_line(&mut self) {
+        // Move everything up one line
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let character = self.buffer.chars[row][col].read();
                 self.buffer.chars[row - 1][col].write(character);
             }
         }
+        // Clear the bottom line and reset column position
         self.clear_row(BUFFER_HEIGHT - 1);
         self.column_position = 0;
     }
@@ -103,7 +106,9 @@ impl Writer {
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
+                // printable ASCII byte or newline
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
+                // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
         }
@@ -116,7 +121,7 @@ impl Writer {
     pub fn backspace(&mut self) {
         if self.column_position > 0 {
             self.column_position -= 1;
-            let row = BUFFER_HEIGHT - 1;
+            let row = BUFFER_HEIGHT - 1;  // Always stay at bottom
             let col = self.column_position;
 
             self.buffer.chars[row][col].write(ScreenChar {
@@ -146,7 +151,8 @@ lazy_static! {
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        WRITER.lock().write_fmt(args).unwrap();
+        let mut writer = WRITER.lock();
+        writer.write_fmt(args).unwrap();
     });
 }
 
@@ -166,4 +172,15 @@ pub fn clear_screen() {
         }
         writer.column_position = 0;
     });
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
