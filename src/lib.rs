@@ -28,17 +28,18 @@ fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
     panic!("allocation error: {:?}", layout)
 }
 
+// src/lib.rs
 pub fn init(boot_info: &'static BootInfo) {
     use x86_64::instructions::interrupts;
     use crate::interrupts::{init_idt, PICS};
-    use crate::vga_buffer::{Color, set_color};
+    use crate::vga_buffer::{Color, set_color, clear_screen};  // Import clear_screen
 
-    // Clear the screen first
     clear_screen();
 
-    // Title in Yellow on Blue
     set_color(Color::Yellow, Color::Blue);
     println!("\n=== Scribble OS ===");
+    // ... rest of the function remains the same
+}
     set_color(Color::LightCyan, Color::Black);
     println!("Starting initialization sequence...\n");
 
