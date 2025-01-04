@@ -7,9 +7,6 @@
 
 extern crate alloc;
 
-use x86_64::VirtAddr;
-use core::panic::PanicInfo;
-
 pub mod vga_buffer;
 pub mod interrupts;
 pub mod gdt;
@@ -18,7 +15,12 @@ pub mod serial;
 pub mod memory;
 pub mod allocator;
 
-// Print macros at module level
+#[alloc_error_handler]
+fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
+    panic!("allocation error: {:?}", layout)
+}
+
+// Print macros
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -30,9 +32,22 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
-#[alloc_error_handler]
-fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
-    panic!("allocation error: {:?}", layout)
+// Serial print macros
+#[macro_export]
+macro_rules! serial_print {
+    ($($arg:tt)*) => ($crate::serial::_print(format_args!($($arg)*)));
 }
 
-// Rest of the file remains the same...
+#[macro_export]
+macro_rules! serial_println {
+    () => ($crate::serial_print!("\n"));
+    ($fmt:expr) => ($crate::serial_print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::serial_print!(
+        concat!($fmt, "\n"), $($arg)*));
+}
+
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
+}
