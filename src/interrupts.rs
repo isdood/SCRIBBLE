@@ -68,14 +68,7 @@ extern "x86-interrupt" fn double_fault_handler(
         use pc_keyboard::{layouts, ScancodeSet1, HandleControl, Keyboard};
         use spin::Mutex;
 
-        lazy_static::lazy_static! {
-            static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
-            Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1,
-                                     HandleControl::Ignore)
-            );
-        }
-
-        let mut port = Port::new(0x60);  // Keep the mut keyword
+        let mut port = Port::new(0x60);  // Add mut here for port.read()
 
         let scancode: u8 = unsafe { port.read() };
         crate::keyboard::add_scancode(scancode);
