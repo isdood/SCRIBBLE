@@ -12,12 +12,12 @@ lazy_static::lazy_static! {
 }
 
 pub fn add_scancode(scancode: u8) {
-    if let Ok(Some(key_event)) = KEYBOARD.lock().add_byte(scancode) {
-        if let Some(key) = KEYBOARD.lock().process_keyevent(key_event) {
+    let mut keyboard = KEYBOARD.lock(); // Lock the keyboard once
+
+    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+        if let Some(key) = keyboard.process_keyevent(key_event) {
             // Set color to green for user input
             vga_buffer::set_color(Color::Green, Color::Black);
-
-            let mut writer = WRITER.lock();
 
             match key {
                 DecodedKey::Unicode(character) => {
@@ -25,10 +25,10 @@ pub fn add_scancode(scancode: u8) {
                 },
                 DecodedKey::RawKey(key) => {
                     match key {
-                        KeyCode::ArrowUp => writer.write_string("^"),
-                        KeyCode::ArrowDown => writer.write_string("v"),
-                        KeyCode::ArrowLeft => writer.write_string("<"),
-                        KeyCode::ArrowRight => writer.write_string(">"),
+                        KeyCode::ArrowUp => print!("^"),
+                        KeyCode::ArrowDown => print!("v"),
+                        KeyCode::ArrowLeft => print!("<"),
+                        KeyCode::ArrowRight => print!(">"),
                         _ => print!("{:?}", key),
                     }
                 },
@@ -38,5 +38,5 @@ pub fn add_scancode(scancode: u8) {
 }
 
 pub fn initialize() {
-    // Initialization code remains the same
+    // No special initialization needed
 }
