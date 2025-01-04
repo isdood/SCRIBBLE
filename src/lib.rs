@@ -103,6 +103,6 @@ pub fn init(boot_info: &'static BootInfo) {
     // Final messages
     set_color(Color::Yellow, Color::Blue);
     crate::println!("\nSystem initialization complete!");
-    set_color(Color::White, Color::Black);
-    crate::println!("\nReady for input...\n");
+    set_color(Color::Green, Color::Black);
+    crate::println!("\nType something in green...");
 }
