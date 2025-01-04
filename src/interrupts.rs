@@ -65,14 +65,15 @@ extern "x86-interrupt" fn double_fault_handler(
         _stack_frame: InterruptStackFrame)
     {
         use x86_64::instructions::port::Port;
-        use pc_keyboard::{layouts, ScancodeSet1, HandleControl, Keyboard};
-        use spin::Mutex;
 
-        let mut port = Port::new(0x60);  // Add mut here for port.read()
+        // Create a mutable port for reading
+        let mut port = Port::new(0x60);
 
+        // Read the scancode
         let scancode: u8 = unsafe { port.read() };
         crate::keyboard::add_scancode(scancode);
 
+        // Notify end of interrupt
         unsafe {
             PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
