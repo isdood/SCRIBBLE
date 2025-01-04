@@ -42,6 +42,7 @@ fn panic(info: &PanicInfo) -> ! {
     hlt_loop();
 }
 
+// in src/lib.rs
 pub fn init(boot_info: &'static BootInfo) {
     use crate::interrupts::PICS;
 
@@ -51,6 +52,7 @@ pub fn init(boot_info: &'static BootInfo) {
     // Boot sequence with colors
     set_color(Color::Yellow, Color::Blue);
     crate::println!("\n=== Scribble OS ===");
+
     set_color(Color::LightCyan, Color::Black);
     crate::println!("Starting initialization sequence...\n");
 
@@ -58,21 +60,21 @@ pub fn init(boot_info: &'static BootInfo) {
     set_color(Color::LightGreen, Color::Black);
     crate::print!("Loading GDT... ");
     gdt::init();
-    set_color(Color::Green, Color::Black);
+    set_color(Color::White, Color::Black);  // Reset color
     crate::println!("OK");
 
     // IDT initialization
     set_color(Color::LightCyan, Color::Black);
     crate::print!("Setting up IDT... ");
     interrupts::init_idt();
-    set_color(Color::Green, Color::Black);
+    set_color(Color::White, Color::Black);  // Reset color
     crate::println!("OK");
 
     // PIC initialization
     set_color(Color::Magenta, Color::Black);
     crate::print!("Configuring PIC... ");
     unsafe { PICS.lock().initialize() };
-    set_color(Color::Green, Color::Black);
+    set_color(Color::White, Color::Black);  // Reset color
     crate::println!("OK");
 
     // Memory management
@@ -83,26 +85,27 @@ pub fn init(boot_info: &'static BootInfo) {
     let _frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
-    set_color(Color::Green, Color::Black);
+    set_color(Color::White, Color::Black);  // Reset color
     crate::println!("OK");
 
     // Keyboard initialization
     set_color(Color::LightBlue, Color::Black);
     crate::print!("Setting up keyboard handler... ");
     keyboard::initialize();
-    set_color(Color::Green, Color::Black);
+    set_color(Color::White, Color::Black);  // Reset color
     crate::println!("OK");
 
     // Enable interrupts
     set_color(Color::LightCyan, Color::Black);
     crate::print!("Enabling interrupts... ");
     x86_64::instructions::interrupts::enable();
-    set_color(Color::Green, Color::Black);
+    set_color(Color::White, Color::Black);  // Reset color
     crate::println!("OK");
 
     // Final messages
     set_color(Color::Yellow, Color::Blue);
     crate::println!("\nSystem initialization complete!");
-    set_color(Color::Green, Color::Black);
-    crate::println!("\nType something in green...");
+
+    set_color(Color::Green, Color::Black);  // Set final color for keyboard input
+    crate::println!("\nReady for input...\n");
 }
