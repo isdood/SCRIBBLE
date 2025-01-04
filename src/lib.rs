@@ -13,6 +13,7 @@ pub mod interrupts;
 pub mod memory;
 pub mod allocator;
 pub mod keyboard;
+pub use vga_buffer::*;
 
 // Macros for printing
 #[macro_export]
@@ -99,4 +100,8 @@ pub fn hlt_loop() -> ! {
 fn panic(info: &core::panic::PanicInfo) -> ! {
     println!("{}", info);
     hlt_loop();
+}
+
+pub fn init() {
+    vga_buffer::init();
 }
