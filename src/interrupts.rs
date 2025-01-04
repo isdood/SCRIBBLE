@@ -84,7 +84,7 @@ extern "x86-interrupt" fn double_fault_handler(
             PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
         }
-    }
+
 
         let port = Port::new(0x60);  // Removed mut as it's not needed
 
