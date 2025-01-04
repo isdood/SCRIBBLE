@@ -5,6 +5,7 @@
 
 use bootloader::BootInfo;
 use core::panic::PanicInfo;
+use x86_64::VirtAddr;  // Add this import
 use vga_buffer::{Color, set_color, clear_screen};
 
 pub mod vga_buffer;
@@ -14,18 +15,19 @@ mod memory;
 mod allocator;
 mod keyboard;
 
-#[macro_use]
-pub mod macros {
-    #[macro_export]
-    macro_rules! print {
-        ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-    }
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => {
+        $crate::vga_buffer::_print(format_args!($($arg)*))
+    };
+}
 
-    #[macro_export]
-    macro_rules! println {
-        () => ($crate::print!("\n"));
-        ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-    }
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => {
+        $crate::print!("{}\n", format_args!($($arg)*))
+    };
 }
 
 pub fn hlt_loop() -> ! {
@@ -36,7 +38,7 @@ pub fn hlt_loop() -> ! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
+    crate::println!("{}", info);
     hlt_loop();
 }
 
@@ -48,59 +50,59 @@ pub fn init(boot_info: &'static BootInfo) {
 
     // Boot sequence with colors
     set_color(Color::Yellow, Color::Blue);
-    println!("\n=== Scribble OS ===");
+    crate::println!("\n=== Scribble OS ===");
     set_color(Color::LightCyan, Color::Black);
-    println!("Starting initialization sequence...\n");
+    crate::println!("Starting initialization sequence...\n");
 
     // GDT initialization
     set_color(Color::LightGreen, Color::Black);
-    print!("Loading GDT... ");
+    crate::print!("Loading GDT... ");
     gdt::init();
     set_color(Color::Green, Color::Black);
-    println!("OK");
+    crate::println!("OK");
 
     // IDT initialization
     set_color(Color::LightCyan, Color::Black);
-    print!("Setting up IDT... ");
+    crate::print!("Setting up IDT... ");
     interrupts::init_idt();
     set_color(Color::Green, Color::Black);
-    println!("OK");
+    crate::println!("OK");
 
     // PIC initialization
     set_color(Color::Magenta, Color::Black);
-    print!("Configuring PIC... ");
+    crate::print!("Configuring PIC... ");
     unsafe { PICS.lock().initialize() };
     set_color(Color::Green, Color::Black);
-    println!("OK");
+    crate::println!("OK");
 
     // Memory management
     set_color(Color::LightBlue, Color::Black);
-    print!("Setting up memory management... ");
+    crate::print!("Setting up memory management... ");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let _mapper = unsafe { memory::init(phys_mem_offset) };
     let _frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
     set_color(Color::Green, Color::Black);
-    println!("OK");
+    crate::println!("OK");
 
     // Keyboard initialization
     set_color(Color::LightBlue, Color::Black);
-    print!("Setting up keyboard handler... ");
+    crate::print!("Setting up keyboard handler... ");
     keyboard::initialize();
     set_color(Color::Green, Color::Black);
-    println!("OK");
+    crate::println!("OK");
 
     // Enable interrupts
     set_color(Color::LightCyan, Color::Black);
-    print!("Enabling interrupts... ");
+    crate::print!("Enabling interrupts... ");
     x86_64::instructions::interrupts::enable();
     set_color(Color::Green, Color::Black);
-    println!("OK");
+    crate::println!("OK");
 
     // Final messages
     set_color(Color::Yellow, Color::Blue);
-    println!("\nSystem initialization complete!");
+    crate::println!("\nSystem initialization complete!");
     set_color(Color::White, Color::Black);
-    println!("\nReady for input...\n");
+    crate::println!("\nReady for input...\n");
 }

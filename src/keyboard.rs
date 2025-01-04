@@ -2,7 +2,6 @@
 use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts, KeyCode};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::{print, println};
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
@@ -21,14 +20,14 @@ pub fn add_scancode(scancode: u8) {
 fn handle_keyevent(key: DecodedKey) {
     match key {
         DecodedKey::Unicode(character) => {
-            print!("{}", character);
+            crate::print!("{}", character);
         }
         DecodedKey::RawKey(key) => {
             match key {
-                KeyCode::ArrowUp => print!("↑"),
-                KeyCode::ArrowDown => print!("↓"),
-                KeyCode::ArrowLeft => print!("←"),
-                KeyCode::ArrowRight => print!("→"),
+                KeyCode::ArrowUp => crate::print!("↑"),
+                KeyCode::ArrowDown => crate::print!("↓"),
+                KeyCode::ArrowLeft => crate::print!("←"),
+                KeyCode::ArrowRight => crate::print!("→"),
                 _ => (), // Ignore other special keys
             }
         }
@@ -36,5 +35,5 @@ fn handle_keyevent(key: DecodedKey) {
 }
 
 pub fn initialize() {
-    println!("Keyboard initialized");
+    crate::println!("Keyboard initialized");
 }
