@@ -2,6 +2,7 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use crate::vga_buffer::Color;
 
+
 pub struct ColorManager {
     system_color: Color,
     input_color: Color,

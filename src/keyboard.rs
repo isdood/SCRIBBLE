@@ -3,7 +3,7 @@ use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::interrupts;
-use crate::vga_buffer::{Color, set_color, WRITER};
+use crate::vga_buffer::{Color, set_color};
 use crate::{print, println};
 
 lazy_static! {
@@ -12,18 +12,11 @@ lazy_static! {
 }
 
 pub fn initialize() {
-    use x86_64::instructions::port::Port;
-    use pic8259::ChainedPics;
-    use spin::Mutex;
-    use crate::interrupts::PICS;
-
-    unsafe {
-        PICS.lock()
-        .initialize();
-    }
+    // We can remove the unused imports and empty the function body
+    // as the initialization is now handled in the interrupts module
 }
 
-pub(crate) fn add_scancode(scancode: u8) {
+pub fn add_scancode(scancode: u8) {
     if let Ok(Some(key_event)) = KEYBOARD.lock().add_byte(scancode) {
         if let Some(key) = KEYBOARD.lock().process_keyevent(key_event) {
             handle_keyevent(key);
@@ -35,7 +28,6 @@ fn handle_keyevent(key: DecodedKey) {
     match key {
         DecodedKey::Unicode(character) => {
             interrupts::without_interrupts(|| {
-                // Set color before printing each character
                 match character {
                     '\n' => {
                         println!();
