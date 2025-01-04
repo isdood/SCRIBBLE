@@ -22,7 +22,7 @@ pub enum Color {
     LightBlue = 9,
     LightGreen = 10,
     LightCyan = 11,
-    LightRed = 12,
+    LightRed = 12, // Representing Orange
     Pink = 13,
     Yellow = 14,
     White = 15,
