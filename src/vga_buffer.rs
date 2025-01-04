@@ -71,12 +71,38 @@ impl Writer {
     pub fn backspace(&mut self) {
         if self.column_position > 0 {
             self.column_position -= 1;
-            self.buffer.chars[self.row_position][self.column_position].write(
-                ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
+            let color_code = self.color_code;
+            let col = self.column_position;
+
+            // Get the current row (last row)
+            let row = BUFFER_HEIGHT - 1;
+
+            // Write space character at current position
+            self.buffer.chars[row][col].write(ScreenChar {
+                ascii_character: b' ',
+                color_code,
+            });
+        }
+    }
+
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
                 }
-            );
+
+                let row = BUFFER_HEIGHT - 1;
+                let col = self.column_position;
+
+                let color_code = self.color_code;
+                self.buffer.chars[row][col].write(ScreenChar {
+                    ascii_character: byte,
+                    color_code,
+                });
+                self.column_position += 1;
+            }
         }
     }
 
