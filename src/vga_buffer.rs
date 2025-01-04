@@ -2,6 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
+use core::sync::atomic::{AtomicU8, Ordering};
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -28,17 +29,9 @@ pub enum Color {
     White = 15,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct ColorCode(u8);
-
-impl ColorCode {
-    pub fn new(foreground: Color, background: Color) -> ColorCode {
-        ColorCode((background as u8) << 4 | (foreground as u8))
-    }
-
-    pub fn get_foreground(&self) -> Color {
-        match self.0 & 0x0F {
+impl Color {
+    fn from_u8(value: u8) -> Color {
+        match value & 0x0F {
             0 => Color::Black,
             1 => Color::Blue,
             2 => Color::Green,
@@ -57,6 +50,44 @@ impl ColorCode {
             _ => Color::White,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct ColorCode(u8);
+
+impl ColorCode {
+    pub fn new(foreground: Color, background: Color) -> ColorCode {
+        ColorCode((background as u8) << 4 | (foreground as u8))
+    }
+
+    pub fn get_foreground(&self) -> Color {
+        Color::from_u8(self.0 & 0x0F)
+    }
+
+    pub fn get_background(&self) -> Color {
+        Color::from_u8((self.0 >> 4) & 0x0F)
+    }
+}
+
+struct ColorState {
+    system_color: AtomicU8,
+    input_color: AtomicU8,
+    current_color: AtomicU8,
+}
+
+impl ColorState {
+    const fn new() -> Self {
+        Self {
+            system_color: AtomicU8::new(Color::White as u8),
+            input_color: AtomicU8::new(Color::Yellow as u8),
+            current_color: AtomicU8::new(Color::White as u8),
+        }
+    }
+}
+
+lazy_static! {
+    static ref COLOR_STATE: ColorState = ColorState::new();
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,10 +110,22 @@ pub struct Writer {
 
 impl Writer {
     pub fn change_color(&mut self, foreground: Color, background: Color) {
-        let old_color = self.color_code;
+        let old_color = self.color_code.get_foreground();
         self.color_code = ColorCode::new(foreground, background);
+        COLOR_STATE.current_color.store(foreground as u8, Ordering::SeqCst);
+
         use crate::serial_println;
-        serial_println!("Color changed from {:?} to {:?}", old_color.get_foreground(), foreground);
+        serial_println!("Color changed from {:?} to {:?}", old_color, foreground);
+    }
+
+    pub fn set_system_color(&mut self) {
+        let fg = Color::from_u8(COLOR_STATE.system_color.load(Ordering::SeqCst));
+        self.change_color(fg, Color::Black);
+    }
+
+    pub fn set_input_color(&mut self) {
+        let fg = Color::from_u8(COLOR_STATE.input_color.load(Ordering::SeqCst));
+        self.change_color(fg, Color::Black);
     }
 
     pub fn write_byte(&mut self, byte: u8) {
@@ -152,6 +195,18 @@ pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        WRITER.lock().write_fmt(args).unwrap();
+        let mut writer = WRITER.lock();
+        writer.set_system_color();
+        writer.write_fmt(args).unwrap();
+    });
+}
+
+pub fn _print_input(args: fmt::Arguments) {
+    use core::fmt::Write;
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.set_input_color();
+        writer.write_fmt(args).unwrap();
     });
 }

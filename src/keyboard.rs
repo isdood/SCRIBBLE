@@ -56,7 +56,8 @@ pub fn add_scancode(scancode: u8) {
     process_keyboard();
 }
 
-fn process_keyboard() {
+// In keyboard.rs
+pub fn process_keyboard() {
     while let Some(scancode) = SCANCODE_QUEUE.lock().pop() {
         let mut keyboard = KEYBOARD.lock();
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
@@ -65,7 +66,7 @@ fn process_keyboard() {
 
                 x86_64::instructions::interrupts::without_interrupts(|| {
                     let mut writer = WRITER.lock();
-                    writer.change_color(Color::Yellow, Color::Black);
+                    writer.set_input_color();  // Use the new method
 
                     match key {
                         DecodedKey::Unicode(character) => {
