@@ -1,9 +1,9 @@
-use x86_64::instructions::port::Port;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::vga_buffer::{Color, WRITER};
-use crate::{print, println, serial_println};
+use crate::vga_buffer::WRITER;
+use crate::println;
+use x86_64::instructions::interrupts;
 
 const QUEUE_SIZE: usize = 100;
 
@@ -56,30 +56,35 @@ pub fn add_scancode(scancode: u8) {
     process_keyboard();
 }
 
-// In keyboard.rs
-pub fn process_keyboard() {
+fn process_keyboard() {
     while let Some(scancode) = SCANCODE_QUEUE.lock().pop() {
         let mut keyboard = KEYBOARD.lock();
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
                 drop(keyboard);
-
-                x86_64::instructions::interrupts::without_interrupts(|| {
-                    let mut writer = WRITER.lock();
-                    writer.set_input_color();  // Use the new method
-
-                    match key {
-                        DecodedKey::Unicode(character) => {
-                            writer.write_byte(character as u8);
-                        },
-                        DecodedKey::RawKey(_key) => {
-                            writer.write_byte(b'#');
-                        },
-                    }
-                });
+                handle_keyevent(key);
             }
         }
     }
 }
 
-// Rest of the keyboard.rs implementation remains the same...
+fn handle_keyevent(key: DecodedKey) {
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        match key {
+            DecodedKey::Unicode(character) => {
+                writer.write_byte(character as u8);
+            },
+            DecodedKey::RawKey(_key) => {
+                writer.write_byte(b'#');
+            },
+        }
+    });
+}
+
+// Add the init function
+pub fn initialize() {
+    println!("Initializing keyboard...");
+    // No need for explicit port initialization in QEMU
+    println!("Keyboard initialization complete");
+}
