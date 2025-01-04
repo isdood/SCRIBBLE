@@ -16,8 +16,7 @@ pub fn add_scancode(scancode: u8) {
 
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
-            vga_buffer::set_color(Color::Green, Color::Black);
-
+            // Remove the color change here
             match key {
                 DecodedKey::Unicode(character) => {
                     if character == '\u{0008}' {  // Backspace character

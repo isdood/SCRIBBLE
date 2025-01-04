@@ -73,76 +73,29 @@ impl Writer {
                     color_code: self.color_code,
                 };
 
-                // Clear everything above the last row
-                for r in 0..BUFFER_HEIGHT - 1 {
-                    self.clear_current_row(r);
-                }
-
+                // Remove the clearing of previous rows to keep boot messages
                 self.buffer.chars[row][col].write(colored_char);
                 self.column_position += 1;
             }
         }
     }
 
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
+    fn move_to_next_line(&mut self) {
+        for row in 1..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                let character = self.buffer.chars[row][col].read();
+                self.buffer.chars[row - 1][col].write(character);
             }
         }
-    }
-
-    pub fn clear_current_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
-    }
-
-    pub fn move_to_next_line(&mut self) {
-        // Clear the row above the last row
-        for row in 0..BUFFER_HEIGHT - 1 {
-            self.clear_current_row(row);
-        }
-        // Clear the last row
         self.clear_current_row(BUFFER_HEIGHT - 1);
         self.column_position = 0;
     }
 
-    pub fn change_color(&mut self, foreground: Color, background: Color) {
-        self.color_code = ColorCode::new(foreground, background);
-    }
-
-    pub fn backspace(&mut self) {
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let color_code = self.color_code;
-            let col = self.column_position;
-
-            let row = BUFFER_HEIGHT - 1;
-            self.buffer.chars[row][col].write(ScreenChar {
-                ascii_character: b' ',
-                color_code,
-            });
-        }
-    }
-
     pub fn init_cursor_position(&mut self) {
-        for row in 0..BUFFER_HEIGHT {
-            self.clear_current_row(row);
-        }
+        // Instead of clearing everything, just move to the last row
         self.column_position = 0;
-    }
-}
-
-impl fmt::Write for Writer {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
-        Ok(())
+        // Clear only the last row
+        self.clear_current_row(BUFFER_HEIGHT - 1);
     }
 }
 
@@ -150,6 +103,7 @@ lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new({
         let mut writer = Writer {
             column_position: 0,
+            // Keep the default white on black color
             color_code: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
         };
