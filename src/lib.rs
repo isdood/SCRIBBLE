@@ -1,5 +1,6 @@
-#![no_std] // Add this at the top to indicate we're not using std
-#![no_main] // Add this since we're writing an OS
+#![no_std]
+#![no_main]
+#![feature(abi_x86_interrupt)]  // Add this to enable x86-interrupt ABI
 
 use bootloader::BootInfo;
 use core::panic::PanicInfo;
@@ -13,7 +14,7 @@ mod allocator;
 mod keyboard;
 
 // Re-export macros
-pub use vga_buffer::{print, println};
+pub use crate::vga_buffer::{print, println};
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -63,7 +64,7 @@ pub fn init(boot_info: &'static BootInfo) {
     // Memory management
     set_color(Color::LightBlue, Color::Black);
     print!("Setting up memory management... ");
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset.unwrap());  // Use unwrap()
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
