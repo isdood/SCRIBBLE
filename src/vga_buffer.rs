@@ -58,32 +58,25 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn write_byte(&mut self, byte: u8) {  // Make public
-        match byte {
-            b'\n' => self.new_line(),
-            b'\r' => self.column_position = 0,
-            b'\t' => {
-                for _ in 0..4 {
-                    self.write_byte(b' ');
-                }
-            },
-            b'\x08' => self.backspace(),
-            byte => {
-                if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
-                }
+    // ... existing methods ...
 
-                let row = BUFFER_HEIGHT - 1;
-                let col = self.column_position;
+    pub fn get_column_position(&self) -> usize {
+        self.column_position
+    }
 
-                let color_code = self.color_code;
-                self.buffer.chars[row][col].write(ScreenChar {
-                    ascii_character: byte,
-                    color_code,
-                });
-                self.column_position += 1;
-                self.update_cursor();
-            }
+    pub fn set_column_position(&mut self, position: usize) {
+        self.column_position = position;
+    }
+
+    pub fn backspace(&mut self) {
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            self.buffer.chars[self.row_position][self.column_position].write(
+                ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                }
+            );
         }
     }
 

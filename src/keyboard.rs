@@ -12,23 +12,16 @@ lazy_static::lazy_static! {
 }
 
 pub fn add_scancode(scancode: u8) {
-    let mut keyboard = KEYBOARD.lock(); // Lock the keyboard once
+    let mut keyboard = KEYBOARD.lock();
 
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
-            // Set color to green for user input
             vga_buffer::set_color(Color::Green, Color::Black);
 
             match key {
                 DecodedKey::Unicode(character) => {
                     if character == '\u{0008}' {  // Backspace character
-                        // Lock writer to handle backspace
-                        let mut writer = WRITER.lock();
-                        if writer.column_position() > 0 {
-                            writer.set_column_position(writer.column_position() - 1);
-                            writer.write_byte(b' ');
-                            writer.set_column_position(writer.column_position() - 1);
-                        }
+                        WRITER.lock().backspace();
                     } else {
                         print!("{}", character);
                     }
