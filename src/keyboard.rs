@@ -21,7 +21,17 @@ pub fn add_scancode(scancode: u8) {
 
             match key {
                 DecodedKey::Unicode(character) => {
-                    print!("{}", character);
+                    if character == '\u{0008}' {  // Backspace character
+                        // Lock writer to handle backspace
+                        let mut writer = WRITER.lock();
+                        if writer.column_position() > 0 {
+                            writer.set_column_position(writer.column_position() - 1);
+                            writer.write_byte(b' ');
+                            writer.set_column_position(writer.column_position() - 1);
+                        }
+                    } else {
+                        print!("{}", character);
+                    }
                 },
                 DecodedKey::RawKey(key) => {
                     match key {
