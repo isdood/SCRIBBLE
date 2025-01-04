@@ -3,7 +3,6 @@
 #![no_main]
 
 use bootloader::{entry_point, BootInfo};
-use core::panic::PanicInfo;
 use scribble::{println, hlt_loop};
 
 entry_point!(kernel_main);
@@ -14,11 +13,5 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("\nWelcome to Scribble OS!");
 
     // Loop indefinitely
-    hlt_loop();
-}
-
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
     hlt_loop();
 }
