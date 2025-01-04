@@ -4,8 +4,8 @@
 
 use bootloader::BootInfo;
 use core::panic::PanicInfo;
+use crate::vga_buffer::{Color, set_color, clear_screen};
 
-// Make vga_buffer public
 pub mod vga_buffer;
 mod gdt;
 mod interrupts;
@@ -13,7 +13,6 @@ mod memory;
 mod allocator;
 mod keyboard;
 
-// Add the hlt_loop function
 pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
@@ -27,9 +26,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 pub fn init(boot_info: &'static BootInfo) {
-    use x86_64::instructions::interrupts;
     use crate::interrupts::{init_idt, PICS};
-    use crate::vga_buffer::{Color, set_color, clear_screen};
     use x86_64::VirtAddr;
 
     // Clear the screen first

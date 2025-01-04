@@ -1,7 +1,6 @@
 // src/keyboard.rs
 use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts, KeyCode};
 use crate::{print, println};
-use x86_64::instructions::port::Port;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -41,9 +40,5 @@ fn handle_keyevent(key: DecodedKey) {
 }
 
 pub fn initialize() {
-    use x86_64::structures::idt::InterruptDescriptorTable;
-    use crate::interrupts::InterruptIndex;
-    use lazy_static::lazy_static;
-
     println!("Initializing keyboard...");
 }
