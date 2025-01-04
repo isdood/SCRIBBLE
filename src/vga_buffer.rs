@@ -172,17 +172,6 @@ lazy_static! {
     });
 }
 
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
@@ -198,7 +187,6 @@ pub fn set_color(foreground: Color, background: Color) {
 
 pub fn clear_screen() {
     let mut writer = WRITER.lock();
-    // Clear all rows
     for row in 0..BUFFER_HEIGHT {
         writer.clear_row(row);
     }
