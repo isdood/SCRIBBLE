@@ -2,7 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::println; // Import the println macro
+use crate::println;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -36,6 +36,26 @@ struct ColorCode(u8);
 impl ColorCode {
     fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
+    }
+
+    fn foreground(&self) -> Color {
+        match self.0 & 0x0F {
+            0 => Color::Black, 1 => Color::Blue, 2 => Color::Green, 3 => Color::Cyan,
+            4 => Color::Red, 5 => Color::Magenta, 6 => Color::Brown, 7 => Color::LightGray,
+            8 => Color::DarkGray, 9 => Color::LightBlue, 10 => Color::LightGreen, 11 => Color::LightCyan,
+            12 => Color::LightRed, 13 => Color::Pink, 14 => Color::Yellow, 15 => Color::White,
+            _ => Color::White,
+        }
+    }
+
+    fn background(&self) -> Color {
+        match (self.0 & 0xF0) >> 4 {
+            0 => Color::Black, 1 => Color::Blue, 2 => Color::Green, 3 => Color::Cyan,
+            4 => Color::Red, 5 => Color::Magenta, 6 => Color::Brown, 7 => Color::LightGray,
+            8 => Color::DarkGray, 9 => Color::LightBlue, 10 => Color::LightGreen, 11 => Color::LightCyan,
+            12 => Color::LightRed, 13 => Color::Pink, 14 => Color::Yellow, 15 => Color::White,
+            _ => Color::Black,
+        }
     }
 }
 
@@ -111,11 +131,15 @@ impl Writer {
 
     pub fn set_color(&mut self, foreground: Color, background: Color) {
         self.color_code = ColorCode::new(foreground, background);
-        println!("Color set to foreground: {:?}, background: {:?}", foreground, background); // Debug statement
+        println!("Color set to foreground: {:?}, background: {:?}", foreground, background);
     }
 
     pub fn print_current_color(&self) {
-        println!("Current color - {:?}", self.color_code);
+        println!(
+            "Current color - foreground: {:?}, background: {:?}",
+            self.color_code.foreground(),
+                 self.color_code.background()
+        );
     }
 }
 
@@ -129,7 +153,7 @@ impl fmt::Write for Writer {
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        color_code: ColorCode::new(Color::White, Color::Black), // Set default text color to white
+        color_code: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }

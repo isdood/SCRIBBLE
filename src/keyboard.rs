@@ -3,7 +3,7 @@ use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::{print, println, vga_buffer::{Color, WRITER}}; // Import Color and WRITER here
+use crate::{print, println, vga_buffer::{Color, WRITER}};
 
 const QUEUE_SIZE: usize = 100;
 
@@ -78,7 +78,7 @@ fn process_keyboard() {
                 {
                     let mut writer = WRITER.lock();
                     writer.set_color(Color::LightRed, Color::Black);
-                    writer.print_current_color(); // Debug statement
+                    println!("Set color to LightRed"); // Debug statement
                 }
 
                 match key {
@@ -93,7 +93,7 @@ fn process_keyboard() {
                 {
                     let mut writer = WRITER.lock();
                     writer.set_color(Color::White, Color::Black);
-                    writer.print_current_color(); // Debug statement
+                    println!("Reset color to White"); // Debug statement
                 }
             }
         }
