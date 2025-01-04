@@ -54,7 +54,7 @@ pub fn init(boot_info: &'static BootInfo) {
     println!("OK");
 
     // PIC initialization in Magenta
-    set_color(Color::LightMagenta, Color::Black);
+    set_color(Color::Magenta, Color::Black);
     print!("Configuring PIC... ");
     unsafe {
         PICS.lock().initialize();
