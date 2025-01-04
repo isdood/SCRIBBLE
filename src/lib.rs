@@ -1,42 +1,87 @@
-// In lib.rs, update the init function
+#![no_std] // Add this at the very top to indicate no standard library
+#![feature(custom_test_frameworks)]
+#![feature(abi_x86_interrupt)]
+#![feature(alloc_error_handler)]
+#![test_runner(crate::test_runner)]
+#![reexport_test_harness_main = "test_main"]
+
+extern crate alloc;
+
+// Add all necessary imports at the top
+use bootloader::BootInfo;
+use core::panic::PanicInfo;
+use x86_64::VirtAddr;
+
+// Declare modules
+pub mod vga_buffer;
+pub mod interrupts;
+pub mod gdt;
+pub mod keyboard;
+pub mod serial;
+pub mod memory;
+pub mod allocator;
+
+// Re-export macros
+pub use crate::vga_buffer::{print, println};
+pub use crate::serial::{serial_print, serial_println};
+
+#[alloc_error_handler]
+fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
+    panic!("allocation error: {:?}", layout)
+}
+
 pub fn init(boot_info: &'static BootInfo) {
     use x86_64::instructions::interrupts;
-    use crate::interrupts::{init_idt, PICS}; // Add these imports at the top of the function
+    use crate::interrupts::{init_idt, PICS};
 
-    println!("=== Scribble OS ===");
-    println!("Initializing system...");
+    println!("\n=== Scribble OS ===");
+    println!("Starting initialization sequence...\n");
 
-    println!("Loading GDT...");
+    // Initialize GDT first as it's required for interrupt handling
+    print!("Loading GDT... ");
     gdt::init();
+    println!("OK");
 
-    println!("Setting up IDT...");
-    init_idt(); // Use the imported function
+    // Set up the Interrupt Descriptor Table
+    print!("Setting up IDT... ");
+    init_idt();
+    println!("OK");
 
-    println!("Configuring PIC...");
+    // Configure the Programmable Interrupt Controller
+    print!("Configuring PIC... ");
     unsafe {
-        PICS.lock().initialize(); // Use the imported PICS
+        PICS.lock().initialize();
     }
+    println!("OK");
 
-    // Rest of the initialization remains the same...
-    println!("Setting up memory management...");
+    // Initialize memory management
+    print!("Setting up memory management... ");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
+    println!("OK");
 
-    println!("Initializing heap...");
-    allocator::init_heap(&mut mapper, &mut frame_allocator)
-    .expect("heap initialization failed");
+    // Initialize heap allocator
+    print!("Initializing heap... ");
+    if let Err(err) = allocator::init_heap(&mut mapper, &mut frame_allocator) {
+        println!("FAILED");
+        panic!("Heap initialization failed: {:?}", err);
+    }
+    println!("OK");
 
-    println!("Initializing keyboard...");
+    // Initialize keyboard handler
+    print!("Setting up keyboard handler... ");
     keyboard::initialize();
+    println!("OK");
 
-    // Enable interrupts after all initialization is complete
-    println!("Enabling interrupts...");
+    // Enable interrupts last, after all initialization is complete
+    print!("Enabling interrupts... ");
     interrupts::enable();
+    println!("OK");
 
-    println!("System initialization complete!");
+    println!("\nSystem initialization complete!\n");
 }
 
 pub fn hlt_loop() -> ! {
@@ -56,7 +101,7 @@ fn test_runner(tests: &[&dyn Fn()]) {
 #[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
+    println!("\nPANIC: {}", info);
     hlt_loop();
 }
 
