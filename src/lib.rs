@@ -1,57 +1,7 @@
-// lib.rs
-#![no_std]
-#![feature(custom_test_frameworks)]
-#![feature(abi_x86_interrupt)]
-#![feature(alloc_error_handler)]
-#![test_runner(crate::test_runner)]
-#![reexport_test_harness_main = "test_main"]
-
-extern crate alloc;
-
-use x86_64::VirtAddr;
-use core::panic::PanicInfo;
-use bootloader::BootInfo;
-
-pub mod vga_buffer;
-pub mod interrupts;
-pub mod gdt;
-pub mod keyboard;
-pub mod serial;
-pub mod memory;
-pub mod allocator;
-
-#[alloc_error_handler]
-fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
-    panic!("allocation error: {:?}", layout)
-}
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! serial_print {
-    ($($arg:tt)*) => ($crate::serial::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! serial_println {
-    () => ($crate::serial_print!("\n"));
-    ($fmt:expr) => ($crate::serial_print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => ($crate::serial_print!(
-        concat!($fmt, "\n"), $($arg)*));
-}
-
-// Make init function public and export it
+// In lib.rs, update the init function
 pub fn init(boot_info: &'static BootInfo) {
     use x86_64::instructions::interrupts;
+    use crate::interrupts::{init_idt, PICS}; // Add these imports at the top of the function
 
     println!("=== Scribble OS ===");
     println!("Initializing system...");
@@ -60,13 +10,14 @@ pub fn init(boot_info: &'static BootInfo) {
     gdt::init();
 
     println!("Setting up IDT...");
-    interrupts::init_idt();
+    init_idt(); // Use the imported function
 
     println!("Configuring PIC...");
     unsafe {
-        interrupts::PICS.lock().initialize();
+        PICS.lock().initialize(); // Use the imported PICS
     }
 
+    // Rest of the initialization remains the same...
     println!("Setting up memory management...");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
@@ -80,6 +31,10 @@ pub fn init(boot_info: &'static BootInfo) {
 
     println!("Initializing keyboard...");
     keyboard::initialize();
+
+    // Enable interrupts after all initialization is complete
+    println!("Enabling interrupts...");
+    interrupts::enable();
 
     println!("System initialization complete!");
 }
