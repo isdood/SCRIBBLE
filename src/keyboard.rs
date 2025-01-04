@@ -21,24 +21,19 @@ pub fn add_scancode(scancode: u8) {
             x86_64::instructions::interrupts::without_interrupts(|| {
                 let mut writer = WRITER.lock();
 
-                // Use the public method instead of accessing the private field
-                let current_color = writer.get_foreground_color();
-                serial_println!("Current color before input: {:?}", current_color);
-
-                // Change to yellow for keyboard input
+                // Set yellow color for keyboard input
                 writer.change_color(Color::Yellow, Color::Black);
 
                 match key {
                     DecodedKey::Unicode(character) => {
                         writer.write_byte(character as u8);
+                        serial_println!("Wrote character '{}' in Yellow", character);
                     },
                     DecodedKey::RawKey(_key) => {
                         writer.write_byte(b'#');
+                        serial_println!("Wrote '#' in Yellow");
                     },
                 }
-
-                // Change back to white for system text
-                writer.change_color(Color::White, Color::Black);
             });
         }
     }
@@ -74,23 +69,27 @@ pub fn init() {
         let mut cmd_port: Port<u8> = Port::new(0x64);
         let mut data_port: Port<u8> = Port::new(0x60);
 
+        // Disable PS/2 ports
         cmd_port.write(0xAD);
         cmd_port.write(0xA7);
 
+        // Flush output buffer
         while (cmd_port.read() & 1) == 1 {
             data_port.read();
         }
 
+        // Configure controller
         cmd_port.write(0x20);
         let mut config = data_port.read();
-        config |= 1 << 0;
-        config &= !(1 << 1);
+        config |= 1 << 0;    // Enable first PS/2 port interrupt
+        config &= !(1 << 1); // Disable second PS/2 port
         cmd_port.write(0x60);
         data_port.write(config);
 
-        cmd_port.write(0xAE);
-        data_port.write(0xFF);
-        data_port.write(0xF4);
+        // Enable devices
+        cmd_port.write(0xAE);  // Enable first PS/2 port
+        data_port.write(0xFF); // Reset keyboard
+        data_port.write(0xF4); // Enable scanning
 
         println!("Keyboard initialization complete");
     }

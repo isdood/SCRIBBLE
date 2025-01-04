@@ -36,27 +36,6 @@ impl ColorCode {
     fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
-
-    fn get_foreground(&self) -> Color {
-        match self.0 & 0x0F {
-            0 => Color::Black,
-            1 => Color::Blue,
-            2 => Color::Green,
-            3 => Color::Cyan,
-            4 => Color::Red,
-            5 => Color::Magenta,
-            6 => Color::Brown,
-            7 => Color::LightGray,
-            8 => Color::DarkGray,
-            9 => Color::LightBlue,
-            10 => Color::LightGreen,
-            11 => Color::LightCyan,
-            12 => Color::LightRed,
-            13 => Color::Pink,
-            14 => Color::Yellow,
-            _ => Color::White,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,53 +56,56 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
-// ... (keep all the existing code until the Writer impl block)
-
 impl Writer {
-    pub fn get_foreground_color(&self) -> Color {
-        self.color_code.get_foreground()
-    }
-
     pub fn change_color(&mut self, foreground: Color, background: Color) {
-        let old_color = self.color_code.get_foreground();
+        let old_color = self.color_code;
         self.color_code = ColorCode::new(foreground, background);
-
-        // Add more detailed debugging
         use crate::serial_println;
-        serial_println!("Color changed from {:?} to {:?} at position {}",
-                        old_color, foreground, self.column_position);
+        serial_println!("Color changed to {:?}", foreground);
     }
 
     pub fn write_byte(&mut self, byte: u8) {
-        // Get current color before writing
-        let current_color = self.color_code;
-
         match byte {
-            b'\n' => self.new_line(),
+            b'\n' => self.move_to_next_line(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
+                    self.move_to_next_line();
                 }
 
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-                // Use the current color explicitly
-                self.buffer.chars[row][col].write(ScreenChar {
+                let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code: current_color,  // Use the current color
-                });
-                self.column_position += 1;
+                    color_code: self.color_code,
+                };
 
-                // Debug output
-                use crate::serial_println;
-                serial_println!("Wrote byte '{}' with color {:?} at position {}",
-                                byte as char, current_color.get_foreground(), self.column_position - 1);
+                self.buffer.chars[row][col].write(colored_char);
+                self.column_position += 1;
             }
         }
     }
 
-    // ... (keep the rest of the Writer implementation)
+    fn move_to_next_line(&mut self) {
+        for row in 1..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                let character = self.buffer.chars[row][col].read();
+                self.buffer.chars[row - 1][col].write(character);
+            }
+        }
+        self.clear_row(BUFFER_HEIGHT - 1);
+        self.column_position = 0;
+    }
+
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
+        }
+    }
 }
 
 impl fmt::Write for Writer {
@@ -149,7 +131,8 @@ lazy_static! {
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
-    x86_64::instructions::interrupts::without_interrupts(|| {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
     });
 }
