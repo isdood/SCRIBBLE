@@ -1,5 +1,5 @@
 // src/vga_buffer.rs
-use core::fmt;
+use core::fmt::{self, Write};
 use lazy_static::lazy_static;
 use spin::Mutex;
 use volatile::Volatile;
@@ -138,4 +138,45 @@ impl Writer {
     }
 }
 
-// Rest of the file remains the same...
+lazy_static! {
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        color_code: ColorCode::new(Color::White, Color::Black),
+                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    });
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
+
+#[doc(hidden)]
+pub fn _print(args: fmt::Arguments) {
+    use core::fmt::Write;
+    use x86_64::instructions::interrupts;
+
+    interrupts::without_interrupts(|| {
+        WRITER.lock().write_fmt(args).unwrap();
+    });
+}
+
+pub fn set_color(foreground: Color, background: Color) {
+    WRITER.lock().color_code = ColorCode::new(foreground, background);
+}
+
+pub fn clear_screen() {
+    let mut writer = WRITER.lock();
+    for row in 0..BUFFER_HEIGHT {
+        writer.clear_row(row);
+    }
+    writer.column_position = 0;
+    writer.update_cursor();
+}
+

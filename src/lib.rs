@@ -5,7 +5,7 @@
 
 use bootloader::BootInfo;
 use core::panic::PanicInfo;
-use crate::vga_buffer::{Color, set_color, clear_screen};
+use vga_buffer::{Color, set_color, clear_screen};
 
 pub mod vga_buffer;
 mod gdt;
@@ -13,6 +13,20 @@ mod interrupts;
 mod memory;
 mod allocator;
 mod keyboard;
+
+#[macro_use]
+pub mod macros {
+    #[macro_export]
+    macro_rules! print {
+        ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+    }
+
+    #[macro_export]
+    macro_rules! println {
+        () => ($crate::print!("\n"));
+        ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+    }
+}
 
 pub fn hlt_loop() -> ! {
     loop {
@@ -27,8 +41,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 pub fn init(boot_info: &'static BootInfo) {
-    use crate::interrupts::{init_idt, PICS};
-    use x86_64::VirtAddr;
+    use crate::interrupts::PICS;
 
     // Clear the screen first
     clear_screen();
@@ -49,7 +62,7 @@ pub fn init(boot_info: &'static BootInfo) {
     // IDT initialization
     set_color(Color::LightCyan, Color::Black);
     print!("Setting up IDT... ");
-    init_idt();
+    interrupts::init_idt();
     set_color(Color::Green, Color::Black);
     println!("OK");
 

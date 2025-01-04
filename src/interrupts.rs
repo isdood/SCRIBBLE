@@ -68,3 +68,7 @@ extern "x86-interrupt" fn double_fault_handler(
             idt
         };
     }
+
+pub fn init_idt() {
+    IDT.load();
+}
