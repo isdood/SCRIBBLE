@@ -74,7 +74,36 @@ impl Writer {
                 _ => self.write_byte(0xfe),
             }
         }
-    }}
+    }
+
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.new_line(),
+            b'\r' => self.column_position = 0,
+            b'\t' => {
+                for _ in 0..4 {
+                    self.write_byte(b' ');
+                }
+            },
+            b'\x08' => self.backspace(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let row = BUFFER_HEIGHT - 1;
+                let col = self.column_position;
+
+                let color_code = self.color_code;
+                self.buffer.chars[row][col].write(ScreenChar {
+                    ascii_character: byte,
+                    color_code,
+                });
+                self.column_position += 1;
+                self.update_cursor();
+            }
+        }
+    }
 
     fn backspace(&mut self) {
         if self.column_position > 0 {
@@ -135,14 +164,6 @@ lazy_static! {
     });
 }
 
-#[doc(hidden)]
-pub fn _print(args: fmt::Arguments) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().write_fmt(args).unwrap();
-    });
-}
-
 pub fn set_color(foreground: Color, background: Color) {
     WRITER.lock().color_code = ColorCode::new(foreground, background);
 }
@@ -156,3 +177,10 @@ pub fn clear_screen() {
     writer.update_cursor();
 }
 
+#[doc(hidden)]
+pub fn _print(args: fmt::Arguments) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().write_fmt(args).unwrap();
+    });
+}
