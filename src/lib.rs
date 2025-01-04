@@ -1,9 +1,32 @@
-// src/lib.rs
+#![no_std] // Add this at the top to indicate we're not using std
+#![no_main] // Add this since we're writing an OS
+
+use bootloader::BootInfo;
+use core::panic::PanicInfo;
+
+// Import our modules
+mod vga_buffer;
+mod gdt;
+mod interrupts;
+mod memory;
+mod allocator;
+mod keyboard;
+
+// Re-export macros
+pub use vga_buffer::{print, println};
+
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    println!("{}", info);
+    loop {}
+}
+
 pub fn init(boot_info: &'static BootInfo) {
     use x86_64::instructions::interrupts;
     use crate::interrupts::{init_idt, PICS};
     use crate::vga_buffer::{Color, set_color, clear_screen};
     use x86_64::VirtAddr;
+    use core::result::Result::Err;
 
     // Clear the screen first
     clear_screen();
@@ -60,7 +83,7 @@ pub fn init(boot_info: &'static BootInfo) {
     println!("OK");
 
     // Keyboard initialization
-    set_color(Color::Pink, Color::Black);
+    set_color(Color::LightBlue, Color::Black); // Changed from Pink to LightBlue as Pink might not be in the Color enum
     print!("Setting up keyboard handler... ");
     keyboard::initialize();
     set_color(Color::Green, Color::Black);
@@ -78,6 +101,6 @@ pub fn init(boot_info: &'static BootInfo) {
     println!("\nSystem initialization complete!");
 
     // Reset to default color for user interaction
-    set_color(Color::LightGray, Color::Black);
+    set_color(Color::White, Color::Black); // Changed from LightGray to White as LightGray might not be in the Color enum
     println!("\nReady for input...\n");
 }
