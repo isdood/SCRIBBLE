@@ -3,15 +3,17 @@ use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts, Ke
 use crate::{print, println};
 use spin::Mutex;
 use lazy_static::lazy_static;
+use x86_64::instructions::port::Port;
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
-    Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore));
+    Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::MapLettersToUnicode));
 }
 
 pub fn add_scancode(scancode: u8) {
-    if let Ok(Some(key_event)) = KEYBOARD.lock().add_byte(scancode) {
-        if let Some(key) = KEYBOARD.lock().process_keyevent(key_event) {
+    let mut keyboard = KEYBOARD.lock();
+    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+        if let Some(key) = keyboard.process_keyevent(key_event) {
             handle_keyevent(key);
         }
     }
@@ -20,13 +22,8 @@ pub fn add_scancode(scancode: u8) {
 fn handle_keyevent(key: DecodedKey) {
     match key {
         DecodedKey::Unicode(character) => {
-            match character {
-                '\n' => println!(),
-                '\t' => print!("    "), // 4 spaces for tab
-                '\x08' => print!("\x08 \x08"), // Backspace: move back, print space, move back
-                character => print!("{}", character),
-            }
-        },
+            print!("{}", character);
+        }
         DecodedKey::RawKey(key) => {
             match key {
                 KeyCode::ArrowUp => print!("↑"),
@@ -40,5 +37,5 @@ fn handle_keyevent(key: DecodedKey) {
 }
 
 pub fn initialize() {
-    println!("Initializing keyboard...");
+    println!("Keyboard initialized");
 }

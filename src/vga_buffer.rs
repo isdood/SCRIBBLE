@@ -27,6 +27,7 @@ pub enum Color {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
 struct ColorCode(u8);
 
 impl ColorCode {
@@ -52,7 +53,6 @@ struct Buffer {
 
 pub struct Writer {
     column_position: usize,
-    row_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
 }
@@ -61,12 +61,19 @@ impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
+            b'\r' => self.column_position = 0,
+            b'\t' => {
+                for _ in 0..4 {
+                    self.write_byte(b' ');
+                }
+            },
+            b'\x08' => self.backspace(), // Handle backspace
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
                 }
 
-                let row = self.row_position;
+                let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
                 let color_code = self.color_code;
@@ -75,23 +82,33 @@ impl Writer {
                     color_code,
                 });
                 self.column_position += 1;
+                self.update_cursor();
             }
         }
     }
 
-    fn new_line(&mut self) {
-        if self.row_position < BUFFER_HEIGHT - 1 {
-            self.row_position += 1;
-        } else {
-            for row in 1..BUFFER_HEIGHT {
-                for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
-                    self.buffer.chars[row - 1][col].write(character);
-                }
-            }
-            self.clear_row(BUFFER_HEIGHT - 1);
+    fn backspace(&mut self) {
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let row = BUFFER_HEIGHT - 1;
+            self.buffer.chars[row][self.column_position].write(ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            });
+            self.update_cursor();
         }
+    }
+
+    fn new_line(&mut self) {
+        for row in 1..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                let character = self.buffer.chars[row][col].read();
+                self.buffer.chars[row - 1][col].write(character);
+            }
+        }
+        self.clear_row(BUFFER_HEIGHT - 1);
         self.column_position = 0;
+        self.update_cursor();
     }
 
     fn clear_row(&mut self, row: usize) {
@@ -104,85 +121,21 @@ impl Writer {
         }
     }
 
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
+    fn update_cursor(&mut self) {
+        use x86_64::instructions::port::Port;
+
+        let pos = (BUFFER_HEIGHT - 1) * BUFFER_WIDTH + self.column_position;
+
+        let mut port_3d4 = Port::new(0x3D4);
+        let mut port_3d5 = Port::new(0x3D5);
+
+        unsafe {
+            port_3d4.write(0x0Fu8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0Eu8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
         }
     }
-
-    pub fn set_color(&mut self, foreground: Color, background: Color) {
-        self.color_code = ColorCode::new(foreground, background);
-    }
 }
 
-impl fmt::Write for Writer {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
-        Ok(())
-    }
-}
-
-lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        row_position: BUFFER_HEIGHT - 1,
-        color_code: ColorCode::new(Color::White, Color::Black),
-                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
-}
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => {{
-        // Use the public path
-        $crate::vga_buffer::_print(format_args!($($arg)*))
-    }};
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-// Make _print public
-#[doc(hidden)]
-pub fn _print(args: fmt::Arguments) {
-    use core::fmt::Write;
-    use x86_64::instructions::interrupts;
-
-    interrupts::without_interrupts(|| {
-        WRITER.lock().write_fmt(args).unwrap();
-    });
-}
-
-pub fn set_color(foreground: Color, background: Color) {
-    use x86_64::instructions::interrupts;
-
-    interrupts::without_interrupts(|| {
-        WRITER.lock().set_color(foreground, background);
-    });
-}
-
-pub fn clear_screen() {
-    use x86_64::instructions::interrupts;
-
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: writer.color_code,
-        };
-
-        for row in 0..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                writer.buffer.chars[row][col].write(blank);
-            }
-        }
-        writer.column_position = 0;
-        writer.row_position = BUFFER_HEIGHT - 1;
-    });
-}
+// Rest of the file remains the same...

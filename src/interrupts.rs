@@ -55,23 +55,16 @@ extern "x86-interrupt" fn double_fault_handler(
         }
     }
 
-    // Then define the IDT with the handlers
+    // IDT initialization...
     lazy_static::lazy_static! {
         static ref IDT: InterruptDescriptorTable = {
             let mut idt = InterruptDescriptorTable::new();
             idt.breakpoint.set_handler_fn(breakpoint_handler);
-            unsafe {
-                idt.double_fault.set_handler_fn(double_fault_handler);
-            }
+            idt.double_fault.set_handler_fn(double_fault_handler);
             idt[InterruptIndex::Timer as usize]
             .set_handler_fn(timer_interrupt_handler);
             idt[InterruptIndex::Keyboard as usize]
             .set_handler_fn(keyboard_interrupt_handler);
             idt
         };
-    }
-
-    // Make init_idt public and implement it
-    pub fn init_idt() {
-        IDT.load();
     }
