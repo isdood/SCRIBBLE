@@ -75,6 +75,7 @@ impl Writer {
                     self.new_line();
                 }
 
+                // Write at current position (bottom row)
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
@@ -83,28 +84,23 @@ impl Writer {
                     color_code: self.color_code,
                 };
 
-                // Move everything up one line
-                for row in 1..BUFFER_HEIGHT {
-                    for col in 0..BUFFER_WIDTH {
-                        let character = self.buffer.chars[row][col].read();
-                        self.buffer.chars[row - 1][col].write(character);
-                    }
-                }
-
-                // Write at bottom
-                self.buffer.chars[BUFFER_HEIGHT - 1][col].write(colored_char);
+                // Write directly at the bottom row
+                self.buffer.chars[row][col].write(colored_char);
                 self.column_position += 1;
             }
         }
     }
 
     fn new_line(&mut self) {
+        // Copy each row up one line
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let character = self.buffer.chars[row][col].read();
                 self.buffer.chars[row - 1][col].write(character);
             }
         }
+
+        // Clear the bottom row
         self.clear_row(BUFFER_HEIGHT - 1);
         self.column_position = 0;
     }
@@ -151,6 +147,7 @@ lazy_static! {
     });
 }
 
+#[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
