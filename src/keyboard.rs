@@ -65,13 +65,6 @@ lazy_static! {
     static ref SCANCODE_QUEUE: KeyboardBuffer = KeyboardBuffer::new();
 }
 
-pub fn add_scancode(scancode: u8) {
-    if !SCANCODE_QUEUE.push(scancode) {
-        println!("WARNING: scancode queue full; dropping keyboard input");
-    }
-    process_keyboard();
-}
-
 fn process_keyboard() {
     while let Some(scancode) = SCANCODE_QUEUE.pop() {
         let mut keyboard = KEYBOARD.lock();
@@ -84,11 +77,8 @@ fn process_keyboard() {
                 x86_64::instructions::interrupts::without_interrupts(|| {
                     let mut writer = WRITER.lock();
 
-                    // Save the current color
-                    let current_color = writer.color_code;
-
-                    // Set to magenta (or any bright color) and ensure it's set
-                    writer.change_color(Color::Magenta, Color::Black);
+                    // Set to yellow color for keyboard input
+                    writer.change_color(Color::Yellow, Color::Black);
 
                     match key {
                         DecodedKey::Unicode(character) => {
@@ -102,8 +92,6 @@ fn process_keyboard() {
 
                     // Add a space after each character
                     writer.write_byte(b' ');
-
-                    // Don't restore the previous color - keep the new one
                 });
             }
         }
