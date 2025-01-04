@@ -25,41 +25,35 @@ pub fn add_scancode(scancode: u8) {
 }
 
 fn handle_keyevent(key: DecodedKey) {
-    match key {
-        DecodedKey::Unicode(character) => {
-            interrupts::without_interrupts(|| {
+    interrupts::without_interrupts(|| {
+        match key {
+            DecodedKey::Unicode(character) => {
                 match character {
                     '\n' => {
                         println!();
                     },
-                    // Special characters in cyan
                     '!' | '@' | '#' | '$' | '%' | '^' | '&' | '*' | '(' | ')' => {
                         set_color(Color::LightCyan, Color::Black);
                         print!("{}", character);
                     },
-                    // Numbers in yellow
                     '0'..='9' => {
                         set_color(Color::Yellow, Color::Black);
                         print!("{}", character);
                     },
-                    // Letters in light green
                     'a'..='z' | 'A'..='Z' => {
                         set_color(Color::LightGreen, Color::Black);
                         print!("{}", character);
                     },
-                    // Spaces and other characters in white
                     _ => {
                         set_color(Color::White, Color::Black);
                         print!("{}", character);
                     }
                 }
-            });
-        }
-        DecodedKey::RawKey(key) => {
-            interrupts::without_interrupts(|| {
+            },
+            DecodedKey::RawKey(key) => {
                 set_color(Color::LightRed, Color::Black);
                 print!("<{:?}>", key);
-            });
+            }
         }
-    }
+    });
 }

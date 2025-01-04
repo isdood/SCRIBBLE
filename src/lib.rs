@@ -33,6 +33,9 @@ pub fn init(boot_info: &'static BootInfo) {
     use crate::interrupts::{init_idt, PICS};
     use crate::vga_buffer::{Color, set_color};
 
+    // Clear the screen first
+    clear_screen();
+
     // Title in Yellow on Blue
     set_color(Color::Yellow, Color::Blue);
     println!("\n=== Scribble OS ===");
