@@ -26,6 +26,9 @@ pub enum Color {
     White = 15,
 }
 
+// src/vga_buffer.rs
+// ... previous imports and Color enum remain the same ...
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct ColorCode(u8);  // Make ColorCode public
@@ -93,6 +96,7 @@ lazy_static! {
 pub fn get_current_color() -> ColorCode {
     WRITER.lock().color_code
 }
+
 
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
