@@ -51,6 +51,28 @@ struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: writer.color_code,
+        };
+
+        for row in 0..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                writer.buffer.chars[row][col].write(blank);
+            }
+        }
+        writer.cursor_position = Position {
+            row: BUFFER_HEIGHT - 1,
+            col: 0,
+        };
+    });
+}
+
 pub struct Writer {
     column_position: usize,
     color_code: ColorCode,
