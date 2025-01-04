@@ -20,15 +20,8 @@ pub mod serial;
 pub mod memory;
 pub mod allocator;
 
-// Remove these re-exports as the macros are already exported via #[macro_export]
-// pub use crate::vga_buffer::{print, println};
-// pub use crate::serial::{serial_print, serial_println};
-
-// ... (rest of the code remains the same)
-
-// Re-export macros
-pub use crate::vga_buffer::{print, println};
-pub use crate::serial::{serial_print, serial_println};
+// Remove these re-exports since macros are already exported at crate root
+// The macros are automatically available due to #[macro_export]
 
 #[alloc_error_handler]
 fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
@@ -88,6 +81,8 @@ pub fn init(boot_info: &'static BootInfo) {
 
     println!("\nSystem initialization complete!\n");
 }
+
+// ... (rest of the code remains the same)
 
 pub fn hlt_loop() -> ! {
     loop {

@@ -190,17 +190,6 @@ lazy_static! {
     });
 }
 
-#[doc(hidden)]
-pub fn _print(args: fmt::Arguments) {
-    use core::fmt::Write;
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        writer.set_system_color();
-        writer.write_fmt(args).unwrap();
-    });
-}
-
 pub fn _print_input(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
