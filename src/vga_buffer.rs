@@ -139,6 +139,18 @@ impl Writer {
     pub fn set_column_position(&mut self, position: usize) {
         self.column_position = position;
     }
+
+    pub fn init_cursor_position(&mut self) {
+        // Clear all rows except the last one
+        for row in 0..BUFFER_HEIGHT - 1 {
+            self.clear_row(row);
+        }
+        // Position cursor at the start of the last row
+        self.column_position = 0;
+
+        // Ensure the last row is ready for input
+        self.clear_row(BUFFER_HEIGHT - 1);
+    }
 }
 
 impl fmt::Write for Writer {
@@ -149,11 +161,26 @@ impl fmt::Write for Writer {
 }
 
 lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        color_code: ColorCode::new(Color::White, Color::Black),
+    pub static ref WRITER: Mutex<Writer> = Mutex::new({
+        let mut writer = Writer {
+            column_position: 0,
+            color_code: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+        };
+        writer.init_cursor_position();
+        writer
     });
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
 #[doc(hidden)]
@@ -171,6 +198,7 @@ pub fn set_color(foreground: Color, background: Color) {
 
 pub fn clear_screen() {
     let mut writer = WRITER.lock();
+    // Clear all rows
     for row in 0..BUFFER_HEIGHT {
         writer.clear_row(row);
     }
