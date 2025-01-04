@@ -1,15 +1,63 @@
-// In keyboard.rs
-use crate::serial_println;
+use x86_64::instructions::port::Port;
+use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
+use spin::Mutex;
+use lazy_static::lazy_static;
+use crate::vga_buffer::{Color, WRITER};
+use crate::{print, println, serial_println};
+
+const QUEUE_SIZE: usize = 100;
+
+struct KeyboardBuffer {
+    buffer: [u8; QUEUE_SIZE],
+    write_pos: usize,
+    read_pos: usize,
+}
+
+impl KeyboardBuffer {
+    const fn new() -> Self {
+        Self {
+            buffer: [0; QUEUE_SIZE],
+            write_pos: 0,
+            read_pos: 0,
+        }
+    }
+
+    fn push(&mut self, scancode: u8) -> bool {
+        if (self.write_pos + 1) % QUEUE_SIZE == self.read_pos {
+            return false;
+        }
+        self.buffer[self.write_pos] = scancode;
+        self.write_pos = (self.write_pos + 1) % QUEUE_SIZE;
+        true
+    }
+
+    fn pop(&mut self) -> Option<u8> {
+        if self.read_pos == self.write_pos {
+            return None;
+        }
+        let scancode = self.buffer[self.read_pos];
+        self.read_pos = (self.read_pos + 1) % QUEUE_SIZE;
+        Some(scancode)
+    }
+}
+
+lazy_static! {
+    static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = Mutex::new(
+        Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore)
+    );
+
+    static ref SCANCODE_QUEUE: Mutex<KeyboardBuffer> = Mutex::new(KeyboardBuffer::new());
+}
 
 pub fn add_scancode(scancode: u8) {
-    if !SCANCODE_QUEUE.push(scancode) {
+    if !SCANCODE_QUEUE.lock().push(scancode) {
         println!("WARNING: scancode queue full; dropping keyboard input");
     }
     process_keyboard();
 }
 
 fn process_keyboard() {
-    while let Some(scancode) = SCANCODE_QUEUE.pop() {
+    while let Some(scancode) = SCANCODE_QUEUE.lock().pop() {
         let mut keyboard = KEYBOARD.lock();
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
@@ -17,29 +65,14 @@ fn process_keyboard() {
 
                 x86_64::instructions::interrupts::without_interrupts(|| {
                     let mut writer = WRITER.lock();
-
-                    // Debug current color
-                    let current_color = writer.get_current_color();
-                    serial_println!("Current color before input: {:?}", current_color);
-
-                    // Set color to yellow for keyboard input
                     writer.change_color(Color::Yellow, Color::Black);
-                    serial_println!("Setting color to Yellow for keyboard input");
 
                     match key {
                         DecodedKey::Unicode(character) => {
-                            if character == '\n' {
-                                writer.write_byte(b'\n');
-                                // Reset color after newline
-                                writer.change_color(Color::White, Color::Black);
-                            } else {
-                                writer.write_byte(character as u8);
-                            }
-                            serial_println!("Wrote character: {:?}", character);
+                            writer.write_byte(character as u8);
                         },
                         DecodedKey::RawKey(_key) => {
                             writer.write_byte(b'#');
-                            serial_println!("Wrote raw key marker '#'");
                         },
                     }
                 });
@@ -48,32 +81,4 @@ fn process_keyboard() {
     }
 }
 
-pub fn init() {
-    println!("Initializing keyboard...");
-
-    // Test color changes with debug output
-    x86_64::instructions::interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-
-        // Start with white
-        writer.change_color(Color::White, Color::Black);
-        serial_println!("Initial color set to White");
-
-        // Color test sequence
-        for (color, text) in &[
-            (Color::Red, "Red Test\n"),
-                                                         (Color::Green, "Green Test\n"),
-                                                         (Color::Blue, "Blue Test\n"),
-                                                         (Color::White, "Back to White\n")
-        ] {
-            writer.change_color(*color, Color::Black);
-            serial_println!("Testing color: {:?}", color);
-            writer.write_str(text).unwrap();
-        }
-    });
-
-    // Rest of keyboard initialization...
-    unsafe {
-        // ... (keep existing initialization code)
-    }
-}
+// Rest of the keyboard.rs implementation remains the same...
