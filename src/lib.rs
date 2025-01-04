@@ -64,8 +64,8 @@ pub fn init(boot_info: &'static BootInfo) {
     set_color(Color::LightBlue, Color::Black);
     print!("Setting up memory management... ");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe {
+    let _mapper = unsafe { memory::init(phys_mem_offset) };
+    let _frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
     set_color(Color::Green, Color::Black);
