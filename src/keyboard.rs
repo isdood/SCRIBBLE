@@ -3,7 +3,9 @@ use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::{print, println};
+use crate::print_colored;
+use crate::println;
+use crate::vga_buffer::THEME;
 
 const QUEUE_SIZE: usize = 100;
 
@@ -76,8 +78,14 @@ fn process_keyboard() {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
                 match key {
-                    DecodedKey::Unicode(character) => print!("{}", character),
-                    DecodedKey::RawKey(key) => print!("{:?}", key),
+                    DecodedKey::Unicode(character) => {
+                        // Use THEME.user_input instead of Color::White
+                        print_colored!(THEME.user_input, "{}", character)
+                    },
+                    DecodedKey::RawKey(key) => {
+                        // Use THEME.user_input instead of Color::White
+                        print_colored!(THEME.user_input, "{:?}", key)
+                    },
                 }
             }
         }
@@ -90,30 +98,22 @@ pub fn init() {
         let mut cmd_port: Port<u8> = Port::new(0x64);
         let mut data_port: Port<u8> = Port::new(0x60);
 
-        // Disable devices
-        cmd_port.write(0xAD);  // Disable first PS/2 port
-        cmd_port.write(0xA7);  // Disable second PS/2 port
+        cmd_port.write(0xAD);
+        cmd_port.write(0xA7);
 
-        // Flush output buffer
         while (cmd_port.read() & 1) == 1 {
             data_port.read();
         }
 
-        // Set controller configuration byte
-        cmd_port.write(0x20);  // Read command byte
+        cmd_port.write(0x20);
         let mut config = data_port.read();
-        config |= 1 << 0;   // Enable first PS/2 port interrupt
-        config &= !(1 << 1);   // Disable second PS/2 port interrupt
-        cmd_port.write(0x60);  // Write command byte
+        config |= 1 << 0;
+        config &= !(1 << 1);
+        cmd_port.write(0x60);
         data_port.write(config);
 
-        // Enable devices
-        cmd_port.write(0xAE);  // Enable first PS/2 port
-
-        // Reset keyboard
+        cmd_port.write(0xAE);
         data_port.write(0xFF);
-
-        // Enable scanning
         data_port.write(0xF4);
 
         println!("Keyboard initialization complete");

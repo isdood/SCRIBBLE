@@ -1,7 +1,7 @@
 use volatile::Volatile;
 use core::fmt;
-use lazy_static::lazy_static;
 use spin::Mutex;
+use lazy_static::lazy_static;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -24,7 +24,7 @@ pub enum Color {
     LightCyan = 11,
     LightRed = 12,
     Pink = 13,
-    Yellow = 14,    // We'll use this for light orange
+    Yellow = 14,
     White = 15,
 }
 
@@ -39,15 +39,10 @@ impl ColorCode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ColorTheme {
-    pub text: Color,
-    pub heading: Color,
-    pub background: Color,
-}
-
-impl ColorTheme {
-    pub fn get_text(&self) -> Color { self.text }
-    pub fn get_background(&self) -> Color { self.background }
+#[repr(C)]
+struct ScreenChar {
+    ascii_character: u8,
+    color_code: ColorCode,
 }
 
 #[repr(transparent)]
@@ -61,33 +56,30 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
-// Define color themes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ColorTheme {
-    text: Color,
-    heading: Color,
-    background: Color,
+    pub text: Color,
+    pub heading: Color,
+    pub background: Color,
+    pub user_input: Color,
 }
 
 lazy_static! {
-    static ref THEME: ColorTheme = ColorTheme {
-        text: Color::Yellow,      // Light orange (using Yellow for a light orange look)
+    pub static ref THEME: ColorTheme = ColorTheme {
+        text: Color::Brown,
         heading: Color::LightGreen,
         background: Color::Black,
+        user_input: Color::White,
     };
+
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        color_code: ColorCode::new(THEME.text, THEME.background),
+                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    });
 }
 
 impl Writer {
-    pub fn set_color(&mut self, foreground: Color, background: Color) {
-        self.color_code = ColorCode::new(foreground, background);
-    }
-
-    pub fn write_styled(&mut self, s: &str, color: Color) {
-        let original_color = self.color_code;
-        self.set_color(color, THEME.background);
-        self.write_string(s);
-        self.color_code = original_color;
-    }
-
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -133,12 +125,14 @@ impl Writer {
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
-                // printable ASCII byte or newline
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
-                // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
         }
+    }
+
+    pub fn set_color(&mut self, foreground: Color, background: Color) {
+        self.color_code = ColorCode::new(foreground, background);
     }
 }
 
@@ -149,15 +143,6 @@ impl fmt::Write for Writer {
     }
 }
 
-// Public interface for color manipulation
-pub fn set_print_color(foreground: Color, background: Color) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().set_color(foreground, background);
-    });
-}
-
-// Print macros with color support
 #[macro_export]
 macro_rules! print_colored {
     ($color:expr, $($arg:tt)*) => ({
@@ -167,23 +152,17 @@ macro_rules! print_colored {
             let mut writer = $crate::vga_buffer::WRITER.lock();
             writer.set_color($color, $crate::vga_buffer::THEME.background);
             writer.write_fmt(format_args!($($arg)*)).unwrap();
-            writer.set_color($crate::vga_buffer::THEME.text, $crate::vga_buffer::THEME.background);
+            // Remove this line to prevent immediate color reset
+            // writer.set_color($crate::vga_buffer::THEME.text, $crate::vga_buffer::THEME.background);
         });
     });
 }
 
 #[macro_export]
-macro_rules! print_colored {
+macro_rules! println_colored {
     ($color:expr, $($arg:tt)*) => ({
-        use core::fmt::Write;
-        use x86_64::instructions::interrupts;
-        interrupts::without_interrupts(|| {
-            let mut writer = $crate::vga_buffer::WRITER.lock();
-            let theme = &$crate::vga_buffer::THEME;
-            writer.set_color($color, theme.get_background());
-            writer.write_fmt(format_args!($($arg)*)).unwrap();
-            writer.set_color(theme.get_text(), theme.get_background());
-        });
+        $crate::print_colored!($color, $($arg)*);
+        $crate::print_colored!($color, "\n");  // Use print_colored instead of print
     });
 }
 
@@ -191,7 +170,6 @@ macro_rules! print_colored {
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
-
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
     });

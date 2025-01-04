@@ -9,7 +9,7 @@ extern crate alloc;
 
 use x86_64::VirtAddr;
 use core::panic::PanicInfo;
-use vga_buffer::Color; // Add this import
+use vga_buffer::Color;
 
 pub mod vga_buffer;
 pub mod interrupts;
@@ -24,8 +24,33 @@ fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
     panic!("allocation error: {:?}", layout)
 }
 
-//
+// Print macros
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
 
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
+
+// Serial print macros for debugging
+#[macro_export]
+macro_rules! serial_print {
+    ($($arg:tt)*) => ($crate::serial::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! serial_println {
+    () => ($crate::serial_print!("\n"));
+    ($fmt:expr) => ($crate::serial_print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::serial_print!(
+        concat!($fmt, "\n"), $($arg)*));
+}
+
+// Keep only this single init function
 pub fn init(boot_info: &'static bootloader::BootInfo) {
     println_colored!(Color::LightGreen, "=== Scribble OS ===");
     println!();
@@ -54,63 +79,6 @@ pub fn init(boot_info: &'static bootloader::BootInfo) {
     keyboard::init();
 
     println_colored!(Color::LightGreen, "System initialization complete!");
-}
-
-// ... keep your existing test and panic handlers ...
-
-// Print macros
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-// Serial print macros for debugging
-#[macro_export]
-macro_rules! serial_print {
-    ($($arg:tt)*) => ($crate::serial::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! serial_println {
-    () => ($crate::serial_print!("\n"));
-    ($fmt:expr) => ($crate::serial_print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => ($crate::serial_print!(
-        concat!($fmt, "\n"), $($arg)*));
-}
-
-pub fn init(boot_info: &'static bootloader::BootInfo) {
-    println!("Initializing GDT...");
-    gdt::init();
-
-    println!("Initializing IDT...");
-    interrupts::init_idt();
-
-    println!("Initializing PIC...");
-    unsafe {
-        interrupts::PICS.lock().initialize();
-    }
-
-    println!("Initializing memory management...");
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe {
-        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
-
-    // Initialize the heap
-    allocator::init_heap(&mut mapper, &mut frame_allocator)
-    .expect("heap initialization failed");
-
-    // Remove the println! here and just call init
-    keyboard::init();
-
-    println!("Initialization complete");
 }
 
 pub fn hlt_loop() -> ! {
@@ -157,35 +125,4 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
         let mut port = Port::new(0xf4);
         port.write(exit_code as u32);
     }
-}
-
-// In your lib.rs or wherever you want to use it:
-pub fn init(boot_info: &'static bootloader::BootInfo) {
-    println_colored!(Color::LightGreen, "=== Scribble OS ===");
-    println!(); // Empty line
-
-    println_colored!(Color::Yellow, "Initializing GDT...");
-    gdt::init();
-
-    println_colored!(Color::Yellow, "Initializing IDT...");
-    interrupts::init_idt();
-
-    println_colored!(Color::Yellow, "Initializing PIC...");
-    unsafe {
-        interrupts::PICS.lock().initialize();
-    }
-
-    println_colored!(Color::Yellow, "Initializing memory management...");
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe {
-        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
-
-    allocator::init_heap(&mut mapper, &mut frame_allocator)
-    .expect("heap initialization failed");
-
-    keyboard::init();
-
-    println_colored!(Color::LightGreen, "System initialization complete!");
 }
