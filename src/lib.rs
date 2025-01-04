@@ -1,6 +1,7 @@
 // src/lib.rs
-#![no_std]  // Add this line to indicate we're not using the standard library
-#![no_main] // Add this line since we're writing an OS
+#![no_std]
+#![no_main]
+#![feature(abi_x86_interrupt)]  // Add this line to enable x86-interrupt ABI
 
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
@@ -14,8 +15,20 @@ pub mod memory;
 pub mod allocator;
 pub mod keyboard;
 
-// Re-export print and println macros from vga_buffer
-pub use vga_buffer::{print, println};
+// Remove the incorrect re-export
+// pub use vga_buffer::{print, println};
+
+// Define the macros here instead
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
 
 pub fn init(boot_info: &'static BootInfo) {
     use crate::interrupts::PICS;
