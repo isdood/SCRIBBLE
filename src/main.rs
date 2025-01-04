@@ -1,34 +1,21 @@
 #![no_std]
 #![no_main]
 
-use core::panic::PanicInfo;
 use bootloader::{entry_point, BootInfo};
-use scribble::println;
+use scribble::{println, hlt_loop};
 
 entry_point!(kernel_main);
 
-fn kernel_main(_boot_info: &'static BootInfo) -> ! {
-    // Disable interrupts during early boot
-    x86_64::instructions::interrupts::disable();
-
+fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("Booting...");
 
-    // Initialize core system components
-    scribble::init();
+    // Initialize core system components with boot_info
+    scribble::init(boot_info);
 
     println!("Enabling interrupts...");
-    // Re-enable interrupts
     x86_64::instructions::interrupts::enable();
 
     println!("System ready!");
 
-    scribble::hlt_loop()
-}
-
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("PANIC: {}", info);
-    loop {
-        x86_64::instructions::hlt();
-    }
+    hlt_loop()
 }

@@ -1,8 +1,8 @@
+use x86_64::instructions::port::Port;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use x86_64::instructions::port::Port;
 use crate::{print, println};
 
 const QUEUE_SIZE: usize = 100;
@@ -56,7 +56,7 @@ impl KeyboardBuffer {
 }
 
 lazy_static! {
-    pub static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = Mutex::new(
+    static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = Mutex::new(
         Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore)
     );
 
@@ -90,24 +90,31 @@ pub fn init() {
         let mut cmd_port: Port<u8> = Port::new(0x64);
         let mut data_port: Port<u8> = Port::new(0x60);
 
-        println!("Waiting for keyboard controller...");
-        let mut timeout = 100000;
-        while (cmd_port.read() & 0x02) != 0 {
-            if timeout == 0 {
-                println!("Keyboard controller timeout - continuing");
-                break;
-            }
-            timeout -= 1;
-            x86_64::instructions::hlt();
+        // Disable devices
+        cmd_port.write(0xAD);  // Disable first PS/2 port
+        cmd_port.write(0xA7);  // Disable second PS/2 port
+
+        // Flush output buffer
+        while (cmd_port.read() & 1) == 1 {
+            data_port.read();
         }
 
-        println!("Sending keyboard enable command");
-        data_port.write(0xF4_u8);
+        // Set controller configuration byte
+        cmd_port.write(0x20);  // Read command byte
+        let mut config = data_port.read();
+        config |= 1 << 0;   // Enable first PS/2 port interrupt
+        config &= !(1 << 1);   // Disable second PS/2 port interrupt
+        cmd_port.write(0x60);  // Write command byte
+        data_port.write(config);
 
-        // Wait a bit for the keyboard to process the command
-        for _ in 0..10000 {
-            x86_64::instructions::hlt();
-        }
+        // Enable devices
+        cmd_port.write(0xAE);  // Enable first PS/2 port
+
+        // Reset keyboard
+        data_port.write(0xFF);
+
+        // Enable scanning
+        data_port.write(0xF4);
 
         println!("Keyboard initialization complete");
     }

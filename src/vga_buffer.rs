@@ -2,8 +2,6 @@ use volatile::Volatile;
 use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
-use core::fmt::Write;
-use x86_64::instructions::interrupts;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -11,8 +9,8 @@ const BUFFER_WIDTH: usize = 80;
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        color_code: ColorCode::new(Color::White, Color::Black),
-                                                      buffer: unsafe { &mut *(0xb8000 as *mut VgaBuffer) },
+        color_code: ColorCode::new(Color::LightGray, Color::Black),
+                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
 
@@ -55,14 +53,15 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
-struct VgaBuffer {
+#[repr(transparent)]
+struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
 pub struct Writer {
     column_position: usize,
     color_code: ColorCode,
-    buffer: &'static mut VgaBuffer,
+    buffer: &'static mut Buffer,
 }
 
 impl Writer {
@@ -77,11 +76,11 @@ impl Writer {
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-                let color_code = self.color_code;
                 self.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: byte,
-                    color_code,
+                    color_code: self.color_code,
                 });
+
                 self.column_position += 1;
             }
         }
@@ -127,19 +126,12 @@ impl fmt::Write for Writer {
     }
 }
 
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
+    use core::fmt::Write;
+    use x86_64::instructions::interrupts;
+
+    // Disable interrupts while writing to prevent race conditions
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
     });
