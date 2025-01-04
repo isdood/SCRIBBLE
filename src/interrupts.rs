@@ -2,7 +2,7 @@
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use pic8259::ChainedPics;
 use spin;
-use crate::{print, println};  // Import from root instead of directly
+use crate::println;  // Import from root instead of directly
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -75,8 +75,7 @@ extern "x86-interrupt" fn double_fault_handler(
             );
         }
 
-        let mut keyboard = KEYBOARD.lock();
-        let mut port = Port::new(0x60);
+        let port = Port::new(0x60);  // Removed mut as it's not needed
 
         let scancode: u8 = unsafe { port.read() };
         crate::keyboard::add_scancode(scancode);

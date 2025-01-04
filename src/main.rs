@@ -3,18 +3,22 @@
 #![no_main]
 
 use bootloader::{entry_point, BootInfo};
-use scribble::{println, hlt_loop};  // Remove the PanicInfo import
+use core::panic::PanicInfo;
+use scribble::{println, hlt_loop};
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    println!("Booting Scribble OS...");
-
     scribble::init(boot_info);
 
-    println!("Boot sequence complete!");
-    println!("Welcome to Scribble OS!");
-    println!("Type something to test the keyboard...");
+    println!("\nWelcome to Scribble OS!");
 
+    // Loop indefinitely
+    hlt_loop();
+}
+
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    println!("{}", info);
     hlt_loop();
 }

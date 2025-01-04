@@ -99,6 +99,13 @@ pub fn init(boot_info: &'static BootInfo) {
     print!("Ready for input > ");
 }
 
+#[export_name = "hlt_loop"]
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
+}
+
 // Add panic handler
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
