@@ -35,7 +35,3 @@ fn handle_keyevent(key: DecodedKey) {
         }
     }
 }
-
-pub fn initialize() {
-    crate::println!("Keyboard initialized");
-}
