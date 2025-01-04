@@ -151,7 +151,7 @@ lazy_static! {
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        WRITER.lock().write_str(fmt::format(args).as_str()).unwrap();
+        WRITER.lock().write_fmt(args).unwrap();
     });
 }
 
@@ -172,15 +172,4 @@ pub fn clear_screen() {
         writer.column_position = 0;
         writer.row_position = BUFFER_HEIGHT - 1;
     });
-}
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
