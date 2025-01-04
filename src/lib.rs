@@ -31,55 +31,80 @@ fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
 pub fn init(boot_info: &'static BootInfo) {
     use x86_64::instructions::interrupts;
     use crate::interrupts::{init_idt, PICS};
+    use crate::vga_buffer::{Color, set_color};
 
+    // Title in Yellow on Blue
+    set_color(Color::Yellow, Color::Blue);
     println!("\n=== Scribble OS ===");
+    set_color(Color::LightCyan, Color::Black);
     println!("Starting initialization sequence...\n");
 
-    // Initialize GDT first as it's required for interrupt handling
+    // GDT initialization in Green
+    set_color(Color::LightGreen, Color::Black);
     print!("Loading GDT... ");
     gdt::init();
+    set_color(Color::Green, Color::Black);
     println!("OK");
 
-    // Set up the Interrupt Descriptor Table
+    // IDT initialization in Cyan
+    set_color(Color::LightCyan, Color::Black);
     print!("Setting up IDT... ");
     init_idt();
+    set_color(Color::Green, Color::Black);
     println!("OK");
 
-    // Configure the Programmable Interrupt Controller
+    // PIC initialization in Magenta
+    set_color(Color::LightMagenta, Color::Black);
     print!("Configuring PIC... ");
     unsafe {
         PICS.lock().initialize();
     }
+    set_color(Color::Green, Color::Black);
     println!("OK");
 
-    // Initialize memory management
+    // Memory management in Blue
+    set_color(Color::LightBlue, Color::Black);
     print!("Setting up memory management... ");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
+    set_color(Color::Green, Color::Black);
     println!("OK");
 
-    // Initialize heap allocator
+    // Heap initialization in Yellow
+    set_color(Color::Yellow, Color::Black);
     print!("Initializing heap... ");
     if let Err(err) = allocator::init_heap(&mut mapper, &mut frame_allocator) {
+        set_color(Color::Red, Color::Black);
         println!("FAILED");
         panic!("Heap initialization failed: {:?}", err);
     }
+    set_color(Color::Green, Color::Black);
     println!("OK");
 
-    // Initialize keyboard handler
+    // Keyboard initialization in Pink
+    set_color(Color::Pink, Color::Black);
     print!("Setting up keyboard handler... ");
     keyboard::initialize();
+    set_color(Color::Green, Color::Black);
     println!("OK");
 
-    // Enable interrupts last, after all initialization is complete
+    // Interrupt enabling in Cyan
+    set_color(Color::LightCyan, Color::Black);
     print!("Enabling interrupts... ");
     interrupts::enable();
+    set_color(Color::Green, Color::Black);
     println!("OK");
 
-    println!("\nSystem initialization complete!\n");
+    // Final message in bright colors
+    set_color(Color::Yellow, Color::Blue);
+    println!("\nSystem initialization complete!");
+
+    // Reset to a comfortable default color for user interaction
+    set_color(Color::LightGray, Color::Black);
+    println!("\nReady for input...\n");
 }
 
 // ... (rest of the code remains the same)

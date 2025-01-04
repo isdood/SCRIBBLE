@@ -68,14 +68,21 @@ fn process_keyboard() {
     }
 }
 
+// Key Handler
 fn handle_keyevent(key: DecodedKey) {
+    use crate::vga_buffer::{Color, set_color};
+
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
         match key {
             DecodedKey::Unicode(character) => {
+                // Use white text for user input
+                set_color(Color::White, Color::Black);
                 writer.write_byte(character as u8);
             },
             DecodedKey::RawKey(_key) => {
+                // Special keys in a different color
+                set_color(Color::LightCyan, Color::Black);
                 writer.write_byte(b'#');
             },
         }
