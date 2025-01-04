@@ -1,19 +1,28 @@
 // src/keyboard.rs
-use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts, KeyCode};
+use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
-use lazy_static::lazy_static;
-use crate::vga_buffer::WRITER;
+use x86_64::instructions::port::Port;
+use crate::{print, vga_buffer};
+use crate::vga_buffer::Color;
 
-lazy_static! {
+lazy_static::lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
-    Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::MapLettersToUnicode));
+    Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1,
+                             HandleControl::Ignore)
+    );
 }
 
 pub fn add_scancode(scancode: u8) {
-    let mut keyboard = KEYBOARD.lock();
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            handle_keyevent(key);
+    if let Ok(Some(key_event)) = KEYBOARD.lock().add_byte(scancode) {
+        if let Some(key) = KEYBOARD.lock().process_keyevent(key_event) {
+            match key {
+                DecodedKey::Unicode(character) => {
+                    // Set color to green before printing character
+                    vga_buffer::set_color(Color::Green, Color::Black);
+                    print!("{}", character);
+                },
+                DecodedKey::RawKey(key) => print!("{:?}", key),
+            }
         }
     }
 }
