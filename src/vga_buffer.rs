@@ -58,7 +58,7 @@ pub struct Writer {
 }
 
 impl Writer {
-    fn write_byte(&mut self, byte: u8) {
+    pub fn write_byte(&mut self, byte: u8) {  // Make public
         match byte {
             b'\n' => self.new_line(),
             b'\r' => self.column_position = 0,
@@ -87,7 +87,7 @@ impl Writer {
         }
     }
 
-    fn write_string(&mut self, s: &str) {
+    pub fn write_string(&mut self, s: &str) {  // Make public
         for byte in s.bytes() {
             match byte {
                 // printable ASCII byte or newline
