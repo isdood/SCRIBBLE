@@ -1,9 +1,7 @@
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::vga_buffer::WRITER;
 use crate::println;
-use x86_64::instructions::interrupts;
 
 const QUEUE_SIZE: usize = 100;
 

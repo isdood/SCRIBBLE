@@ -1,4 +1,4 @@
-#![no_std] // Add this at the very top to indicate no standard library
+#![no_std]
 #![feature(custom_test_frameworks)]
 #![feature(abi_x86_interrupt)]
 #![feature(alloc_error_handler)]
@@ -7,7 +7,6 @@
 
 extern crate alloc;
 
-// Add all necessary imports at the top
 use bootloader::BootInfo;
 use core::panic::PanicInfo;
 use x86_64::VirtAddr;
@@ -20,6 +19,12 @@ pub mod keyboard;
 pub mod serial;
 pub mod memory;
 pub mod allocator;
+
+// Remove these re-exports as the macros are already exported via #[macro_export]
+// pub use crate::vga_buffer::{print, println};
+// pub use crate::serial::{serial_print, serial_println};
+
+// ... (rest of the code remains the same)
 
 // Re-export macros
 pub use crate::vga_buffer::{print, println};
