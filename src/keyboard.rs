@@ -1,9 +1,11 @@
+// src/keyboard.rs
 use x86_64::instructions::port::Port;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::{print, println, vga_buffer::{Color, WRITER}};
+use crate::vga_buffer::{Color, WRITER};
+use crate::println;
 
 const QUEUE_SIZE: usize = 100;
 
@@ -75,26 +77,27 @@ fn process_keyboard() {
         let mut keyboard = KEYBOARD.lock();
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
-                {
-                    let mut writer = WRITER.lock();
-                    writer.set_color(Color::LightRed, Color::Black);
-                    println!("Set color to LightRed"); // Debug statement
-                }
+                // Drop the keyboard lock before acquiring the writer lock
+                drop(keyboard);
+
+                let mut writer = WRITER.lock();
+                writer.change_color(Color::Yellow, Color::Black);
+
+                writer.write_str("[").unwrap();
 
                 match key {
                     DecodedKey::Unicode(character) => {
-                        print!("{}", character);
+                        let mut buf = [0u8; 1];
+                        buf[0] = character as u8;
+                        writer.write_str(core::str::from_utf8(&buf).unwrap()).unwrap();
                     },
-                    DecodedKey::RawKey(key) => {
-                        print!("{:?}", key);
+                    DecodedKey::RawKey(_key) => {
+                        writer.write_str("#").unwrap();
                     },
                 }
 
-                {
-                    let mut writer = WRITER.lock();
-                    writer.set_color(Color::White, Color::Black);
-                    println!("Reset color to White"); // Debug statement
-                }
+                writer.write_str("]").unwrap();
+                writer.write_str(" ").unwrap();
             }
         }
     }
@@ -106,23 +109,27 @@ pub fn init() {
         let mut cmd_port: Port<u8> = Port::new(0x64);
         let mut data_port: Port<u8> = Port::new(0x60);
 
+        // Disable PS/2 ports
         cmd_port.write(0xAD);
         cmd_port.write(0xA7);
 
+        // Flush output buffer
         while (cmd_port.read() & 1) == 1 {
             data_port.read();
         }
 
+        // Set configuration byte
         cmd_port.write(0x20);
         let mut config = data_port.read();
-        config |= 1 << 0;
-        config &= !(1 << 1);
+        config |= 1 << 0;      // Enable first PS/2 port interrupt
+        config &= !(1 << 1);   // Disable second PS/2 port
         cmd_port.write(0x60);
         data_port.write(config);
 
-        cmd_port.write(0xAE);
-        data_port.write(0xFF);
-        data_port.write(0xF4);
+        // Enable devices
+        cmd_port.write(0xAE);  // Enable first PS/2 port
+        data_port.write(0xFF); // Reset keyboard
+        data_port.write(0xF4); // Enable scanning
 
         println!("Keyboard initialization complete");
     }

@@ -2,7 +2,6 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::println;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -37,26 +36,6 @@ impl ColorCode {
     fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
-
-    fn foreground(&self) -> Color {
-        match self.0 & 0x0F {
-            0 => Color::Black, 1 => Color::Blue, 2 => Color::Green, 3 => Color::Cyan,
-            4 => Color::Red, 5 => Color::Magenta, 6 => Color::Brown, 7 => Color::LightGray,
-            8 => Color::DarkGray, 9 => Color::LightBlue, 10 => Color::LightGreen, 11 => Color::LightCyan,
-            12 => Color::LightRed, 13 => Color::Pink, 14 => Color::Yellow, 15 => Color::White,
-            _ => Color::White,
-        }
-    }
-
-    fn background(&self) -> Color {
-        match (self.0 & 0xF0) >> 4 {
-            0 => Color::Black, 1 => Color::Blue, 2 => Color::Green, 3 => Color::Cyan,
-            4 => Color::Red, 5 => Color::Magenta, 6 => Color::Brown, 7 => Color::LightGray,
-            8 => Color::DarkGray, 9 => Color::LightBlue, 10 => Color::LightGreen, 11 => Color::LightCyan,
-            12 => Color::LightRed, 13 => Color::Pink, 14 => Color::Yellow, 15 => Color::White,
-            _ => Color::Black,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,26 +59,27 @@ pub struct Writer {
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            b'\n' => self.new_line(),
+            b'\n' => self.move_to_next_line(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
+                    self.move_to_next_line();
                 }
 
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-                self.buffer.chars[row][col].write(ScreenChar {
+                let colored_char = ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
-                });
+                };
 
+                self.buffer.chars[row][col].write(colored_char);
                 self.column_position += 1;
             }
         }
     }
 
-    fn new_line(&mut self) {
+    fn move_to_next_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let character = self.buffer.chars[row][col].read();
@@ -120,33 +100,24 @@ impl Writer {
         }
     }
 
-    pub fn write_string(&mut self, s: &str) {
+    pub fn write_str(&mut self, s: &str) -> fmt::Result {
         for byte in s.bytes() {
             match byte {
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
                 _ => self.write_byte(0xfe),
             }
         }
+        Ok(())
     }
 
-    pub fn set_color(&mut self, foreground: Color, background: Color) {
+    pub fn change_color(&mut self, foreground: Color, background: Color) {
         self.color_code = ColorCode::new(foreground, background);
-        println!("Color set to foreground: {:?}, background: {:?}", foreground, background);
-    }
-
-    pub fn print_current_color(&self) {
-        println!(
-            "Current color - foreground: {:?}, background: {:?}",
-            self.color_code.foreground(),
-                 self.color_code.background()
-        );
     }
 }
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
-        Ok(())
+        self.write_str(s)
     }
 }
 

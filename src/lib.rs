@@ -13,7 +13,7 @@ use core::panic::PanicInfo;
 pub mod vga_buffer;
 pub mod interrupts;
 pub mod gdt;
-pub mod keyboard;
+pub mod keyboard;  // Keep only this one declaration
 pub mod serial;
 pub mod memory;
 pub mod allocator;
@@ -49,7 +49,6 @@ macro_rules! serial_println {
         concat!($fmt, "\n"), $($arg)*));
 }
 
-// Keep only this single init function
 pub fn init(boot_info: &'static bootloader::BootInfo) {
     println!("=== Scribble OS ===");
     println!();
