@@ -88,7 +88,7 @@ pub fn init(boot_info: &'static BootInfo) {
     println!("OK");
 
     // Keyboard initialization
-    set_color(Color::LightBlue, Color::Black); // Changed from Pink to LightBlue as Pink might not be in the Color enum
+    set_color(Color::LightBlue, Color::Black);
     print!("Setting up keyboard handler... ");
     keyboard::initialize();
     set_color(Color::Green, Color::Black);
@@ -97,7 +97,7 @@ pub fn init(boot_info: &'static BootInfo) {
     // Enable interrupts
     set_color(Color::LightCyan, Color::Black);
     print!("Enabling interrupts... ");
-    interrupts::enable();
+    x86_64::instructions::interrupts::enable();
     set_color(Color::Green, Color::Black);
     println!("OK");
 

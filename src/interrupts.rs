@@ -27,7 +27,9 @@ lazy_static! {
 }
 
 pub fn init_idt() {
-    IDT.load();
+    let mut idt = InterruptDescriptorTable::new();
+    idt[InterruptIndex::Keyboard as usize]
+    .set_handler_fn(keyboard_interrupt_handler);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -35,6 +37,13 @@ pub fn init_idt() {
 pub enum InterruptIndex {
     Timer = PIC_1_OFFSET,
     Keyboard,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum InterruptIndex {
+    Timer = PIC_1_OFFSET,
+    Keyboard, // This will be PIC_1_OFFSET + 1
 }
 
 impl InterruptIndex {
@@ -60,33 +69,15 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
     _stack_frame: InterruptStackFrame)
 {
     use x86_64::instructions::port::Port;
-    use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-    use spin::Mutex;
-    use lazy_static::lazy_static;
 
-    lazy_static! {
-        static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
-        Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1,
-                                 HandleControl::Ignore)
-        );
-    }
-
-    let mut keyboard = KEYBOARD.lock();
     let mut port = Port::new(0x60);
-
     let scancode: u8 = unsafe { port.read() };
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            match key {
-                DecodedKey::Unicode(character) => print!("{}", character),
-                DecodedKey::RawKey(key) => print!("{:?}", key),
-            }
-        }
-    }
+
+    crate::keyboard::add_scancode(scancode);
 
     unsafe {
         PICS.lock()
-        .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
+        .notify_end_of_interrupt(InterruptIndex::Keyboard as u8);
     }
 }
 
