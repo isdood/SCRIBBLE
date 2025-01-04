@@ -24,11 +24,13 @@ fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
 }
 
 // Print macros
+#[macro_use] // Ensure macros are available to other modules
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
 }
 
+#[macro_use] // Ensure macros are available to other modules
 #[macro_export]
 macro_rules! println {
     () => ($crate::print!("\n"));

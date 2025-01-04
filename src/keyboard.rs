@@ -3,7 +3,7 @@ use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::{print, println, vga_buffer::Color}; // Import Color here
+use crate::{print, println, vga_buffer::{Color, WRITER}}; // Import Color and WRITER here
 
 const QUEUE_SIZE: usize = 100;
 
@@ -76,22 +76,24 @@ fn process_keyboard() {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
                 {
-                    let mut writer = crate::vga_buffer::WRITER.lock();
-                    // Set color to LightRed (Orange) before printing user input
+                    let mut writer = WRITER.lock();
                     writer.set_color(Color::LightRed, Color::Black);
+                    writer.print_current_color(); // Debug statement
                 }
+
                 match key {
                     DecodedKey::Unicode(character) => {
-                        print!("{}", character)
+                        print!("{}", character);
                     },
                     DecodedKey::RawKey(key) => {
-                        print!("{:?}", key)
+                        print!("{:?}", key);
                     },
                 }
+
                 {
-                    let mut writer = crate::vga_buffer::WRITER.lock();
-                    // Reset color to default white after printing user input
+                    let mut writer = WRITER.lock();
                     writer.set_color(Color::White, Color::Black);
+                    writer.print_current_color(); // Debug statement
                 }
             }
         }

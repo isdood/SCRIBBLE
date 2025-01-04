@@ -2,6 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
+use crate::println; // Import the println macro
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -22,7 +23,7 @@ pub enum Color {
     LightBlue = 9,
     LightGreen = 10,
     LightCyan = 11,
-    LightRed = 12, // Representing Orange
+    LightRed = 12,
     Pink = 13,
     Yellow = 14,
     White = 15,
@@ -110,6 +111,11 @@ impl Writer {
 
     pub fn set_color(&mut self, foreground: Color, background: Color) {
         self.color_code = ColorCode::new(foreground, background);
+        println!("Color set to foreground: {:?}, background: {:?}", foreground, background); // Debug statement
+    }
+
+    pub fn print_current_color(&self) {
+        println!("Current color - {:?}", self.color_code);
     }
 }
 
