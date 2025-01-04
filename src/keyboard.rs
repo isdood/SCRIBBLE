@@ -2,7 +2,7 @@
 use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts, KeyCode};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::vga_buffer::{WRITER, get_current_color};
+use crate::vga_buffer::WRITER;
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
@@ -19,27 +19,17 @@ pub fn add_scancode(scancode: u8) {
 }
 
 fn handle_keyevent(key: DecodedKey) {
-    let current_color = get_current_color();
     let mut writer = WRITER.lock();
-
     match key {
         DecodedKey::Unicode(character) => {
-            writer.write_byte_colored(character as u8, current_color);
+            writer.write_byte(character as u8);
         }
         DecodedKey::RawKey(key) => {
             match key {
-                KeyCode::ArrowUp => {
-                    writer.write_byte_colored(b'↑', current_color);
-                }
-                KeyCode::ArrowDown => {
-                    writer.write_byte_colored(b'↓', current_color);
-                }
-                KeyCode::ArrowLeft => {
-                    writer.write_byte_colored(b'←', current_color);
-                }
-                KeyCode::ArrowRight => {
-                    writer.write_byte_colored(b'→', current_color);
-                }
+                KeyCode::ArrowUp => writer.write_string("^"),
+                KeyCode::ArrowDown => writer.write_string("v"),
+                KeyCode::ArrowLeft => writer.write_string("<"),
+                KeyCode::ArrowRight => writer.write_string(">"),
                 _ => (), // Ignore other special keys
             }
         }
