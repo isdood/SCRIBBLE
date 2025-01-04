@@ -77,6 +77,8 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
+// ... (keep all the existing code until the Writer impl block)
+
 impl Writer {
     pub fn get_foreground_color(&self) -> Color {
         self.color_code.get_foreground()
@@ -86,14 +88,16 @@ impl Writer {
         let old_color = self.color_code.get_foreground();
         self.color_code = ColorCode::new(foreground, background);
 
-        // Debug color changes
-        if old_color != foreground {
-            use crate::serial_println;
-            serial_println!("Color changed from {:?} to {:?}", old_color, foreground);
-        }
+        // Add more detailed debugging
+        use crate::serial_println;
+        serial_println!("Color changed from {:?} to {:?} at position {}",
+                        old_color, foreground, self.column_position);
     }
 
     pub fn write_byte(&mut self, byte: u8) {
+        // Get current color before writing
+        let current_color = self.color_code;
+
         match byte {
             b'\n' => self.new_line(),
             byte => {
@@ -104,37 +108,22 @@ impl Writer {
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-                let color_code = self.color_code;
-
+                // Use the current color explicitly
                 self.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: byte,
-                    color_code,
+                    color_code: current_color,  // Use the current color
                 });
                 self.column_position += 1;
+
+                // Debug output
+                use crate::serial_println;
+                serial_println!("Wrote byte '{}' with color {:?} at position {}",
+                                byte as char, current_color.get_foreground(), self.column_position - 1);
             }
         }
     }
 
-    fn new_line(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let character = self.buffer.chars[row][col].read();
-                self.buffer.chars[row - 1][col].write(character);
-            }
-        }
-        self.clear_row(BUFFER_HEIGHT - 1);
-        self.column_position = 0;
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
-    }
+    // ... (keep the rest of the Writer implementation)
 }
 
 impl fmt::Write for Writer {
