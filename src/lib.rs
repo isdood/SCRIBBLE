@@ -5,21 +5,25 @@
 use bootloader::BootInfo;
 use core::panic::PanicInfo;
 
-// Import our modules
-mod vga_buffer;
+// Make vga_buffer public
+pub mod vga_buffer;
 mod gdt;
 mod interrupts;
 mod memory;
 mod allocator;
 mod keyboard;
 
-// Remove the redundant re-export since the macros are already exported at crate root
-// pub use crate::{print, println};  // Remove this line
+// Add the hlt_loop function
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
+}
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    loop {}
+    hlt_loop();
 }
 
 pub fn init(boot_info: &'static BootInfo) {
