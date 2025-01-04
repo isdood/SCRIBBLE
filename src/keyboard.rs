@@ -80,24 +80,31 @@ fn process_keyboard() {
                 // Drop the keyboard lock before acquiring the writer lock
                 drop(keyboard);
 
-                let mut writer = WRITER.lock();
-                writer.change_color(Color::Yellow, Color::Black);
+                // Use interrupts::without_interrupts to ensure atomic access
+                x86_64::instructions::interrupts::without_interrupts(|| {
+                    let mut writer = WRITER.lock();
 
-                writer.write_str("[").unwrap();
+                    // Save the current color
+                    let current_color = writer.color_code;
 
-                match key {
-                    DecodedKey::Unicode(character) => {
-                        let mut buf = [0u8; 1];
-                        buf[0] = character as u8;
-                        writer.write_str(core::str::from_utf8(&buf).unwrap()).unwrap();
-                    },
-                    DecodedKey::RawKey(_key) => {
-                        writer.write_str("#").unwrap();
-                    },
-                }
+                    // Set to magenta (or any bright color) and ensure it's set
+                    writer.change_color(Color::Magenta, Color::Black);
 
-                writer.write_str("]").unwrap();
-                writer.write_str(" ").unwrap();
+                    match key {
+                        DecodedKey::Unicode(character) => {
+                            // Write directly using write_byte to maintain color
+                            writer.write_byte(character as u8);
+                        },
+                        DecodedKey::RawKey(_key) => {
+                            writer.write_byte(b'#');
+                        },
+                    }
+
+                    // Add a space after each character
+                    writer.write_byte(b' ');
+
+                    // Don't restore the previous color - keep the new one
+                });
             }
         }
     }
@@ -105,6 +112,7 @@ fn process_keyboard() {
 
 pub fn init() {
     println!("Initializing keyboard...");
+        test_color_output();
     unsafe {
         let mut cmd_port: Port<u8> = Port::new(0x64);
         let mut data_port: Port<u8> = Port::new(0x60);
@@ -133,4 +141,24 @@ pub fn init() {
 
         println!("Keyboard initialization complete");
     }
+}
+
+// Add this to keyboard.rs
+pub fn test_color_output() {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+
+        // Test with different colors
+        writer.change_color(Color::Red, Color::Black);
+        writer.write_str("Red Text\n").unwrap();
+
+        writer.change_color(Color::Green, Color::Black);
+        writer.write_str("Green Text\n").unwrap();
+
+        writer.change_color(Color::Blue, Color::Black);
+        writer.write_str("Blue Text\n").unwrap();
+
+        // Reset to default
+        writer.change_color(Color::White, Color::Black);
+    });
 }

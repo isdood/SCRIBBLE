@@ -57,6 +57,10 @@ pub struct Writer {
 }
 
 impl Writer {
+    pub fn change_color(&mut self, foreground: Color, background: Color) {
+        let old_color = self.color_code;
+        self.color_code = ColorCode::new(foreground, background);
+
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.move_to_next_line(),
@@ -115,9 +119,16 @@ impl Writer {
     }
 }
 
+// In vga_buffer.rs, fix the fmt::Write implementation
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_str(s)
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+        Ok(())
     }
 }
 
