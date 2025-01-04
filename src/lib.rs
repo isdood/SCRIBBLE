@@ -1,3 +1,4 @@
+// src/lib.rs
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
@@ -55,32 +56,18 @@ pub fn init(boot_info: &'static BootInfo) {
     // PIC initialization
     set_color(Color::Magenta, Color::Black);
     print!("Configuring PIC... ");
-    unsafe {
-        PICS.lock().initialize();
-    }
+    unsafe { PICS.lock().initialize() };
     set_color(Color::Green, Color::Black);
     println!("OK");
 
     // Memory management
     set_color(Color::LightBlue, Color::Black);
     print!("Setting up memory management... ");
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset); // Remove unwrap()
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
-
-    set_color(Color::Green, Color::Black);
-    println!("OK");
-
-    // Heap initialization
-    set_color(Color::Yellow, Color::Black);
-    print!("Initializing heap... ");
-    if let Err(err) = allocator::init_heap(&mut mapper, &mut frame_allocator) {
-        set_color(Color::Red, Color::Black);
-        println!("FAILED");
-        panic!("Heap initialization failed: {:?}", err);
-    }
     set_color(Color::Green, Color::Black);
     println!("OK");
 
@@ -98,11 +85,9 @@ pub fn init(boot_info: &'static BootInfo) {
     set_color(Color::Green, Color::Black);
     println!("OK");
 
-    // Final message
+    // Final messages
     set_color(Color::Yellow, Color::Blue);
     println!("\nSystem initialization complete!");
-
-    // Reset to default color for user interaction
-    set_color(Color::White, Color::Black); // Changed from LightGray to White as LightGray might not be in the Color enum
+    set_color(Color::White, Color::Black);
     println!("\nReady for input...\n");
 }

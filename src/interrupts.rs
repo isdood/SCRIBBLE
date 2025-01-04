@@ -1,9 +1,8 @@
-use crate::println; // Remove unused print import
-use crate::gdt;
-use lazy_static::lazy_static;
+// src/interrupts.rs
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use pic8259::ChainedPics;
 use spin;
+use crate::println;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -18,20 +17,24 @@ pub enum InterruptIndex {
 pub static PICS: spin::Mutex<ChainedPics> =
 spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
-extern "x86-interrupt" fn keyboard_interrupt_handler(
-    _stack_frame: InterruptStackFrame)
-{
-    use x86_64::instructions::port::Port;
+lazy_static::lazy_static! {
+    static ref IDT: InterruptDescriptorTable = {
+        let mut idt = InterruptDescriptorTable::new();
+        idt.breakpoint.set_handler_fn(breakpoint_handler);
+        unsafe {
+            idt.double_fault
+            .set_handler_fn(double_fault_handler)
+        }
+        idt[InterruptIndex::Timer as usize]
+        .set_handler_fn(timer_interrupt_handler);
+        idt[InterruptIndex::Keyboard as usize]
+        .set_handler_fn(keyboard_interrupt_handler);
+        idt
+    };
+}
 
-    let mut port = Port::new(0x60);
-    let scancode: u8 = unsafe { port.read() };
-
-    crate::keyboard::add_scancode(scancode);
-
-    unsafe {
-        PICS.lock()
-        .notify_end_of_interrupt(InterruptIndex::Keyboard as u8);
-    }
+pub fn init_idt() {
+    IDT.load();
 }
 
 extern "x86-interrupt" fn breakpoint_handler(
@@ -44,4 +47,29 @@ extern "x86-interrupt" fn double_fault_handler(
     stack_frame: InterruptStackFrame, _error_code: u64) -> !
     {
         panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+    }
+
+    extern "x86-interrupt" fn timer_interrupt_handler(
+        _stack_frame: InterruptStackFrame)
+    {
+        unsafe {
+            PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::Timer as u8);
+        }
+    }
+
+    extern "x86-interrupt" fn keyboard_interrupt_handler(
+        _stack_frame: InterruptStackFrame)
+    {
+        use x86_64::instructions::port::Port;
+
+        let mut port = Port::new(0x60);
+        let scancode: u8 = unsafe { port.read() };
+
+        crate::keyboard::add_scancode(scancode);
+
+        unsafe {
+            PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::Keyboard as u8);
+        }
     }
