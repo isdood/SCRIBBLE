@@ -15,7 +15,7 @@ pub fn init_heap(_boot_info: &'static BootInfo) {
     // Your heap initialization code here
 }
 
-pub fn init_kernel(boot_info: &'static BootInfo) {
+pub fn init_kernel(_boot_info: &'static BootInfo) {
     // Initialize GDT
     gdt::init();
 
