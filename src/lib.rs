@@ -37,6 +37,9 @@ pub fn init_heap(_boot_info: &'static BootInfo) {
 pub fn init_kernel(boot_info: &'static BootInfo) {
     use x86_64::VirtAddr;
 
+    // Disable interrupts during initialization
+    x86_64::instructions::interrupts::disable();
+
     println!("Starting GDT initialization...");
     gdt::init();
     println!("GDT initialized");
@@ -45,20 +48,24 @@ pub fn init_kernel(boot_info: &'static BootInfo) {
     interrupts::init_idt();
     println!("IDT initialized");
 
-    // Initialize memory management before PIC
     println!("Starting memory management initialization...");
     let phys_mem_offset = VirtAddr::new(boot_info.memory_map.as_ptr() as u64);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    println!("Memory mapper initialized");
+
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
-    println!("Memory management initialized");
+    println!("Frame allocator initialized");
 
-    // Initialize heap after memory management
+    // Initialize heap
     println!("Starting heap initialization...");
     match allocator::init_heap(&mut mapper, &mut frame_allocator) {
         Ok(_) => println!("Heap initialized successfully"),
-        Err(e) => panic!("Heap initialization failed: {:?}", e),
+        Err(e) => {
+            println!("Failed to initialize heap: {:?}", e);
+            crate::hlt_loop();
+        }
     }
 
     println!("Starting PIC initialization...");
@@ -67,6 +74,7 @@ pub fn init_kernel(boot_info: &'static BootInfo) {
     }
     println!("PIC initialized");
 
+    // Enable interrupts after everything is set up
     println!("Enabling interrupts...");
     x86_64::instructions::interrupts::enable();
     println!("Interrupts enabled");
