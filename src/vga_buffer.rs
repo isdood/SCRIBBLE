@@ -225,7 +225,6 @@ impl Writer {
 
         self.update_cursor();
     }
-    }
 
     pub fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
