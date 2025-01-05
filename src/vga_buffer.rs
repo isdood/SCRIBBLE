@@ -1,8 +1,7 @@
 use volatile::Volatile;
-use core::fmt;
+use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use core::ops::DerefMut;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -173,12 +172,30 @@ impl Writer {
             self.move_cursor();
         }
     }
+
+    pub fn write_str(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
 }
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
+        self.write_str(s);
         Ok(())
+    }
+}
+
+pub struct WriterGuard<'a>(spin::MutexGuard<'a, Writer>);
+
+impl<'a> fmt::Write for WriterGuard<'a> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.0.write_str(s)
     }
 }
 
@@ -197,16 +214,12 @@ lazy_static! {
     });
 }
 
-// Public interface functions
 pub fn _print(args: fmt::Arguments) {
-    use core::fmt::Write;
     use x86_64::instructions::interrupts;
 
     interrupts::without_interrupts(|| {
-        WRITER
-        .lock()
-        .write_fmt(args)
-        .expect("Printing to vga failed");
+        let mut writer = WriterGuard(WRITER.lock());
+        writer.write_fmt(args).unwrap();
     });
 }
 
