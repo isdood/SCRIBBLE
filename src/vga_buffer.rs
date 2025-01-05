@@ -1,5 +1,6 @@
 use volatile::Volatile;
 use core::fmt;
+use core::ops::Deref;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -82,7 +83,10 @@ impl Writer {
                     color_code: current_color,
                 };
 
-                self.buffer.chars[row][col].write(colored_char);
+                unsafe {
+                    self.buffer.chars[row][col].update(|_| colored_char);
+                }
+
                 self.column_position += 1;
                 self.update_cursor();
             }
@@ -104,8 +108,8 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
-                    self.buffer.chars[row - 1][col].write(character);
+                    let character = unsafe { self.buffer.chars[row][col].get_mut().clone() };
+                    unsafe { self.buffer.chars[row - 1][col].update(|_| character); }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -120,26 +124,30 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
+            unsafe { self.buffer.chars[row][col].update(|_| blank); }
         }
     }
 
     pub fn backspace(&mut self) {
         // Check if we're at the prompt position
-        if self.column_position <= 2 &&
-            self.buffer.chars[self.row_position][0].read().ascii_character == b'>' {
-                return;
-            }
+        if self.column_position <= 2 && unsafe {
+            self.buffer.chars[self.row_position][0].get_mut().ascii_character == b'>'
+        } {
+            return;
+        }
 
-            if self.column_position > 0 {
-                self.column_position -= 1;
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[self.row_position][self.column_position].write(blank);
-                self.update_cursor();
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            unsafe {
+                self.buffer.chars[self.row_position][self.column_position]
+                .update(|_| blank);
             }
+            self.update_cursor();
+        }
     }
 
     fn update_cursor(&mut self) {
