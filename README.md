@@ -1,11 +1,6 @@
-# scribble
-
-# > Compiles with no issue.
-
-# > Boots in QEMU via BIOS
-
-# > displays text correctly
-
-#   - No racing, no segfaults
-
-# ! Keyboard input not working
+# [STABLE]
+ - Compiles without issue
+ - Coloured text
+ - Memory management
+ - Keyboard driver
+ - VGA driver
