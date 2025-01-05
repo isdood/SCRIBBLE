@@ -68,7 +68,7 @@ impl Writer {
 
                 let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code: self.color_code,
+                    color_code: ColorCode::new(Color::Green, Color::Black), // Ensure consistent color
                 };
 
                 self.buffer.chars[self.row_position][self.column_position].write(colored_char);
@@ -106,7 +106,7 @@ impl Writer {
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: self.color_code,
+            color_code: ColorCode::new(Color::Green, Color::Black), // Ensure consistent color
         };
         for col in 0..BUFFER_WIDTH {
             self.buffer.chars[row][col].write(blank);
@@ -129,34 +129,25 @@ impl Writer {
 
     pub fn backspace(&mut self) {
         if self.column_position <= 2 && self.row_position == 0 {
-            // Don't backspace over initial prompt
             return;
         }
 
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: self.color_code,
+            color_code: ColorCode::new(Color::Green, Color::Black), // Ensure consistent color
         };
 
         if self.column_position > 0 {
             self.column_position -= 1;
             self.buffer.chars[self.row_position][self.column_position].write(blank);
         } else if self.row_position > 0 {
-            // Move to end of previous line
             self.row_position -= 1;
-            let mut last_col = BUFFER_WIDTH - 1;
-
-            // Find the last non-empty character
-            while last_col > 0 {
-                let char = self.buffer.chars[self.row_position][last_col - 1].read();
-                if char.ascii_character != b' ' {
-                    break;
+            self.column_position = BUFFER_WIDTH - 1;
+            while self.column_position > 0 &&
+                self.buffer.chars[self.row_position][self.column_position - 1].read().ascii_character == b' ' {
+                    self.column_position -= 1;
                 }
-                last_col -= 1;
-            }
-
-            self.column_position = last_col;
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
+                self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
         self.update_cursor();
     }
@@ -202,21 +193,22 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set cursor shape to underscore (lines 14-15)
+            // Set cursor shape to underscore
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line (14)
+            port_3d5.write(0x0D_u8);  // Start scan line (13)
 
     port_3d4.write(0x0B_u8);
-    port_3d5.write(0x0F_u8);  // End scan line (15)
+    port_3d5.write(0x0E_u8);  // End scan line (14)
 
-    // Enable cursor and make it white
+    // Enable cursor (clear bit 5)
     port_3d4.write(0x0A_u8);
-    let current = port_3d5.read();
-    port_3d5.write(current & 0xC0);
+    let mut cursor_state = port_3d5.read();
+    cursor_state &= 0xDF;  // Clear bit 5 to enable cursor
+    port_3d5.write(cursor_state);
 
     // Set cursor color to white
-    port_3d4.write(0x0E_u8);
-    port_3d5.write(0x0F_u8);
+    port_3d4.write(0x08_u8);
+    port_3d5.write(0x0F_u8);  // White (0x0F)
         }
     });
 }
@@ -233,7 +225,7 @@ pub fn clear_screen() {
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
 
-        // Clear screen with green text attributes
+        // Clear with consistent color attributes
         let blank = ScreenChar {
             ascii_character: b' ',
             color_code: ColorCode::new(Color::Green, Color::Black),
@@ -248,10 +240,10 @@ pub fn clear_screen() {
         writer.row_position = 0;
         writer.column_position = 0;
 
-        // Write initial prompt only
-        writer.write_string("> ");
-
-        // Enable white underscore cursor
+        // Enable cursor first
         enable_cursor();
+
+        // Then write prompt
+        writer.write_string("> ");
     });
 }
