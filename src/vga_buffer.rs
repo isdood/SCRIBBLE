@@ -221,7 +221,7 @@ impl Writer {
         self.column_position = 0;
         self.update_cursor();
         }
-    }
+
 
     pub fn clear_screen() {
         use x86_64::instructions::interrupts;
