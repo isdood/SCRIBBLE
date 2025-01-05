@@ -83,6 +83,37 @@ impl Writer {
                 self.column_position += 1;
                 self.update_cursor();
             }
+        }
+    }
+
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
+    fn new_line(&mut self) {
+        if self.row_position < BUFFER_HEIGHT - 1 {
+            self.row_position += 1;
+        } else {
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    unsafe {
+                        let char_ptr = &self.buffer.chars[row][col];
+                        let char_val = char_ptr.read_volatile();
+
+                        let dest_ptr = &mut self.buffer.chars[row - 1][col];
+                        dest_ptr.write_volatile(char_val);
+                    }
+                }
+            }
+            self.clear_row(BUFFER_HEIGHT - 1);
+        }
+        self.column_position = 0;
+        self.update_cursor();
     }
 
     fn move_cursor(&mut self) {
@@ -97,29 +128,6 @@ impl Writer {
             port_3d4.write(0x0E_u8);
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
         }
-    }
-
-    fn new_line(&mut self) {
-        if self.row_position < BUFFER_HEIGHT - 1 {
-            self.row_position += 1;
-        } else {
-            for row in 1..BUFFER_HEIGHT {
-                for col in 0..BUFFER_WIDTH {
-                    let character = unsafe {
-                        core::ptr::read_volatile(&self.buffer.chars[row][col] as *const Volatile<ScreenChar>)
-                    };
-                    unsafe {
-                        core::ptr::write_volatile(
-                            &mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>,
-                            character
-                        );
-                    }
-                }
-            }
-            self.clear_row(BUFFER_HEIGHT - 1);
-        }
-        self.column_position = 0;
-        self.move_cursor();
     }
 
     pub fn clear_row(&mut self, row: usize) {
@@ -170,16 +178,6 @@ impl Writer {
             self.move_cursor();
         }
     }
-
-    pub fn write_str(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
-        }
-    }
-
 }
 
 impl fmt::Write for Writer {
