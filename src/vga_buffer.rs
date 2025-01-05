@@ -64,28 +64,20 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First disable cursor completely
+            // First disable cursor
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Reset cursor size registers
+            // Set cursor shape (back to original working position)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);
+            port_3d5.write(0x0E_u8);  // Start scan line 14
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x00_u8);
+            port_3d5.write(0x0F_u8);  // End scan line 15
 
-            // Set for maximum visibility (full block)
-            // In VGA text mode, scan lines 0-7 are the primary character cell
-            // and scan lines 8-15 are the attribute/color cell
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x06_u8);  // Start at scan line 6
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x07_u8);  // End at scan line 7
-
-            // Enable cursor with maximum intensity
+            // Enable cursor
             port_3d4.write(0x0A_u8);
             let cur_state = port_3d5.read() as u8;
-            port_3d5.write((cur_state & !0x20) | 0x00);
+            port_3d5.write(cur_state & !0x20);
         }
     }
 
@@ -223,16 +215,23 @@ impl Writer {
     }
 
     pub fn set_color(&mut self, foreground: Color, background: Color) {
+        // Set text color
         self.color_code = ColorCode::new(foreground, background);
+
+        // Set cursor color to white (override the text color for cursor)
+        let cursor_color = ColorCode::new(Color::White, Color::White);
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            // Select cursor color register
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(cursor_color.0);
+        }
     }
 }
 
-impl fmt::Write for Writer {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
-        Ok(())
-    }
-}
 
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
