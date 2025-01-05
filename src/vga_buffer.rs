@@ -64,17 +64,19 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First completely disable cursor
+            // First disable cursor
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape (try a different combination for white cursor)
+            // Try a different approach for white cursor:
+            // Using scan lines 14-15 (just bottom of character)
+            // This often appears as a white underline which becomes a block
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x01_u8);  // Start at scan line 1
+            port_3d5.write(0x0E_u8);  // Start at scan line 14
             port_3d4.write(0x0B_u8);
             port_3d5.write(0x0F_u8);  // End at scan line 15
 
-            // Re-enable cursor
+            // Enable cursor
             port_3d4.write(0x0A_u8);
             let cur_state = port_3d5.read() as u8;
             port_3d5.write(cur_state & !0x20);
@@ -154,6 +156,14 @@ impl Writer {
             let current_row = self.row_position;
             self.row_position -= 1;
 
+            // Save first line content if we're moving back to it
+            let mut first_line_content = [blank; BUFFER_WIDTH];
+            if self.row_position == 0 {
+                for i in 0..BUFFER_WIDTH {
+                    first_line_content[i] = self.buffer.chars[0][i].read();
+                }
+            }
+
             // Find the last non-space character in previous line
             self.column_position = BUFFER_WIDTH;
             while self.column_position > 0 {
@@ -164,18 +174,26 @@ impl Writer {
                 self.column_position -= 1;
             }
 
-            // Clear the entire current (old) row
+            // Clear the current (old) row
             for col in 0..BUFFER_WIDTH {
                 self.buffer.chars[current_row][col].write(blank);
             }
 
-            // Handle first line specially
+            // If moving back to first line, restore its content
             if self.row_position == 0 {
-                let orig_pos = self.column_position;
-                self.clear_row(0);
-                self.column_position = 0;
-                self.write_string("> ");
-                self.column_position = orig_pos;
+                // Restore first line content
+                for i in 0..BUFFER_WIDTH {
+                    self.buffer.chars[0][i].write(first_line_content[i]);
+                }
+                // Ensure cursor position is after the last character
+                self.column_position = 2;  // Start after prompt
+                while self.column_position < BUFFER_WIDTH {
+                    let char = self.buffer.chars[0][self.column_position].read();
+                    if char.ascii_character == b' ' {
+                        break;
+                    }
+                    self.column_position += 1;
+                }
             }
         }
 
