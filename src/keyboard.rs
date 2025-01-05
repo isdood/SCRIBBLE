@@ -1,5 +1,4 @@
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1, KeyCode};
-use crate::{print, println};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use crate::interrupts::{InterruptIndex, PICS};
@@ -19,16 +18,15 @@ pub fn handle_scancode(scancode: u8) {
                 DecodedKey::Unicode(character) => {
                     match character {
                         '\n' => {
-                            println!();
-                            // Add time display when enter is pressed
+                            crate::println!();
                             crate::show_datetime();
-                            print!("> ");
+                            crate::print!("> ");
                         }
                         '\u{0008}' => { // Backspace character
                             crate::vga_buffer::backspace();
                         }
                         _ => {
-                            print!("{}", character);
+                            crate::print!("{}", character);
                         }
                     }
                 }
@@ -41,7 +39,7 @@ pub fn handle_scancode(scancode: u8) {
     }
 }
 
-extern "x86-interrupt" fn keyboard_interrupt_handler(
+pub extern "x86-interrupt" fn keyboard_interrupt_handler(
     _stack_frame: InterruptStackFrame)
 {
     use x86_64::instructions::port::Port;

@@ -5,6 +5,8 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+extern crate alloc;  // Add this line
+
 pub mod vga_buffer;
 pub mod gdt;
 pub mod interrupts;
@@ -17,45 +19,62 @@ pub mod rtc;
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
 
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
+
 pub fn init_kernel(boot_info: &'static BootInfo) {
     // Disable interrupts during initialization
     x86_64::instructions::interrupts::disable();
 
-    println!("Initializing GDT...");
+    crate::println!("Initializing GDT...");
     gdt::init();
 
-    println!("Initializing IDT...");
+    crate::println!("Initializing IDT...");
     interrupts::init_idt();
 
-    println!("Initializing PIC...");
+    crate::println!("Initializing PIC...");
     unsafe {
         interrupts::PICS.lock().initialize();
     }
 
-    println!("Initializing memory management...");
+    crate::println!("Initializing memory management...");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
 
-    println!("Initializing heap...");
+    crate::println!("Initializing heap...");
     allocator::init_heap(&mut mapper, &mut frame_allocator)
     .expect("heap initialization failed");
 
-    println!("Initializing VGA...");
+    crate::println!("Initializing VGA...");
     vga_buffer::init();
 
-    // Enable interrupts last
-    println!("Enabling interrupts...");
+    crate::println!("Enabling interrupts...");
     x86_64::instructions::interrupts::enable();
+}
+
+#[inline]
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
 pub fn show_datetime() {
     let mut rtc = rtc::RTC_DEVICE.lock();
-    let datetime = rtc.format_datetime();
-    println!("Current Date and Time (UTC): {}", datetime);
-    println!("Current User's Login: isdood");
+    let (year, month, day) = rtc.get_date();
+    let (hours, minutes, seconds) = rtc.get_time();
+    crate::println!("Current Date and Time (UTC): {}-{:02}-{:02} {:02}:{:02}:{:02}",
+                    year, month, day, hours, minutes, seconds);
+    crate::println!("Current User's Login: isdood");
 }
-
-// ... rest of your existing lib.rs code ...

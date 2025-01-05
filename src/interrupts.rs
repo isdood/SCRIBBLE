@@ -16,11 +16,11 @@ pub enum InterruptIndex {
 }
 
 impl InterruptIndex {
-    fn as_u8(self) -> u8 {
+    pub fn as_u8(self) -> u8 {  // Make this public
         self as u8
     }
 
-    fn as_usize(self) -> usize {
+    pub fn as_usize(self) -> usize {  // Make this public too
         usize::from(self.as_u8())
     }
 }
