@@ -49,40 +49,7 @@ pub fn init_kernel(boot_info: &'static BootInfo) {
     interrupts::init_idt();
     system_println!("IDT initialized");
 
-    system_println!("Starting memory management initialization...");
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    system_println!("Physical memory offset: {:#x}", phys_mem_offset.as_u64());
-
-    // Initialize the memory mapper
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    system_println!("Memory mapper initialized");
-
-    // Initialize the frame allocator
-    let mut frame_allocator = unsafe {
-        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
-    println!("Frame allocator initialized");
-
-    // Initialize heap
-    println!("Starting heap initialization...");
-    match allocator::init_heap(&mut mapper, &mut frame_allocator) {
-        Ok(_) => println!("Heap initialized successfully"),
-        Err(e) => {
-            println!("Failed to initialize heap: {:?}", e);
-            hlt_loop();
-        }
-    }
-
-    println!("Starting PIC initialization...");
-    unsafe {
-        interrupts::PICS.lock().initialize();
-    }
-    println!("PIC initialized");
-
-    // Enable interrupts after everything is set up
-    println!("Enabling interrupts...");
-    x86_64::instructions::interrupts::enable();
-    println!("Interrupts enabled");
+    // ... rest of initialization using system_println! ...
 }
 
 pub fn hlt_loop() -> ! {

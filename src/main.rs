@@ -15,6 +15,8 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
+    use scribble::{print, system_println};
+
     system_println!("Booting Scribble OS...");
     system_println!("Starting kernel initialization...");
 

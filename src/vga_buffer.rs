@@ -56,7 +56,7 @@ pub struct Writer {
     row_position: usize,
     color_code: ColorCode,
     input_color: ColorCode,
-    is_system_output: bool,  // Add this field
+    is_system_output: bool,
     buffer: &'static mut Buffer,
 }
 
@@ -87,10 +87,11 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
-                // Use system color (green) for prompts and system messages
                 let color = if self.is_system_output {
                     self.color_code  // Green for system messages
-                } else if self.is_prompt_position() {
+                } else if col < 2 && unsafe {
+                    self.buffer.chars[row][0].read_volatile().ascii_character == b'>'
+                } {
                     self.color_code  // Green for prompt
                 } else {
                     self.input_color // White for user input
@@ -117,12 +118,6 @@ impl Writer {
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
                 _ => self.write_byte(0xfe),
             }
-        }
-    }
-
-    fn is_prompt_position(&self) -> bool {
-        self.column_position < 2 && unsafe {
-            self.buffer.chars[self.row_position][0].read_volatile().ascii_character == b'>'
         }
     }
 
@@ -184,8 +179,9 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // Don't allow backspace over prompt
-        if self.column_position <= 2 && self.is_prompt_position() {
+        if self.column_position <= 2 && unsafe {
+            self.buffer.chars[self.row_position][0].read_volatile().ascii_character == b'>'
+        } {
             return;
         }
 
@@ -221,14 +217,8 @@ lazy_static! {
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
                                                       input_color: ColorCode::new(Color::White, Color::Black),
+                                                      is_system_output: true,
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
-}
-
-pub fn set_system_output(enabled: bool) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().set_system_output(enabled);
     });
 }
 
@@ -277,6 +267,13 @@ pub fn set_input_color(foreground: Color, background: Color) {
     });
 }
 
+pub fn set_system_output(enabled: bool) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().set_system_output(enabled);
+    });
+}
+
 pub fn enable_cursor() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
@@ -299,4 +296,24 @@ pub fn enable_cursor() {
 
 pub fn init() {
     enable_cursor();
+}
+
+#[macro_export]
+macro_rules! _system_print {
+    ($($arg:tt)*) => ({
+        $crate::vga_buffer::set_system_output(true);
+        $crate::print!($($arg)*);
+        $crate::vga_buffer::set_system_output(false);
+    });
+}
+
+#[macro_export]
+macro_rules! system_print {
+    ($($arg:tt)*) => ($crate::_system_print!($($arg)*));
+}
+
+#[macro_export]
+macro_rules! system_println {
+    () => ($crate::system_print!("\n"));
+    ($($arg:tt)*) => ($crate::system_print!("{}\n", format_args!($($arg)*)));
 }
