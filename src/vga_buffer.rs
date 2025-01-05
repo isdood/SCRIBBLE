@@ -57,8 +57,8 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
-pub fn enable_cursor(&mut self) {
-    unsafe {
+    pub fn enable_cursor(&mut self) {
+        unsafe {
         use x86_64::instructions::port::Port;
         let mut port_3d4 = Port::new(0x3D4);
         let mut port_3d5 = Port::new(0x3D5);
@@ -77,8 +77,8 @@ pub fn enable_cursor(&mut self) {
         port_3d4.write(0x0A_u8);
         let cur_state = port_3d5.read() as u8;
         port_3d5.write(cur_state & !0x20);
+        }
     }
-
     pub fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
 
