@@ -50,5 +50,5 @@ macro_rules! println {
 }
 
 pub fn init_vga() {
-    vga_buffer::clear_screen();  // This handles everything
+    vga_buffer::init();
 }

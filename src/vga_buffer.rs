@@ -67,16 +67,12 @@ impl Writer {
                     self.new_line();
                 }
 
-                // Store current character's color
-                let current = self.buffer.chars[self.row_position][self.column_position].read();
-
-                // Write the new character
                 let colored_char = ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
                 };
-                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
 
+                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
                 self.column_position += 1;
                 self.update_cursor();
             }
@@ -93,17 +89,10 @@ impl Writer {
     }
 
     fn new_line(&mut self) {
-        // Restore current character color
-        let current = self.buffer.chars[self.row_position][self.column_position].read();
-        let restored_char = ScreenChar {
-            ascii_character: current.ascii_character,
-            color_code: self.color_code,
-        };
-        self.buffer.chars[self.row_position][self.column_position].write(restored_char);
-
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
+            // Scroll everything up
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     let character = self.buffer.chars[row][col].read();
@@ -113,6 +102,9 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
+
+        // Write prompt at start of new line
+        self.write_string("> ");
         self.update_cursor();
     }
 
@@ -150,23 +142,25 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        if self.column_position <= 2 && self.row_position == 0 {
+        // Prevent backspacing over prompt ("> ")
+        if self.row_position == 0 && self.column_position <= 2 {
             return;
         }
 
-        // Restore current character color
-        let current = self.buffer.chars[self.row_position][self.column_position].read();
-        let restored_char = ScreenChar {
-            ascii_character: current.ascii_character,
+        let blank = ScreenChar {
+            ascii_character: b' ',
             color_code: self.color_code,
         };
-        self.buffer.chars[self.row_position][self.column_position].write(restored_char);
 
         if self.column_position > 0 {
             self.column_position -= 1;
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
         } else if self.row_position > 0 {
+            // Move to end of previous line
             self.row_position -= 1;
             self.column_position = BUFFER_WIDTH - 1;
+
+            // Find the last non-space character
             while self.column_position > 0 {
                 let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
                 if char.ascii_character != b' ' {
@@ -174,7 +168,11 @@ impl Writer {
                 }
                 self.column_position -= 1;
             }
+
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
+        self.update_cursor();
+    }
 
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -251,22 +249,29 @@ pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
-
         let blank = ScreenChar {
             ascii_character: b' ',
             color_code: writer.color_code,
         };
 
+        // Clear entire screen
         for row in 0..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 writer.buffer.chars[row][col].write(blank);
             }
         }
 
+        // Reset position
         writer.row_position = 0;
         writer.column_position = 0;
 
+        // Enable cursor and write prompt
         enable_cursor();
         writer.write_string("> ");
     });
+}
+
+pub fn init() {
+    enable_cursor();
+    clear_screen();
 }
