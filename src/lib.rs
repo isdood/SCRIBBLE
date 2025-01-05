@@ -37,10 +37,7 @@ pub fn hlt_loop() -> ! {
 }
 
 pub fn init_vga() {
-    let mut writer = vga_buffer::WRITER.lock();
-    writer.enable_cursor(); // Now public
-    drop(writer);
-
+    vga_buffer::enable_cursor(); // Use the public function instead
     vga_buffer::clear_screen();
     vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
 }
