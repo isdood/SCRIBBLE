@@ -3,40 +3,7 @@ use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
-const BUFFER_HEIGHT: usize = 25;
-const BUFFER_WIDTH: usize = 80;
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Color {
-    Black = 0,
-    Blue = 1,
-    Green = 2,
-    Cyan = 3,
-    Red = 4,
-    Magenta = 5,
-    Brown = 6,
-    LightGray = 7,
-    DarkGray = 8,
-    LightBlue = 9,
-    LightGreen = 10,
-    LightCyan = 11,
-    LightRed = 12,
-    Pink = 13,
-    Yellow = 14,
-    White = 15,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-struct ColorCode(u8);
-
-impl ColorCode {
-    const fn new(foreground: Color, background: Color) -> ColorCode {
-        ColorCode((background as u8) << 4 | (foreground as u8))
-    }
-}
+// ... (Color enum and ColorCode implementations remain the same)
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
@@ -79,6 +46,36 @@ impl Writer {
         }
     }
 
+    pub fn backspace(&mut self) {
+        if self.column_position <= 2 {
+            return;
+        }
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar::new(b' ', self.color_code);
+            unsafe {
+                (*(&mut self.buffer.chars[self.row_position][self.column_position]
+                as *mut Volatile<ScreenChar>)) = Volatile::new(blank);
+            }
+            self.update_cursor();
+        }
+    }
+
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
+
     fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -109,6 +106,7 @@ impl Writer {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     unsafe {
+                        // Use raw pointer operations instead of read/write methods
                         let character = (*(&self.buffer.chars[row][col] as *const Volatile<ScreenChar>)).read();
                         (*(&mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>)) =
                         Volatile::new(character);
@@ -141,6 +139,7 @@ impl Writer {
     }
 }
 
+// Single implementation of Write trait
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_string(s);
@@ -155,13 +154,6 @@ lazy_static! {
         color_code: ColorCode::new(Color::Green, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
-}
-
-impl fmt::Write for Writer {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
-        Ok(())
-    }
 }
 
 pub fn _print(args: fmt::Arguments) {
