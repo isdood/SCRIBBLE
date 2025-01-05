@@ -230,31 +230,51 @@ pub fn backspace() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
-        if writer.column_position > 0 || writer.row_position > 0 {
-            // Don't backspace if we're at the prompt
-            if writer.row_position == BUFFER_HEIGHT - 1 && writer.column_position <= 2 {
-                return;
-            }
 
-            // Store current position
-            let row = writer.row_position;
-            let col = writer.column_position;
+        // Debug print current position
+        serial_println!("Current position: row={}, col={}",
+                        writer.row_position, writer.column_position);
 
-            // Move cursor back
-            if writer.column_position > 0 {
-                writer.column_position -= 1;
-            } else if writer.row_position > 0 {
-                writer.row_position -= 1;
-                writer.column_position = BUFFER_WIDTH - 1;
-            }
-
-            // Clear the character at the stored position
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: writer.color_code,
-            };
-            writer.buffer.chars[row][col].write(blank);
-            writer.update_cursor();
+        // Only proceed if we're not at the start of the buffer or at the prompt
+        if writer.row_position == BUFFER_HEIGHT - 1 && writer.column_position <= 2 {
+            serial_println!("At prompt, not backspacing");
+            return;
         }
+
+        // Store current position
+        let current_row = writer.row_position;
+        let current_col = writer.column_position;
+
+        // Calculate new position
+        let (new_row, new_col) = if current_col > 0 {
+            (current_row, current_col - 1)
+        } else if current_row > 0 {
+            (current_row - 1, BUFFER_WIDTH - 1)
+        } else {
+            serial_println!("At buffer start, not backspacing");
+            return;
+        };
+
+        // Clear the character at current position
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: writer.color_code,
+        };
+
+        // Debug print the operation
+        serial_println!("Clearing character at row={}, col={}", current_row, current_col);
+
+        // Perform the clear
+        writer.buffer.chars[current_row][current_col].write(blank);
+
+        // Update position
+        writer.row_position = new_row;
+        writer.column_position = new_col;
+
+        // Debug print new position
+        serial_println!("New position: row={}, col={}", new_row, new_col);
+
+        // Update cursor
+        writer.update_cursor();
     });
 }
