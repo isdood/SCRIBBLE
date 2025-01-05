@@ -164,42 +164,6 @@ impl Writer {
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
         }
     }
-
-    pub fn backspace(&mut self) {
-        // Don't backspace past the prompt
-        if self.row_position == 0 && self.column_position <= 2 {
-            return;
-        }
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-            self.update_cursor();
-        } else if self.row_position > 0 {
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-
-            // Find last non-space character on previous line
-            while self.column_position > 0 {
-                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
-                if char.ascii_character != b' ' {
-                    break;
-                }
-                self.column_position -= 1;
-            }
-
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-            self.update_cursor();
-        }
-    }
 }
 
 impl fmt::Write for Writer {
