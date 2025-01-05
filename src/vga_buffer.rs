@@ -200,7 +200,7 @@ impl Writer {
         }
 
         self.update_cursor();
-    }
+}
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
