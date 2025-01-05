@@ -2,6 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
+use x86_64::instructions::port::{Port, PortGeneric, ReadWriteAccess};
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -59,15 +60,6 @@ pub struct Writer {
 }
 
 impl Writer {
-
-    pub fn set_prompt_row(&mut self, row: usize) {
-        self.prompt_row = row;
-    }
-
-    pub fn get_row_position(&self) -> usize {
-        self.row_position
-    }
-
     fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -100,7 +92,6 @@ impl Writer {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
-            // Scroll the screen
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     let character = self.buffer.chars[row][col].read();
@@ -108,7 +99,6 @@ impl Writer {
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
-            self.prompt_row = self.prompt_row.saturating_sub(1); // Update prompt row when scrolling
         }
         self.column_position = 0;
         self.update_cursor();
@@ -128,8 +118,8 @@ impl Writer {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
             use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
+            let mut port_3d4: Port<u8> = Port::new(0x3D4);
+            let mut port_3d5: Port<u8> = Port::new(0x3D5);
 
             port_3d4.write(0x0F_u8);
             port_3d5.write((pos & 0xFF) as u8);
@@ -139,9 +129,7 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // Only protect prompt character on prompt lines
-        let is_at_prompt = self.column_position <= 2 && self.row_position == self.prompt_row;
-        if is_at_prompt {
+        if self.column_position <= 2 {
             return;
         }
 
@@ -169,10 +157,8 @@ lazy_static! {
         column_position: 0,
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
-                                                      prompt_row: 3,  // Initialize prompt row
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
-
 }
 
 pub fn enable_cursor() {
@@ -180,60 +166,35 @@ pub fn enable_cursor() {
     interrupts::without_interrupts(|| {
         unsafe {
             use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
+            let mut port_3d4: Port<u8> = Port::new(0x3D4);
+            let mut port_3d5: Port<u8> = Port::new(0x3D5);
+            let mut port_3c0: Port<u8> = Port::new(0x3C0);
+            let mut port_3da: Port<u8> = Port::new(0x3DA);
 
-            // Set cursor shape (more visible)
+            // Reset attribute controller
+            port_3da.read();  // Reset flip-flop
+            port_3c0.write(0x20_u8);  // Enable video
+
+            // Set cursor shape
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0D_u8);  // Start scan line
+            port_3d5.write(0x00_u8);  // Start scan line
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0E_u8);  // End scan line
+            port_3d5.write(0x0F_u8);  // End scan line (full block)
 
-            // Enable cursor with high intensity
-            port_3d4.write(0x0A_u8);
-            let current = port_3d5.read();
-            port_3d5.write(current & !0x20);
+    // Enable cursor with high intensity
+    port_3d4.write(0x0A_u8);
+    let current = port_3d5.read();
+    port_3d5.write(current & !0x20);
+
+    // Set cursor color to white
+    port_3c0.write(0x0D_u8);  // Select cursor color register
+    port_3c0.write(0x0F_u8);  // Set to white (intensity + RGB)
         }
     });
 }
 
 pub fn init() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        unsafe {
-            // Reset VGA registers
-            use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
-            let mut port_3c0 = Port::new(0x3C0);
-
-            // Enable video output
-            let mut port_3da = Port::new(0x3DA);
-            port_3da.read(); // Reset flip-flop
-            port_3c0.write(0x20_u8); // Enable video
-
-            // Set cursor shape
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0D_u8);  // Cursor start line (moved down)
-    port_3d4.write(0x0B_u8);
-    port_3d5.write(0x0E_u8);  // Cursor end line
-
-    // Enable cursor (clear bit 5)
-    port_3d4.write(0x0A_u8);
-    let mut cursor_state = port_3d5.read();
-    cursor_state &= !0x20;
-    port_3d5.write(cursor_state);
-        }
-    });
-
-    // Initialize Writer state
-    let mut writer = WRITER.lock();
-    writer.row_position = 0;
-    writer.column_position = 0;
-    writer.color_code = ColorCode::new(Color::Green, Color::Black);
-
-    // Clear screen to ensure clean state
-    clear_screen();
+    enable_cursor();
 }
 
 pub fn _print(args: fmt::Arguments) {
@@ -263,36 +224,10 @@ pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: writer.color_code,
-        };
-
         for row in 0..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                writer.buffer.chars[row][col].write(blank);
-            }
+            writer.clear_row(row);
         }
         writer.row_position = 0;
         writer.column_position = 0;
-        writer.update_cursor();
-    });
-}
-
-// Add this new function for VGA power-on
-fn vga_enable_output() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3c0 = Port::new(0x3C0);
-            let mut port_3da = Port::new(0x3DA);
-
-            // Reset attribute controller flip-flop
-            port_3da.read();
-
-            // Enable video output
-            port_3c0.write(0x20_u8);
-        }
     });
 }

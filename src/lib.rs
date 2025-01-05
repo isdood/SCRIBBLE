@@ -1,7 +1,7 @@
 #![no_std]
 #![cfg_attr(test, no_main)]
 #![feature(custom_test_frameworks)]
-#![feature(abi_x86_interrupt)]  // Add this line
+#![feature(abi_x86_interrupt)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
@@ -13,6 +13,7 @@ pub mod memory;
 pub mod keyboard;
 
 use bootloader::BootInfo;
+use vga_buffer::{Color, clear_screen, set_color, enable_cursor};
 
 pub fn init_heap(_boot_info: &'static BootInfo) {
     // Your heap initialization code here
@@ -56,5 +57,6 @@ pub fn init_vga() {
     println!("Welcome to Scribble OS");
     println!("Kernel initialized");
     println!("");  // Blank line
+    enable_cursor();  // Enable cursor with proper settings
     print!("> ");  // Print prompt
 }
