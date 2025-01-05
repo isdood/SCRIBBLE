@@ -57,10 +57,8 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
-// Previous color, buffer, and other struct definitions remain the same...
-
 impl Writer {
-    pub fn enable_cursor(&mut self) {
+    fn enable_cursor(&mut self) {
         unsafe {
             use x86_64::instructions::port::Port;
             let mut port_3d4 = Port::new(0x3D4);
@@ -78,13 +76,18 @@ impl Writer {
 
             // Enable cursor (high intensity white)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);  // Enable and force high intensity
+            port_3d5.write(0x00_u8);
         }
+        self.update_cursor();
+    }
+
+    fn set_color(&mut self, foreground: Color, background: Color) {
+        self.color_code = ColorCode::new(foreground, background);
     }
 
     fn backspace(&mut self) {
         if self.row_position == 0 && self.column_position <= 2 {
-            return;  // Protect prompt
+            return;
         }
 
         let blank = ScreenChar {
@@ -108,55 +111,6 @@ impl Writer {
             self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
         self.update_cursor();
-    }
-
-    fn new_line(&mut self) {
-        if self.row_position < BUFFER_HEIGHT - 1 {
-            self.row_position += 1;
-        } else {
-            for row in 1..BUFFER_HEIGHT {
-                for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
-                    self.buffer.chars[row - 1][col].write(character);
-                }
-            }
-            self.clear_row(BUFFER_HEIGHT - 1);
-        }
-        self.column_position = 0;
-        self.update_cursor();
-    }
-}
-
-// Remove prompt from lazy_static initialization
-lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        row_position: 0,
-        color_code: ColorCode::new(Color::Green, Color::Black),
-                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
-}
-
-pub fn clear_screen() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
-        }
-        writer.row_position = 0;
-        writer.column_position = 0;
-        writer.write_string("> ");  // Single prompt
-        writer.enable_cursor();     // Set up white underscore cursor
-    });
-}
-    pub fn enable_cursor(&mut self) {
-        self.set_cursor_style();
-        self.update_cursor();
-    }
-
-    pub fn set_color(&mut self, foreground: Color, background: Color) {
-        self.color_code = ColorCode::new(foreground, background);
     }
 
     fn update_cursor(&mut self) {
@@ -225,8 +179,8 @@ pub fn clear_screen() {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.write_string("> ");
         self.update_cursor();
+    }
 }
 
 impl fmt::Write for Writer {
@@ -242,20 +196,6 @@ lazy_static! {
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
-}
-
-pub fn clear_screen() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
-        }
-        writer.row_position = 0;
-        writer.column_position = 0;
-        writer.write_string("> ");  // Single prompt
-        writer.enable_cursor();     // Set up white underscore cursor
     });
 }
 
@@ -277,6 +217,20 @@ pub fn backspace() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         WRITER.lock().backspace();
+    });
+}
+
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.write_string("> ");
+        writer.enable_cursor();
     });
 }
 
