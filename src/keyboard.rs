@@ -1,5 +1,5 @@
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1, KeyCode};
-use crate::{print, vga_buffer, serial_println};
+use crate::{print, vga_buffer};
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -16,19 +16,16 @@ pub fn handle_scancode(scancode: u8) {
             match key {
                 DecodedKey::Unicode(character) => {
                     if character == '\n' {
-                        print!("\n");  // Just newline, no prompt
-                    } else if character as u8 == 8 {  // ASCII backspace
+                        print!("\n> ");  // Add prompt on newline
+                    } else if character as u8 == 8 {
                         vga_buffer::backspace();
                     } else {
                         print!("{}", character);
                     }
                 }
                 DecodedKey::RawKey(key) => {
-                    match key {
-                        KeyCode::Backspace => {
-                            vga_buffer::backspace();
-                        },
-                        _ => {}
+                    if let KeyCode::Backspace = key {
+                        vga_buffer::backspace();
                     }
                 }
             }
