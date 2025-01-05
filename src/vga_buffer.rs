@@ -58,32 +58,125 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
-pub fn backspace(&mut self) {
-    // Don't backspace if we're at the prompt ("> ")
-    if self.row_position == BUFFER_HEIGHT - 1 && self.column_position <= 2 {
-        return;
+impl Writer {
+    pub fn enable_cursor(&mut self) {
+        unsafe {
+            use x86_64::instructions::port::Port;
+
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0A_u8);
+            let cur_state = port_3d5.read() as u8;
+            port_3d5.write((cur_state & !0x20) as u8);
+
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(0x0F_u8);
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(0x0F_u8);
+        }
     }
 
-    // Move cursor back
-    if self.column_position > 0 {
-        self.column_position -= 1;
-    } else if self.row_position > 0 {
-        self.row_position -= 1;
-        self.column_position = BUFFER_WIDTH - 1;
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
     }
 
-    // Create a blank character
-    let blank = ScreenChar {
-        ascii_character: b' ',
-        color_code: self.color_code,
-    };
+    pub fn backspace(&mut self) {
+        // Don't backspace if we're at the prompt ("> ")
+        if self.row_position == BUFFER_HEIGHT - 1 && self.column_position <= 2 {
+            return;
+        }
 
-    // Clear the character at the current position
-    self.buffer.chars[self.row_position][self.column_position].write(blank);
+        // Move cursor back
+        if self.column_position > 0 {
+            self.column_position -= 1;
+        } else if self.row_position > 0 {
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+        }
 
-    // Update the cursor position
-    self.update_cursor();
-}
+        // Create a blank character
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+
+        // Clear the character at the current position
+        self.buffer.chars[self.row_position][self.column_position].write(blank);
+
+        // Update the cursor position
+        self.update_cursor();
+    }
+
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => {
+                self.new_line();
+                self.write_str("> ");
+            },
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let colored_char = ScreenChar {
+                    ascii_character: byte,
+                    color_code: self.color_code,
+                };
+
+                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
+                self.column_position += 1;
+                self.update_cursor();
+            }
+        }
+    }
+
+    fn write_str(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
+        }
+    }
+
+    fn new_line(&mut self) {
+        if self.row_position < BUFFER_HEIGHT - 1 {
+            self.row_position += 1;
+        } else {
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col].write(character);
+                }
+            }
+            self.clear_row(BUFFER_HEIGHT - 1);
+        }
+        self.column_position = 0;
+        self.update_cursor();
+    }
+
 
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
