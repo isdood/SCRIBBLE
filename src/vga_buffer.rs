@@ -96,8 +96,8 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // Don't backspace if we're at the prompt ("> ")
-        if self.row_position == BUFFER_HEIGHT - 1 && self.column_position <= 2 {
+        // Check if we're at the beginning of all text (first prompt)
+        if self.row_position == 0 && self.column_position <= 2 {
             return;
         }
 
@@ -106,7 +106,19 @@ impl Writer {
             self.column_position -= 1;
         } else if self.row_position > 0 {
             self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
+            // Find the last non-empty character in the previous line
+            let mut last_col = BUFFER_WIDTH - 1;
+            while last_col > 0 {
+                let char = self.buffer.chars[self.row_position][last_col].read();
+                if char.ascii_character != b' ' {
+                    break;
+                }
+                last_col -= 1;
+            }
+            self.column_position = last_col + 1;
+            if self.column_position >= BUFFER_WIDTH {
+                self.column_position = BUFFER_WIDTH - 1;
+            }
         }
 
         // Create a blank character
@@ -126,7 +138,7 @@ impl Writer {
         match byte {
             b'\n' => {
                 self.new_line();
-                self.write_str("> ");
+                // Remove the prompt writing from here since it's handled in new_line
             },
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
@@ -145,25 +157,6 @@ impl Writer {
         }
     }
 
-    fn write_str(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
-        }
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
-    }
-
     fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
@@ -177,6 +170,10 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
+
+        // Write the prompt here, after moving to the new line
+        self.write_str("> ");
+
         self.update_cursor();
     }
 }
