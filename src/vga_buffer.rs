@@ -54,7 +54,6 @@ pub struct Writer {
     column_position: usize,
     row_position: usize,
     color_code: ColorCode,
-    cursor_color: ColorCode,  // Add cursor color
     buffer: &'static mut Buffer,
 }
 
