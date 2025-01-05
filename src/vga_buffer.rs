@@ -72,8 +72,23 @@ impl Writer {
                     color_code: self.color_code,
                 };
 
+                // Save current character
+                let current = self.buffer.chars[self.row_position][self.column_position].read();
+
+                // Write new character
                 self.buffer.chars[self.row_position][self.column_position].write(colored_char);
                 self.column_position += 1;
+
+                // Update cursor with white color
+                let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+                if self.column_position < BUFFER_WIDTH {
+                    let cursor_char = ScreenChar {
+                        ascii_character: self.buffer.chars[self.row_position][self.column_position].read().ascii_character,
+                        color_code: ColorCode::new(Color::White, Color::Black),
+                    };
+                    self.buffer.chars[self.row_position][self.column_position].write(cursor_char);
+                }
+
                 self.update_cursor();
             }
         }
@@ -186,10 +201,10 @@ lazy_static! {
         column_position: 0,
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
-                                                      cursor_color: ColorCode::new(Color::White, Color::Black),  // Add cursor color
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
+
 
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
@@ -239,13 +254,6 @@ pub fn clear_screen() {
         writer.row_position = 0;
         writer.column_position = 0;
     });
-}
-
-pub fn init_vga() {
-    println!("Welcome to Scribble OS");
-    println!("");  // Add a blank line
-    enable_cursor();  // Enable cursor first
-    print!("> ");    // Print prompt after boot messages
 }
 
 pub fn init() {
