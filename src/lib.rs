@@ -50,9 +50,11 @@ macro_rules! println {
 }
 
 pub fn init_vga() {
+    use crate::{print, println};
+
     println!("Welcome to Scribble OS");
     println!("Kernel initialized");
     println!("");  // Add blank line
-    vga_buffer::enable_cursor();
+    vga_buffer::init();  // Enable cursor
     print!("> ");  // Print prompt after messages
 }
