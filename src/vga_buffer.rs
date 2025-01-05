@@ -54,7 +54,7 @@ pub struct Writer {
     column_position: usize,
     row_position: usize,
     color_code: ColorCode,
-    last_char_color: ColorCode,
+    cursor_color: ColorCode,
     buffer: &'static mut Buffer,
 }
 
@@ -67,13 +67,18 @@ impl Writer {
                     self.new_line();
                 }
 
-                // Save current character's color before overwriting
-                let current = self.buffer.chars[self.row_position][self.column_position].read();
-                self.last_char_color = current.color_code;
+                // Restore the previous character's color
+                if self.column_position > 0 {
+                    let prev_char = self.buffer.chars[self.row_position][self.column_position - 1].read();
+                    self.buffer.chars[self.row_position][self.column_position - 1].write(ScreenChar {
+                        ascii_character: prev_char.ascii_character,
+                        color_code: self.color_code,
+                    });
+                }
 
                 let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code: ColorCode::new(Color::Green, Color::Black),
+                    color_code: self.color_code,
                 };
 
                 self.buffer.chars[self.row_position][self.column_position].write(colored_char);
@@ -93,13 +98,12 @@ impl Writer {
     }
 
     fn new_line(&mut self) {
-        // Restore color of current position
-        let current = self.buffer.chars[self.row_position][self.column_position].read();
-        let restored_char = ScreenChar {
-            ascii_character: current.ascii_character,
-            color_code: ColorCode::new(Color::Green, Color::Black),
-        };
-        self.buffer.chars[self.row_position][self.column_position].write(restored_char);
+        // Restore current character color before moving
+        let current_char = self.buffer.chars[self.row_position][self.column_position].read();
+        self.buffer.chars[self.row_position][self.column_position].write(ScreenChar {
+            ascii_character: current_char.ascii_character,
+            color_code: self.color_code,
+        });
 
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
@@ -119,7 +123,7 @@ impl Writer {
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: ColorCode::new(Color::Green, Color::Black),
+            color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
             self.buffer.chars[row][col].write(blank);
@@ -129,13 +133,12 @@ impl Writer {
     fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
 
-        // Make the character at cursor position white
-        let current = self.buffer.chars[self.row_position][self.column_position].read();
-        let white_char = ScreenChar {
-            ascii_character: current.ascii_character,
-            color_code: ColorCode::new(Color::White, Color::Black),
-        };
-        self.buffer.chars[self.row_position][self.column_position].write(white_char);
+        // Change current character to white (cursor)
+        let current_char = self.buffer.chars[self.row_position][self.column_position].read();
+        self.buffer.chars[self.row_position][self.column_position].write(ScreenChar {
+            ascii_character: current_char.ascii_character,
+            color_code: self.cursor_color,
+        });
 
         unsafe {
             use x86_64::instructions::port::Port;
@@ -155,27 +158,29 @@ impl Writer {
         }
 
         // Restore current character color
-        let current = self.buffer.chars[self.row_position][self.column_position].read();
-        let restored_char = ScreenChar {
-            ascii_character: current.ascii_character,
-            color_code: ColorCode::new(Color::Green, Color::Black),
-        };
-        self.buffer.chars[self.row_position][self.column_position].write(restored_char);
+        let current_char = self.buffer.chars[self.row_position][self.column_position].read();
+        self.buffer.chars[self.row_position][self.column_position].write(ScreenChar {
+            ascii_character: current_char.ascii_character,
+            color_code: self.color_code,
+        });
 
         if self.column_position > 0 {
             self.column_position -= 1;
         } else if self.row_position > 0 {
             self.row_position -= 1;
             self.column_position = BUFFER_WIDTH - 1;
-            while self.column_position > 0 &&
-                self.buffer.chars[self.row_position][self.column_position - 1].read().ascii_character == b' ' {
-                    self.column_position -= 1;
+            while self.column_position > 0 {
+                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
+                if char.ascii_character != b' ' {
+                    break;
                 }
+                self.column_position -= 1;
+            }
         }
 
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: ColorCode::new(Color::Green, Color::Black),
+            color_code: self.color_code,
         };
         self.buffer.chars[self.row_position][self.column_position].write(blank);
         self.update_cursor();
@@ -194,7 +199,7 @@ lazy_static! {
         column_position: 0,
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
-                                                      last_char_color: ColorCode::new(Color::Green, Color::Black),
+                                                      cursor_color: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
@@ -252,7 +257,7 @@ pub fn clear_screen() {
 
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: ColorCode::new(Color::Green, Color::Black),
+            color_code: writer.color_code,
         };
 
         for row in 0..BUFFER_HEIGHT {
@@ -265,6 +270,6 @@ pub fn clear_screen() {
         writer.column_position = 0;
 
         enable_cursor();
-        writer.write_string("> ");
+        writer.write_str("> ").unwrap();
     });
 }
