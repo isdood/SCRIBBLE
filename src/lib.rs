@@ -41,7 +41,8 @@ pub fn init_vga() {
     drop(writer);
 
     vga_buffer::clear_screen();
-    vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
+    // Use white text on black background for better visibility
+    vga_buffer::set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
 }
 
 #[macro_export]

@@ -58,62 +58,32 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
-impl Writer {
-    pub fn enable_cursor(&mut self) {
-        unsafe {
-            use x86_64::instructions::port::Port;
-
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
-
-            port_3d4.write(0x0A_u8);
-            let cur_state = port_3d5.read() as u8;
-            port_3d5.write((cur_state & !0x20) as u8);
-
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0F_u8);
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);
-        }
+pub fn backspace(&mut self) {
+    // Don't backspace if we're at the prompt ("> ")
+    if self.row_position == BUFFER_HEIGHT - 1 && self.column_position <= 2 {
+        return;
     }
 
-    fn update_cursor(&mut self) {
-        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-        unsafe {
-            use x86_64::instructions::port::Port;
-
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
-
-            port_3d4.write(0x0F_u8);
-            port_3d5.write((pos & 0xFF) as u8);
-            port_3d4.write(0x0E_u8);
-            port_3d5.write(((pos >> 8) & 0xFF) as u8);
-        }
+    // Move cursor back
+    if self.column_position > 0 {
+        self.column_position -= 1;
+    } else if self.row_position > 0 {
+        self.row_position -= 1;
+        self.column_position = BUFFER_WIDTH - 1;
     }
 
-    pub fn backspace(&mut self) {
-        // Don't backspace if we're at the prompt
-        if self.row_position == BUFFER_HEIGHT - 1 && self.column_position <= 2 {
-            return;
-        }
+    // Create a blank character
+    let blank = ScreenChar {
+        ascii_character: b' ',
+        color_code: self.color_code,
+    };
 
-        // Move cursor back
-        if self.column_position > 0 {
-            self.column_position -= 1;
-        } else if self.row_position > 0 {
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-        }
+    // Clear the character at the current position
+    self.buffer.chars[self.row_position][self.column_position].write(blank);
 
-        // Clear the character at current position
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        self.buffer.chars[self.row_position][self.column_position].write(blank);
-        self.update_cursor();
-    }
+    // Update the cursor position
+    self.update_cursor();
+}
 
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
@@ -229,53 +199,9 @@ pub fn _print(args: fmt::Arguments) {
 
 pub fn backspace() {
     use x86_64::instructions::interrupts;
+
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
-
-        // Debug print current position
-        serial_println!("Current position: row={}, col={}",
-                        writer.row_position, writer.column_position);
-
-        // Only proceed if we're not at the start of the buffer or at the prompt
-        if writer.row_position == BUFFER_HEIGHT - 1 && writer.column_position <= 2 {
-            serial_println!("At prompt, not backspacing");
-            return;
-        }
-
-        // Store current position
-        let current_row = writer.row_position;
-        let current_col = writer.column_position;
-
-        // Calculate new position
-        let (new_row, new_col) = if current_col > 0 {
-            (current_row, current_col - 1)
-        } else if current_row > 0 {
-            (current_row - 1, BUFFER_WIDTH - 1)
-        } else {
-            serial_println!("At buffer start, not backspacing");
-            return;
-        };
-
-        // Clear the character at current position
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: writer.color_code,
-        };
-
-        // Debug print the operation
-        serial_println!("Clearing character at row={}, col={}", current_row, current_col);
-
-        // Perform the clear
-        writer.buffer.chars[current_row][current_col].write(blank);
-
-        // Update position
-        writer.row_position = new_row;
-        writer.column_position = new_col;
-
-        // Debug print new position
-        serial_println!("New position: row={}, col={}", new_row, new_col);
-
-        // Update cursor
-        writer.update_cursor();
+        writer.backspace();
     });
 }
