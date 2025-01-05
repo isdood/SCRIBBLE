@@ -49,10 +49,15 @@ pub fn init_kernel(boot_info: &'static BootInfo) {
     println!("IDT initialized");
 
     println!("Starting memory management initialization...");
-    let phys_mem_offset = VirtAddr::new(boot_info.memory_map.as_ptr() as u64);
+    // Fix: Use the correct physical memory offset from boot_info
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    println!("Physical memory offset: {:#x}", phys_mem_offset.as_u64());
+
+    // Initialize the memory mapper
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     println!("Memory mapper initialized");
 
+    // Initialize the frame allocator
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
@@ -64,7 +69,7 @@ pub fn init_kernel(boot_info: &'static BootInfo) {
         Ok(_) => println!("Heap initialized successfully"),
         Err(e) => {
             println!("Failed to initialize heap: {:?}", e);
-            crate::hlt_loop();
+            hlt_loop();
         }
     }
 
