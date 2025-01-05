@@ -106,8 +106,6 @@ macro_rules! println {
 pub fn init_vga() {
     vga_buffer::clear_screen();
     vga_buffer::enable_cursor();
-    println!("Welcome to Scribble OS");  // This will be on line 0
-    print!("> ");                       // Prompt on line 1
 }
 
 pub fn show_datetime() {
