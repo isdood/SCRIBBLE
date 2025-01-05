@@ -64,17 +64,17 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First disable cursor
+            // First completely disable cursor
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape for white block cursor
+            // Set cursor shape (try a different combination for white cursor)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);  // Start scan line 0
+            port_3d5.write(0x01_u8);  // Start at scan line 1
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line 15 (covers most of character)
+            port_3d5.write(0x0F_u8);  // End at scan line 15
 
-            // Enable cursor (clear bit 5)
+            // Re-enable cursor
             port_3d4.write(0x0A_u8);
             let cur_state = port_3d5.read() as u8;
             port_3d5.write(cur_state & !0x20);
@@ -146,17 +146,16 @@ impl Writer {
         };
 
         if self.column_position > 0 {
+            // Simple backspace within current line
             self.column_position -= 1;
             self.buffer.chars[self.row_position][self.column_position].write(blank);
         } else if self.row_position > 0 {
-            // Save current row for clearing
-            let old_row = self.row_position;
-
-            // Move to previous line
+            // Moving to previous line
+            let current_row = self.row_position;
             self.row_position -= 1;
 
-            // Find last non-space character
-            self.column_position = BUFFER_WIDTH - 1;
+            // Find the last non-space character in previous line
+            self.column_position = BUFFER_WIDTH;
             while self.column_position > 0 {
                 let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
                 if char.ascii_character != b' ' {
@@ -165,34 +164,18 @@ impl Writer {
                 self.column_position -= 1;
             }
 
-            // Clear the entire old row first
-            self.clear_row(old_row);
+            // Clear the entire current (old) row
+            for col in 0..BUFFER_WIDTH {
+                self.buffer.chars[current_row][col].write(blank);
+            }
 
-            // If moving back to first line, ensure prompt is preserved
+            // Handle first line specially
             if self.row_position == 0 {
-                // Save the characters after the prompt
-                let mut saved_chars = [blank; BUFFER_WIDTH];
-                let mut saved_count = 0;
-
-                for i in 2..self.column_position {
-                    saved_chars[saved_count] = self.buffer.chars[0][i].read();
-                    saved_count += 1;
-                }
-
-                // Clear first line and rewrite prompt
+                let orig_pos = self.column_position;
                 self.clear_row(0);
                 self.column_position = 0;
                 self.write_string("> ");
-
-                // Restore saved characters
-                for i in 0..saved_count {
-                    self.buffer.chars[0][self.column_position].write(saved_chars[i]);
-                    self.column_position += 1;
-                }
-            } else {
-                // For lines other than the first, clear the first character of the current line
-                // to prevent leftover characters
-                self.buffer.chars[self.row_position][0].write(blank);
+                self.column_position = orig_pos;
             }
         }
 
