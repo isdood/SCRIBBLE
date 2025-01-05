@@ -104,43 +104,6 @@ impl Writer {
         self.update_cursor();
     }
 
-    pub fn backspace(&mut self) {
-        // Don't backspace past the prompt
-        if self.row_position == 0 && self.column_position <= 2 {
-            return;
-        }
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-            self.update_cursor();
-        } else if self.row_position > 0 {
-            // Move to previous line
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-
-            // Find the last non-space character
-            while self.column_position > 0 {
-                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
-                if char.ascii_character != b' ' {
-                    break;
-                }
-                self.column_position -= 1;
-            }
-
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-            self.update_cursor();
-        }
-    }
-
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -163,6 +126,42 @@ impl Writer {
             port_3d4.write(0x0E_u8);
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
         }
+    }
+
+    fn do_backspace(&mut self) {
+        // Don't backspace past the prompt
+        if self.row_position == 0 && self.column_position <= 2 {
+            return;
+        }
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+        } else if self.row_position > 0 {
+            // Move to previous line
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+
+            // Find the last non-space character
+            while self.column_position > 0 {
+                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
+                if char.ascii_character != b' ' {
+                    break;
+                }
+                self.column_position -= 1;
+            }
+
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+        }
+        self.update_cursor();
     }
 }
 
@@ -194,7 +193,7 @@ pub fn _print(args: fmt::Arguments) {
 pub fn backspace() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        WRITER.lock().backspace();
+        WRITER.lock().do_backspace();
     });
 }
 
@@ -217,6 +216,13 @@ pub fn enable_cursor() {
             let current = port_3d5.read();
             port_3d5.write(current & !0x20);
         }
+    });
+}
+
+pub fn set_color(foreground: Color, background: Color) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().color_code = ColorCode::new(foreground, background);
     });
 }
 
@@ -244,9 +250,6 @@ pub fn clear_screen() {
 }
 
 pub fn init() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        enable_cursor();
-        clear_screen();
-    });
+    enable_cursor();
+    clear_screen();
 }
