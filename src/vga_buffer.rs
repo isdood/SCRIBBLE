@@ -195,9 +195,11 @@ pub struct WriterProxy(spin::MutexGuard<'static, Writer>);
 
 impl fmt::Write for WriterProxy {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.0.write_str(s)
+        self.0.write_str(s);  // Call write_str on the inner Writer
+        Ok(())  // Return Ok(()) to satisfy the Result return type
     }
 }
+
 
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
