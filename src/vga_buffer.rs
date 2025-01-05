@@ -2,7 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use x86_64::instructions::port::{Port, PortGeneric, ReadWriteAccess};
+use x86_64::instructions::port::Port;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -54,8 +54,8 @@ struct Buffer {
 pub struct Writer {
     column_position: usize,
     row_position: usize,
+    prompt_row: usize,  // Add this field
     color_code: ColorCode,
-    prompt_row: usize,
     buffer: &'static mut Buffer,
 }
 
@@ -128,8 +128,18 @@ impl Writer {
         }
     }
 
+    pub fn get_row_position(&self) -> usize {
+        self.row_position
+    }
+
+    pub fn set_prompt_row(&mut self, row: usize) {
+        self.prompt_row = row;
+    }
+
+    // Update backspace to use prompt_row
     pub fn backspace(&mut self) {
-        if self.column_position <= 2 {
+        let is_at_prompt = self.column_position <= 2 && self.row_position == self.prompt_row;
+        if is_at_prompt {
             return;
         }
 
@@ -156,6 +166,7 @@ lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         row_position: 0,
+        prompt_row: 0,  // Add this field
         color_code: ColorCode::new(Color::Green, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });

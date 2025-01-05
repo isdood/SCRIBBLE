@@ -54,6 +54,12 @@ pub fn init_vga() {
     vga_buffer::init();  // Initialize VGA hardware first
     set_color(Color::Green, Color::Black);  // Set initial color
     clear_screen();  // Clear screen with the set color
+
+    // Set initial prompt row
+    let mut writer = vga_buffer::WRITER.lock();
+    writer.set_prompt_row(3);  // Set initial prompt row after welcome messages
+    drop(writer);
+
     println!("Welcome to Scribble OS");
     println!("Kernel initialized");
     println!("");  // Blank line

@@ -16,12 +16,10 @@ pub fn handle_scancode(scancode: u8) {
             match key {
                 DecodedKey::Unicode(character) => {
                     if character == '\n' {
-                        print!("\n> ");  // New prompt on new line
-                        // Update prompt row using the public methods
-                        if let Some(mut writer) = vga_buffer::WRITER.try_lock() {
-                            let current_row = writer.get_row_position();
-                            writer.set_prompt_row(current_row);
-                        }
+                        let mut writer = vga_buffer::WRITER.lock();
+                        writer.set_prompt_row(writer.get_row_position() + 1);
+                        drop(writer);  // Release the lock before printing
+                        print!("\n> ");
                     } else if character as u8 == 8 {
                         vga_buffer::backspace();
                     } else {
