@@ -69,16 +69,21 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Enable cursor (clear bit 5)
+            // First, set the cursor start (register 0xA)
+            port_3d4.write(0x0A_u8);
+            // Set start scanline to 0 and disable cursor by setting bit 5
+            port_3d5.write(0x20_u8);
+
+            // Then, set cursor end (register 0xB)
+            port_3d4.write(0x0B_u8);
+            // End scanline at 7 (creates a block cursor)
+            port_3d5.write(0x07_u8);
+
+            // Finally, enable cursor (register 0xA again)
             port_3d4.write(0x0A_u8);
             let cur_state = port_3d5.read() as u8;
-            port_3d5.write((cur_state & !0x20) as u8);
-
-            // Set cursor shape (make it block cursor from lines 0-15)
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0_u8);  // Start scanline
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(15_u8);  // End scanline
+            // Clear bit 5 to enable cursor
+            port_3d5.write(cur_state & !0x20);
         }
     }
 
@@ -86,7 +91,6 @@ impl Writer {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
             use x86_64::instructions::port::Port;
-
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
@@ -105,41 +109,6 @@ impl Writer {
         for col in 0..BUFFER_WIDTH {
             self.buffer.chars[row][col].write(blank);
         }
-    }
-
-    pub fn backspace(&mut self) {
-        // Don't backspace if at the very beginning
-        if self.row_position == 0 && self.column_position <= 2 {
-            return;
-        }
-
-        // Move cursor back
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-        } else if self.row_position > 0 {
-            // Move to previous line's end
-            self.row_position -= 1;
-            // Find the last non-empty character in the previous line
-            let mut last_col = BUFFER_WIDTH - 1;
-            while last_col > 0 {
-                let char = self.buffer.chars[self.row_position][last_col].read();
-                if char.ascii_character != b' ' {
-                    break;
-                }
-                last_col -= 1;
-            }
-            self.column_position = last_col + 1;
-            if self.column_position >= BUFFER_WIDTH {
-                self.column_position = BUFFER_WIDTH - 1;
-            }
-        }
-
-        self.update_cursor();
     }
 
     pub fn write_byte(&mut self, byte: u8) {
@@ -200,6 +169,53 @@ impl Writer {
         }
 
         self.update_cursor();
+    }
+
+    pub fn backspace(&mut self) {
+        // Check if we're at the prompt or beginning
+        if self.row_position == 0 && self.column_position <= 2 {
+            return;
+        }
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+        } else if self.row_position > 0 {
+            // Get content of previous line before moving
+            let mut prev_line_content = [ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            }; BUFFER_WIDTH];
+
+            for col in 0..BUFFER_WIDTH {
+                prev_line_content[col] = self.buffer.chars[self.row_position - 1][col].read();
+            }
+
+            // Move to previous line
+            self.row_position -= 1;
+
+            // Find last non-space character
+            let mut last_col = BUFFER_WIDTH - 1;
+            while last_col > 0 && prev_line_content[last_col].ascii_character == b' ' {
+                last_col -= 1;
+            }
+
+            // Set position after last character
+            self.column_position = last_col;
+            if self.column_position >= BUFFER_WIDTH {
+                self.column_position = BUFFER_WIDTH - 1;
+            }
+
+            // Clear current line
+            self.clear_row(self.row_position + 1);
+        }
+
+        self.update_cursor();
+    }
 }
 
 impl fmt::Write for Writer {
@@ -218,7 +234,6 @@ lazy_static! {
     });
 }
 
-// Public interface
 pub fn set_color(foreground: Color, background: Color) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
