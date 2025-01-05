@@ -54,11 +54,20 @@ pub struct Writer {
     column_position: usize,
     row_position: usize,
     color_code: ColorCode,
-    prompt_row: usize,  // Add this to track prompt line
+    prompt_row: usize,
     buffer: &'static mut Buffer,
 }
 
 impl Writer {
+
+    pub fn set_prompt_row(&mut self, row: usize) {
+        self.prompt_row = row;
+    }
+
+    pub fn get_row_position(&self) -> usize {
+        self.row_position
+    }
+
     fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
