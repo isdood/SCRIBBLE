@@ -67,13 +67,15 @@ impl Writer {
                     self.new_line();
                 }
 
+                let row = self.row_position;
+                let col = self.column_position;
+
                 let colored_char = ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
                 };
-                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
+                self.buffer.chars[row][col].write(colored_char);
                 self.column_position += 1;
-                self.update_cursor();
             }
         }
     }
@@ -100,7 +102,6 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.update_cursor();
     }
 
     fn clear_row(&mut self, row: usize) {
