@@ -116,7 +116,6 @@ impl Writer {
 
             self.update_cursor();
         }
-    }
 
     fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
