@@ -141,19 +141,6 @@ impl Writer {
         }
     }
 
-    impl fmt::Write for Writer {
-        fn write_str(&mut self, s: &str) -> fmt::Result {
-            self.write_string(s);
-            Ok(())
-        }
-    }
-
-    impl fmt::Write for spin::MutexGuard<'_, Writer> {
-        fn write_str(&mut self, s: &str) -> fmt::Result {
-            self.deref_mut().write_str(s)
-        }
-    }
-
     pub fn backspace(&mut self) {
         if self.column_position <= 2 {
             return;
@@ -185,6 +172,19 @@ impl Writer {
             self.column_position = 0;
             self.move_cursor();
         }
+    }
+}
+
+impl fmt::Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_string(s);
+        Ok(())
+    }
+}
+
+impl fmt::Write for spin::MutexGuard<'_, Writer> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.deref_mut().write_str(s)
     }
 }
 
