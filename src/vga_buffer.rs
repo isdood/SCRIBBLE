@@ -58,6 +58,19 @@ pub struct Writer {
 }
 
 impl Writer {
+    pub fn enable_cursor(&mut self) {  // Changed from fn to pub fn
+        unsafe {
+            use x86_64::instructions::port::Port;
+
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            // Set cursor shape (make it white by using lines 14-15)
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(14_u8);  // Start scanline
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(15_u8);  // End scanline
+        }
     pub fn set_color(&mut self, foreground: Color, background: Color) {
         self.color_code = ColorCode::new(foreground, background);
     }
