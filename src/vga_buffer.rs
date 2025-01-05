@@ -195,20 +195,18 @@ pub fn enable_cursor() {
 
             // Set cursor shape to underscore
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0D_u8);  // Start scan line (13)
-
+            port_3d5.write(0x0E_u8);  // Start scan line (set to 14 for underscore)
     port_3d4.write(0x0B_u8);
-    port_3d5.write(0x0E_u8);  // End scan line (14)
+    port_3d5.write(0x0F_u8);  // End scan line (set to 15 for underscore)
 
-    // Enable cursor (clear bit 5)
+    // Enable cursor
     port_3d4.write(0x0A_u8);
-    let mut cursor_state = port_3d5.read();
-    cursor_state &= 0xDF;  // Clear bit 5 to enable cursor
-    port_3d5.write(cursor_state);
+    let current = port_3d5.read();
+    port_3d5.write(current & !0x20);  // Clear bit 5 to enable cursor
 
-    // Set cursor color to white
-    port_3d4.write(0x08_u8);
-    port_3d5.write(0x0F_u8);  // White (0x0F)
+    // Set cursor attribute to white on black
+    port_3d4.write(0x0E_u8);
+    port_3d5.write(0x0F_u8);  // White (0x0F) cursor
         }
     });
 }
