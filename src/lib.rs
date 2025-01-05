@@ -30,9 +30,18 @@ pub fn init_kernel(_boot_info: &'static BootInfo) {
 }
 
 pub fn init_vga() {
+    let mut writer = vga_buffer::WRITER.lock();
+    writer.enable_cursor(); // Enable hardware cursor
+    drop(writer); // Release the lock
+
     vga_buffer::clear_screen();
     vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
-    // Don't print prompt here - let main do it
+}
+
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
 #[macro_export]

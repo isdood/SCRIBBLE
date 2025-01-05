@@ -16,19 +16,15 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn kernel_main(_boot_info: &'static BootInfo) -> ! {
-    // Initialize VGA with proper cursor position
-    scribble::init_vga();
+    // Initialize kernel first
+    scribble::init_kernel(_boot_info);
 
-    // Set initial color to green
-    vga_buffer::set_color(Color::Green, Color::Black);
+    // Initialize VGA and enable cursor
+    scribble::init_vga();
 
     // Print initial prompt
     print!("> ");
 
-    // Initialize kernel
-    scribble::init_kernel(_boot_info);
-
-    loop {
-        // Your existing loop code...
-    }
+    // Use hlt_loop instead of busy loop
+    scribble::hlt_loop();
 }
