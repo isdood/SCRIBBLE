@@ -238,7 +238,7 @@ pub fn backspace() {
     });
 }
 
-pub fn clear_screen() {
+pub fn reset_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
@@ -248,6 +248,8 @@ pub fn clear_screen() {
         writer.row_position = 0;
         writer.column_position = 0;
         writer.move_cursor();
+        drop(writer);
+        print!("> ");
     });
 }
 

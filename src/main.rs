@@ -15,29 +15,29 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
+    use scribble::{print, println};
+
     println!("Booting Scribble OS...");
     println!("Starting kernel initialization...");
 
     // Initialize kernel components with error checking
-    unsafe {
-        // Disable interrupts during initialization
-        x86_64::instructions::interrupts::disable();
+    // Disable interrupts during initialization
+    x86_64::instructions::interrupts::disable();
 
-        // Initialize kernel components
-        scribble::init_kernel(boot_info);
+    // Initialize kernel components
+    scribble::init_kernel(boot_info);
 
-        println!("Kernel initialization complete");
-        println!("Initializing VGA...");
+    println!("Kernel initialization complete");
+    println!("Initializing VGA...");
 
-        // Initialize VGA after kernel is ready
-        scribble::init_vga();
+    // Initialize VGA after kernel is ready
+    scribble::init_vga();
 
-        println!("Welcome to Scribble OS!");
-        print!("> ");
+    println!("Welcome to Scribble OS!");
+    print!("> ");
 
-        // Enable interrupts
-        x86_64::instructions::interrupts::enable();
-    }
+    // Enable interrupts
+    x86_64::instructions::interrupts::enable();
 
     // Enter main loop
     scribble::hlt_loop();
