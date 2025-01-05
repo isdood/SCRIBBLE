@@ -58,7 +58,6 @@ pub struct Writer {
 }
 
 impl Writer {
-    // Add this new method
     pub fn enable_cursor(&mut self) {
         unsafe {
             use x86_64::instructions::port::Port;
@@ -74,6 +73,21 @@ impl Writer {
             port_3d5.write(0x0F_u8);
             port_3d4.write(0x0B_u8);
             port_3d5.write(0x0F_u8);
+        }
+    }
+
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
         }
     }
 
