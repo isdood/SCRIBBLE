@@ -46,8 +46,6 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
-pub fn init_vga() {
-    vga_buffer::enable_cursor();
-    vga_buffer::clear_screen();
-    vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
+pub fn init() {
+    vga_buffer::initialize();
 }

@@ -70,9 +70,9 @@ impl Writer {
 
             // Set cursor shape to underscore (only bottom scanline)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start at scan line 14
+            port_3d5.write(0x0F_u8);  // Start at scan line 15
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End at scan line 15
+            port_3d5.write(0x0F_u8);  // End at scan line 15 (makes it an underscore)
 
             // Enable cursor
             port_3d4.write(0x0A_u8);
@@ -119,6 +119,9 @@ impl Writer {
             for col in 0..BUFFER_WIDTH {
                 self.buffer.chars[old_row][col].write(blank);
             }
+
+            // Clear any leftover characters in current position
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
 
         self.update_cursor();
@@ -126,7 +129,6 @@ impl Writer {
 
     fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-
         unsafe {
             use x86_64::instructions::port::Port;
             let mut port_3d4 = Port::new(0x3D4);
@@ -185,13 +187,12 @@ impl Writer {
         self.row_position = 0;
         self.column_position = 0;
 
-        // Write prompt only once at start
+        // Write prompt only once, and immediately enable cursor after
         self.write_string("> ");
-        self.update_cursor();
+        self.enable_cursor();
     }
 
     fn new_line(&mut self) {
-        let old_row = self.row_position;
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
@@ -204,11 +205,6 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-
-        // Only write prompt if we're moving from row 0 to row 1
-        if old_row == 0 {
-            self.write_string("> ");
-        }
         self.update_cursor();
     }
 }
@@ -263,5 +259,13 @@ pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
+    });
+}
+
+pub fn initialize() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.clear_screen();  // This will write one prompt and enable cursor
     });
 }
