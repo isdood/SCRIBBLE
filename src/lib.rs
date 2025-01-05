@@ -30,6 +30,17 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
+pub fn show_datetime() {
+    let mut rtc = rtc::RTC_DEVICE.lock();
+    let (year, month, day) = rtc.get_date();
+    let (hours, minutes, seconds) = rtc.get_time();
+    crate::system_println!(
+        "Current Date and Time (UTC): {}-{:02}-{:02} {:02}:{:02}:{:02}",
+                           year, month, day, hours, minutes, seconds
+    );
+    crate::system_println!("Current User's Login: isdood");
+}
+
 pub fn init_kernel(boot_info: &'static BootInfo) {
     // Disable interrupts during initialization
     x86_64::instructions::interrupts::disable();
@@ -68,13 +79,4 @@ pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
     }
-}
-
-pub fn show_datetime() {
-    let mut rtc = rtc::RTC_DEVICE.lock();
-    let (year, month, day) = rtc.get_date();
-    let (hours, minutes, seconds) = rtc.get_time();
-    crate::println!("Current Date and Time (UTC): {}-{:02}-{:02} {:02}:{:02}:{:02}",
-                    year, month, day, hours, minutes, seconds);
-    crate::println!("Current User's Login: isdood");
 }

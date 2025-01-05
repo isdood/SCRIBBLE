@@ -2,7 +2,6 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::print;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -31,10 +30,10 @@ pub enum Color {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct ColorCode(u8);
+struct ColorCode(u8);
 
 impl ColorCode {
-    pub const fn new(foreground: Color, background: Color) -> ColorCode {
+    const fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
 }
@@ -54,25 +53,11 @@ struct Buffer {
 pub struct Writer {
     column_position: usize,
     row_position: usize,
-    color_code: ColorCode,
+    prompt_color: ColorCode,
     input_color: ColorCode,
-    is_system_output: bool,
+    system_color: ColorCode,
     buffer: &'static mut Buffer,
-}
-
-trait VolatileAccess<T> {
-    unsafe fn read_volatile(&self) -> T;
-    unsafe fn write_volatile(&mut self, value: T);
-}
-
-impl VolatileAccess<ScreenChar> for Volatile<ScreenChar> {
-    unsafe fn read_volatile(&self) -> ScreenChar {
-        core::ptr::read_volatile(self as *const Volatile<ScreenChar> as *const ScreenChar)
-    }
-
-    unsafe fn write_volatile(&mut self, value: ScreenChar) {
-        core::ptr::write_volatile(self as *mut Volatile<ScreenChar> as *mut ScreenChar, value)
-    }
+    is_system_output: bool,
 }
 
 impl Writer {
@@ -87,34 +72,33 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
-                // Simplified color logic to prevent page faults
-                let color = if self.is_system_output {
-                    self.color_code // Green for system messages
+                // Determine the appropriate color
+                let color_code = if self.is_system_output {
+                    self.system_color
+                } else if col <= 1 && unsafe {
+                    self.buffer.chars[row][0].read_volatile().ascii_character == b'>'
+                } {
+                    self.prompt_color
                 } else {
-                    match col {
-                        0..=1 if unsafe { self.buffer.chars[row][0].read_volatile().ascii_character == b'>' } => {
-                            self.color_code  // Green for prompt
-                        },
-                        _ => self.input_color // White for user input
-                    }
+                    self.input_color
                 };
 
                 let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code: color,
+                    color_code,
                 };
 
                 unsafe {
-                    (&mut self.buffer.chars[row][col]).write_volatile(colored_char);
+                    self.buffer.chars[row][col].write_volatile(colored_char);
                 }
 
                 self.column_position += 1;
-                self.move_cursor();
+                self.update_cursor();
             }
         }
     }
 
-    pub fn write_str(&mut self, s: &str) {
+    pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
@@ -130,18 +114,18 @@ impl Writer {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     unsafe {
-                        let char_val = (&self.buffer.chars[row][col]).read_volatile();
-                        (&mut self.buffer.chars[row - 1][col]).write_volatile(char_val);
+                        let character = self.buffer.chars[row][col].read_volatile();
+                        self.buffer.chars[row - 1][col].write_volatile(character);
                     }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.move_cursor();
+        self.update_cursor();
     }
 
-    fn move_cursor(&mut self) {
+    fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
             use x86_64::instructions::port::Port;
@@ -163,19 +147,19 @@ impl Writer {
         if row < BUFFER_HEIGHT {
             self.row_position = row;
             self.column_position = 0;
-            self.move_cursor();
+            self.update_cursor();
         }
     }
 
-    pub fn clear_row(&mut self, row: usize) {
+    fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: self.color_code,
+            color_code: self.input_color,
         };
 
         for col in 0..BUFFER_WIDTH {
             unsafe {
-                (&mut self.buffer.chars[row][col]).write_volatile(blank);
+                self.buffer.chars[row][col].write_volatile(blank);
             }
         }
     }
@@ -195,10 +179,10 @@ impl Writer {
                 color_code: self.input_color,
             };
             unsafe {
-                (&mut self.buffer.chars[self.row_position][self.column_position])
+                self.buffer.chars[self.row_position][self.column_position]
                 .write_volatile(blank);
             }
-            self.move_cursor();
+            self.update_cursor();
         }
     }
 
@@ -209,7 +193,7 @@ impl Writer {
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_str(s);
+        self.write_string(s);
         Ok(())
     }
 }
@@ -218,33 +202,12 @@ lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         row_position: 0,
-        color_code: ColorCode::new(Color::Green, Color::Black),
+        prompt_color: ColorCode::new(Color::Green, Color::Black),
                                                       input_color: ColorCode::new(Color::White, Color::Black),
-                                                      is_system_output: true,
+                                                      system_color: ColorCode::new(Color::Green, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+                                                      is_system_output: false,
     });
-}
-
-#[macro_export]
-macro_rules! _print {
-    ($($arg:tt)*) => ({
-        $crate::vga_buffer::_print(format_args!($($arg)*))
-    });
-}
-
-#[macro_export]
-macro_rules! system_print {
-    ($($arg:tt)*) => ({
-        $crate::vga_buffer::set_system_output(true);
-        $crate::print!($($arg)*);
-        $crate::vga_buffer::set_system_output(false);
-    });
-}
-
-#[macro_export]
-macro_rules! system_println {
-    () => ($crate::system_print!("\n"));
-    ($($arg:tt)*) => ($crate::system_print!("{}\n", format_args!($($arg)*)));
 }
 
 pub fn _print(args: fmt::Arguments) {
@@ -272,16 +235,9 @@ pub fn clear_screen() {
         }
         writer.row_position = 0;
         writer.column_position = 0;
-        writer.move_cursor();
+        writer.update_cursor();
         drop(writer);
-        print!("> ");
-    });
-}
-
-pub fn set_system_output(enabled: bool) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().set_system_output(enabled);
+        crate::print!("> ");
     });
 }
 
@@ -306,5 +262,6 @@ pub fn enable_cursor() {
 }
 
 pub fn init() {
+    clear_screen();
     enable_cursor();
 }
