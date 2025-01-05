@@ -68,16 +68,16 @@ impl Writer {
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape to underscore (only bottom scanline)
+            // Set cursor shape
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0F_u8);  // Start at scan line 15
+            port_3d5.write(0x0D_u8);  // Changed to scan line 13 for better alignment
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End at scan line 15 (makes it an underscore)
+            port_3d5.write(0x0D_u8);  // End at same line for underscore shape
 
-            // Enable cursor
+            // Enable cursor with maximum intensity
             port_3d4.write(0x0A_u8);
             let cur_state = port_3d5.read() as u8;
-            port_3d5.write(cur_state & !0x20);
+            port_3d5.write((cur_state & !0x20) | 0x00);
         }
     }
 
@@ -161,7 +161,7 @@ impl Writer {
 
                 let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code: self.color_code,
+                    color_code: ColorCode::new(Color::Green, Color::Black),  // Keep text green
                 };
 
                 self.buffer.chars[self.row_position][self.column_position].write(colored_char);
