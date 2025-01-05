@@ -2,6 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
+use core::ops::DerefMut;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -140,12 +141,16 @@ impl Writer {
         }
     }
 
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
+    impl fmt::Write for Writer {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            self.write_string(s);
+            Ok(())
+        }
+    }
+
+    impl fmt::Write for spin::MutexGuard<'_, Writer> {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            self.deref_mut().write_str(s)
         }
     }
 
@@ -198,7 +203,10 @@ pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
 
     interrupts::without_interrupts(|| {
-        WRITER.lock().write_fmt(args).unwrap();
+        WRITER
+        .lock()
+        .write_fmt(args)
+        .expect("Printing to vga failed");
     });
 }
 
