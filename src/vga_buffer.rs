@@ -233,21 +233,6 @@ impl fmt::Write for Writer {
     }
 }
 
-lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = {
-        let mut writer = Writer {
-            column_position: 0,
-            row_position: 0,
-            color_code: ColorCode::new(Color::Green, Color::Black),
-            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-        };
-
-        // Write initial prompt
-        writer.write_string("> ");
-        writer
-    };
-}
-
 pub fn set_color(foreground: Color, background: Color) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
