@@ -232,3 +232,32 @@ pub fn _print(args: fmt::Arguments) {
         WRITER.lock().write_fmt(args).unwrap();
     });
 }
+
+pub fn backspace() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        if writer.column_position > 0 || writer.row_position > 0 {
+            // Don't backspace if we're at the prompt
+            if writer.row_position == BUFFER_HEIGHT - 1 && writer.column_position <= 2 {
+                return;
+            }
+
+            // Move cursor back
+            if writer.column_position > 0 {
+                writer.column_position -= 1;
+            } else if writer.row_position > 0 {
+                writer.row_position -= 1;
+                writer.column_position = BUFFER_WIDTH - 1;
+            }
+
+            // Clear the character
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: writer.color_code,
+            };
+            writer.buffer.chars[writer.row_position][writer.column_position].write(blank);
+            writer.update_cursor();
+        }
+    });
+}

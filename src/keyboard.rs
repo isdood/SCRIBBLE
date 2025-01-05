@@ -2,6 +2,7 @@ use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1, Ke
 use crate::{print, vga_buffer};
 use spin::Mutex;
 use lazy_static::lazy_static;
+use x86_64::instructions::port::Port;
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
@@ -23,7 +24,11 @@ pub fn handle_scancode(scancode: u8) {
                 }
                 DecodedKey::RawKey(key) => {
                     match key {
-                        KeyCode::Backspace => vga_buffer::backspace(),
+                        KeyCode::Backspace => {
+                            // Try printing a debug message to verify the key is detected
+                            serial_println!("Backspace pressed!");
+                            vga_buffer::backspace();
+                        },
                         _ => {}
                     }
                 }
