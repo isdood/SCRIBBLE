@@ -166,18 +166,23 @@ impl Writer {
 
             // If moving back to first line, ensure prompt is preserved
             if self.row_position == 0 {
-                let saved_text = (2..self.column_position)
-                .map(|i| self.buffer.chars[0][i].read())
-                .collect::<Vec<_>>();
+                // Save the characters after the prompt
+                let mut saved_chars = [blank; BUFFER_WIDTH];
+                let mut saved_count = 0;
+
+                for i in 2..self.column_position {
+                    saved_chars[saved_count] = self.buffer.chars[0][i].read();
+                    saved_count += 1;
+                }
 
                 // Clear first line and rewrite prompt
                 self.clear_row(0);
                 self.column_position = 0;
                 self.write_string("> ");
 
-                // Restore saved text
-                for char in saved_text {
-                    self.buffer.chars[0][self.column_position].write(char);
+                // Restore saved characters
+                for i in 0..saved_count {
+                    self.buffer.chars[0][self.column_position].write(saved_chars[i]);
                     self.column_position += 1;
                 }
             }
