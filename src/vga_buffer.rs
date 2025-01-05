@@ -185,10 +185,11 @@ impl Writer {
         }
         self.column_position = 0;
 
-        // Only write prompt on the first line (row 0)
+        // Only write prompt on first line
         if self.row_position == 0 {
-            let prompt = "> ";
-            for byte in prompt.bytes() {
+            // Write prompt with protected attributes
+            let prompt_chars = [b'>', b' '];
+            for &byte in prompt_chars.iter() {
                 let colored_char = ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
@@ -200,7 +201,6 @@ impl Writer {
 
         self.update_cursor();
     }
-}
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
