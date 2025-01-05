@@ -1,7 +1,7 @@
-use crate::{print, vga_buffer::WRITER};
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1, KeyCode};
+use crate::{print, vga_buffer};
 use spin::Mutex;
-use x86_64::instructions::port::Port;
+use lazy_static::lazy_static;
 
 lazy_static::lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =

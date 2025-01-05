@@ -5,6 +5,7 @@ use x86_64::{
     VirtAddr,
 };
 use linked_list_allocator::LockedHeap;
+use crate::println;  // Add this line
 
 pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
@@ -37,7 +38,7 @@ pub fn init_heap(
 
     unsafe {
         println!("Initializing heap allocator...");
-        ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE);
+        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);  // Fixed: removed as *mut u8
         println!("Heap allocator initialized");
     }
 
