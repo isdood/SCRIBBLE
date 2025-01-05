@@ -17,9 +17,9 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     // Initialize kernel first
     scribble::init_kernel(_boot_info);
 
-    // Initialize VGA
+    // Initialize VGA (this will handle cursor and prompt)
     scribble::init_vga();
 
-    // Use hlt_loop
+    // Use hlt_loop (no need for extra prompt)
     scribble::hlt_loop();
 }

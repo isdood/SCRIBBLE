@@ -16,7 +16,7 @@ pub fn handle_scancode(scancode: u8) {
             match key {
                 DecodedKey::Unicode(character) => {
                     if character == '\n' {
-                        print!("\n> ");
+                        print!("\n");  // Just newline, no prompt
                     } else if character as u8 == 8 {  // ASCII backspace
                         vga_buffer::backspace();
                     } else {
@@ -26,7 +26,6 @@ pub fn handle_scancode(scancode: u8) {
                 DecodedKey::RawKey(key) => {
                     match key {
                         KeyCode::Backspace => {
-                            serial_println!("Backspace detected!");
                             vga_buffer::backspace();
                         },
                         _ => {}
