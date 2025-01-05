@@ -78,6 +78,16 @@ impl Writer {
             port_3d4.write(0x0A_u8);
             let cur_state = port_3d5.read() as u8;
             port_3d5.write(cur_state & !0x20);
+
+            // Set cursor color through VGA attribute controller
+            let mut port_3c0 = Port::new(0x3C0);
+            port_3c0.write(0x0B_u8);  // Select Attribute Mode Control Register
+            let attr_mode = port_3c0.read() as u8;
+            port_3c0.write(attr_mode | 0x08);  // Set bit 3 for cursor attribute
+
+            // Set cursor attribute to white (0x0F)
+            port_3c0.write(0x0F_u8);
+            port_3c0.write(0x0F_u8);
         }
     }
 
