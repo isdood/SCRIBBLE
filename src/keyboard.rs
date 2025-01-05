@@ -1,45 +1,47 @@
-use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, KeyCode, ScancodeSet1};
+use conquer_once::spin::OnceCell;
+use crossbeam_queue::ArrayQueue;
+use futures_util::task::AtomicWaker;
+use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
+use crate::vga_buffer;
 use crate::print;
-use crate::vga_buffer::{Color, WRITER, set_color};
-use spin::Mutex;
-use lazy_static::lazy_static;
 
-lazy_static! {
-    static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
-    Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1,
-                             HandleControl::Ignore)
-    );
+static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
+static WAKER: AtomicWaker = AtomicWaker::new();
+
+/// Called by the keyboard interrupt handler
+/// Must not block or allocate.
+pub(crate) fn add_scancode(scancode: u8) {
+    if let Ok(queue) = SCANCODE_QUEUE.try_get() {
+        if let Err(_) = queue.push(scancode) {
+            println!("WARNING: scancode queue full; dropping keyboard input");
+        } else {
+            WAKER.wake();
+        }
+    } else {
+        println!("WARNING: scancode queue uninitialized");
+    }
 }
 
-pub fn initialize() {
-    // Set initial color to green
-    set_color(Color::Green, Color::Black);
-    let _ = KEYBOARD.lock();
+pub fn init_keyboard() {
+    SCANCODE_QUEUE.try_init_once(|| ArrayQueue::new(100))
+    .expect("ScancodeQueue already initialized");
 }
 
-pub fn add_scancode(scancode: u8) {
-    let mut keyboard = KEYBOARD.lock();
+pub fn handle_key(scancode: u8) {
+    let mut keyboard = Keyboard::new(layouts::Us104Key, ScancodeSet1,
+                                     HandleControl::Ignore);
+
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
-            // Ensure text is green for each key press
-            set_color(Color::Green, Color::Black);
             match key {
                 DecodedKey::Unicode(character) => {
-                    if character == '\u{0008}' {  // Backspace character
-                        WRITER.lock().backspace();
+                    if character == '\n' {
+                        print!("\n> ");
                     } else {
                         print!("{}", character);
                     }
-                },
-                DecodedKey::RawKey(key) => {
-                    match key {
-                        KeyCode::ArrowUp => print!("^"),
-                        KeyCode::ArrowDown => print!("v"),
-                        KeyCode::ArrowLeft => print!("<"),
-                        KeyCode::ArrowRight => print!(">"),
-                        _ => print!("{:?}", key),
-                    }
-                },
+                }
+                DecodedKey::RawKey(key) => print!("{:?}", key),
             }
         }
     }

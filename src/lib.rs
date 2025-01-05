@@ -7,6 +7,7 @@ pub mod gdt;
 pub mod interrupts;
 pub mod serial;
 pub mod memory;
+pub mod keyboard;
 
 use bootloader::BootInfo;
 
