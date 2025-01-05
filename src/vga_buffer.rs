@@ -100,6 +100,7 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
+        self.write_string("> ");  // Add prompt at new line
         self.update_cursor();
     }
 
@@ -128,7 +129,8 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        if self.column_position <= 2 {
+        // Don't allow backspace before the prompt ("> ")
+        if self.column_position <= 2 && self.row_position == 0 {
             return;
         }
 
@@ -140,8 +142,25 @@ impl Writer {
         if self.column_position > 0 {
             self.column_position -= 1;
             self.buffer.chars[self.row_position][self.column_position].write(blank);
-            self.update_cursor();
+        } else if self.row_position > 0 {
+            // Move to the end of the previous line
+            self.row_position -= 1;
+            // Find the last non-space character in the previous line
+            let mut last_col = BUFFER_WIDTH - 1;
+            while last_col > 0 {
+                let char = self.buffer.chars[self.row_position][last_col].read();
+                if char.ascii_character != b' ' {
+                    break;
+                }
+                last_col -= 1;
+            }
+            self.column_position = last_col + 1;
+            if self.column_position >= BUFFER_WIDTH {
+                self.column_position = BUFFER_WIDTH - 1;
+            }
         }
+
+        self.update_cursor();
     }
 }
 
@@ -177,6 +196,21 @@ pub fn backspace() {
     });
 }
 
+pub fn set_cursor_color(color: Color) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            // Set cursor color attribute
+            port_3d4.write(0x0E_u8);
+            port_3d5.write((color as u8) | ((Color::Black as u8) << 4));
+        }
+    });
+}
+
 pub fn enable_cursor() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
@@ -185,19 +219,15 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set text size
-            port_3d4.write(0x09_u8);
-            port_3d5.write(0x0F_u8);
-
-            // Set cursor shape
+            // Set cursor shape (make it a solid block)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line
+            port_3d5.write(0x00_u8);  // Start scan line (top of cursor)
+    port_3d4.write(0x0B_u8);
+    port_3d5.write(0x0F_u8);  // End scan line (bottom of cursor)
 
-            // Enable cursor with high intensity
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);
+    // Set cursor color attribute (White on Black)
+    port_3d4.write(0x0E_u8);
+    port_3d5.write(0x0F_u8);  // White (0x0F) on Black (0x00)
         }
     });
 }
@@ -218,6 +248,13 @@ pub fn clear_screen() {
         }
         writer.row_position = 0;
         writer.column_position = 0;
+
+        // Set text color to green
+        writer.color_code = ColorCode::new(Color::Green, Color::Black);
         writer.write_string("> ");
+
+        // Enable cursor and set it to white
+        enable_cursor();
+        set_cursor_color(Color::White);
     });
 }
