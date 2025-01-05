@@ -59,7 +59,43 @@ pub struct Writer {
 }
 
 impl Writer {
-    // ... other methods remain the same ...
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let row = self.row_position;
+                let col = self.column_position;
+
+                let current_color = if self.prompt_active && col <= 1 {
+                    ColorCode::new(Color::Green, Color::Black)
+                } else {
+                    self.color_code
+                };
+
+                let colored_char = ScreenChar {
+                    ascii_character: byte,
+                    color_code: current_color,
+                };
+
+                self.buffer.chars[row][col] = Volatile::new(colored_char);
+                self.column_position += 1;
+                self.update_cursor();
+            }
+        }
+    }
+
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
 
     fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
@@ -67,9 +103,8 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    // Get character directly without read()
-                    let character = self.buffer.chars[row][col].get().clone();
-                    // Write directly without unsafe
+                    // Access the volatile value directly
+                    let character = *self.buffer.chars[row][col];
                     self.buffer.chars[row - 1][col] = Volatile::new(character);
                 }
             }
@@ -85,7 +120,6 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            // Write directly without unsafe
             self.buffer.chars[row][col] = Volatile::new(blank);
         }
     }
@@ -93,7 +127,7 @@ impl Writer {
     pub fn backspace(&mut self) {
         // Check if we're at the prompt position
         if self.column_position <= 2 &&
-            self.buffer.chars[self.row_position][0].get().ascii_character == b'>' {
+            (*self.buffer.chars[self.row_position][0]).ascii_character == b'>' {
                 return;
             }
 
@@ -103,11 +137,11 @@ impl Writer {
                     ascii_character: b' ',
                     color_code: self.color_code,
                 };
-                // Write directly without unsafe
                 self.buffer.chars[self.row_position][self.column_position] = Volatile::new(blank);
                 self.update_cursor();
             }
     }
+
 
     fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
