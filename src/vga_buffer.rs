@@ -72,12 +72,11 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
-                let colored_char = ScreenChar {
+                self.buffer.chars[row][col] = Volatile::new(ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
-                };
+                });
 
-                self.buffer.chars[row][col].write(colored_char);
                 self.column_position += 1;
                 self.update_cursor();
             }
@@ -171,7 +170,7 @@ impl Writer {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     let character = self.buffer.chars[row][col].read();
-                    self.buffer.chars[row - 1][col].write(character);
+                    self.buffer.chars[row - 1][col] = Volatile::new(character);
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -251,13 +250,11 @@ pub fn backspace() {
     WRITER.lock().backspace();
 }
 
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+impl ScreenChar {
+    fn new(ascii_character: u8, color_code: ColorCode) -> Self {
+        ScreenChar {
+            ascii_character,
+            color_code,
+        }
+    }
 }
