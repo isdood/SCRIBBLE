@@ -37,7 +37,11 @@ pub fn init_heap(boot_info: &'static BootInfo) {
     .expect("heap initialization failed");
 }
 
-pub fn init_kernel(_boot_info: &'static BootInfo) {
+pub fn init_kernel(boot_info: &'static BootInfo) {
+    use x86_64::VirtAddr;
+    use crate::memory;
+    use crate::allocator;
+
     // Initialize GDT
     gdt::init();
 
@@ -46,6 +50,17 @@ pub fn init_kernel(_boot_info: &'static BootInfo) {
 
     // Initialize PICS
     unsafe { interrupts::PICS.lock().initialize() };
+
+    // Initialize memory management
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    let mut frame_allocator = unsafe {
+        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
+    };
+
+    // Initialize heap allocation
+    allocator::init_heap(&mut mapper, &mut frame_allocator)
+    .expect("heap initialization failed");
 
     // Enable interrupts
     x86_64::instructions::interrupts::enable();
