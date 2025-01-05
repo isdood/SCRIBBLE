@@ -58,7 +58,19 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn write_byte(&mut self, byte: u8) {
+    pub fn get_row_position(&self) -> usize {
+        self.row_position
+    }
+
+    pub fn set_prompt_row(&mut self, row: usize) {
+        if row < BUFFER_HEIGHT {
+            self.row_position = row;
+            self.column_position = 0;
+            self.update_cursor();
+        }
+    }
+
+    fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
             byte => {
@@ -66,22 +78,21 @@ impl Writer {
                     self.new_line();
                 }
 
-                let row = self.row_position;
-                let col = self.column_position;
-
                 let colored_char = ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
                 };
 
+                // Use unsafe block for volatile operations
                 unsafe {
-                    // Get a mutable reference to the Volatile<ScreenChar>
-                    let volatile_char = &mut self.buffer.chars[row][col];
-                    // Write to it using the Volatile API
-                    volatile_char.write(colored_char);
+                    core::ptr::write_volatile(
+                        &mut self.buffer.chars[self.row_position][self.column_position] as *mut Volatile<ScreenChar>,
+                        Volatile::new(colored_char)
+                    );
                 }
 
                 self.column_position += 1;
+                self.update_cursor();
             }
         }
     }
@@ -166,6 +177,46 @@ lazy_static! {
         row_position: 0,
         color_code: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    });
+}
+
+pub fn _print(args: fmt::Arguments) {
+    use core::fmt::Write;
+    use x86_64::instructions::interrupts;
+
+    interrupts::without_interrupts(|| {
+        WRITER.lock().write_fmt(args).unwrap();
+    });
+}
+
+pub fn backspace() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().backspace();
+    });
+}
+
+pub fn init() {
+    enable_cursor();
+}
+
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.update_cursor();
+    });
+}
+
+pub fn set_color(foreground: Color, background: Color) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().color_code = ColorCode::new(foreground, background);
     });
 }
 

@@ -14,7 +14,6 @@ pub mod keyboard;
 pub mod allocator;
 
 use bootloader::BootInfo;
-use vga_buffer::{Color, clear_screen, set_color, enable_cursor};
 
 pub fn init_heap(boot_info: &'static BootInfo) {
     use memory::{self, BootInfoFrameAllocator};
@@ -58,6 +57,16 @@ pub fn hlt_loop() -> ! {
     }
 }
 
+pub fn init_vga() {
+    vga_buffer::init();
+    vga_buffer::set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
+    vga_buffer::clear_screen();
+    println!("Welcome to Scribble OS");
+    println!("Kernel initialized");
+    println!("");
+    print!("> ");
+}
+
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -67,27 +76,4 @@ macro_rules! print {
 macro_rules! println {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-pub fn init_vga() {
-    serial_println!("[DEBUG] Starting VGA initialization");
-
-    // Initialize VGA hardware
-    vga_buffer::init();
-    serial_println!("[DEBUG] VGA hardware initialized");
-
-    // Set up display
-    set_color(Color::White, Color::Black);
-    clear_screen();
-    serial_println!("[DEBUG] Screen cleared");
-
-    // Write test output
-    println!("Welcome to Scribble OS");
-    println!("Kernel initialized");
-    println!("");
-
-    enable_cursor();
-    print!("> ");
-
-    serial_println!("[DEBUG] VGA initialization complete");
 }
