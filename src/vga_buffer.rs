@@ -1,5 +1,5 @@
 use volatile::Volatile;
-use core::fmt;
+use core::fmt::Write;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
