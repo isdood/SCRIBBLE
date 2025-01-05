@@ -221,19 +221,12 @@ impl fmt::Write for Writer {
 }
 
 lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = {
-        let mut writer = Writer {
-            column_position: 0,
-            row_position: 0,
-            color_code: ColorCode::new(Color::Green, Color::Black),
-            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-        };
-
-        // Write initial prompt
-        writer.write_string("> ");
-        writer.enable_cursor();  // Enable cursor right after initialization
-        writer
-    };
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        row_position: 0,
+        color_code: ColorCode::new(Color::Green, Color::Black),
+                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    });
 }
 
 // Public interface functions
@@ -271,15 +264,4 @@ pub fn _print(args: fmt::Arguments) {
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
     });
-}
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
