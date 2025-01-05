@@ -38,11 +38,13 @@ pub fn hlt_loop() -> ! {
 pub fn init_vga() {
     let mut writer = vga_buffer::WRITER.lock();
     writer.enable_cursor();
+    // Set color before dropping the lock
+    writer.set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
     drop(writer);
 
     vga_buffer::clear_screen();
-    // Use white text on black background for better visibility
-    vga_buffer::set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
+    // This line is no longer needed since we set the color directly on the writer
+    // vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
 }
 
 #[macro_export]

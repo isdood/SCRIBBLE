@@ -58,22 +58,9 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn enable_cursor(&mut self) {
-        unsafe {
-            use x86_64::instructions::port::Port;
-
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
-
-            port_3d4.write(0x0A_u8);
-            let cur_state = port_3d5.read() as u8;
-            port_3d5.write((cur_state & !0x20) as u8);
-
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0F_u8);
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);
-        }
+    // Add this new method
+    pub fn set_color(&mut self, foreground: Color, background: Color) {
+        self.color_code = ColorCode::new(foreground, background);
     }
 
     fn update_cursor(&mut self) {
@@ -188,7 +175,7 @@ lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         row_position: BUFFER_HEIGHT - 1,
-        color_code: ColorCode::new(Color::White, Color::Black),
+        color_code: ColorCode::new(Color::Green, Color::Black),  // Set default color to green
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
@@ -205,7 +192,7 @@ pub fn set_color(foreground: Color, background: Color) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
-        writer.color_code = ColorCode::new(foreground, background);
+        writer.set_color(foreground, background);
     });
 }
 
