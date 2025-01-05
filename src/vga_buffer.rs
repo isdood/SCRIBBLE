@@ -232,17 +232,6 @@ macro_rules! _print {
 }
 
 #[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::_print!($($arg)*));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-#[macro_export]
 macro_rules! system_print {
     ($($arg:tt)*) => ({
         $crate::vga_buffer::set_system_output(true);
