@@ -1,6 +1,6 @@
 //
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1, KeyCode};
-use crate::{print, vga_buffer::WRITER};  // Import WRITER directly
+use crate::print;  // Only import what we need
 use spin::Mutex;
 use lazy_static::lazy_static;
 

@@ -2,7 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use core::ops::{Deref, DerefMut};
+use crate::print;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -55,7 +55,7 @@ pub struct Writer {
     column_position: usize,
     row_position: usize,
     color_code: ColorCode,
-    input_color: ColorCode,  // New field for user input color
+    input_color: ColorCode,
     buffer: &'static mut Buffer,
 }
 
@@ -86,9 +86,15 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
+                let color = if self.is_prompt_position() {
+                    self.color_code
+                } else {
+                    self.input_color
+                };
+
                 let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code: if col <= 1 { self.color_code } else { self.input_color },  // Use input_color for user text
+                    color_code: color,
                 };
 
                 unsafe {
@@ -107,6 +113,12 @@ impl Writer {
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
                 _ => self.write_byte(0xfe),
             }
+        }
+    }
+
+    fn is_prompt_position(&self) -> bool {
+        self.column_position < 2 && unsafe {
+            self.buffer.chars[self.row_position][0].read_volatile().ascii_character == b'>'
         }
     }
 
@@ -168,39 +180,23 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        if self.column_position <= 2 {
-            // If we're at the start of a line, try to go to the previous line
-            if self.row_position > 0 {
-                self.row_position -= 1;
-                // Find the last non-empty character in the previous line
-                for col in (2..BUFFER_WIDTH).rev() {
-                    unsafe {
-                        let char_val = (&self.buffer.chars[self.row_position][col]).read_volatile();
-                        if char_val.ascii_character != b' ' {
-                            self.column_position = col + 1;
-                            break;
-                        }
-                    }
-                }
-            }
+        // Don't allow backspace over prompt
+        if self.column_position <= 2 && self.is_prompt_position() {
             return;
         }
 
-        // Normal backspace behavior
-        self.column_position -= 1;
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.input_color,
-        };
-        unsafe {
-            (&mut self.buffer.chars[self.row_position][self.column_position])
-            .write_volatile(blank);
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.input_color,
+            };
+            unsafe {
+                (&mut self.buffer.chars[self.row_position][self.column_position])
+                .write_volatile(blank);
+            }
+            self.move_cursor();
         }
-        self.move_cursor();
-    }
-
-    pub fn set_input_color(&mut self, foreground: Color, background: Color) {
-        self.input_color = ColorCode::new(foreground, background);
     }
 }
 
@@ -216,11 +212,10 @@ lazy_static! {
         column_position: 0,
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
-                                                      input_color: ColorCode::new(Color::White, Color::Black),  // User input will be white
+                                                      input_color: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
-
 
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
@@ -238,8 +233,7 @@ pub fn backspace() {
     });
 }
 
-
-pub fn reset_screen() {
+pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
@@ -258,6 +252,13 @@ pub fn set_color(foreground: Color, background: Color) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         WRITER.lock().color_code = ColorCode::new(foreground, background);
+    });
+}
+
+pub fn set_input_color(foreground: Color, background: Color) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().input_color = ColorCode::new(foreground, background);
     });
 }
 
@@ -283,11 +284,4 @@ pub fn enable_cursor() {
 
 pub fn init() {
     enable_cursor();
-}
-
-pub fn set_input_color(foreground: Color, background: Color) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().set_input_color(foreground, background);
-    });
 }
