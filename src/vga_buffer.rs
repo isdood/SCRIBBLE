@@ -1,5 +1,5 @@
 use volatile::Volatile;
-use core::fmt;
+use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -75,20 +75,11 @@ impl Writer {
                 };
 
                 unsafe {
-                    self.buffer.chars[row][col].write(colored_char);
+                    self.buffer.chars[row][col].write_volatile(colored_char);
                 }
 
                 self.column_position += 1;
                 self.move_cursor();
-            }
-        }
-    }
-
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
             }
         }
     }
@@ -99,11 +90,9 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = unsafe {
-                        self.buffer.chars[row][col].read()
-                    };
                     unsafe {
-                        self.buffer.chars[row - 1][col].write(character);
+                        let character = self.buffer.chars[row][col].read_volatile();
+                        self.buffer.chars[row - 1][col].write_volatile(character);
                     }
                 }
             }
@@ -127,18 +116,6 @@ impl Writer {
         }
     }
 
-    pub fn get_row_position(&self) -> usize {
-        self.row_position
-    }
-
-    pub fn set_prompt_row(&mut self, row: usize) {
-        if row < BUFFER_HEIGHT {
-            self.row_position = row;
-            self.column_position = 0;
-            self.move_cursor();
-        }
-    }
-
     pub fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -147,7 +124,7 @@ impl Writer {
 
         for col in 0..BUFFER_WIDTH {
             unsafe {
-                self.buffer.chars[row][col].write(blank);
+                self.buffer.chars[row][col].write_volatile(blank);
             }
         }
     }
@@ -164,7 +141,7 @@ impl Writer {
                 color_code: self.color_code,
             };
             unsafe {
-                self.buffer.chars[self.row_position][self.column_position].write(blank);
+                self.buffer.chars[self.row_position][self.column_position].write_volatile(blank);
             }
             self.move_cursor();
         }
@@ -177,16 +154,6 @@ impl fmt::Write for Writer {
         Ok(())
     }
 }
-
-pub struct WriterProxy(spin::MutexGuard<'static, Writer>);
-
-impl fmt::Write for WriterProxy {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.0.write_str(s);  // Call write_str on the inner Writer
-        Ok(())  // Return Ok(()) to satisfy the Result return type
-    }
-}
-
 
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
@@ -201,9 +168,7 @@ pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
 
     interrupts::without_interrupts(|| {
-        WriterProxy(WRITER.lock())
-        .write_fmt(args)
-        .expect("Printing to VGA failed");
+        WRITER.lock().write_fmt(args).unwrap();
     });
 }
 
