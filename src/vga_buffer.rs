@@ -127,7 +127,9 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        if self.column_position <= 2 {
+        // Only protect prompt on the first line after boot messages
+        let is_prompt_line = self.row_position == 2 && self.column_position <= 2;
+        if is_prompt_line {
             return;
         }
 
@@ -167,16 +169,16 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set cursor shape
+            // Set cursor shape (make it more visible)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line
+            port_3d5.write(0x00_u8);  // Start scan line (top of cursor)
+    port_3d4.write(0x0B_u8);
+    port_3d5.write(0x0F_u8);  // End scan line (bottom)
 
-            // Enable cursor
-            port_3d4.write(0x0A_u8);
-            let current = port_3d5.read();
-            port_3d5.write(current & !0x20);
+    // Enable cursor (make sure bit 5 is cleared)
+    port_3d4.write(0x0A_u8);
+    let current = port_3d5.read();
+    port_3d5.write(current & !0x20);
         }
     });
 }
@@ -215,7 +217,8 @@ pub fn clear_screen() {
         for row in 0..BUFFER_HEIGHT {
             writer.clear_row(row);
         }
-        writer.row_position = 0;
-        writer.column_position = 0;
+        writer.row_position = 2;  // Start at line 3 (after boot messages)
+    writer.column_position = 0;
+    writer.write_string("> ");  // Write prompt
     });
 }

@@ -52,7 +52,8 @@ macro_rules! println {
 pub fn init_vga() {
     println!("Welcome to Scribble OS");
     println!("Kernel initialized");
-    println!("");
+    println!("");  // Add blank line
     vga_buffer::enable_cursor();
-    print!("> ");
+    println!("");  // Add another blank line for spacing
+    print!("> ");  // Print prompt on correct line
 }
