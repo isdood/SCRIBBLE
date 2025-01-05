@@ -32,9 +32,9 @@ pub fn init_heap(
         }
     }
 
-    // Initialize the allocator with the correct pointer type
+    // Initialize the allocator with heap_start as usize instead of *mut u8
     unsafe {
-        ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE);
+        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
     }
 
     Ok(())
