@@ -29,7 +29,6 @@ pub fn init_kernel(_boot_info: &'static BootInfo) {
     x86_64::instructions::interrupts::enable();
 }
 
-// Keep only one definition of hlt_loop
 pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
@@ -37,7 +36,10 @@ pub fn hlt_loop() -> ! {
 }
 
 pub fn init_vga() {
-    vga_buffer::enable_cursor(); // Use the public function instead
+    let mut writer = vga_buffer::WRITER.lock();
+    writer.enable_cursor();
+    drop(writer);
+
     vga_buffer::clear_screen();
     vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
 }
@@ -51,4 +53,17 @@ macro_rules! print {
 macro_rules! println {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! serial_print {
+    ($($arg:tt)*) => ($crate::serial::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! serial_println {
+    () => ($crate::serial_print!("\n"));
+    ($fmt:expr) => ($crate::serial_print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::serial_print!(
+        concat!($fmt, "\n"), $($arg)*));
 }
