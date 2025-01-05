@@ -70,10 +70,13 @@ impl Writer {
             port_3d5.write(14_u8);  // Start scanline
             port_3d4.write(0x0B_u8);
             port_3d5.write(15_u8);  // End scanline
+
+            }
         }
-    pub fn set_color(&mut self, foreground: Color, background: Color) {
+
+        pub fn set_color(&mut self, foreground: Color, background: Color) {
         self.color_code = ColorCode::new(foreground, background);
-    }
+        }
 
     fn backspace(&mut self) {
         // Always protect the prompt on first line
