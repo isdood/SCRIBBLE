@@ -20,9 +20,6 @@ fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     // Initialize VGA
     scribble::init_vga();
 
-    // Print initial prompt
-    print!("> ");
-
     // Use hlt_loop
     scribble::hlt_loop();
 }

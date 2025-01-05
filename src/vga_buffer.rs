@@ -68,16 +68,15 @@ impl Writer {
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape (thin underscore)
+            // Set text-mode cursor color (force high intensity white)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line 14
+            port_3d5.write(0x00_u8);  // Start scan line and force high intensity
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line 15
+            port_3d5.write(0x0F_u8);  // End scan line
 
-            // Force high intensity white cursor
+            // Enable cursor
             port_3d4.write(0x0A_u8);
-            let cur_state = port_3d5.read() as u8;
-            port_3d5.write(cur_state & 0xDF);  // Clear bit 5 to enable cursor and force high intensity
+            port_3d5.write(0x00_u8);  // Enable cursor and force intensity bit
         }
         self.update_cursor();
     }
@@ -230,7 +229,7 @@ pub fn clear_screen() {
         }
         writer.row_position = 0;
         writer.column_position = 0;
-        writer.write_string("> ");
+        writer.write_string("> ");  // Only place where prompt is written
         writer.enable_cursor();
     });
 }
