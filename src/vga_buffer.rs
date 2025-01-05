@@ -91,25 +91,26 @@ impl Writer {
         }
     }
 
-    fn backspace(&mut self) {
+    pub fn backspace(&mut self) {  // Made public
         // First check if we're at the start of a line
         if self.column_position == 0 {
             // Only move up if we're not on the first line
             if self.row_position > 0 {
                 self.row_position -= 1;
                 self.column_position = BUFFER_WIDTH - 1;
+
+                // Clear the character at the new position
+                let blank = ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                };
+                self.buffer.chars[self.row_position][self.column_position].write(blank);
             }
         } else {
             // We're in the middle of a line
             self.column_position -= 1;
-        }
 
-        // Now check if we'd be deleting the prompt
-        if self.row_position == BUFFER_HEIGHT - 1 && self.column_position < 2 {
-            // Reset to after prompt
-            self.column_position = 2;
-        } else {
-            // Safe to delete the character
+            // Clear the character at the current position
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
@@ -117,8 +118,15 @@ impl Writer {
             self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
 
+        // Now check if we'd be deleting the prompt
+        if self.row_position == BUFFER_HEIGHT - 1 && self.column_position < 2 {
+            // Reset to after prompt
+            self.column_position = 2;
+        }
+
         self.update_cursor();
     }
+}
 
     fn write_byte(&mut self, byte: u8) {
         match byte {
