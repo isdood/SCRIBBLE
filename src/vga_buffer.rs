@@ -1,10 +1,9 @@
+// src/vga_buffer.rs
+
 use volatile::Volatile;
 use core::fmt;
-use spin::Mutex;
 use lazy_static::lazy_static;
-
-pub const BUFFER_HEIGHT: usize = 25;
-pub const BUFFER_WIDTH: usize = 80;
+use spin::Mutex;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,10 +29,10 @@ pub enum Color {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct ColorCode(u8);
+struct ColorCode(u8);
 
 impl ColorCode {
-    pub const fn new(foreground: Color, background: Color) -> ColorCode {
+    fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
 }
@@ -45,6 +44,9 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
+const BUFFER_HEIGHT: usize = 25;
+const BUFFER_WIDTH: usize = 80;
+
 #[repr(transparent)]
 struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
@@ -55,12 +57,24 @@ pub struct Writer {
     row_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
+    prompt_row: usize,
 }
 
 impl Writer {
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                0x08 => self.backspace(),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
+            0x08 => self.backspace(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
@@ -69,63 +83,87 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
-                let colored_char = ScreenChar {
+                self.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
-                };
-
-                unsafe {
-                    (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)) =
-                    Volatile::new(colored_char);
-                }
-
+                });
                 self.column_position += 1;
                 self.update_cursor();
             }
         }
     }
 
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
+    fn backspace(&mut self) {
+        if self.row_position == self.prompt_row && self.column_position <= 2 {
+            return;
         }
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            self.buffer.chars[self.row_position][self.column_position].write(ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            });
+        } else if self.row_position > 0 {
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+            self.buffer.chars[self.row_position][self.column_position].write(ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            });
+        }
+        self.update_cursor();
     }
 
     fn new_line(&mut self) {
-        if self.row_position < BUFFER_HEIGHT - 1 {
-            self.row_position += 1;
-        } else {
-            for row in 1..BUFFER_HEIGHT {
-                for col in 0..BUFFER_WIDTH {
-                    unsafe {
-                        let char_ptr = &self.buffer.chars[row][col];
-                        let char_val = char_ptr.read_volatile();
-
-                        let dest_ptr = &mut self.buffer.chars[row - 1][col];
-                        dest_ptr.write_volatile(char_val);
-                    }
-                }
-            }
-            self.clear_row(BUFFER_HEIGHT - 1);
-        }
+        self.row_position += 1;
         self.column_position = 0;
+        if self.row_position >= BUFFER_HEIGHT {
+            self.scroll_up();
+            if self.prompt_row > 0 {
+                self.prompt_row -= 1;
+            }
+        }
         self.update_cursor();
+    }
+
+    fn scroll_up(&mut self) {
+        for row in 1..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                let character = self.buffer.chars[row][col].read();
+                self.buffer.chars[row - 1][col].write(character);
+            }
+        }
+        self.clear_row(BUFFER_HEIGHT - 1);
+        self.row_position = BUFFER_HEIGHT - 1;
+    }
+
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
+        }
     }
 
     fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
             use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
+            let mut port = Port::new(0x3D4);
+            let mut data_port = Port::new(0x3D5);
 
-            port_3d4.write(0x0F_u8);
-            port_3d5.write((pos & 0xFF) as u8);
-            port_3d4.write(0x0E_u8);
-            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+            port.write(0x0Au8);
+            data_port.write(0x00u8);  // Start scanline
+            port.write(0x0Bu8);
+            data_port.write(15u8);    // End scanline (full block cursor)
+
+            port.write(0x0Fu8);
+            data_port.write((pos & 0xFF) as u8);
+            port.write(0x0Eu8);
+            data_port.write(((pos >> 8) & 0xFF) as u8);
         }
     }
 
@@ -134,44 +172,7 @@ impl Writer {
     }
 
     pub fn set_prompt_row(&mut self, row: usize) {
-        if row < BUFFER_HEIGHT {
-            self.row_position = row;
-            self.column_position = 0;
-            self.update_cursor();
-        }
-    }
-
-    pub fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-
-        for col in 0..BUFFER_WIDTH {
-            unsafe {
-                let volatile_cell = &mut self.buffer.chars[row][col];
-                volatile_cell.write_volatile(blank);
-            }
-        }
-    }
-
-    pub fn backspace(&mut self) {
-        if self.column_position <= 2 {
-            return;
-        }
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            unsafe {
-                (*(&mut self.buffer.chars[self.row_position][self.column_position]
-                as *mut Volatile<ScreenChar>)) = Volatile::new(blank);
-            }
-            self.update_cursor();
-        }
+        self.prompt_row = row;
     }
 }
 
@@ -186,11 +187,13 @@ lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         row_position: 0,
-        color_code: ColorCode::new(Color::Green, Color::Black),
+        color_code: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+                                                      prompt_row: 0,
     });
 }
 
+#[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
@@ -200,68 +203,56 @@ pub fn _print(args: fmt::Arguments) {
     });
 }
 
-pub fn backspace() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().backspace();
-    });
-}
-
-pub fn clear_screen() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        for row in 0..BUFFER_HEIGHT {
-            Writer::clear_row(&mut *writer, row);
-        }
-        writer.row_position = 0;
-        writer.column_position = 0;
-        writer.update_cursor();
-    });
-}
-
-pub fn set_color(foreground: Color, background: Color) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().color_code = ColorCode::new(foreground, background);
-    });
+pub fn print(args: fmt::Arguments) {
+    _print(args);
 }
 
 pub fn enable_cursor() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
+    unsafe {
+        use x86_64::instructions::port::Port;
+        let mut port = Port::new(0x3D4);
+        let mut data_port = Port::new(0x3D5);
 
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);
-
-            port_3d4.write(0x0A_u8);
-            let current = port_3d5.read();
-            port_3d5.write(current & !0x20);
-        }
-    });
-}
-
-trait VolatileAccess<T> {
-    unsafe fn read_volatile(&self) -> T;
-    unsafe fn write_volatile(&mut self, value: T);
-}
-
-impl VolatileAccess<ScreenChar> for Volatile<ScreenChar> {
-    unsafe fn read_volatile(&self) -> ScreenChar {
-        core::ptr::read_volatile(self as *const Volatile<ScreenChar> as *const ScreenChar)
-    }
-
-    unsafe fn write_volatile(&mut self, value: ScreenChar) {
-        core::ptr::write_volatile(self as *mut Volatile<ScreenChar> as *mut ScreenChar, value)
+        port.write(0x0Au8);
+        data_port.write(0x00u8);
+        port.write(0x0Bu8);
+        data_port.write(15u8);
     }
 }
 
-pub fn init() {
-    enable_cursor();
+pub fn disable_cursor() {
+    unsafe {
+        use x86_64::instructions::port::Port;
+        let mut port = Port::new(0x3D4);
+        let mut data_port = Port::new(0x3D5);
+
+        port.write(0x0Au8);
+        data_port.write(0x20u8);
+    }
+}
+
+pub fn clear_screen() {
+    let mut writer = WRITER.lock();
+    for row in 0..BUFFER_HEIGHT {
+        writer.clear_row(row);
+    }
+    writer.column_position = 0;
+    writer.row_position = 0;
+    writer.prompt_row = 0;
+    writer.update_cursor();
+}
+
+pub fn backspace() {
+    WRITER.lock().backspace();
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
