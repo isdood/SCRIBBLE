@@ -10,9 +10,21 @@ lazy_static! {
     };
 }
 
+#[doc(hidden)]
+pub fn _print(args: ::core::fmt::Arguments) {
+    use core::fmt::Write;
+    use x86_64::instructions::interrupts;
+
+    interrupts::without_interrupts(|| {
+        SERIAL1.lock().write_fmt(args).unwrap();
+    });
+}
+
 #[macro_export]
 macro_rules! serial_print {
-    ($($arg:tt)*) => ($crate::serial::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => {
+        $crate::serial::_print(core::format_args!($($arg)*));
+    };
 }
 
 #[macro_export]

@@ -14,7 +14,6 @@ pub mod keyboard;
 pub mod allocator;  // Add this line
 
 use bootloader::BootInfo;
-use vga_buffer::{Color, clear_screen, set_color, enable_cursor};
 
 pub fn init_heap(boot_info: &'static BootInfo) {
     use memory::{self, BootInfoFrameAllocator};

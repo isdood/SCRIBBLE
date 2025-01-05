@@ -1,6 +1,9 @@
-use bootloader::{BootInfo, entry_point};
+#![no_std]
+#![no_main]
+
 use core::panic::PanicInfo;
-use scribble::{println, serial_println};
+use bootloader::{BootInfo, entry_point};
+use scribble::serial_println;
 
 entry_point!(kernel_main);
 
