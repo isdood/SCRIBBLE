@@ -57,6 +57,15 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
+lazy_static! {
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        row_position: 0,
+        color_code: ColorCode::new(Color::Green, Color::Black),
+                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    });
+}
+
 impl Writer {
     pub fn enable_cursor(&mut self) {
         unsafe {
@@ -64,21 +73,20 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First completely disable the cursor to reset it
+            // Disable cursor first
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Clear registers
+            // Set cursor appearance
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);
+            port_3d5.write(0x00_u8);  // Start at line 0
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x00_u8);
+            port_3d5.write(0x0F_u8);  // End at line 15 (full block)
 
-            // Now set up white block cursor
+            // Enable cursor (clear bit 5)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8); // Start at scanline 0
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x1F_u8); // End at scanline 31 (maximum)
+            let cur_state = port_3d5.read() as u8;
+            port_3d5.write(cur_state & !0x20);
         }
     }
 
@@ -100,25 +108,20 @@ impl Writer {
                 self.column_position -= 1;
                 self.buffer.chars[self.row_position][self.column_position].write(blank);
             } else if self.row_position > 0 {
-                // Save current row for clearing
-                let old_row = self.row_position;
+                // Clear current line first
+                self.clear_row(self.row_position);
 
-                // Move to end of previous row
+                // Move to previous line
                 self.row_position -= 1;
-                self.column_position = BUFFER_WIDTH - 1;
 
-                // Find actual last character
+                // Find last non-space character
+                self.column_position = BUFFER_WIDTH - 1;
                 while self.column_position > 0 {
                     let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
                     if char.ascii_character != b' ' {
                         break;
                     }
                     self.column_position -= 1;
-                }
-
-                // Clear entire old row
-                for col in 0..BUFFER_WIDTH {
-                    self.buffer.chars[old_row][col].write(blank);
                 }
             }
 
@@ -194,7 +197,6 @@ impl Writer {
     }
 
     fn new_line(&mut self) {
-        let old_row = self.row_position;
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
@@ -207,12 +209,21 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-
-        // Only write prompt if we're moving from row 0 to row 1
-        if old_row == 0 {
-            self.update_cursor();
+        self.update_cursor();
         }
     }
+
+    pub fn clear_screen() {
+        use x86_64::instructions::interrupts;
+        interrupts::without_interrupts(|| {
+            let mut writer = WRITER.lock();
+            for row in 0..BUFFER_HEIGHT {
+                writer.clear_row(row);
+            }
+            writer.row_position = 0;
+            writer.column_position = 0;
+            writer.update_cursor();
+        });
 }
 
 impl fmt::Write for Writer {
