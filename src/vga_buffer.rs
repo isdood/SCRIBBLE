@@ -57,67 +57,26 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
-impl Writer {
-    pub fn enable_cursor(&mut self) {
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
+pub fn enable_cursor(&mut self) {
+    unsafe {
+        use x86_64::instructions::port::Port;
+        let mut port_3d4 = Port::new(0x3D4);
+        let mut port_3d5 = Port::new(0x3D5);
 
-            // First disable cursor
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x20_u8);
+        // First disable cursor
+        port_3d4.write(0x0A_u8);
+        port_3d5.write(0x20_u8);
 
-            // Set cursor shape back to smaller size
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start at scan line 14 (near bottom)
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End at scan line 15 (bottom)
+        // Set cursor shape to underscore
+        port_3d4.write(0x0A_u8);
+        port_3d5.write(0x0F_u8);  // Start at scan line 15 (bottom)
+        port_3d4.write(0x0B_u8);
+        port_3d5.write(0x0F_u8);  // End at scan line 15 (bottom)
 
-            // Enable cursor
-            port_3d4.write(0x0A_u8);
-            let cur_state = port_3d5.read() as u8;
-            port_3d5.write(cur_state & !0x20);
-        }
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
-    }
-
-
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            self.write_byte(byte);
-        }
-    }
-
-    pub fn write_byte(&mut self, byte: u8) {
-        match byte {
-            b'\n' => self.new_line(),
-            byte => {
-                if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
-                }
-
-                let row = self.row_position;
-                let col = self.column_position;
-
-                let color_code = self.color_code;
-                self.buffer.chars[row][col].write(ScreenChar {
-                    ascii_character: byte,
-                    color_code,
-                });
-                self.column_position += 1;
-            }
-        }
-        self.update_cursor();
+        // Enable cursor
+        port_3d4.write(0x0A_u8);
+        let cur_state = port_3d5.read() as u8;
+        port_3d5.write(cur_state & !0x20);
     }
 
     pub fn update_cursor(&mut self) {
@@ -133,11 +92,11 @@ impl Writer {
             port_3d4.write(0x0E_u8);
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
 
-            // Set white background for cursor position (keeping this part for the white color)
+            // Set white background for cursor position (keeping this for the white color)
             let current_char = self.buffer.chars[self.row_position][self.column_position].read();
             let white_bg_char = ScreenChar {
                 ascii_character: current_char.ascii_character,
-                color_code: ColorCode::new(Color::Black, Color::White),  // White background, black text for cursor
+                color_code: ColorCode::new(Color::Black, Color::White),
             };
             self.buffer.chars[self.row_position][self.column_position].write(white_bg_char);
         }
@@ -188,11 +147,9 @@ impl Writer {
 
             // If moving back to first line, restore its content
             if self.row_position == 0 {
-                // Restore first line content
                 for i in 0..BUFFER_WIDTH {
                     self.buffer.chars[0][i].write(first_line_content[i]);
                 }
-                // Ensure cursor position is after the last character
                 self.column_position = 2;  // Start after prompt
                 while self.column_position < BUFFER_WIDTH {
                     let char = self.buffer.chars[0][self.column_position].read();
@@ -203,6 +160,9 @@ impl Writer {
                 }
             }
         }
+
+        self.update_cursor();
+    }
 
         self.update_cursor();
     }
