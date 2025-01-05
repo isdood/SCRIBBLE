@@ -54,6 +54,7 @@ pub struct Writer {
     column_position: usize,
     row_position: usize,
     color_code: ColorCode,
+    cursor_color: ColorCode,
     buffer: &'static mut Buffer,
 }
 
@@ -66,12 +67,16 @@ impl Writer {
                     self.new_line();
                 }
 
+                // Store current character's color
+                let current = self.buffer.chars[self.row_position][self.column_position].read();
+
+                // Write the new character
                 let colored_char = ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
                 };
-
                 self.buffer.chars[self.row_position][self.column_position].write(colored_char);
+
                 self.column_position += 1;
                 self.update_cursor();
             }
@@ -88,6 +93,14 @@ impl Writer {
     }
 
     fn new_line(&mut self) {
+        // Restore current character color
+        let current = self.buffer.chars[self.row_position][self.column_position].read();
+        let restored_char = ScreenChar {
+            ascii_character: current.ascii_character,
+            color_code: self.color_code,
+        };
+        self.buffer.chars[self.row_position][self.column_position].write(restored_char);
+
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
@@ -115,21 +128,24 @@ impl Writer {
 
     fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+
+        // Change current character to white (cursor)
+        let current_char = self.buffer.chars[self.row_position][self.column_position].read();
+        self.buffer.chars[self.row_position][self.column_position].write(ScreenChar {
+            ascii_character: current_char.ascii_character,
+            color_code: self.cursor_color,
+        });
+
         unsafe {
             use x86_64::instructions::port::Port;
             let mut port_3d4: Port<u8> = Port::new(0x3D4);
             let mut port_3d5: Port<u8> = Port::new(0x3D5);
-            let mut port_3c0: Port<u8> = Port::new(0x3C0);
 
             // Update cursor position
             port_3d4.write(0x0F_u8);
             port_3d5.write((pos & 0xFF) as u8);
             port_3d4.write(0x0E_u8);
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
-
-            // Set cursor color to white through attribute controller
-            port_3c0.write(0x0D_u8);  // Select cursor color register
-            port_3c0.write(0x0F_u8);  // Set to white
         }
     }
 
@@ -137,6 +153,14 @@ impl Writer {
         if self.column_position <= 2 && self.row_position == 0 {
             return;
         }
+
+        // Restore current character color
+        let current = self.buffer.chars[self.row_position][self.column_position].read();
+        let restored_char = ScreenChar {
+            ascii_character: current.ascii_character,
+            color_code: self.color_code,
+        };
+        self.buffer.chars[self.row_position][self.column_position].write(restored_char);
 
         if self.column_position > 0 {
             self.column_position -= 1;
@@ -173,6 +197,7 @@ lazy_static! {
         column_position: 0,
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
+                                                      cursor_color: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
@@ -203,14 +228,14 @@ pub fn enable_cursor() {
 
             // Set cursor shape to underscore (lines 14-15)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line (14)
-    port_3d4.write(0x0B_u8);
-    port_3d5.write(0x0F_u8);  // End scan line (15)
+            port_3d5.write(0x0E_u8);  // Start scan line
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(0x0F_u8);  // End scan line
 
-    // Enable cursor
-    port_3d4.write(0x0A_u8);
-    let current = port_3d5.read();
-    port_3d5.write(current & !0x20);
+            // Enable cursor
+            port_3d4.write(0x0A_u8);
+            let current = port_3d5.read();
+            port_3d5.write(current & !0x20);
         }
     });
 }
