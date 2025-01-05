@@ -53,11 +53,9 @@ struct Buffer {
 pub struct Writer {
     column_position: usize,
     row_position: usize,
-    prompt_color: ColorCode,
-    input_color: ColorCode,
-    system_color: ColorCode,
+    color_code: ColorCode,
     buffer: &'static mut Buffer,
-    is_system_output: bool,
+    prompt_active: bool,
 }
 
 impl Writer {
@@ -72,24 +70,20 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
-                // Determine the appropriate color
-                let color_code = if self.is_system_output {
-                    self.system_color
-                } else if col <= 1 && unsafe {
-                    self.buffer.chars[row][0].read_volatile().ascii_character == b'>'
-                } {
-                    self.prompt_color
+                // Determine the color based on the context
+                let current_color = if self.prompt_active && col <= 1 {
+                    ColorCode::new(Color::Green, Color::Black)  // Green prompt
                 } else {
-                    self.input_color
+                    self.color_code  // Normal color (white)
                 };
 
                 let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code,
+                    color_code: current_color,
                 };
 
                 unsafe {
-                    self.buffer.chars[row][col].write_volatile(colored_char);
+                    self.buffer.chars[row][col].write(colored_char);
                 }
 
                 self.column_position += 1;
@@ -114,8 +108,8 @@ impl Writer {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     unsafe {
-                        let character = self.buffer.chars[row][col].read_volatile();
-                        self.buffer.chars[row - 1][col].write_volatile(character);
+                        let character = self.buffer.chars[row][col].read();
+                        self.buffer.chars[row - 1][col].write(character);
                     }
                 }
             }
@@ -123,6 +117,38 @@ impl Writer {
         }
         self.column_position = 0;
         self.update_cursor();
+    }
+
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            unsafe {
+                self.buffer.chars[row][col].write(blank);
+            }
+        }
+    }
+
+    pub fn backspace(&mut self) {
+        // Check if we're at the prompt position
+        if self.column_position <= 2 && self.prompt_active {
+            return;
+        }
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            unsafe {
+                self.buffer.chars[self.row_position][self.column_position]
+                .write(blank);
+            }
+            self.update_cursor();
+        }
     }
 
     fn update_cursor(&mut self) {
@@ -139,55 +165,8 @@ impl Writer {
         }
     }
 
-    pub fn get_row_position(&self) -> usize {
-        self.row_position
-    }
-
-    pub fn set_prompt_row(&mut self, row: usize) {
-        if row < BUFFER_HEIGHT {
-            self.row_position = row;
-            self.column_position = 0;
-            self.update_cursor();
-        }
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.input_color,
-        };
-
-        for col in 0..BUFFER_WIDTH {
-            unsafe {
-                self.buffer.chars[row][col].write_volatile(blank);
-            }
-        }
-    }
-
-    pub fn backspace(&mut self) {
-        // Don't allow backspace over prompt
-        if self.column_position <= 2 && unsafe {
-            self.buffer.chars[self.row_position][0].read_volatile().ascii_character == b'>'
-        } {
-            return;
-        }
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.input_color,
-            };
-            unsafe {
-                self.buffer.chars[self.row_position][self.column_position]
-                .write_volatile(blank);
-            }
-            self.update_cursor();
-        }
-    }
-
-    pub fn set_system_output(&mut self, is_system: bool) {
-        self.is_system_output = is_system;
+    pub fn set_prompt_active(&mut self, active: bool) {
+        self.prompt_active = active;
     }
 }
 
@@ -202,20 +181,21 @@ lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         row_position: 0,
-        prompt_color: ColorCode::new(Color::Green, Color::Black),
-                                                      input_color: ColorCode::new(Color::White, Color::Black),
-                                                      system_color: ColorCode::new(Color::Green, Color::Black),
+        color_code: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-                                                      is_system_output: false,
+                                                      prompt_active: false,
     });
 }
 
+#[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
 
     interrupts::without_interrupts(|| {
-        WRITER.lock().write_fmt(args).unwrap();
+        let mut writer = WRITER.lock();
+        writer.prompt_active = args.to_string().starts_with('>');
+        writer.write_fmt(args).unwrap();
     });
 }
 
@@ -236,8 +216,6 @@ pub fn clear_screen() {
         writer.row_position = 0;
         writer.column_position = 0;
         writer.update_cursor();
-        drop(writer);
-        crate::print!("> ");
     });
 }
 
@@ -264,4 +242,16 @@ pub fn enable_cursor() {
 pub fn init() {
     clear_screen();
     enable_cursor();
+    print!("> ");  // Initial prompt
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }

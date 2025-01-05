@@ -5,7 +5,7 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-extern crate alloc;  // Add this line
+extern crate alloc;
 
 pub mod vga_buffer;
 pub mod gdt;
@@ -34,11 +34,9 @@ pub fn show_datetime() {
     let mut rtc = rtc::RTC_DEVICE.lock();
     let (year, month, day) = rtc.get_date();
     let (hours, minutes, seconds) = rtc.get_time();
-    crate::system_println!(
-        "Current Date and Time (UTC): {}-{:02}-{:02} {:02}:{:02}:{:02}",
-                           year, month, day, hours, minutes, seconds
-    );
-    crate::system_println!("Current User's Login: isdood");
+    println!("Current Date and Time (UTC): {}-{:02}-{:02} {:02}:{:02}:{:02}",
+             year, month, day, hours, minutes, seconds);
+    println!("Current User's Login: isdood");
 }
 
 pub fn init_kernel(boot_info: &'static BootInfo) {
