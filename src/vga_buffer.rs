@@ -78,16 +78,6 @@ impl Writer {
             port_3d4.write(0x0A_u8);
             let cur_state = port_3d5.read() as u8;
             port_3d5.write(cur_state & !0x20);
-
-            // Set cursor color through VGA attribute controller
-            let mut port_3c0 = Port::new(0x3C0);
-            port_3c0.write(0x0B_u8);  // Select Attribute Mode Control Register
-            let attr_mode = port_3c0.read() as u8;
-            port_3c0.write(attr_mode | 0x08);  // Set bit 3 for cursor attribute
-
-            // Set cursor attribute to white (0x0F)
-            port_3c0.write(0x0F_u8);
-            port_3c0.write(0x0F_u8);
         }
     }
 
@@ -130,8 +120,9 @@ impl Writer {
         self.update_cursor();
     }
 
-    fn update_cursor(&mut self) {
+    pub fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+
         unsafe {
             use x86_64::instructions::port::Port;
             let mut port_3d4 = Port::new(0x3D4);
@@ -141,6 +132,14 @@ impl Writer {
             port_3d5.write((pos & 0xFF) as u8);
             port_3d4.write(0x0E_u8);
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
+
+            // Try to set the character at cursor position to use white background
+            let current_char = self.buffer.chars[self.row_position][self.column_position].read();
+            let white_bg_char = ScreenChar {
+                ascii_character: current_char.ascii_character,
+                color_code: ColorCode::new(Color::Black, Color::White),  // White background, black text for cursor
+            };
+            self.buffer.chars[self.row_position][self.column_position].write(white_bg_char);
         }
     }
 
