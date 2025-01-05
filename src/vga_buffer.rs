@@ -107,6 +107,7 @@ pub struct Writer {
         if self.row_position == 0 && self.column_position <= 2 {
             return;
         }
+    }
 
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -160,7 +161,7 @@ pub struct Writer {
                 }
             }
         }
-    }
+
 
         self.update_cursor();
     }
