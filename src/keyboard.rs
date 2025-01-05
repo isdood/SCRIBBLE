@@ -16,18 +16,21 @@ pub fn handle_scancode(scancode: u8) {
             match key {
                 DecodedKey::Unicode(character) => {
                     if character == '\n' {
-                        print!("\n> ");  // Add prompt on newline
+                        print!("\n> ");  // New prompt on new line
+                        // Update prompt row
+                        if let Some(writer) = vga_buffer::WRITER.try_lock() {
+                            writer.prompt_row = writer.row_position;
+                        }
                     } else if character as u8 == 8 {
                         vga_buffer::backspace();
                     } else {
                         print!("{}", character);
                     }
                 }
-                DecodedKey::RawKey(key) => {
-                    if let KeyCode::Backspace = key {
-                        vga_buffer::backspace();
-                    }
+                DecodedKey::RawKey(KeyCode::Backspace) => {
+                    vga_buffer::backspace();
                 }
+                _ => {}
             }
         }
     }

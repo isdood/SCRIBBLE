@@ -54,6 +54,7 @@ pub struct Writer {
     column_position: usize,
     row_position: usize,
     color_code: ColorCode,
+    prompt_row: usize,  // Add this to track prompt line
     buffer: &'static mut Buffer,
 }
 
@@ -90,6 +91,7 @@ impl Writer {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
+            // Scroll the screen
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     let character = self.buffer.chars[row][col].read();
@@ -97,6 +99,7 @@ impl Writer {
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
+            self.prompt_row = self.prompt_row.saturating_sub(1); // Update prompt row when scrolling
         }
         self.column_position = 0;
         self.update_cursor();
@@ -127,9 +130,9 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // Only protect prompt on the first line after boot messages
-        let is_prompt_line = self.row_position == 2 && self.column_position <= 2;
-        if is_prompt_line {
+        // Only protect prompt character on prompt lines
+        let is_at_prompt = self.column_position <= 2 && self.row_position == self.prompt_row;
+        if is_at_prompt {
             return;
         }
 
@@ -157,8 +160,10 @@ lazy_static! {
         column_position: 0,
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
+                                                      prompt_row: 3,  // Initialize prompt row
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
+
 }
 
 pub fn enable_cursor() {
@@ -169,22 +174,35 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set cursor shape (make it more visible)
+            // Set cursor shape (block cursor)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);  // Start scan line (top of cursor)
+            port_3d5.write(0x00_u8);  // Start scan line (top)
     port_3d4.write(0x0B_u8);
     port_3d5.write(0x0F_u8);  // End scan line (bottom)
 
-    // Enable cursor (make sure bit 5 is cleared)
+    // Enable cursor and set intensity
     port_3d4.write(0x0A_u8);
-    let current = port_3d5.read();
-    port_3d5.write(current & !0x20);
+    port_3d5.write(0x00_u8);  // Enable cursor and set to high intensity
+
+    // Set cursor color to white using attribute controller
+    let mut port_3c0 = Port::new(0x3C0);
+    port_3c0.write(0x0D_u8);  // Select cursor color register
+    port_3c0.write(0x0F_u8);  // Set to white (high intensity)
         }
     });
 }
 
 pub fn init() {
     enable_cursor();
+
+    // Reset the screen state
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.prompt_row = 3;  // Set initial prompt row
+    });
 }
 
 pub fn _print(args: fmt::Arguments) {
