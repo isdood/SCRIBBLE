@@ -180,7 +180,7 @@ impl Writer {
         };
         self.buffer.chars[self.row_position][self.column_position].write(blank);
         self.update_cursor();
-        }
+            }
 }
 
 impl fmt::Write for Writer {
