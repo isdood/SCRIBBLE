@@ -59,107 +59,8 @@ pub struct Writer {
 }
 
 impl Writer {
-    fn write_byte(&mut self, byte: u8) {
-        match byte {
-            b'\n' => self.new_line(),
-            byte => {
-                if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
-                }
-
-                // Restore the previous character's color
-                if self.column_position > 0 {
-                    let prev_pos = self.column_position - 1;
-                    let prev_char = self.buffer.chars[self.row_position][prev_pos].read();
-                    let restored_char = ScreenChar {
-                        ascii_character: prev_char.ascii_character,
-                        color_code: ColorCode::new(Color::Green, Color::Black),
-                    };
-                    self.buffer.chars[self.row_position][prev_pos].write(restored_char);
-                }
-
-                let colored_char = ScreenChar {
-                    ascii_character: byte,
-                    color_code: ColorCode::new(Color::Green, Color::Black),
-                };
-
-                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
-                self.column_position += 1;
-                self.update_cursor();
-            }
-        }
-    }
-
-    fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
-        }
-    }
-
-    fn new_line(&mut self) {
-        if self.row_position < BUFFER_HEIGHT - 1 {
-            // Restore color of current position before moving
-            let current_char = self.buffer.chars[self.row_position][self.column_position].read();
-            let restored_char = ScreenChar {
-                ascii_character: current_char.ascii_character,
-                color_code: ColorCode::new(Color::Green, Color::Black),
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(restored_char);
-
-            self.row_position += 1;
-        } else {
-            for row in 1..BUFFER_HEIGHT {
-                for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
-                    self.buffer.chars[row - 1][col].write(character);
-                }
-            }
-            self.clear_row(BUFFER_HEIGHT - 1);
-        }
-        self.column_position = 0;
-        self.update_cursor();
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: ColorCode::new(Color::Green, Color::Black),
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
-    }
-
-    fn update_cursor(&mut self) {
-        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-
-        // Save current character attributes
-        let current_char = self.buffer.chars[self.row_position][self.column_position].read();
-        self.last_color_code = current_char.color_code;
-
-        // Set character at cursor position to white
-        let white_char = ScreenChar {
-            ascii_character: current_char.ascii_character,
-            color_code: ColorCode::new(Color::White, Color::Black),
-        };
-        self.buffer.chars[self.row_position][self.column_position].write(white_char);
-
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3d4: Port<u8> = Port::new(0x3D4);
-            let mut port_3d5: Port<u8> = Port::new(0x3D5);
-
-            port_3d4.write(0x0F_u8);
-            port_3d5.write((pos & 0xFF) as u8);
-            port_3d4.write(0x0E_u8);
-            port_3d5.write(((pos >> 8) & 0xFF) as u8);
-        }
-    }
-
     pub fn backspace(&mut self) {
+        // Only prevent backspace at the very start of prompt
         if self.column_position <= 2 && self.row_position == 0 {
             return;
         }
@@ -175,12 +76,17 @@ impl Writer {
         if self.column_position > 0 {
             self.column_position -= 1;
         } else if self.row_position > 0 {
+            // Move to previous line
             self.row_position -= 1;
+            // Find last non-empty character in previous line
             self.column_position = BUFFER_WIDTH - 1;
-            while self.column_position > 0 &&
-                self.buffer.chars[self.row_position][self.column_position - 1].read().ascii_character == b' ' {
-                    self.column_position -= 1;
+            while self.column_position > 0 {
+                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
+                if char.ascii_character != b' ' {
+                    break;
                 }
+                self.column_position -= 1;
+            }
         }
 
         let blank = ScreenChar {
@@ -189,6 +95,64 @@ impl Writer {
         };
         self.buffer.chars[self.row_position][self.column_position].write(blank);
         self.update_cursor();
+    }
+
+    fn new_line(&mut self) {
+        // Restore color of current position before moving
+        let current_char = self.buffer.chars[self.row_position][self.column_position].read();
+        let restored_char = ScreenChar {
+            ascii_character: current_char.ascii_character,
+            color_code: ColorCode::new(Color::Green, Color::Black),
+        };
+        self.buffer.chars[self.row_position][self.column_position].write(restored_char);
+
+        if self.row_position < BUFFER_HEIGHT - 1 {
+            self.row_position += 1;
+        } else {
+            // Scroll the screen
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col].write(character);
+                }
+            }
+            self.clear_row(BUFFER_HEIGHT - 1);
+        }
+        self.column_position = 0;
+        self.update_cursor();
+    }
+
+    fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                // Restore the previous character's color if needed
+                if self.column_position > 0 {
+                    let prev_pos = self.column_position - 1;
+                    let prev_char = self.buffer.chars[self.row_position][prev_pos].read();
+                    if prev_char.color_code != ColorCode::new(Color::Green, Color::Black) {
+                        let restored_char = ScreenChar {
+                            ascii_character: prev_char.ascii_character,
+                            color_code: ColorCode::new(Color::Green, Color::Black),
+                        };
+                        self.buffer.chars[self.row_position][prev_pos].write(restored_char);
+                    }
+                }
+
+                let colored_char = ScreenChar {
+                    ascii_character: byte,
+                    color_code: ColorCode::new(Color::Green, Color::Black),
+                };
+
+                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
+                self.column_position += 1;
+                self.update_cursor();
+            }
+        }
     }
 }
 
