@@ -194,11 +194,19 @@ pub fn set_color(foreground: Color, background: Color) {
     });
 }
 
-pub fn enable_cursor() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().enable_cursor();
-    });
+pub fn enable_cursor(&mut self) {
+    unsafe {
+        use x86_64::instructions::port::Port;
+
+        let mut port_3d4 = Port::new(0x3D4);
+        let mut port_3d5 = Port::new(0x3D5);
+
+        // Set cursor shape (make it white by using lines 14-15)
+        port_3d4.write(0x0A_u8);
+        port_3d5.write(14_u8);  // Start scanline
+        port_3d4.write(0x0B_u8);
+        port_3d5.write(15_u8);  // End scanline
+    }
 }
 
 pub fn clear_screen() {
@@ -214,11 +222,26 @@ pub fn clear_screen() {
     });
 }
 
-pub fn backspace() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().backspace();
-    });
+pub fn backspace(&mut self) {
+    // Always protect the prompt on first line
+    if self.row_position == 0 {
+        if self.column_position <= 2 {
+            return;
+        }
+    }
+
+    // Handle backspace within current line
+    if self.column_position > 0 {
+        self.column_position -= 1;
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        self.buffer.chars[self.row_position][self.column_position].write(blank);
+    }
+    // Do not allow backspace between lines
+
+    self.update_cursor();
 }
 
 #[doc(hidden)]
