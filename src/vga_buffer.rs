@@ -154,64 +154,17 @@ impl Writer {
         }
         self.column_position = 0;
 
-        // Only write prompt on first line
+        // Only write prompt if we're on the first line
         if self.row_position == 0 {
-            // Write prompt with protected attributes
-            let prompt_chars = [b'>', b' '];
-            for &byte in prompt_chars.iter() {
+            let prompt = "> ";
+            for byte in prompt.bytes() {
                 let colored_char = ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
                 };
-                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
+                self.buffer.chars[0][self.column_position].write(colored_char);
                 self.column_position += 1;
             }
-        }
-
-        self.update_cursor();
-    }
-
-    pub fn backspace(&mut self) {
-        // Check if we're at the prompt or beginning
-        if self.row_position == 0 && self.column_position <= 2 {
-            return;
-        }
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-        } else if self.row_position > 0 {
-            // Get content of previous line before moving
-            let mut prev_line_content = [ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            }; BUFFER_WIDTH];
-
-            for col in 0..BUFFER_WIDTH {
-                prev_line_content[col] = self.buffer.chars[self.row_position - 1][col].read();
-            }
-
-            // Move to previous line
-            self.row_position -= 1;
-
-            // Find last non-space character
-            let mut last_col = BUFFER_WIDTH - 1;
-            while last_col > 0 && prev_line_content[last_col].ascii_character == b' ' {
-                last_col -= 1;
-            }
-
-            // Set position after last character
-            self.column_position = last_col;
-            if self.column_position >= BUFFER_WIDTH {
-                self.column_position = BUFFER_WIDTH - 1;
-            }
-
-            // Clear current line
-            self.clear_row(self.row_position + 1);
         }
 
         self.update_cursor();
