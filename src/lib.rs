@@ -1,6 +1,8 @@
 #![no_std]
-#![no_main]
-#![feature(abi_x86_interrupt)]
+#![cfg_attr(test, no_main)]
+#![feature(custom_test_frameworks)]
+#![test_runner(crate::test_runner)]
+#![reexport_test_harness_main = "test_main"]
 
 pub mod vga_buffer;
 pub mod gdt;
@@ -46,6 +48,6 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
-pub fn init() {
+pub fn init_vga() {
     vga_buffer::initialize();
 }
