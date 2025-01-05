@@ -58,6 +58,10 @@ pub struct Writer {
 }
 
 impl Writer {
+    pub fn set_color(&mut self, foreground: Color, background: Color) {
+        self.color_code = ColorCode::new(foreground, background);
+    }
+
     pub fn enable_cursor(&mut self) {
         unsafe {
             use x86_64::instructions::port::Port;
@@ -75,6 +79,31 @@ impl Writer {
             port_3d5.write(0_u8);  // Start scanline
             port_3d4.write(0x0B_u8);
             port_3d5.write(15_u8);  // End scanline
+        }
+    }
+
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
+
+    pub fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
         }
     }
 
@@ -113,6 +142,35 @@ impl Writer {
         self.update_cursor();
     }
 
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let colored_char = ScreenChar {
+                    ascii_character: byte,
+                    color_code: self.color_code,
+                };
+
+                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
+                self.column_position += 1;
+                self.update_cursor();
+            }
+        }
+    }
+
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
     fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
@@ -142,6 +200,7 @@ impl Writer {
 
         self.update_cursor();
     }
+}
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -181,9 +240,9 @@ pub fn clear_screen() {
         for row in 0..BUFFER_HEIGHT {
             writer.clear_row(row);
         }
-        writer.row_position = BUFFER_HEIGHT - 1;
+        writer.row_position = 0;
         writer.column_position = 0;
-        writer.update_cursor();
+        writer.new_line();
     });
 }
 
