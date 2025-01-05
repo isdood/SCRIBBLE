@@ -186,22 +186,16 @@ impl Writer {
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
+        self.write_str(s);
         Ok(())
     }
 }
 
-pub struct WriterGuard<'a>(spin::MutexGuard<'a, Writer>);
+pub struct WriterProxy(spin::MutexGuard<'static, Writer>);
 
-impl<'a> fmt::Write for WriterGuard<'a> {
+impl fmt::Write for WriterProxy {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.0.write_str(s)
-    }
-}
-
-impl fmt::Write for spin::MutexGuard<'_, Writer> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.deref_mut().write_str(s)
     }
 }
 
@@ -218,8 +212,9 @@ pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
 
     interrupts::without_interrupts(|| {
-        let mut writer = WriterGuard(WRITER.lock());
-        writer.write_fmt(args).unwrap();
+        WriterProxy(WRITER.lock())
+        .write_fmt(args)
+        .expect("Printing to VGA failed");
     });
 }
 
