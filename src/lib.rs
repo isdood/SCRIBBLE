@@ -13,6 +13,7 @@ pub mod serial;
 pub mod memory;
 pub mod keyboard;
 pub mod allocator;
+pub mod rtc;
 
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
@@ -107,4 +108,14 @@ pub fn init_vga() {
     vga_buffer::enable_cursor();
     println!("Welcome to Scribble OS");  // This will be on line 0
     print!("> ");                       // Prompt on line 1
+}
+
+pub fn show_datetime() {
+    let mut rtc = rtc::RTC_DEVICE.lock();
+    let (year, month, day) = rtc.get_date();
+    let (hours, minutes, seconds) = rtc.get_time();
+
+    println!("Date: {}-{:02}-{:02}", year, month, day);
+    println!("Time (UTC): {:02}:{:02}:{:02}", hours, minutes, seconds);
+    println!("User: isdood");  // Hardcoded for now, could be made configurable
 }
