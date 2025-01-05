@@ -237,9 +237,9 @@ impl Writer {
                 Ok(())
             }
 
+        }
     }
 }
-
 
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
