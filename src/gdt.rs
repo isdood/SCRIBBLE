@@ -9,13 +9,14 @@ const STACK_SIZE: usize = 4096 * 5;
 #[repr(align(16))]
 struct Stack([u8; STACK_SIZE]);
 
+#[no_mangle]
 static mut DOUBLE_FAULT_STACK: Stack = Stack([0; STACK_SIZE]);
 
 lazy_static! {
     static ref TSS: TaskStateSegment = {
         let mut tss = TaskStateSegment::new();
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
-            let stack_start = VirtAddr::from_ptr(unsafe { &DOUBLE_FAULT_STACK });
+            let stack_start = VirtAddr::from_ptr(unsafe { &raw const DOUBLE_FAULT_STACK });
             let stack_end = stack_start + STACK_SIZE;
             stack_end
         };
@@ -23,12 +24,6 @@ lazy_static! {
     };
 }
 
-struct Selectors {
-    code_selector: SegmentSelector,
-    tss_selector: SegmentSelector,
-}
-
-// GDT definition
 lazy_static! {
     static ref GDT: (GlobalDescriptorTable, Selectors) = {
         let mut gdt = GlobalDescriptorTable::new();
@@ -36,6 +31,11 @@ lazy_static! {
         let tss_selector = gdt.add_entry(Descriptor::tss_segment(&TSS));
         (gdt, Selectors { code_selector, tss_selector })
     };
+}
+
+struct Selectors {
+    code_selector: SegmentSelector,
+    tss_selector: SegmentSelector,
 }
 
 pub fn init() {
