@@ -58,59 +58,67 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn enable_cursor(&mut self) {  // Changed from fn to pub fn
+    pub fn enable_cursor(&mut self) {
         unsafe {
             use x86_64::instructions::port::Port;
-
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set cursor shape (make it white by using lines 14-15)
+            // First completely disable the cursor to reset it
             port_3d4.write(0x0A_u8);
-            port_3d5.write(14_u8);  // Start scanline
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(15_u8);  // End scanline
+            port_3d5.write(0x20_u8);
 
-            }
+            // Clear registers
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(0x00_u8);
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(0x00_u8);
+
+            // Now set up white block cursor
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(0x00_u8); // Start at scanline 0
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(0x1F_u8); // End at scanline 31 (maximum)
         }
+    }
 
         pub fn set_color(&mut self, foreground: Color, background: Color) {
         self.color_code = ColorCode::new(foreground, background);
         }
 
         fn backspace(&mut self) {
-            // Protect prompt on first line
             if self.row_position == 0 && self.column_position <= 2 {
                 return;
             }
 
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+
             if self.column_position > 0 {
-                // Within same line
                 self.column_position -= 1;
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
                 self.buffer.chars[self.row_position][self.column_position].write(blank);
             } else if self.row_position > 0 {
-                // Get previous line's last character position
-                let mut prev_last_col = BUFFER_WIDTH - 1;
-                while prev_last_col > 0 {
-                    let char = self.buffer.chars[self.row_position - 1][prev_last_col].read();
+                // Save current row for clearing
+                let old_row = self.row_position;
+
+                // Move to end of previous row
+                self.row_position -= 1;
+                self.column_position = BUFFER_WIDTH - 1;
+
+                // Find actual last character
+                while self.column_position > 0 {
+                    let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
                     if char.ascii_character != b' ' {
                         break;
                     }
-                    prev_last_col -= 1;
+                    self.column_position -= 1;
                 }
 
-                // Clear current line completely
-                self.clear_row(self.row_position);
-
-                // Move to previous line
-                self.row_position -= 1;
-                self.column_position = prev_last_col + 1;
-                if self.column_position >= BUFFER_WIDTH {
-                    self.column_position = BUFFER_WIDTH - 1;
+                // Clear entire old row
+                for col in 0..BUFFER_WIDTH {
+                    self.buffer.chars[old_row][col].write(blank);
                 }
             }
 
@@ -186,6 +194,7 @@ impl Writer {
     }
 
     fn new_line(&mut self) {
+        let old_row = self.row_position;
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
@@ -198,9 +207,12 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.update_cursor();
-    }
 
+        // Only write prompt if we're moving from row 0 to row 1
+        if old_row == 0 {
+            self.update_cursor();
+        }
+    }
 }
 
 impl fmt::Write for Writer {
@@ -211,12 +223,18 @@ impl fmt::Write for Writer {
 }
 
 lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        row_position: 0,
-        color_code: ColorCode::new(Color::Green, Color::Black),
-                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
+    pub static ref WRITER: Mutex<Writer> = {
+        let mut writer = Writer {
+            column_position: 0,
+            row_position: 0,
+            color_code: ColorCode::new(Color::Green, Color::Black),
+            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+        };
+
+        // Write initial prompt
+        writer.write_string("> ");
+        writer
+    };
 }
 
 pub fn set_color(foreground: Color, background: Color) {
