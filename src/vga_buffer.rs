@@ -1,5 +1,5 @@
 use volatile::Volatile;
-use core::fmt::Write;
+use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -252,6 +252,7 @@ pub fn set_color(foreground: Color, background: Color) {
 
 pub fn clear_screen() {
     use x86_64::instructions::interrupts;
+    use core::fmt::Write;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
 
