@@ -11,9 +11,10 @@ pub mod interrupts;
 pub mod serial;
 pub mod memory;
 pub mod keyboard;
-pub mod allocator;  // Add this line
+pub mod allocator;
 
 use bootloader::BootInfo;
+use vga_buffer::{Color, clear_screen, set_color, enable_cursor};
 
 pub fn init_heap(boot_info: &'static BootInfo) {
     use memory::{self, BootInfoFrameAllocator};
@@ -71,31 +72,22 @@ macro_rules! println {
 pub fn init_vga() {
     serial_println!("[DEBUG] Starting VGA initialization");
 
-    // Basic VGA initialization
+    // Initialize VGA hardware
     vga_buffer::init();
     serial_println!("[DEBUG] VGA hardware initialized");
 
-    // Set color and clear screen
-    set_color(Color::White, Color::Black);  // Try white text for better visibility
+    // Set up display
+    set_color(Color::White, Color::Black);
     clear_screen();
     serial_println!("[DEBUG] Screen cleared");
 
-    // Write test pattern to screen buffer directly
-    unsafe {
-        let buffer = 0xb8000 as *mut u8;
-        // Write 'TEST' in white on black
-        let test_str = b"TEST";
-        for (i, &byte) in test_str.iter().enumerate() {
-            *buffer.offset(i as isize * 2) = byte;
-            *buffer.offset(i as isize * 2 + 1) = 0x0F; // White on black
-        }
-    }
-    serial_println!("[DEBUG] Test pattern written");
-
-    // Try to print something
-    print!("Test Output");
-    serial_println!("[DEBUG] Print attempted");
+    // Write test output
+    println!("Welcome to Scribble OS");
+    println!("Kernel initialized");
+    println!("");
 
     enable_cursor();
-    serial_println!("[DEBUG] Cursor enabled");
+    print!("> ");
+
+    serial_println!("[DEBUG] VGA initialization complete");
 }

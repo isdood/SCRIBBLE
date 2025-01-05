@@ -238,14 +238,12 @@ pub fn write_test_pattern() {
 
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
-        let color_code = writer.color_code;  // Store color code before the loop
-
         for row in 0..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let character = if (row + col) % 2 == 0 { b'X' } else { b'.' };
                 writer.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: character,
-                    color_code,  // Use stored color code
+                    color_code: writer.color_code,
                 });
             }
         }
