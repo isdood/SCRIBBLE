@@ -68,7 +68,7 @@ impl Writer {
 
                 let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code: ColorCode::new(Color::Green, Color::Black),
+                    color_code: self.color_code,
                 };
 
                 self.buffer.chars[self.row_position][self.column_position].write(colored_char);
@@ -100,14 +100,13 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.write_string("> ");
         self.update_cursor();
     }
 
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: ColorCode::new(Color::Green, Color::Black),
+            color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
             self.buffer.chars[row][col].write(blank);
@@ -129,20 +128,37 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        if self.column_position <= 2 {
+        if self.column_position <= 2 && self.row_position == 0 {
+            // Don't backspace over initial prompt
             return;
         }
 
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: ColorCode::new(Color::Green, Color::Black),
+            color_code: self.color_code,
         };
 
         if self.column_position > 0 {
             self.column_position -= 1;
             self.buffer.chars[self.row_position][self.column_position].write(blank);
-            self.update_cursor();
+        } else if self.row_position > 0 {
+            // Move to end of previous line
+            self.row_position -= 1;
+            let mut last_col = BUFFER_WIDTH - 1;
+
+            // Find the last non-empty character
+            while last_col > 0 {
+                let char = self.buffer.chars[self.row_position][last_col - 1].read();
+                if char.ascii_character != b' ' {
+                    break;
+                }
+                last_col -= 1;
+            }
+
+            self.column_position = last_col;
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
+        self.update_cursor();
     }
 }
 
@@ -186,17 +202,21 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Enable the cursor
+            // Set cursor shape to underscore (lines 14-15)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);  // Cursor start line (0 = top)
+            port_3d5.write(0x0E_u8);  // Start scan line (14)
 
     port_3d4.write(0x0B_u8);
-    port_3d5.write(0x0F_u8);  // Cursor end line (15 = bottom)
+    port_3d5.write(0x0F_u8);  // End scan line (15)
 
-    // Make cursor visible and set to normal size
+    // Enable cursor and make it white
     port_3d4.write(0x0A_u8);
     let current = port_3d5.read();
     port_3d5.write(current & 0xC0);
+
+    // Set cursor color to white
+    port_3d4.write(0x0E_u8);
+    port_3d5.write(0x0F_u8);
         }
     });
 }
@@ -213,7 +233,7 @@ pub fn clear_screen() {
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
 
-        // Reset all attributes and clear screen
+        // Clear screen with green text attributes
         let blank = ScreenChar {
             ascii_character: b' ',
             color_code: ColorCode::new(Color::Green, Color::Black),
@@ -228,10 +248,10 @@ pub fn clear_screen() {
         writer.row_position = 0;
         writer.column_position = 0;
 
-        // Write prompt with consistent attributes
+        // Write initial prompt only
         writer.write_string("> ");
 
-        // Enable cursor last
+        // Enable white underscore cursor
         enable_cursor();
     });
 }
