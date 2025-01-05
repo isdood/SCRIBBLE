@@ -200,7 +200,7 @@ impl Writer {
         self.column_position = 0;
         self.update_cursor();
     }
-    }
+
 }
 
 impl fmt::Write for Writer {
