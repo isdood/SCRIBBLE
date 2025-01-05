@@ -174,7 +174,7 @@ impl Writer {
         self.update_cursor();
     }
 
-        let blank = ScreenChar {
+        const blank = ScreenChar {
             ascii_character: b' ',
             color_code: self.color_code,
         };
