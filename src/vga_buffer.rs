@@ -93,28 +93,29 @@ impl Writer {
                 };
                 self.buffer.chars[self.row_position][self.column_position].write(blank);
             } else if self.row_position > 0 {
-                // Move to previous line
-                let cur_row = self.row_position;
-                self.row_position -= 1;
-
-                // Find the last non-space character in previous line
-                let mut last_col = BUFFER_WIDTH - 1;
-                while last_col > 0 {
-                    let char = self.buffer.chars[self.row_position][last_col].read();
+                // Get previous line's last character position
+                let mut prev_last_col = BUFFER_WIDTH - 1;
+                while prev_last_col > 0 {
+                    let char = self.buffer.chars[self.row_position - 1][prev_last_col].read();
                     if char.ascii_character != b' ' {
                         break;
                     }
-                    last_col -= 1;
+                    prev_last_col -= 1;
                 }
 
-                // Set cursor to position after last character
-                self.column_position = if last_col == BUFFER_WIDTH - 1 { last_col } else { last_col + 1 };
+                // Clear current line completely
+                self.clear_row(self.row_position);
 
-                // Clear the entire line we're leaving
-                self.clear_row(cur_row);
+                // Move to previous line
+                self.row_position -= 1;
+                self.column_position = prev_last_col + 1;
+                if self.column_position >= BUFFER_WIDTH {
+                    self.column_position = BUFFER_WIDTH - 1;
+                }
             }
 
             self.update_cursor();
+        }
     }
 
     fn update_cursor(&mut self) {
@@ -170,6 +171,21 @@ impl Writer {
         }
     }
 
+    pub fn clear_screen() {
+        use x86_64::instructions::interrupts;
+        interrupts::without_interrupts(|| {
+            let mut writer = WRITER.lock();
+            for row in 0..BUFFER_HEIGHT {
+                writer.clear_row(row);
+            }
+            writer.row_position = 0;
+            writer.column_position = 0;
+
+            // Write prompt only once at start
+            writer.write_string("> ");
+        });
+    }
+
     fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
@@ -183,21 +199,8 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-
-        // Only write prompt on the very first line (row 0), not after each newline
-        if self.row_position == 0 && self.column_position == 0 {
-            let prompt = "> ";
-            for byte in prompt.bytes() {
-                let colored_char = ScreenChar {
-                    ascii_character: byte,
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[0][self.column_position].write(colored_char);
-                self.column_position += 1;
-            }
-        }
-
         self.update_cursor();
+    }
     }
 }
 
