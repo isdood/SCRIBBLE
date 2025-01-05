@@ -56,6 +56,7 @@ pub struct Writer {
     row_position: usize,
     color_code: ColorCode,
     input_color: ColorCode,
+    is_system_output: bool,  // Add this field
     buffer: &'static mut Buffer,
 }
 
@@ -86,10 +87,13 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
-                let color = if self.is_prompt_position() {
-                    self.color_code
+                // Use system color (green) for prompts and system messages
+                let color = if self.is_system_output {
+                    self.color_code  // Green for system messages
+                } else if self.is_prompt_position() {
+                    self.color_code  // Green for prompt
                 } else {
-                    self.input_color
+                    self.input_color // White for user input
                 };
 
                 let colored_char = ScreenChar {
@@ -198,6 +202,10 @@ impl Writer {
             self.move_cursor();
         }
     }
+
+    pub fn set_system_output(&mut self, is_system: bool) {
+        self.is_system_output = is_system;
+    }
 }
 
 impl fmt::Write for Writer {
@@ -214,6 +222,13 @@ lazy_static! {
         color_code: ColorCode::new(Color::Green, Color::Black),
                                                       input_color: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    });
+}
+
+pub fn set_system_output(enabled: bool) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().set_system_output(enabled);
     });
 }
 

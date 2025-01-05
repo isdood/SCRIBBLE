@@ -41,22 +41,21 @@ pub fn init_kernel(boot_info: &'static BootInfo) {
     // Disable interrupts during initialization
     x86_64::instructions::interrupts::disable();
 
-    println!("Starting GDT initialization...");
+    system_println!("Starting GDT initialization...");
     gdt::init();
-    println!("GDT initialized");
+    system_println!("GDT initialized");
 
-    println!("Starting IDT initialization...");
+    system_println!("Starting IDT initialization...");
     interrupts::init_idt();
-    println!("IDT initialized");
+    system_println!("IDT initialized");
 
-    println!("Starting memory management initialization...");
-    // Fix: Use the correct physical memory offset from boot_info
+    system_println!("Starting memory management initialization...");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    println!("Physical memory offset: {:#x}", phys_mem_offset.as_u64());
+    system_println!("Physical memory offset: {:#x}", phys_mem_offset.as_u64());
 
     // Initialize the memory mapper
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    println!("Memory mapper initialized");
+    system_println!("Memory mapper initialized");
 
     // Initialize the frame allocator
     let mut frame_allocator = unsafe {
