@@ -151,13 +151,19 @@ impl Writer {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
             use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
+            let mut port_3d4: Port<u8> = Port::new(0x3D4);
+            let mut port_3d5: Port<u8> = Port::new(0x3D5);
+            let mut port_3c0: Port<u8> = Port::new(0x3C0);
 
+            // Update cursor position
             port_3d4.write(0x0F_u8);
             port_3d5.write((pos & 0xFF) as u8);
             port_3d4.write(0x0E_u8);
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
+
+            // Set cursor color to white through attribute controller
+            port_3c0.write(0x0D_u8);  // Select cursor color register
+            port_3c0.write(0x0F_u8);  // Set to white
         }
     }
 }
@@ -240,7 +246,9 @@ pub fn clear_screen() {
     });
 }
 
-pub fn init() {
-    enable_cursor();
-    clear_screen();
+pub fn init_vga() {
+    println!("Welcome to Scribble OS");
+    println!("");  // Add a blank line
+    enable_cursor();  // Enable cursor first
+    print!("> ");    // Print prompt after boot messages
 }
