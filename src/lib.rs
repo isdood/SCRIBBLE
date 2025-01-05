@@ -35,12 +35,6 @@ pub fn hlt_loop() -> ! {
     }
 }
 
-pub fn init_vga() {
-    vga_buffer::enable_cursor();
-    vga_buffer::clear_screen();
-    vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
-}
-
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
