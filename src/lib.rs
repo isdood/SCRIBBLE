@@ -36,20 +36,36 @@ pub fn init_heap(_boot_info: &'static BootInfo) {
 }
 
 pub fn init_kernel(boot_info: &'static BootInfo) {
-    use x86_64::VirtAddr;
-
     // Disable interrupts during initialization
     x86_64::instructions::interrupts::disable();
 
-    system_println!("Starting GDT initialization...");
+    // Initialize GDT first
     gdt::init();
-    system_println!("GDT initialized");
 
-    system_println!("Starting IDT initialization...");
+    // Then initialize IDT
     interrupts::init_idt();
-    system_println!("IDT initialized");
 
-    // ... rest of initialization using system_println! ...
+    // Initialize PIC before enabling interrupts
+    unsafe {
+        interrupts::PICS.lock().initialize();
+    }
+
+    // Initialize memory management
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    let mut frame_allocator = unsafe {
+        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
+    };
+
+    // Initialize heap
+    allocator::init_heap(&mut mapper, &mut frame_allocator)
+    .expect("heap initialization failed");
+
+    // Initialize VGA after memory management is set up
+    vga_buffer::init();
+
+    // Enable interrupts last
+    x86_64::instructions::interrupts::enable();
 }
 
 pub fn hlt_loop() -> ! {

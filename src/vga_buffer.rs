@@ -2,7 +2,6 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::print;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -87,14 +86,16 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
+                // Simplified color logic to prevent page faults
                 let color = if self.is_system_output {
-                    self.color_code  // Green for system messages
-                } else if col < 2 && unsafe {
-                    self.buffer.chars[row][0].read_volatile().ascii_character == b'>'
-                } {
-                    self.color_code  // Green for prompt
+                    self.color_code // Green for system messages
                 } else {
-                    self.input_color // White for user input
+                    match col {
+                        0..=1 if unsafe { self.buffer.chars[row][0].read_volatile().ascii_character == b'>' } => {
+                            self.color_code  // Green for prompt
+                        },
+                        _ => self.input_color // White for user input
+                    }
                 };
 
                 let colored_char = ScreenChar {
@@ -179,6 +180,7 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
+        // Don't allow backspace over prompt
         if self.column_position <= 2 && unsafe {
             self.buffer.chars[self.row_position][0].read_volatile().ascii_character == b'>'
         } {
@@ -222,6 +224,39 @@ lazy_static! {
     });
 }
 
+#[macro_export]
+macro_rules! _print {
+    ($($arg:tt)*) => ({
+        $crate::vga_buffer::_print(format_args!($($arg)*))
+    });
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::_print!($($arg)*));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! system_print {
+    ($($arg:tt)*) => ({
+        $crate::vga_buffer::set_system_output(true);
+        $crate::print!($($arg)*);
+        $crate::vga_buffer::set_system_output(false);
+    });
+}
+
+#[macro_export]
+macro_rules! system_println {
+    () => ($crate::system_print!("\n"));
+    ($($arg:tt)*) => ($crate::system_print!("{}\n", format_args!($($arg)*)));
+}
+
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
@@ -250,20 +285,6 @@ pub fn clear_screen() {
         writer.move_cursor();
         drop(writer);
         print!("> ");
-    });
-}
-
-pub fn set_color(foreground: Color, background: Color) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().color_code = ColorCode::new(foreground, background);
-    });
-}
-
-pub fn set_input_color(foreground: Color, background: Color) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().input_color = ColorCode::new(foreground, background);
     });
 }
 
@@ -296,24 +317,4 @@ pub fn enable_cursor() {
 
 pub fn init() {
     enable_cursor();
-}
-
-#[macro_export]
-macro_rules! _system_print {
-    ($($arg:tt)*) => ({
-        $crate::vga_buffer::set_system_output(true);
-        $crate::print!($($arg)*);
-        $crate::vga_buffer::set_system_output(false);
-    });
-}
-
-#[macro_export]
-macro_rules! system_print {
-    ($($arg:tt)*) => ($crate::_system_print!($($arg)*));
-}
-
-#[macro_export]
-macro_rules! system_println {
-    () => ($crate::system_print!("\n"));
-    ($($arg:tt)*) => ($crate::system_print!("{}\n", format_args!($($arg)*)));
 }
