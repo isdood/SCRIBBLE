@@ -64,19 +64,19 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First completely disable cursor
+            // First disable cursor
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape - just the bottom line for underscore
+            // Set cursor shape to underscore
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line
+            port_3d5.write(0x0E_u8);  // Start scan line 14
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line
+            port_3d5.write(0x0F_u8);  // End scan line 15
 
-            // Enable cursor and force high intensity
+            // Enable cursor with maximum intensity (white)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);  // Force high intensity white cursor
+            port_3d5.write(0x00_u8);  // Clear bit 5 to enable and set max intensity
         }
     }
 
@@ -179,19 +179,6 @@ impl Writer {
         }
     }
 
-    pub fn initialize(&mut self) {
-        // Clear screen first
-        for row in 0..BUFFER_HEIGHT {
-            self.clear_row(row);
-        }
-        self.row_position = 0;
-        self.column_position = 0;
-
-        // Write prompt ONCE and enable cursor
-        self.write_string("> ");
-        self.enable_cursor();
-    }
-
     fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
@@ -246,10 +233,23 @@ pub fn backspace() {
     });
 }
 
-pub fn initialize() {
+pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        WRITER.lock().initialize();
+        let mut writer = WRITER.lock();
+
+        // Clear all rows
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+
+        // Reset position
+        writer.row_position = 0;
+        writer.column_position = 0;
+
+        // Write single prompt and enable cursor with proper configuration
+        writer.write_string("> ");
+        writer.enable_cursor();
     });
 }
 
@@ -260,3 +260,5 @@ pub fn _print(args: fmt::Arguments) {
         WRITER.lock().write_fmt(args).unwrap();
     });
 }
+
+// Remove any other initialization functions or prompt writings
