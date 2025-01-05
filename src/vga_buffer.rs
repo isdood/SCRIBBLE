@@ -59,6 +59,9 @@ pub struct Writer {
 }
 
 impl Writer {
+    pub fn set_color(&mut self, foreground: Color, background: Color) {
+        self.color_code = ColorCode::new(foreground, background);
+    }
     pub fn enable_cursor(&mut self) {
         unsafe {
             use x86_64::instructions::port::Port;
