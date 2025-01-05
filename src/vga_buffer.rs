@@ -238,6 +238,19 @@ pub fn backspace() {
     });
 }
 
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.move_cursor();
+    });
+}
+
 pub fn reset_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
