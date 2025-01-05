@@ -101,14 +101,16 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
+                    // Get the character from the current row
                     let character = unsafe {
-                        (&self.buffer.chars[row][col] as *const Volatile<ScreenChar>)
-                        .read()
-                        .read()
+                        let ptr = &self.buffer.chars[row][col] as *const Volatile<ScreenChar>;
+                        (*ptr).read()
                     };
+
+                    // Write it to the row above
                     unsafe {
-                        (&mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>)
-                        .write(Volatile::new(character));
+                        let ptr = &mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>;
+                        (*ptr).write(character);
                     }
                 }
             }
@@ -118,7 +120,15 @@ impl Writer {
         self.update_cursor();
     }
 
-    fn clear_row(&mut self, row: usize) {
+    pub fn set_prompt_row(&mut self, row: usize) {
+        if row < BUFFER_HEIGHT {
+            self.row_position = row;
+            self.column_position = 0;
+            self.update_cursor();
+        }
+    }
+
+    pub fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
             color_code: self.color_code,
@@ -126,67 +136,10 @@ impl Writer {
 
         for col in 0..BUFFER_WIDTH {
             unsafe {
-                (&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)
-                .write(Volatile::new(blank));
+                let ptr = &mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>;
+                (*ptr).write(blank);
             }
         }
-    }
-
-    pub fn backspace(&mut self) {
-        if self.column_position <= 2 {
-            return;
-        }
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            unsafe {
-                (&mut self.buffer.chars[self.row_position][self.column_position] as *mut Volatile<ScreenChar>)
-                .write(Volatile::new(blank));
-            }
-            self.update_cursor();
-        }
-    }
-
-    fn scroll_up(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let character = self.buffer.chars[row][col].read();
-                self.buffer.chars[row - 1][col].write(character);
-            }
-        }
-        self.clear_row(BUFFER_HEIGHT - 1);
-        self.row_position = BUFFER_HEIGHT - 1;
-    }
-
-    fn update_cursor(&mut self) {
-        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port = Port::new(0x3D4);
-            let mut data_port = Port::new(0x3D5);
-
-            port.write(0x0Au8);
-            data_port.write(0x00u8);  // Start scanline
-            port.write(0x0Bu8);
-            data_port.write(15u8);    // End scanline (full block cursor)
-
-            port.write(0x0Fu8);
-            data_port.write((pos & 0xFF) as u8);
-            port.write(0x0Eu8);
-            data_port.write(((pos >> 8) & 0xFF) as u8);
-        }
-    }
-
-    pub fn get_row_position(&self) -> usize {
-        self.row_position
-    }
-
-    pub fn set_prompt_row(&mut self, row: usize) {
-        self.prompt_row = row;
     }
 }
 
@@ -201,9 +154,8 @@ lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
         row_position: 0,
-        color_code: ColorCode::new(Color::White, Color::Black),
+        color_code: ColorCode::new(Color::Green, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-                                                      prompt_row: 0,
     });
 }
 
@@ -246,14 +198,16 @@ pub fn disable_cursor() {
 }
 
 pub fn clear_screen() {
-    let mut writer = WRITER.lock();
-    for row in 0..BUFFER_HEIGHT {
-        writer.clear_row(row);
-    }
-    writer.column_position = 0;
-    writer.row_position = 0;
-    writer.prompt_row = 0;
-    writer.update_cursor();
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.update_cursor();
+    });
 }
 
 pub fn backspace() {
