@@ -49,6 +49,16 @@ impl RTC {
             (year, month, day)
         }
     }
+
+    pub fn format_datetime(&mut self) -> alloc::string::String {
+        let (year, month, day) = self.get_date();
+        let (hours, minutes, seconds) = self.get_time();
+
+        alloc::format!(
+            "{}-{:02}-{:02} {:02}:{:02}:{:02}",
+            year, month, day, hours, minutes, seconds
+        )
+    }
 }
 
 lazy_static::lazy_static! {

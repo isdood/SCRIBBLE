@@ -1,4 +1,3 @@
-// src/lib.rs
 #![no_std]
 #![cfg_attr(test, no_main)]
 #![feature(custom_test_frameworks)]
@@ -18,84 +17,45 @@ pub mod rtc;
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
 
-pub fn init_heap(_boot_info: &'static BootInfo) {
-    println!("Starting heap initialization...");
-
-    // Initialize memory management
-    let phys_mem_offset = VirtAddr::new(_boot_info.memory_map.as_ptr() as u64);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe {
-        memory::BootInfoFrameAllocator::init(&_boot_info.memory_map)
-    };
-
-    // Initialize the heap
-    allocator::init_heap(&mut mapper, &mut frame_allocator)
-    .expect("heap initialization failed");
-
-    println!("Heap initialization complete");
-}
-
 pub fn init_kernel(boot_info: &'static BootInfo) {
     // Disable interrupts during initialization
     x86_64::instructions::interrupts::disable();
 
-    // Initialize GDT first
+    println!("Initializing GDT...");
     gdt::init();
 
-    // Then initialize IDT
+    println!("Initializing IDT...");
     interrupts::init_idt();
 
-    // Initialize PIC before enabling interrupts
+    println!("Initializing PIC...");
     unsafe {
         interrupts::PICS.lock().initialize();
     }
 
-    // Initialize memory management
+    println!("Initializing memory management...");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
 
-    // Initialize heap
+    println!("Initializing heap...");
     allocator::init_heap(&mut mapper, &mut frame_allocator)
     .expect("heap initialization failed");
 
-    // Initialize VGA after memory management is set up
+    println!("Initializing VGA...");
     vga_buffer::init();
 
     // Enable interrupts last
+    println!("Enabling interrupts...");
     x86_64::instructions::interrupts::enable();
-}
-
-pub fn hlt_loop() -> ! {
-    loop {
-        x86_64::instructions::hlt();
-    }
-}
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-pub fn init_vga() {
-    vga_buffer::clear_screen();
-    vga_buffer::enable_cursor();
 }
 
 pub fn show_datetime() {
     let mut rtc = rtc::RTC_DEVICE.lock();
-    let (year, month, day) = rtc.get_date();
-    let (hours, minutes, seconds) = rtc.get_time();
-
-    println!("Date: {}-{:02}-{:02}", year, month, day);
-    println!("Time (UTC): {:02}:{:02}:{:02}", hours, minutes, seconds);
-    println!("User: isdood");  // Hardcoded for now, could be made configurable
+    let datetime = rtc.format_datetime();
+    println!("Current Date and Time (UTC): {}", datetime);
+    println!("Current User's Login: isdood");
 }
+
+// ... rest of your existing lib.rs code ...

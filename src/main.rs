@@ -1,4 +1,3 @@
-// src/main.rs
 #![no_std]
 #![no_main]
 
@@ -16,6 +15,10 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     scribble::init_kernel(boot_info);
 
     println!("Kernel initialization complete");
+
+    // Show initial date/time
+    scribble::show_datetime();
+
     println!("Welcome to Scribble OS");
     print!("> ");
 
