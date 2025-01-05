@@ -1,6 +1,5 @@
 use volatile::Volatile;
 use core::fmt;
-use core::ops::Deref;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -84,7 +83,7 @@ impl Writer {
                 };
 
                 unsafe {
-                    self.buffer.chars[row][col].update(|_| colored_char);
+                    (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)).write(colored_char);
                 }
 
                 self.column_position += 1;
@@ -108,8 +107,13 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = unsafe { self.buffer.chars[row][col].get_mut().clone() };
-                    unsafe { self.buffer.chars[row - 1][col].update(|_| character); }
+                    let character = unsafe {
+                        (*(&self.buffer.chars[row][col] as *const Volatile<ScreenChar>)).read()
+                    };
+                    unsafe {
+                        (*(&mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>))
+                        .write(character);
+                    }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -124,14 +128,19 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            unsafe { self.buffer.chars[row][col].update(|_| blank); }
+            unsafe {
+                (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>))
+                .write(blank);
+            }
         }
     }
 
     pub fn backspace(&mut self) {
         // Check if we're at the prompt position
         if self.column_position <= 2 && unsafe {
-            self.buffer.chars[self.row_position][0].get_mut().ascii_character == b'>'
+            (*(&self.buffer.chars[self.row_position][0] as *const Volatile<ScreenChar>))
+            .read()
+            .ascii_character == b'>'
         } {
             return;
         }
@@ -143,8 +152,9 @@ impl Writer {
                 color_code: self.color_code,
             };
             unsafe {
-                self.buffer.chars[self.row_position][self.column_position]
-                .update(|_| blank);
+                (*(&mut self.buffer.chars[self.row_position][self.column_position]
+                as *mut Volatile<ScreenChar>))
+                .write(blank);
             }
             self.update_cursor();
         }
