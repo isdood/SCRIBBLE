@@ -50,10 +50,11 @@ macro_rules! println {
 }
 
 pub fn init_vga() {
+    vga_buffer::init();  // Initialize VGA hardware first
+    set_color(Color::Green, Color::Black);  // Set initial color
+    clear_screen();  // Clear screen with the set color
     println!("Welcome to Scribble OS");
     println!("Kernel initialized");
-    println!("");  // Add blank line
-    vga_buffer::enable_cursor();
-    println!("");  // Add another blank line for spacing
-    print!("> ");  // Print prompt on correct line
+    println!("");  // Blank line
+    print!("> ");  // Print prompt
 }

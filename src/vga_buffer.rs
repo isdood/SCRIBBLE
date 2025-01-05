@@ -183,35 +183,57 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set cursor shape (block cursor)
+            // Set cursor shape (more visible)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);  // Start scan line (top)
-    port_3d4.write(0x0B_u8);
-    port_3d5.write(0x0F_u8);  // End scan line (bottom)
+            port_3d5.write(0x0D_u8);  // Start scan line
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(0x0E_u8);  // End scan line
 
-    // Enable cursor and set intensity
-    port_3d4.write(0x0A_u8);
-    port_3d5.write(0x00_u8);  // Enable cursor and set to high intensity
-
-    // Set cursor color to white using attribute controller
-    let mut port_3c0 = Port::new(0x3C0);
-    port_3c0.write(0x0D_u8);  // Select cursor color register
-    port_3c0.write(0x0F_u8);  // Set to white (high intensity)
+            // Enable cursor with high intensity
+            port_3d4.write(0x0A_u8);
+            let current = port_3d5.read();
+            port_3d5.write(current & !0x20);
         }
     });
 }
 
 pub fn init() {
-    enable_cursor();
-
-    // Reset the screen state
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        writer.row_position = 0;
-        writer.column_position = 0;
-        writer.prompt_row = 3;  // Set initial prompt row
+        unsafe {
+            // Reset VGA registers
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+            let mut port_3c0 = Port::new(0x3C0);
+
+            // Enable video output
+            let mut port_3da = Port::new(0x3DA);
+            port_3da.read(); // Reset flip-flop
+            port_3c0.write(0x20_u8); // Enable video
+
+            // Set cursor shape
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(0x0D_u8);  // Cursor start line (moved down)
+    port_3d4.write(0x0B_u8);
+    port_3d5.write(0x0E_u8);  // Cursor end line
+
+    // Enable cursor (clear bit 5)
+    port_3d4.write(0x0A_u8);
+    let mut cursor_state = port_3d5.read();
+    cursor_state &= !0x20;
+    port_3d5.write(cursor_state);
+        }
     });
+
+    // Initialize Writer state
+    let mut writer = WRITER.lock();
+    writer.row_position = 0;
+    writer.column_position = 0;
+    writer.color_code = ColorCode::new(Color::Green, Color::Black);
+
+    // Clear screen to ensure clean state
+    clear_screen();
 }
 
 pub fn _print(args: fmt::Arguments) {
@@ -241,11 +263,36 @@ pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: writer.color_code,
+        };
+
         for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
+            for col in 0..BUFFER_WIDTH {
+                writer.buffer.chars[row][col].write(blank);
+            }
         }
-        writer.row_position = 2;  // Start at line 3 (after boot messages)
-    writer.column_position = 0;
-    writer.write_string("> ");  // Write prompt
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.update_cursor();
+    });
+}
+
+// Add this new function for VGA power-on
+fn vga_enable_output() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3c0 = Port::new(0x3C0);
+            let mut port_3da = Port::new(0x3DA);
+
+            // Reset attribute controller flip-flop
+            port_3da.read();
+
+            // Enable video output
+            port_3c0.write(0x20_u8);
+        }
     });
 }
