@@ -248,31 +248,6 @@ pub fn enable_cursor() {
     });
 }
 
-pub fn backspace() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().backspace();
-    });
-}
-
-pub fn clear_screen() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
-        }
-        writer.row_position = 0;
-        writer.column_position = 0;
-
-        // Write initial prompt
-        let prompt = "> ";
-        for byte in prompt.bytes() {
-            writer.write_byte(byte);
-        }
-    });
-}
-
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
