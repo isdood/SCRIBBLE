@@ -95,20 +95,63 @@ impl Writer {
         self.color_code = ColorCode::new(foreground, background);
     }
 
+    pub fn enable_cursor(&mut self) {
+        unsafe {
+            use x86_64::instructions::port::Port;
+
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            // Enable cursor (clear bit 5)
+            port_3d4.write(0x0A_u8);
+            let cur_state = port_3d5.read() as u8;
+            port_3d5.write((cur_state & !0x20) as u8);
+
+            // Set cursor shape (make it white by using scanlines 14-15)
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(14_u8);  // Start scanline
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(15_u8);  // End scanline
+        }
+    }
+
     pub fn backspace(&mut self) {
-        // Check if we're at the beginning of all text (first prompt)
-        if self.row_position == 0 && self.column_position <= 2 {
+        // Store the current line's content to check for prompt
+        let mut line_content = String::new();
+        for col in 0..self.column_position {
+            let char = self.buffer.chars[self.row_position][col].read();
+            line_content.push(char.ascii_character as char);
+        }
+
+        // Check if we're at the prompt position ("> ")
+        if line_content.starts_with("> ") && self.column_position <= 2 {
+            return;
+        }
+
+        // Don't backspace if we're at column 0 and row 0
+        if self.row_position == 0 && self.column_position == 0 {
             return;
         }
 
         // Move cursor back
         if self.column_position > 0 {
-            self.column_position -= 1;
+            // Don't allow deleting the prompt on the current line
+            if !(line_content.starts_with("> ") && self.column_position <= 2) {
+                self.column_position -= 1;
+                // Create a blank character
+                let blank = ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                };
+                // Clear the character at the current position
+                self.buffer.chars[self.row_position][self.column_position].write(blank);
+            }
         } else if self.row_position > 0 {
+            // Move to previous line
             self.row_position -= 1;
             // Find the last non-empty character in the previous line
             let mut last_col = BUFFER_WIDTH - 1;
-            while last_col > 0 {
+            while last_col > 2 { // Start after prompt
                 let char = self.buffer.chars[self.row_position][last_col].read();
                 if char.ascii_character != b' ' {
                     break;
@@ -121,59 +164,7 @@ impl Writer {
             }
         }
 
-        // Create a blank character
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-
-        // Clear the character at the current position
-        self.buffer.chars[self.row_position][self.column_position].write(blank);
-
-        // Update the cursor position
         self.update_cursor();
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
-    }
-
-    pub fn write_byte(&mut self, byte: u8) {
-        match byte {
-            b'\n' => {
-                self.new_line();
-                // Remove the prompt writing from here since it's handled in new_line
-            },
-            byte => {
-                if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
-                }
-
-                let colored_char = ScreenChar {
-                    ascii_character: byte,
-                    color_code: self.color_code,
-                };
-
-                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
-                self.column_position += 1;
-                self.update_cursor();
-            }
-        }
-    }
-
-    fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
-        }
     }
 
     fn new_line(&mut self) {
@@ -190,8 +181,17 @@ impl Writer {
         }
         self.column_position = 0;
 
-        // Write the prompt here, after moving to the new line
-        self.write_str("> ");
+        // Write prompt with proper colors
+        let prompt_color = ColorCode::new(Color::Green, Color::Black);
+        let prompt_chars = [b'>', b' '];
+        for &byte in prompt_chars.iter() {
+            let colored_char = ScreenChar {
+                ascii_character: byte,
+                color_code: prompt_color,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write(colored_char);
+            self.column_position += 1;
+        }
 
         self.update_cursor();
     }
@@ -208,8 +208,8 @@ impl fmt::Write for Writer {
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        row_position: BUFFER_HEIGHT - 1,
-        color_code: ColorCode::new(Color::Green, Color::Black),  // Set default color to green
+        row_position: 0,
+        color_code: ColorCode::new(Color::Green, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
