@@ -227,7 +227,6 @@ pub fn clear_screen() {
         self.column_position = 0;
         self.write_string("> ");
         self.update_cursor();
-    }
 }
 
 impl fmt::Write for Writer {
