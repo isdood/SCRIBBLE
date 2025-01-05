@@ -1,13 +1,16 @@
 // src/lib.rs
 #![no_std]
-#![feature(abi_x86_interrupt)]
+#![no_main]
+
+pub mod vga_buffer;
+pub mod gdt;
+pub mod interrupts;
+pub mod serial;
+pub mod memory;
 
 use bootloader::BootInfo;
-use x86_64::VirtAddr;
-use crate::vga_buffer::{Color, set_color, clear_screen};
 
 // Module declarations
-pub mod vga_buffer;
 pub mod gdt;
 pub mod interrupts;
 pub mod memory;
@@ -28,8 +31,9 @@ macro_rules! println {
 }
 
 // The main initialization function
-pub fn init(boot_info: &'static BootInfo) {
-    use crate::interrupts::PICS;
+pub fn init_kernel(boot_info: &'static BootInfo) {
+    use x86_64::VirtAddr;
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
 
     // Clear the screen first
     clear_screen();
@@ -103,5 +107,9 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 }
 
 pub fn init() {
+    vga_buffer::init();
+}
+
+pub fn init_vga() {
     vga_buffer::init();
 }

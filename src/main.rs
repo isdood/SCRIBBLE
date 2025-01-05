@@ -1,32 +1,32 @@
-#![no_std] // don't link the Rust standard library
-#![no_main] // disable all Rust-level entry points
+#![no_std]
+#![no_main]
 
 use core::panic::PanicInfo;
-use scribble::println;
-use scribble::vga_buffer::{self, Color, WRITER};
+use scribble::{println, init_kernel, init_vga};
+use scribble::vga_buffer::{Color, set_color};
+use bootloader::{BootInfo, entry_point};
 
-/// This function is called on panic.
+entry_point!(kernel_main);
+
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
     loop {}
 }
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Initialize VGA with proper cursor position
-    vga_buffer::init();
+    init_vga();
 
     // Set initial color to green
-    vga_buffer::set_color(Color::Green, Color::Black);
+    set_color(Color::Green, Color::Black);
 
     // Print initial prompt
     print!("> ");
 
-    // Initialize hardware
-    scribble::init();
+    // Initialize kernel
+    init_kernel(boot_info);
 
-    // Main loop
     loop {
         // Your existing loop code...
     }
