@@ -68,11 +68,11 @@ impl Writer {
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape (white block cursor)
+            // Set cursor shape for white block cursor
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line (14) for white cursor
+            port_3d5.write(0x0D_u8);  // Start scan line 13 for white cursor
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line (15)
+            port_3d5.write(0x0F_u8);  // End scan line 15
 
             // Enable cursor (clear bit 5)
             port_3d4.write(0x0A_u8);
@@ -164,16 +164,26 @@ impl Writer {
                 self.column_position -= 1;
             }
 
-            // Clear old row
-            self.clear_row(old_row);
-
-            // If moving back to first line, ensure prompt is there
+            // If moving back to first line, ensure prompt is preserved
             if self.row_position == 0 {
+                let saved_text = (2..self.column_position)
+                .map(|i| self.buffer.chars[0][i].read())
+                .collect::<Vec<_>>();
+
+                // Clear first line and rewrite prompt
                 self.clear_row(0);
                 self.column_position = 0;
                 self.write_string("> ");
-                self.column_position = 2;  // Position after prompt
+
+                // Restore saved text
+                for char in saved_text {
+                    self.buffer.chars[0][self.column_position].write(char);
+                    self.column_position += 1;
+                }
             }
+
+            // Clear old row
+            self.clear_row(old_row);
         }
 
         self.update_cursor();
