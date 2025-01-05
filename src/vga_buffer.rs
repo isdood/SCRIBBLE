@@ -64,20 +64,19 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First disable cursor
+            // First completely disable cursor
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape
+            // Set cursor shape - just the bottom line for underscore
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0D_u8);  // Changed to scan line 13 for better alignment
+            port_3d5.write(0x0E_u8);  // Start scan line
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0D_u8);  // End at same line for underscore shape
+            port_3d5.write(0x0F_u8);  // End scan line
 
-            // Enable cursor with maximum intensity
+            // Enable cursor and force high intensity
             port_3d4.write(0x0A_u8);
-            let cur_state = port_3d5.read() as u8;
-            port_3d5.write((cur_state & !0x20) | 0x00);
+            port_3d5.write(0x00_u8);  // Force high intensity white cursor
         }
     }
 
@@ -161,7 +160,7 @@ impl Writer {
 
                 let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code: ColorCode::new(Color::Green, Color::Black),  // Keep text green
+                    color_code: self.color_code,
                 };
 
                 self.buffer.chars[self.row_position][self.column_position].write(colored_char);
@@ -180,14 +179,15 @@ impl Writer {
         }
     }
 
-    pub fn clear_screen(&mut self) {
+    pub fn initialize(&mut self) {
+        // Clear screen first
         for row in 0..BUFFER_HEIGHT {
             self.clear_row(row);
         }
         self.row_position = 0;
         self.column_position = 0;
 
-        // Write prompt only once, and immediately enable cursor after
+        // Write prompt ONCE and enable cursor
         self.write_string("> ");
         self.enable_cursor();
     }
@@ -225,7 +225,6 @@ lazy_static! {
     });
 }
 
-// Public interface functions
 pub fn set_color(foreground: Color, background: Color) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
@@ -247,10 +246,10 @@ pub fn backspace() {
     });
 }
 
-pub fn clear_screen() {
+pub fn initialize() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        WRITER.lock().clear_screen();
+        WRITER.lock().initialize();
     });
 }
 
@@ -259,13 +258,5 @@ pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
-    });
-}
-
-pub fn initialize() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        writer.clear_screen();  // This will write one prompt and enable cursor
     });
 }
