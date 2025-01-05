@@ -67,28 +67,26 @@ impl Writer {
                     self.new_line();
                 }
 
-                let colored_char = ScreenChar {
-                    ascii_character: byte,
-                    color_code: self.color_code,
-                };
-
-                // Save current character
+                // Save current character at cursor position
                 let current = self.buffer.chars[self.row_position][self.column_position].read();
 
-                // Write new character
-                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
-                self.column_position += 1;
-
-                // Update cursor with white color
-                let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-                if self.column_position < BUFFER_WIDTH {
-                    let cursor_char = ScreenChar {
-                        ascii_character: self.buffer.chars[self.row_position][self.column_position].read().ascii_character,
-                        color_code: ColorCode::new(Color::White, Color::Black),
+                // Restore previous character's color if it exists
+                if self.column_position > 0 {
+                    let prev = self.buffer.chars[self.row_position][self.column_position - 1].read();
+                    let restored_char = ScreenChar {
+                        ascii_character: prev.ascii_character,
+                        color_code: self.color_code,
                     };
-                    self.buffer.chars[self.row_position][self.column_position].write(cursor_char);
+                    self.buffer.chars[self.row_position][self.column_position - 1].write(restored_char);
                 }
 
+                // Write new character
+                let colored_char = ScreenChar {
+                    ascii_character: byte,
+                    color_code: self.cursor_color,  // Use cursor color for current position
+                };
+                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
+                self.column_position += 1;
                 self.update_cursor();
             }
         }
@@ -201,6 +199,7 @@ lazy_static! {
         column_position: 0,
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
+                                                      cursor_color: ColorCode::new(Color::White, Color::Black),  // Add cursor color
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
@@ -244,6 +243,10 @@ pub fn enable_cursor() {
     });
 }
 
+pub fn init() {
+    enable_cursor();
+}
+
 pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
@@ -254,8 +257,4 @@ pub fn clear_screen() {
         writer.row_position = 0;
         writer.column_position = 0;
     });
-}
-
-pub fn init() {
-    enable_cursor();
 }
