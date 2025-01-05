@@ -2,6 +2,7 @@ use volatile::Volatile;
 use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
+use core::fmt::{self, Write};
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -229,6 +230,13 @@ impl Writer {
             port_3d4.write(0x0E_u8);
             port_3d5.write(cursor_color.0);
         }
+
+        impl fmt::Write for Writer {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                self.write_string(s);
+                Ok(())
+            }
+
     }
 }
 
