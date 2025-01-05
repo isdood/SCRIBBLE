@@ -1,5 +1,6 @@
 use volatile::Volatile;
 use core::fmt;
+use core::fmt::Write;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -26,16 +27,6 @@ pub enum Color {
     Pink = 13,
     Yellow = 14,
     White = 15,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-struct ColorCode(u8);
-
-impl ColorCode {
-    fn new(foreground: Color, background: Color) -> ColorCode {
-        ColorCode((background as u8) << 4 | (foreground as u8))
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,12 +65,8 @@ impl Writer {
                     color_code: self.color_code,
                 };
 
-                unsafe {
-                    // Get a reference to the volatile cell
-                    let volatile_cell = &mut self.buffer.chars[row][col];
-                    // Write directly to the volatile memory location
-                    (volatile_cell as *mut Volatile<ScreenChar>).write(Volatile::new(colored_char));
-                }
+                // Use direct volatile write
+                self.buffer.chars[row][col] = Volatile::new(colored_char);
 
                 self.column_position += 1;
                 self.update_cursor();
@@ -93,15 +80,8 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = unsafe {
-                        // Read from volatile memory
-                        (*(&self.buffer.chars[row][col] as *const Volatile<ScreenChar>)).read()
-                    };
-                    unsafe {
-                        // Write to volatile memory
-                        (*(&mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>))
-                        .write(character);
-                    }
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col] = Volatile::new(character);
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -117,9 +97,15 @@ impl Writer {
         };
 
         for col in 0..BUFFER_WIDTH {
-            unsafe {
-                (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>))
-                .write(blank);
+            self.buffer.chars[row][col] = Volatile::new(blank);
+        }
+    }
+
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
             }
         }
     }
@@ -156,6 +142,19 @@ impl Writer {
             self.update_cursor();
         }
     }
+
+    pub fn get_row_position(&self) -> usize {
+        self.row_position
+    }
+
+    pub fn set_prompt_row(&mut self, row: usize) {
+        if row < BUFFER_HEIGHT {
+            self.row_position = row;
+            self.column_position = 0;
+            self.update_cursor();
+        }
+    }
+
 }
 
 // Rest of the implementation remains the same
@@ -167,6 +166,13 @@ lazy_static! {
         color_code: ColorCode::new(Color::Green, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
+}
+
+impl fmt::Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_string(s);
+        Ok(())
+    }
 }
 
 pub fn _print(args: fmt::Arguments) {
