@@ -236,6 +236,10 @@ pub fn backspace() {
                 return;
             }
 
+            // Store current position
+            let row = writer.row_position;
+            let col = writer.column_position;
+
             // Move cursor back
             if writer.column_position > 0 {
                 writer.column_position -= 1;
@@ -244,12 +248,12 @@ pub fn backspace() {
                 writer.column_position = BUFFER_WIDTH - 1;
             }
 
-            // Clear the character
+            // Clear the character at the stored position
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: writer.color_code,
             };
-            writer.buffer.chars[writer.row_position][writer.column_position].write(blank);
+            writer.buffer.chars[row][col].write(blank);
             writer.update_cursor();
         }
     });
