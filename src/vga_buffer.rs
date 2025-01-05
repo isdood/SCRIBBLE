@@ -70,9 +70,9 @@ impl Writer {
 
             // Set cursor shape for white block cursor
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0D_u8);  // Start scan line 13 for white cursor
+            port_3d5.write(0x00_u8);  // Start scan line 0
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line 15
+            port_3d5.write(0x0F_u8);  // End scan line 15 (covers most of character)
 
             // Enable cursor (clear bit 5)
             port_3d4.write(0x0A_u8);
@@ -134,6 +134,7 @@ impl Writer {
         }
     }
 
+    // Backspace functionality
     fn backspace(&mut self) {
         if self.row_position == 0 && self.column_position <= 2 {
             return;
@@ -164,6 +165,9 @@ impl Writer {
                 self.column_position -= 1;
             }
 
+            // Clear the entire old row first
+            self.clear_row(old_row);
+
             // If moving back to first line, ensure prompt is preserved
             if self.row_position == 0 {
                 // Save the characters after the prompt
@@ -185,10 +189,11 @@ impl Writer {
                     self.buffer.chars[0][self.column_position].write(saved_chars[i]);
                     self.column_position += 1;
                 }
+            } else {
+                // For lines other than the first, clear the first character of the current line
+                // to prevent leftover characters
+                self.buffer.chars[self.row_position][0].write(blank);
             }
-
-            // Clear old row
-            self.clear_row(old_row);
         }
 
         self.update_cursor();
