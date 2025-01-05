@@ -83,7 +83,7 @@ impl Writer {
                 };
 
                 unsafe {
-                    self.buffer.chars[row][col].write(colored_char);
+                    self.buffer.chars[row][col].write_volatile(colored_char);
                 }
 
                 self.column_position += 1;
@@ -108,8 +108,8 @@ impl Writer {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     unsafe {
-                        let character = self.buffer.chars[row][col].read();
-                        self.buffer.chars[row - 1][col].write(character);
+                        let character = self.buffer.chars[row][col].read_volatile();
+                        self.buffer.chars[row - 1][col].write_volatile(character);
                     }
                 }
             }
@@ -126,14 +126,16 @@ impl Writer {
         };
         for col in 0..BUFFER_WIDTH {
             unsafe {
-                self.buffer.chars[row][col].write(blank);
+                self.buffer.chars[row][col].write_volatile(blank);
             }
         }
     }
 
     pub fn backspace(&mut self) {
         // Check if we're at the prompt position
-        if self.column_position <= 2 && self.prompt_active {
+        if self.column_position <= 2 && unsafe {
+            self.buffer.chars[self.row_position][0].read_volatile().ascii_character == b'>'
+        } {
             return;
         }
 
@@ -145,7 +147,7 @@ impl Writer {
             };
             unsafe {
                 self.buffer.chars[self.row_position][self.column_position]
-                .write(blank);
+                .write_volatile(blank);
             }
             self.update_cursor();
         }
@@ -194,8 +196,9 @@ pub fn _print(args: fmt::Arguments) {
 
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
-        writer.prompt_active = args.to_string().starts_with('>');
+        writer.prompt_active = true; // Set for prompt characters
         writer.write_fmt(args).unwrap();
+        writer.prompt_active = false;
     });
 }
 
@@ -242,16 +245,5 @@ pub fn enable_cursor() {
 pub fn init() {
     clear_screen();
     enable_cursor();
-    print!("> ");  // Initial prompt
-}
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+    crate::print!("> ");  // Initial prompt
 }
