@@ -51,24 +51,33 @@ macro_rules! println {
 }
 
 pub fn init_vga() {
-    // First initialize the VGA hardware
+    serial_println!("[DEBUG] Starting VGA initialization");
+
+    // Basic VGA initialization
     vga_buffer::init();
+    serial_println!("[DEBUG] VGA hardware initialized");
 
-    // Small delay to ensure VGA is ready
-    for _ in 0..10000 {
-        x86_64::instructions::nop();
+    // Set color and clear screen
+    set_color(Color::White, Color::Black);  // Try white text for better visibility
+    clear_screen();
+    serial_println!("[DEBUG] Screen cleared");
+
+    // Write test pattern to screen buffer directly
+    unsafe {
+        let buffer = 0xb8000 as *mut u8;
+        // Write 'TEST' in white on black
+        let test_str = b"TEST";
+        for (i, &byte) in test_str.iter().enumerate() {
+            *buffer.offset(i as isize * 2) = byte;
+            *buffer.offset(i as isize * 2 + 1) = 0x0F; // White on black
+        }
     }
+    serial_println!("[DEBUG] Test pattern written");
 
-    // Now set up the display
-    vga_buffer::clear_screen();
-    vga_buffer::set_color(Color::Green, Color::Black);
+    // Try to print something
+    print!("Test Output");
+    serial_println!("[DEBUG] Print attempted");
 
-    // Write initial text
-    println!("Welcome to Scribble OS");
-    println!("Kernel initialized");
-    println!("");
-
-    // Set up cursor
-    vga_buffer::enable_cursor();
-    print!("> ");
+    enable_cursor();
+    serial_println!("[DEBUG] Cursor enabled");
 }
