@@ -64,19 +64,19 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First disable cursor
+            // Clear everything first
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x20_u8);
+            port_3d5.write(0x20_u8);  // Disable cursor temporarily
 
-            // Set text-mode cursor color (force high intensity white)
+            // Set white cursor color (force intensity)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);  // Start scan line and force high intensity
+            port_3d5.write(0x00_u8);  // Start scan line (0 = force intensity)
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line
+            port_3d5.write(0x0F_u8);  // End scan line 15 (underscore)
 
-            // Enable cursor
+            // Enable cursor with maximum intensity
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);  // Enable cursor and force intensity bit
+            port_3d5.write(0x00_u8);  // Enable cursor with intensity bit
         }
         self.update_cursor();
     }
@@ -86,7 +86,8 @@ impl Writer {
     }
 
     fn backspace(&mut self) {
-        if self.row_position == 0 && self.column_position <= 2 {
+        // Always protect against backspacing past the prompt
+        if self.column_position <= 2 {
             return;
         }
 
@@ -97,17 +98,6 @@ impl Writer {
 
         if self.column_position > 0 {
             self.column_position -= 1;
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-        } else if self.row_position > 0 {
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-            while self.column_position > 0 {
-                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
-                if char.ascii_character != b' ' {
-                    break;
-                }
-                self.column_position -= 1;
-            }
             self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
         self.update_cursor();
@@ -178,7 +168,8 @@ impl Writer {
             }
             self.clear_row(BUFFER_HEIGHT - 1);
         }
-        self.column_position = 0;
+        self.column_position = 2;  // Start after the prompt
+        self.write_string("> ");   // Write prompt at start of new line
         self.update_cursor();
     }
 }
@@ -229,7 +220,7 @@ pub fn clear_screen() {
         }
         writer.row_position = 0;
         writer.column_position = 0;
-        writer.write_string("> ");  // Only place where prompt is written
+        writer.write_string("> ");  // Only place where prompt is initially written
         writer.enable_cursor();
     });
 }
