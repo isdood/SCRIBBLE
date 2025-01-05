@@ -144,6 +144,43 @@ impl Writer {
         self.update_cursor();
     }
 
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
+
+    pub fn enable_cursor(&mut self) {
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            // First disable cursor
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(0x20_u8);
+
+            // Set cursor shape (white block cursor)
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(0x0E_u8);  // Start scan line (14)
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(0x0F_u8);  // End scan line (15)
+
+            // Enable cursor (clear bit 5)
+            port_3d4.write(0x0A_u8);
+            let cur_state = port_3d5.read() as u8;
+            port_3d5.write(cur_state & !0x20);
+        }
+    }
+
     fn backspace(&mut self) {
         if self.row_position == 0 && self.column_position <= 2 {
             return;
@@ -158,7 +195,7 @@ impl Writer {
             self.column_position -= 1;
             self.buffer.chars[self.row_position][self.column_position].write(blank);
         } else if self.row_position > 0 {
-            // Save the current row for clearing
+            // Save current row for clearing
             let old_row = self.row_position;
 
             // Move to previous line
@@ -174,12 +211,11 @@ impl Writer {
                 self.column_position -= 1;
             }
 
-            // Clear the old row completely
+            // Clear old row
             self.clear_row(old_row);
 
             // If moving back to first line, ensure prompt is there
             if self.row_position == 0 {
-                // Clear line and rewrite prompt
                 self.clear_row(0);
                 self.column_position = 0;
                 self.write_string("> ");
@@ -188,6 +224,7 @@ impl Writer {
         }
 
         self.update_cursor();
+    }
     }
 
     pub fn new_line(&mut self) {
