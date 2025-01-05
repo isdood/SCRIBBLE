@@ -58,33 +58,40 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn set_color(&mut self, foreground: Color, background: Color) {
-        self.color_code = ColorCode::new(foreground, background);
-    }
-
-    pub fn enable_cursor(&mut self) {
+    fn enable_cursor(&mut self) {
         unsafe {
             use x86_64::instructions::port::Port;
 
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First, set the cursor start (register 0xA)
+            // Set cursor shape (make it white by using lines 14-15)
             port_3d4.write(0x0A_u8);
-            // Set start scanline to 0 and disable cursor by setting bit 5
-            port_3d5.write(0x20_u8);
-
-            // Then, set cursor end (register 0xB)
+            port_3d5.write(14_u8);  // Start scanline
             port_3d4.write(0x0B_u8);
-            // End scanline at 7 (creates a block cursor)
-            port_3d5.write(0x07_u8);
-
-            // Finally, enable cursor (register 0xA again)
-            port_3d4.write(0x0A_u8);
-            let cur_state = port_3d5.read() as u8;
-            // Clear bit 5 to enable cursor
-            port_3d5.write(cur_state & !0x20);
+            port_3d5.write(15_u8);  // End scanline
         }
+    }
+
+    fn backspace(&mut self) {
+        // Always protect the prompt on first line
+        if self.row_position == 0 {
+            if self.column_position <= 2 {
+                return;
+            }
+        }
+
+        // Handle backspace within current line
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+        }
+
+        self.update_cursor();
     }
 
     fn update_cursor(&mut self) {
@@ -101,7 +108,7 @@ impl Writer {
         }
     }
 
-    pub fn clear_row(&mut self, row: usize) {
+    fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
             color_code: self.color_code,
@@ -111,7 +118,7 @@ impl Writer {
         }
     }
 
-    pub fn write_byte(&mut self, byte: u8) {
+    fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
             byte => {
@@ -131,7 +138,7 @@ impl Writer {
         }
     }
 
-    pub fn write_string(&mut self, s: &str) {
+    fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
@@ -154,7 +161,7 @@ impl Writer {
         }
         self.column_position = 0;
 
-        // Only write prompt if we're on the first line
+        // Only write prompt on first line
         if self.row_position == 0 {
             let prompt = "> ";
             for byte in prompt.bytes() {
@@ -187,26 +194,19 @@ lazy_static! {
     });
 }
 
-pub fn set_color(foreground: Color, background: Color) {
+// Public interface functions
+pub fn enable_cursor() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        WRITER.lock().set_color(foreground, background);
+        WRITER.lock().enable_cursor();
     });
 }
 
-pub fn enable_cursor(&mut self) {
-    unsafe {
-        use x86_64::instructions::port::Port;
-
-        let mut port_3d4 = Port::new(0x3D4);
-        let mut port_3d5 = Port::new(0x3D5);
-
-        // Set cursor shape (make it white by using lines 14-15)
-        port_3d4.write(0x0A_u8);
-        port_3d5.write(14_u8);  // Start scanline
-        port_3d4.write(0x0B_u8);
-        port_3d5.write(15_u8);  // End scanline
-    }
+pub fn backspace() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().backspace();
+    });
 }
 
 pub fn clear_screen() {
@@ -218,30 +218,13 @@ pub fn clear_screen() {
         }
         writer.row_position = 0;
         writer.column_position = 0;
-        writer.new_line();
-    });
-}
 
-pub fn backspace(&mut self) {
-    // Always protect the prompt on first line
-    if self.row_position == 0 {
-        if self.column_position <= 2 {
-            return;
+        // Write initial prompt
+        let prompt = "> ";
+        for byte in prompt.bytes() {
+            writer.write_byte(byte);
         }
-    }
-
-    // Handle backspace within current line
-    if self.column_position > 0 {
-        self.column_position -= 1;
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        self.buffer.chars[self.row_position][self.column_position].write(blank);
-    }
-    // Do not allow backspace between lines
-
-    self.update_cursor();
+    });
 }
 
 #[doc(hidden)]
