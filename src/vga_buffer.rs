@@ -160,6 +160,7 @@ pub struct Writer {
                 }
             }
         }
+    }
 
         self.update_cursor();
     }
