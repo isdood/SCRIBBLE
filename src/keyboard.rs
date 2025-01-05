@@ -3,6 +3,7 @@ use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1, Ke
 use crate::print;  // Only import what we need
 use spin::Mutex;
 use lazy_static::lazy_static;
+use crate::interrupts::InterruptIndex;
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
