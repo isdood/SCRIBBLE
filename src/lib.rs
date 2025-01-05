@@ -6,7 +6,6 @@
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
-
 pub mod vga_buffer;
 pub mod gdt;
 pub mod interrupts;
@@ -21,17 +20,6 @@ use x86_64::VirtAddr;
 
 //
 pub use vga_buffer::{print, println};
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
 
 pub fn show_datetime() {
     let mut rtc = rtc::RTC_DEVICE.lock();
