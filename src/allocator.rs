@@ -16,7 +16,8 @@ pub fn init_heap(
     mapper: &mut impl Mapper<Size4KiB>,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
 ) -> Result<(), MapToError<Size4KiB>> {
-    // Map the heap pages
+    println!("Mapping heap pages...");
+
     let heap_start = VirtAddr::new(HEAP_START as u64);
     let heap_end = heap_start + HEAP_SIZE - 1u64;
     let heap_start_page = Page::containing_address(heap_start);
@@ -32,9 +33,12 @@ pub fn init_heap(
         }
     }
 
-    // Initialize the allocator with heap_start as usize instead of *mut u8
+    println!("Heap pages mapped successfully");
+
     unsafe {
-        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
+        println!("Initializing heap allocator...");
+        ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE);
+        println!("Heap allocator initialized");
     }
 
     Ok(())

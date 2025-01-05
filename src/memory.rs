@@ -15,6 +15,15 @@ use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 /// to avoid aliasing `&mut` references (which is undefined behavior).
 pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
     let level_4_table = active_level_4_table(physical_memory_offset);
+
+    // Ensure the page table is properly initialized
+    for i in 0..512 {
+        if level_4_table[i].is_unused() {
+            continue;
+        }
+        println!("L4 entry {}: {:?}", i, level_4_table[i]);
+    }
+
     OffsetPageTable::new(level_4_table, physical_memory_offset)
 }
 
