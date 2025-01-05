@@ -58,26 +58,31 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn enable_cursor(&mut self) {
+    fn set_cursor_style(&mut self) {
         unsafe {
             use x86_64::instructions::port::Port;
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First disable cursor
+            // Completely reset cursor first
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape to underscore
+            // Small underscore cursor (bottom 2 lines only)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line 14
+            port_3d5.write(0x0D_u8);  // Cursor start at line 13
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line 15
+            port_3d5.write(0x0E_u8);  // Cursor end at line 14
 
-            // Enable cursor with maximum intensity (white)
+            // Enable cursor and force intensity
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);  // Clear bit 5 to enable and set max intensity
+            port_3d5.write(0x00_u8);
         }
+    }
+
+    pub fn enable_cursor(&mut self) {
+        self.set_cursor_style();
+        self.update_cursor();
     }
 
     pub fn set_color(&mut self, foreground: Color, background: Color) {
@@ -98,14 +103,8 @@ impl Writer {
             self.column_position -= 1;
             self.buffer.chars[self.row_position][self.column_position].write(blank);
         } else if self.row_position > 0 {
-            // Save current row for clearing
-            let old_row = self.row_position;
-
-            // Move to end of previous row
             self.row_position -= 1;
             self.column_position = BUFFER_WIDTH - 1;
-
-            // Find actual last character
             while self.column_position > 0 {
                 let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
                 if char.ascii_character != b' ' {
@@ -113,16 +112,7 @@ impl Writer {
                 }
                 self.column_position -= 1;
             }
-
-            // Clear entire old row
-            for col in 0..BUFFER_WIDTH {
-                self.buffer.chars[old_row][col].write(blank);
-            }
-
-            // Clear any leftover characters in current position
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
-
         self.update_cursor();
     }
 
@@ -192,6 +182,7 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
+        self.write_string("> ");
         self.update_cursor();
     }
 }
@@ -237,19 +228,14 @@ pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
-
-        // Clear all rows
         for row in 0..BUFFER_HEIGHT {
             writer.clear_row(row);
         }
-
-        // Reset position
         writer.row_position = 0;
         writer.column_position = 0;
-
-        // Write single prompt and enable cursor with proper configuration
         writer.write_string("> ");
-        writer.enable_cursor();
+        writer.set_cursor_style();  // Set cursor style first
+        writer.update_cursor();     // Then update position
     });
 }
 
@@ -260,5 +246,3 @@ pub fn _print(args: fmt::Arguments) {
         WRITER.lock().write_fmt(args).unwrap();
     });
 }
-
-// Remove any other initialization functions or prompt writings
