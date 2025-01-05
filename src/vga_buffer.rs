@@ -101,9 +101,13 @@ impl Writer {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     unsafe {
-                        let character = (*(&self.buffer.chars[row][col] as *const Volatile<ScreenChar>)).read();
-                        (*(&mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>)) =
-                        Volatile::new(character);
+                        // Get the character from the current row
+                        let char_ptr = &self.buffer.chars[row][col] as *const Volatile<ScreenChar>;
+                        let char_val = (*char_ptr).read_volatile();
+
+                        // Write it to the row above
+                        let dest_ptr = &mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>;
+                        (*dest_ptr).write_volatile(char_val);
                     }
                 }
             }
@@ -111,19 +115,6 @@ impl Writer {
         }
         self.column_position = 0;
         self.update_cursor();
-    }
-
-    pub fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            unsafe {
-                (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)) =
-                Volatile::new(blank);
-            }
-        }
     }
 
     fn update_cursor(&mut self) {
@@ -242,6 +233,21 @@ pub fn enable_cursor() {
             port_3d5.write(current & !0x20);
         }
     });
+}
+
+trait VolatileAccess<T> {
+    unsafe fn read_volatile(&self) -> T;
+    unsafe fn write_volatile(&mut self, value: T);
+}
+
+impl VolatileAccess<ScreenChar> for Volatile<ScreenChar> {
+    unsafe fn read_volatile(&self) -> ScreenChar {
+        core::ptr::read_volatile(self as *const Volatile<ScreenChar> as *const ScreenChar)
+    }
+
+    unsafe fn write_volatile(&mut self, value: ScreenChar) {
+        core::ptr::write_volatile(self as *mut Volatile<ScreenChar> as *mut ScreenChar, value)
+    }
 }
 
 pub fn init() {
