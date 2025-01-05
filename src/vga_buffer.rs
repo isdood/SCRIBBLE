@@ -50,13 +50,7 @@ struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
-pub struct Writer {
-    column_position: usize,
-    row_position: usize,
-    color_code: ColorCode,
-    buffer: &'static mut Buffer,
-}
-
+// Remove the duplicate Writer struct and keep only one definition
 pub struct Writer {
     column_position: usize,
     row_position: usize,
@@ -83,6 +77,18 @@ impl Writer {
 
                 self.buffer.chars[row][col].write(colored_char);
                 self.column_position += 1;
+            }
+        }
+    }
+
+    // Add the missing write_string method
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                // printable ASCII byte or newline
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                // not part of printable ASCII range
+                _ => self.write_byte(0xfe),
             }
         }
     }
