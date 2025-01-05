@@ -227,20 +227,44 @@ pub fn enable_cursor() {
             use x86_64::instructions::port::Port;
             let mut port_3d4: Port<u8> = Port::new(0x3D4);
             let mut port_3d5: Port<u8> = Port::new(0x3D5);
+            let mut port_3c0: Port<u8> = Port::new(0x3C0);
 
-            // Set cursor shape to underscore
+            // Set cursor shape to underscore (lines 14-15)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line
+            port_3d5.write(0x0E_u8);  // Start scan line (14)
+    port_3d4.write(0x0B_u8);
+    port_3d5.write(0x0F_u8);  // End scan line (15)
 
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line
+    // Enable cursor and set attributes
+    port_3d4.write(0x0A_u8);
+    port_3d5.write(0x00_u8);  // Enable cursor
 
-            // Enable cursor
-            port_3d4.write(0x0A_u8);
-            let current = port_3d5.read();
-            port_3d5.write(current & !0x20);
+    // Set cursor attribute (white)
+    port_3d4.write(0x0E_u8);
+    port_3d5.write(0x1F_u8);  // White on black
+
+    // Set attribute controller
+    port_3c0.write(0x0D_u8);  // Select cursor color register
+    port_3c0.write(0x0F_u8);  // Set to white
         }
     });
+}
+
+impl Writer {
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4: Port<u8> = Port::new(0x3D4);
+            let mut port_3d5: Port<u8> = Port::new(0x3D5);
+
+            // Update cursor position
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
 }
 
 pub fn set_color(foreground: Color, background: Color) {
