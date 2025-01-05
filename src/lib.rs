@@ -1,6 +1,6 @@
-// src/lib.rs
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
 
 pub mod vga_buffer;
 pub mod gdt;
@@ -10,15 +10,34 @@ pub mod memory;
 
 use bootloader::BootInfo;
 
-// Module declarations
-pub mod gdt;
-pub mod interrupts;
-pub mod memory;
-pub mod allocator;
-pub mod keyboard;
-pub use vga_buffer::*;
+pub fn init_heap(boot_info: &'static BootInfo) {
+    // Your heap initialization code
+}
 
-// Macros for printing
+pub fn init_kernel(boot_info: &'static BootInfo) {
+    use x86_64::VirtAddr;
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+
+    // Initialize GDT
+    gdt::init();
+
+    // Initialize IDT
+    interrupts::init_idt();
+
+    // Initialize PICS
+    unsafe { interrupts::PICS.lock().initialize() };
+
+    // Enable interrupts
+    x86_64::instructions::interrupts::enable();
+}
+
+// Add VGA initialization function
+pub fn init_vga() {
+    vga_buffer::clear_screen();
+    vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
+    print!("> ");
+}
+
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -28,88 +47,4 @@ macro_rules! print {
 macro_rules! println {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-// The main initialization function
-pub fn init_kernel(boot_info: &'static BootInfo) {
-    use x86_64::VirtAddr;
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-
-    // Clear the screen first
-    clear_screen();
-
-    // Boot sequence with colors
-    set_color(Color::Yellow, Color::Blue);
-    println!("\n=== Scribble OS ===");
-
-    set_color(Color::LightCyan, Color::Black);
-    println!("Starting initialization sequence...\n");
-
-    // GDT initialization
-    set_color(Color::LightGreen, Color::Black);
-    print!("Loading GDT... ");
-    gdt::init();
-    set_color(Color::White, Color::Black);
-    println!("OK");
-
-    // IDT initialization
-    set_color(Color::LightCyan, Color::Black);
-    print!("Setting up IDT... ");
-    interrupts::init_idt();
-    set_color(Color::White, Color::Black);
-    println!("OK");
-
-    // PIC initialization
-    set_color(Color::Magenta, Color::Black);
-    print!("Setting up PIC... ");
-    unsafe { PICS.lock().initialize() };
-    set_color(Color::White, Color::Black);
-    println!("OK");
-
-    // Memory management
-    set_color(Color::LightBlue, Color::Black);
-    print!("Setting up memory management... ");
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let _mapper = unsafe { memory::init(phys_mem_offset) };
-    let _frame_allocator = unsafe {
-        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
-    set_color(Color::White, Color::Black);
-    println!("OK");
-
-    // Keyboard initialization
-    set_color(Color::LightBlue, Color::Black);
-    print!("Setting up keyboard handler... ");
-    keyboard::initialize();
-    set_color(Color::White, Color::Black);
-    println!("OK");
-
-    // Enable interrupts
-    set_color(Color::LightCyan, Color::Black);
-    print!("Enabling interrupts... ");
-    x86_64::instructions::interrupts::enable();
-    set_color(Color::White, Color::Black);
-    println!("OK");
-}
-
-// Utility function for halting
-pub fn hlt_loop() -> ! {
-    loop {
-        x86_64::instructions::hlt();
-    }
-}
-
-// Panic handler
-#[panic_handler]
-fn panic(info: &core::panic::PanicInfo) -> ! {
-    println!("{}", info);
-    hlt_loop();
-}
-
-pub fn init() {
-    vga_buffer::init();
-}
-
-pub fn init_vga() {
-    vga_buffer::init();
 }
