@@ -184,21 +184,21 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set cursor shape (lines 14-15 for underscore cursor)
+            // Set cursor shape to underline (lines 14-15)
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x0E_u8);  // Start scan line
             port_3d4.write(0x0B_u8);
             port_3d5.write(0x0F_u8);  // End scan line
 
-            // Enable cursor
+            // Enable cursor with high intensity (white)
             port_3d4.write(0x0A_u8);
             let current = port_3d5.read();
             port_3d5.write(current & !0x20);
 
-            // Set cursor color (white)
+            // Set cursor color through attribute controller
             let mut port_3c0 = Port::new(0x3C0);
-            port_3c0.write(0x0D_u8);  // Cursor color register
-            port_3c0.write(0x0F_u8);  // White (intensity + RGB)
+            port_3c0.write(0x0D_u8);  // Select cursor color register
+            port_3c0.write(0x0F_u8);  // Set to white (intensity + RGB)
         }
     });
 }
