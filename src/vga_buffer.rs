@@ -2,7 +2,6 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use x86_64::instructions::port::Port;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -174,6 +173,8 @@ lazy_static! {
 
 pub fn enable_cursor() {
     use x86_64::instructions::interrupts;
+    use x86_64::instructions::port::Port;
+
     interrupts::without_interrupts(|| {
         unsafe {
             use x86_64::instructions::port::Port;

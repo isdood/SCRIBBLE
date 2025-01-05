@@ -17,7 +17,8 @@ pub fn handle_scancode(scancode: u8) {
                 DecodedKey::Unicode(character) => {
                     if character == '\n' {
                         let mut writer = vga_buffer::WRITER.lock();
-                        writer.set_prompt_row(writer.get_row_position() + 1);
+                        let next_row = writer.get_row_position() + 1;  // Store the value first
+                        writer.set_prompt_row(next_row);  // Use stored value
                         drop(writer);  // Release the lock before printing
                         print!("\n> ");
                     } else if character as u8 == 8 {
