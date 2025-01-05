@@ -78,41 +78,43 @@ impl Writer {
         self.color_code = ColorCode::new(foreground, background);
         }
 
-    fn backspace(&mut self) {
-        // Always protect the prompt on first line
-        if self.row_position == 0 && self.column_position <= 2 {
-            return;
-        }
-
-        if self.column_position > 0 {
-            // Within the same line
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-        } else if self.row_position > 0 {
-            // Move to previous line
-            self.row_position -= 1;
-            // Find last non-space character in previous line
-            self.column_position = BUFFER_WIDTH - 1;
-            while self.column_position > 0 {
-                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
-                if char.ascii_character != b' ' {
-                    break;
-                }
-                self.column_position -= 1;
+        fn backspace(&mut self) {
+            // Protect prompt on first line
+            if self.row_position == 0 && self.column_position <= 2 {
+                return;
             }
-            // Clear character at current position in current row
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position + 1][0].write(blank);
-        }
 
-        self.update_cursor();
+            if self.column_position > 0 {
+                // Within same line
+                self.column_position -= 1;
+                let blank = ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                };
+                self.buffer.chars[self.row_position][self.column_position].write(blank);
+            } else if self.row_position > 0 {
+                // Move to previous line
+                let cur_row = self.row_position;
+                self.row_position -= 1;
+
+                // Find the last non-space character in previous line
+                let mut last_col = BUFFER_WIDTH - 1;
+                while last_col > 0 {
+                    let char = self.buffer.chars[self.row_position][last_col].read();
+                    if char.ascii_character != b' ' {
+                        break;
+                    }
+                    last_col -= 1;
+                }
+
+                // Set cursor to position after last character
+                self.column_position = if last_col == BUFFER_WIDTH - 1 { last_col } else { last_col + 1 };
+
+                // Clear the entire line we're leaving
+                self.clear_row(cur_row);
+            }
+
+            self.update_cursor();
     }
 
     fn update_cursor(&mut self) {
@@ -182,8 +184,8 @@ impl Writer {
         }
         self.column_position = 0;
 
-        // Only write prompt on first line
-        if self.row_position == 0 {
+        // Only write prompt on the very first line (row 0), not after each newline
+        if self.row_position == 0 && self.column_position == 0 {
             let prompt = "> ";
             for byte in prompt.bytes() {
                 let colored_char = ScreenChar {
