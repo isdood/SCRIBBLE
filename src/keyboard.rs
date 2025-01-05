@@ -1,5 +1,5 @@
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1, KeyCode};
-use crate::{print, vga_buffer};
+use crate::{print, vga_buffer, serial_println};  // Add serial_println
 use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
@@ -25,8 +25,7 @@ pub fn handle_scancode(scancode: u8) {
                 DecodedKey::RawKey(key) => {
                     match key {
                         KeyCode::Backspace => {
-                            // Try printing a debug message to verify the key is detected
-                            serial_println!("Backspace pressed!");
+                            serial_println!("Backspace pressed!");  // Debug output
                             vga_buffer::backspace();
                         },
                         _ => {}
