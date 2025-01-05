@@ -167,6 +167,15 @@ impl Writer {
         }
     }
 
+    fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
     fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
@@ -190,7 +199,8 @@ impl Writer {
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_str(s);
+        // Use write_string instead of recursively calling write_str
+        self.write_string(s);
         Ok(())
     }
 }
