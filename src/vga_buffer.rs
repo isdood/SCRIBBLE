@@ -1,10 +1,8 @@
-// vga_buffer.rs
 use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
-// Constants must be defined before they're used
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
 
@@ -60,6 +58,88 @@ pub struct Writer {
 }
 
 impl Writer {
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let row = self.row_position;
+                let col = self.column_position;
+
+                let colored_char = ScreenChar {
+                    ascii_character: byte,
+                    color_code: self.color_code,
+                };
+
+                unsafe {
+                    (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)) =
+                    Volatile::new(colored_char);
+                }
+
+                self.column_position += 1;
+                self.update_cursor();
+            }
+        }
+    }
+
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
+    fn new_line(&mut self) {
+        if self.row_position < BUFFER_HEIGHT - 1 {
+            self.row_position += 1;
+        } else {
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    unsafe {
+                        let character = (*(&self.buffer.chars[row][col] as *const Volatile<ScreenChar>)).read();
+                        (*(&mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>)) =
+                        Volatile::new(character);
+                    }
+                }
+            }
+            self.clear_row(BUFFER_HEIGHT - 1);
+        }
+        self.column_position = 0;
+        self.update_cursor();
+    }
+
+    pub fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            unsafe {
+                (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)) =
+                Volatile::new(blank);
+            }
+        }
+    }
+
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
+
     pub fn get_row_position(&self) -> usize {
         self.row_position
     }
@@ -90,22 +170,6 @@ impl Writer {
             self.update_cursor();
         }
     }
-
-    fn update_cursor(&mut self) {
-        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
-
-            port_3d4.write(0x0F_u8);
-            port_3d5.write((pos & 0xFF) as u8);
-            port_3d4.write(0x0E_u8);
-            port_3d5.write(((pos >> 8) & 0xFF) as u8);
-        }
-    }
-
-    // ... rest of Writer implementation remains the same
 }
 
 impl fmt::Write for Writer {
@@ -124,7 +188,6 @@ lazy_static! {
     });
 }
 
-// Public interface functions
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     use x86_64::instructions::interrupts;
@@ -138,6 +201,26 @@ pub fn backspace() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         WRITER.lock().backspace();
+    });
+}
+
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.update_cursor();
+    });
+}
+
+pub fn set_color(foreground: Color, background: Color) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().color_code = ColorCode::new(foreground, background);
     });
 }
 
@@ -163,24 +246,4 @@ pub fn enable_cursor() {
 
 pub fn init() {
     enable_cursor();
-}
-
-pub fn set_color(foreground: Color, background: Color) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().color_code = ColorCode::new(foreground, background);
-    });
-}
-
-pub fn clear_screen() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
-        }
-        writer.row_position = 0;
-        writer.column_position = 0;
-        writer.update_cursor();
-    });
 }
