@@ -100,7 +100,40 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.write_string("> ");  // Add prompt at new line
+        // Remove the prompt from here - we only want it at initialization
+        self.update_cursor();
+    }
+
+    fn do_backspace(&mut self) {
+        // Only protect prompt on first line
+        if self.row_position == 0 && self.column_position <= 2 {
+            return;
+        }
+
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+        } else if self.row_position > 0 {
+            // Move to previous line
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+
+            // Find the last non-space character
+            while self.column_position > 0 {
+                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
+                if char.ascii_character != b' ' {
+                    break;
+                }
+                self.column_position -= 1;
+            }
+
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+        }
         self.update_cursor();
     }
 
@@ -126,42 +159,6 @@ impl Writer {
             port_3d4.write(0x0E_u8);
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
         }
-    }
-
-    fn do_backspace(&mut self) {
-        // Don't backspace past the prompt
-        if self.row_position == 0 && self.column_position <= 2 {
-            return;
-        }
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-        } else if self.row_position > 0 {
-            // Move to previous line
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-
-            // Find the last non-space character
-            while self.column_position > 0 {
-                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
-                if char.ascii_character != b' ' {
-                    break;
-                }
-                self.column_position -= 1;
-            }
-
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-        }
-        self.update_cursor();
     }
 }
 
@@ -205,24 +202,17 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set cursor shape
+            // Set cursor shape to underline (lines 14-15)
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x0E_u8);  // Start scan line
             port_3d4.write(0x0B_u8);
             port_3d5.write(0x0F_u8);  // End scan line
 
-            // Enable cursor
+            // Enable cursor and set intensity
             port_3d4.write(0x0A_u8);
             let current = port_3d5.read();
             port_3d5.write(current & !0x20);
         }
-    });
-}
-
-pub fn set_color(foreground: Color, background: Color) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().color_code = ColorCode::new(foreground, background);
     });
 }
 
@@ -242,10 +232,11 @@ pub fn clear_screen() {
             }
         }
 
+        // Reset position and write initial prompt
         writer.row_position = 0;
         writer.column_position = 0;
         enable_cursor();
-        writer.write_string("> ");
+        writer.write_string("> ");  // Only write prompt once at initialization
     });
 }
 
