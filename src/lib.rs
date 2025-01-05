@@ -19,6 +19,9 @@ pub mod rtc;
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
 
+//
+pub use vga_buffer::{print, println};
+
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -42,7 +45,7 @@ pub fn show_datetime() {
     crate::print!("> ");
 }
 
-// ... rest of lib.rs remains the same ...
+//
 
 pub fn init_kernel(boot_info: &'static BootInfo) {
     // Disable interrupts during initialization
