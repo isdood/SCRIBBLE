@@ -57,41 +57,34 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
+// Previous color, buffer, and other struct definitions remain the same...
+
 impl Writer {
-    fn set_cursor_style(&mut self) {
+    pub fn enable_cursor(&mut self) {
         unsafe {
             use x86_64::instructions::port::Port;
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Completely reset cursor first
+            // Disable cursor first
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Small underscore cursor (bottom 2 lines only)
+            // Set cursor shape (underscore)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0D_u8);  // Cursor start at line 13
+            port_3d5.write(0x0F_u8);  // Start scan line 15
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0E_u8);  // Cursor end at line 14
+            port_3d5.write(0x0F_u8);  // End scan line 15 (single line underscore)
 
-            // Enable cursor and force intensity
+            // Enable cursor (high intensity white)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);
+            port_3d5.write(0x00_u8);  // Enable and force high intensity
         }
-    }
-
-    pub fn enable_cursor(&mut self) {
-        self.set_cursor_style();
-        self.update_cursor();
-    }
-
-    pub fn set_color(&mut self, foreground: Color, background: Color) {
-        self.color_code = ColorCode::new(foreground, background);
     }
 
     fn backspace(&mut self) {
         if self.row_position == 0 && self.column_position <= 2 {
-            return;
+            return;  // Protect prompt
         }
 
         let blank = ScreenChar {
@@ -112,8 +105,58 @@ impl Writer {
                 }
                 self.column_position -= 1;
             }
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
         self.update_cursor();
+    }
+
+    fn new_line(&mut self) {
+        if self.row_position < BUFFER_HEIGHT - 1 {
+            self.row_position += 1;
+        } else {
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col].write(character);
+                }
+            }
+            self.clear_row(BUFFER_HEIGHT - 1);
+        }
+        self.column_position = 0;
+        self.update_cursor();
+    }
+}
+
+// Remove prompt from lazy_static initialization
+lazy_static! {
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        row_position: 0,
+        color_code: ColorCode::new(Color::Green, Color::Black),
+                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    });
+}
+
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.write_string("> ");  // Single prompt
+        writer.enable_cursor();     // Set up white underscore cursor
+    });
+}
+    pub fn enable_cursor(&mut self) {
+        self.set_cursor_style();
+        self.update_cursor();
+    }
+
+    pub fn set_color(&mut self, foreground: Color, background: Color) {
+        self.color_code = ColorCode::new(foreground, background);
     }
 
     fn update_cursor(&mut self) {
@@ -203,6 +246,20 @@ lazy_static! {
     });
 }
 
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.write_string("> ");  // Single prompt
+        writer.enable_cursor();     // Set up white underscore cursor
+    });
+}
+
 pub fn set_color(foreground: Color, background: Color) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
@@ -221,21 +278,6 @@ pub fn backspace() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         WRITER.lock().backspace();
-    });
-}
-
-pub fn clear_screen() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
-        }
-        writer.row_position = 0;
-        writer.column_position = 0;
-        writer.write_string("> ");
-        writer.set_cursor_style();  // Set cursor style first
-        writer.update_cursor();     // Then update position
     });
 }
 
