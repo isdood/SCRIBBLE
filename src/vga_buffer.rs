@@ -1,7 +1,8 @@
 use volatile::Volatile;
-use core::fmt::{self, Write};
+use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
+use core::ops::{Deref, DerefMut};
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -75,11 +76,21 @@ impl Writer {
                 };
 
                 unsafe {
-                    self.buffer.chars[row][col].write_volatile(colored_char);
+                    // Use write() instead of write_volatile
+                    self.buffer.chars[row][col].write(colored_char);
                 }
 
                 self.column_position += 1;
                 self.move_cursor();
+            }
+        }
+    }
+
+    pub fn write_str(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
             }
         }
     }
@@ -91,8 +102,9 @@ impl Writer {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     unsafe {
-                        let character = self.buffer.chars[row][col].read_volatile();
-                        self.buffer.chars[row - 1][col].write_volatile(character);
+                        // Use read() and write() instead of volatile versions
+                        let character = self.buffer.chars[row][col].read();
+                        self.buffer.chars[row - 1][col].write(character);
                     }
                 }
             }
@@ -116,6 +128,18 @@ impl Writer {
         }
     }
 
+    pub fn get_row_position(&self) -> usize {
+        self.row_position
+    }
+
+    pub fn set_prompt_row(&mut self, row: usize) {
+        if row < BUFFER_HEIGHT {
+            self.row_position = row;
+            self.column_position = 0;
+            self.move_cursor();
+        }
+    }
+
     pub fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -124,7 +148,7 @@ impl Writer {
 
         for col in 0..BUFFER_WIDTH {
             unsafe {
-                self.buffer.chars[row][col].write_volatile(blank);
+                self.buffer.chars[row][col].write(blank);
             }
         }
     }
@@ -141,16 +165,33 @@ impl Writer {
                 color_code: self.color_code,
             };
             unsafe {
-                self.buffer.chars[self.row_position][self.column_position].write_volatile(blank);
+                self.buffer.chars[self.row_position][self.column_position].write(blank);
             }
             self.move_cursor();
         }
     }
 }
 
+// Add a wrapper type for MutexGuard to implement methods
+pub struct WriterGuard<'a>(spin::MutexGuard<'a, Writer>);
+
+impl<'a> Deref for WriterGuard<'a> {
+    type Target = Writer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> DerefMut for WriterGuard<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);
+        self.write_str(s);
         Ok(())
     }
 }
@@ -164,20 +205,24 @@ lazy_static! {
     });
 }
 
+// Update the public functions to use WriterGuard
 pub fn _print(args: fmt::Arguments) {
+    use core::fmt::Write;
     use x86_64::instructions::interrupts;
 
     interrupts::without_interrupts(|| {
-        WRITER.lock().write_fmt(args).unwrap();
+        let mut writer = WriterGuard(WRITER.lock());
+        writer.write_fmt(args).unwrap();
     });
 }
 
 pub fn backspace() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        WRITER.lock().backspace();
+        WriterGuard(WRITER.lock()).backspace();
     });
 }
+
 
 pub fn clear_screen() {
     use x86_64::instructions::interrupts;
