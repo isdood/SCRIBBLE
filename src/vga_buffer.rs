@@ -114,9 +114,9 @@ impl Writer {
     }
 
     fn update_cursor(&mut self) {
+        use x86_64::instructions::port::Port;
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
-            use x86_64::instructions::port::Port;
             let mut port_3d4: Port<u8> = Port::new(0x3D4);
             let mut port_3d5: Port<u8> = Port::new(0x3D5);
 
@@ -238,12 +238,14 @@ pub fn write_test_pattern() {
 
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
+        let color_code = writer.color_code;  // Store color code before the loop
+
         for row in 0..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
                 let character = if (row + col) % 2 == 0 { b'X' } else { b'.' };
                 writer.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: character,
-                    color_code: writer.color_code,
+                    color_code,  // Use stored color code
                 });
             }
         }

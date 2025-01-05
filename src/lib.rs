@@ -11,45 +11,31 @@ pub mod interrupts;
 pub mod serial;
 pub mod memory;
 pub mod keyboard;
+pub mod allocator;  // Add this line
 
 use bootloader::BootInfo;
 use vga_buffer::{Color, clear_screen, set_color, enable_cursor};
 
-pub fn init_heap(_boot_info: &'static BootInfo) {
-    // Your heap initialization code here
-    use x86_64::{
-        structures::paging::{
-            FrameAllocator,
-            Mapper,
-            Page,
-            Size4KiB,
-        },
-        VirtAddr,
+pub fn init_heap(boot_info: &'static BootInfo) {
+    use memory::{self, BootInfoFrameAllocator};
+
+    // Get memory map from boot info
+    let memory_map = &boot_info.memory_map;
+
+    // Initialize the frame allocator
+    let mut frame_allocator = unsafe {
+        BootInfoFrameAllocator::init(memory_map)
     };
 
-    pub fn init_heap(boot_info: &'static BootInfo) {
-        use memory::{self, BootInfoFrameAllocator};
-        use x86_64::structures::paging::Page;
+    // Initialize page tables
+    let mut mapper = unsafe {
+        let phys_mem_offset = x86_64::VirtAddr::new(0xFFFF_8000_0000_0000);  // Common offset used by bootloader
+        memory::init(phys_mem_offset)
+    };
 
-        let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-
-        // Initialize a new offset page table
-        let mut mapper = unsafe { memory::init(phys_mem_offset) };
-
-        // Initialize the frame allocator
-        let mut frame_allocator = unsafe {
-            BootInfoFrameAllocator::init(&boot_info.memory_map)
-        };
-
-        // Initialize the heap
-        allocator::init_heap(&mut mapper, &mut frame_allocator)
-        .expect("heap initialization failed");
-
-        // Log heap initialization for debugging
-        serial_println!("[DEBUG] Heap initialized at 0x{:x}", allocator::HEAP_START);
-    }
-
-
+    // Initialize the heap
+    crate::allocator::init_heap(&mut mapper, &mut frame_allocator)
+    .expect("heap initialization failed");
 }
 
 pub fn init_kernel(_boot_info: &'static BootInfo) {

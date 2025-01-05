@@ -13,18 +13,18 @@ fn panic(info: &PanicInfo) -> ! {
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     serial_println!("[DEBUG] Kernel starting");
 
-    // Initialize heap first
+    // Initialize basic hardware
+    scribble::init_kernel(boot_info);
+    serial_println!("[DEBUG] Basic hardware initialized");
+
+    // Initialize heap
     scribble::init_heap(boot_info);
     serial_println!("[DEBUG] Heap initialized");
-
-    // Initialize kernel
-    scribble::init_kernel(boot_info);
-    serial_println!("[DEBUG] Kernel initialized");
 
     // Initialize VGA
     scribble::init_vga();
     serial_println!("[DEBUG] VGA initialized");
 
-    // Halt
+    // Enter main loop
     scribble::hlt_loop();
 }
