@@ -64,22 +64,28 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // First disable cursor
+            // First disable cursor completely
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Try a different approach for white cursor:
-            // Using scan lines 14-15 (just bottom of character)
-            // This often appears as a white underline which becomes a block
+            // Reset cursor size registers
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start at scan line 14
+            port_3d5.write(0x00_u8);
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End at scan line 15
+            port_3d5.write(0x00_u8);
 
-            // Enable cursor
+            // Set for maximum visibility (full block)
+            // In VGA text mode, scan lines 0-7 are the primary character cell
+            // and scan lines 8-15 are the attribute/color cell
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(0x06_u8);  // Start at scan line 6
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(0x07_u8);  // End at scan line 7
+
+            // Enable cursor with maximum intensity
             port_3d4.write(0x0A_u8);
             let cur_state = port_3d5.read() as u8;
-            port_3d5.write(cur_state & !0x20);
+            port_3d5.write((cur_state & !0x20) | 0x00);
         }
     }
 
