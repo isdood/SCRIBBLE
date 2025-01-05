@@ -2,7 +2,6 @@ use volatile::Volatile;
 use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::serial_println;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -160,52 +159,6 @@ impl Writer {
             self.buffer.chars[row][col].write(blank);
         }
     }
-        self.column_position = 0;
-        self.update_cursor();
-    }
-
-
-    pub fn write_byte(&mut self, byte: u8) {
-        match byte {
-            b'\n' => {
-                self.new_line();
-                self.write_str("> ");
-            },
-            byte => {
-                if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
-                }
-
-                let colored_char = ScreenChar {
-                    ascii_character: byte,
-                    color_code: self.color_code,
-                };
-
-                self.buffer.chars[self.row_position][self.column_position].write(colored_char);
-                self.column_position += 1;
-                self.update_cursor();
-            }
-        }
-    }
-
-    fn write_str(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
-        }
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
-    }
 
     fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
@@ -241,6 +194,13 @@ lazy_static! {
 }
 
 // Public interface functions
+pub fn backspace() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().backspace();
+    });
+}
+
 pub fn set_color(foreground: Color, background: Color) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
@@ -274,14 +234,5 @@ pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
-    });
-}
-
-pub fn backspace() {
-    use x86_64::instructions::interrupts;
-
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        writer.backspace();
     });
 }
