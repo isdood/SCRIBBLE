@@ -1,5 +1,5 @@
 use volatile::Volatile;
-use core::fmt::{self, Write};
+use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -58,7 +58,6 @@ pub struct Writer {
 }
 
 impl Writer {
-
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -76,12 +75,11 @@ impl Writer {
                 };
 
                 unsafe {
-                    (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)) =
-                    Volatile::new(colored_char);
+                    self.buffer.chars[row][col].write(colored_char);
                 }
 
                 self.column_position += 1;
-                self.move_cursor();  // Changed from update_cursor
+                self.move_cursor();
             }
         }
     }
@@ -101,35 +99,19 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
+                    let character = unsafe {
+                        self.buffer.chars[row][col].read()
+                    };
                     unsafe {
-                        let char_ptr = &self.buffer.chars[row][col];
-                        let char_val = char_ptr.read();  // Changed from read_volatile
-
-                        let dest_ptr = &mut self.buffer.chars[row - 1][col];
-                        dest_ptr.write(char_val);  // Changed from write_volatile
+                        self.buffer.chars[row - 1][col].write(character);
                     }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.move_cursor();  // Changed from update_cursor
+        self.move_cursor();
     }
-
-    fn move_cursor(&mut self) {  // Renamed from update_cursor
-        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
-
-            port_3d4.write(0x0F_u8);
-            port_3d5.write((pos & 0xFF) as u8);
-            port_3d4.write(0x0E_u8);
-            port_3d5.write(((pos >> 8) & 0xFF) as u8);
-        }
-    }
-
 
     fn move_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
@@ -145,6 +127,18 @@ impl Writer {
         }
     }
 
+    pub fn get_row_position(&self) -> usize {
+        self.row_position
+    }
+
+    pub fn set_prompt_row(&mut self, row: usize) {
+        if row < BUFFER_HEIGHT {
+            self.row_position = row;
+            self.column_position = 0;
+            self.move_cursor();
+        }
+    }
+
     pub fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -153,10 +147,7 @@ impl Writer {
 
         for col in 0..BUFFER_WIDTH {
             unsafe {
-                core::ptr::write_volatile(
-                    &mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>,
-                    Volatile::new(blank)
-                );
+                self.buffer.chars[row][col].write(blank);
             }
         }
     }
@@ -173,23 +164,8 @@ impl Writer {
                 color_code: self.color_code,
             };
             unsafe {
-                core::ptr::write_volatile(
-                    &mut self.buffer.chars[self.row_position][self.column_position] as *mut Volatile<ScreenChar>,
-                    Volatile::new(blank)
-                );
+                self.buffer.chars[self.row_position][self.column_position].write(blank);
             }
-            self.move_cursor();
-        }
-    }
-
-    pub fn get_row_position(&self) -> usize {
-        self.row_position
-    }
-
-    pub fn set_prompt_row(&mut self, row: usize) {
-        if row < BUFFER_HEIGHT {
-            self.row_position = row;
-            self.column_position = 0;
             self.move_cursor();
         }
     }
@@ -197,7 +173,7 @@ impl Writer {
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_string(s);  // This calls the non-recursive write_string method
+        self.write_string(s);
         Ok(())
     }
 }
