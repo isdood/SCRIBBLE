@@ -193,20 +193,34 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set cursor shape to underscore
+            // Enable cursor and set underscore shape
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line (set to 14 for underscore)
+            port_3d5.write(0x0E_u8);  // Set cursor start line (14)
+
     port_3d4.write(0x0B_u8);
-    port_3d5.write(0x0F_u8);  // End scan line (set to 15 for underscore)
+    port_3d5.write(0x0F_u8);  // Set cursor end line (15)
 
-    // Enable cursor
-    port_3d4.write(0x0A_u8);
-    let current = port_3d5.read();
-    port_3d5.write(current & !0x20);  // Clear bit 5 to enable cursor
+    // Set cursor color by writing directly to the attribute controller
+    let mut port_3c0 = Port::new(0x3C0);
+    let mut port_3da = Port::new(0x3DA);
 
-    // Set cursor attribute to white on black
-    port_3d4.write(0x0E_u8);
-    port_3d5.write(0x0F_u8);  // White (0x0F) cursor
+    // Reset flip-flop
+    port_3da.read();
+
+    // Select attribute mode control register
+    port_3c0.write(0x10_u8);
+
+    // Set attribute mode control (enable cursor color control)
+    port_3c0.write(0x08_u8);  // Enable cursor color control
+
+    // Reset flip-flop again
+    port_3da.read();
+
+    // Select cursor color register
+    port_3c0.write(0x0F_u8);
+
+    // Set cursor color to white
+    port_3c0.write(0x0F_u8);  // White (0x0F)
         }
     });
 }
