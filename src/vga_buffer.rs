@@ -69,7 +69,7 @@ impl Writer {
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape (back to original working position)
+            // Set cursor shape
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x0E_u8);  // Start scan line 14
             port_3d4.write(0x0B_u8);
@@ -219,7 +219,7 @@ impl Writer {
         // Set text color
         self.color_code = ColorCode::new(foreground, background);
 
-        // Set cursor color to white (override the text color for cursor)
+        // Set cursor color to white
         let cursor_color = ColorCode::new(Color::White, Color::White);
         unsafe {
             use x86_64::instructions::port::Port;
@@ -229,14 +229,6 @@ impl Writer {
             // Select cursor color register
             port_3d4.write(0x0E_u8);
             port_3d5.write(cursor_color.0);
-        }
-
-        impl fmt::Write for Writer {
-            fn write_str(&mut self, s: &str) -> fmt::Result {
-                self.write_string(s);
-                Ok(())
-            }
-
         }
     }
 }
@@ -283,6 +275,13 @@ pub fn set_color(foreground: Color, background: Color) {
     interrupts::without_interrupts(|| {
         WRITER.lock().set_color(foreground, background);
     });
+}
+
+impl fmt::Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_string(s);
+        Ok(())
+    }
 }
 
 #[doc(hidden)]
