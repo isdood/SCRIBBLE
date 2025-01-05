@@ -58,9 +58,11 @@ pub fn hlt_loop() -> ! {
 }
 
 pub fn init_vga() {
-    vga_buffer::init();
-    vga_buffer::set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
-    vga_buffer::clear_screen();
+    use vga_buffer::{Color, set_color, clear_screen, enable_cursor};
+
+    enable_cursor();
+    set_color(Color::White, Color::Black);
+    clear_screen();
     println!("Welcome to Scribble OS");
     println!("Kernel initialized");
     println!("");
