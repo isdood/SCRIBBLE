@@ -187,40 +187,28 @@ pub fn backspace() {
 
 pub fn enable_cursor() {
     use x86_64::instructions::interrupts;
+    use x86_64::instructions::port::Port;
+
     interrupts::without_interrupts(|| {
         unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
+            let mut port_3d4: Port<u8> = Port::new(0x3D4);
+            let mut port_3d5: Port<u8> = Port::new(0x3D5);
 
-            // Enable cursor and set underscore shape
+            // Set cursor shape to underscore (lines 14-15)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Set cursor start line (14)
+            port_3d5.write(0x0E_u8);  // Start scan line
 
-    port_3d4.write(0x0B_u8);
-    port_3d5.write(0x0F_u8);  // Set cursor end line (15)
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(0x0F_u8);  // End scan line
 
-    // Set cursor color by writing directly to the attribute controller
-    let mut port_3c0 = Port::new(0x3C0);
-    let mut port_3da = Port::new(0x3DA);
+            // Enable cursor
+            port_3d4.write(0x0A_u8);
+            let current = port_3d5.read();
+            port_3d5.write(current & !0x20);  // Clear bit 5 to enable cursor
 
-    // Reset flip-flop
-    port_3da.read();
-
-    // Select attribute mode control register
-    port_3c0.write(0x10_u8);
-
-    // Set attribute mode control (enable cursor color control)
-    port_3c0.write(0x08_u8);  // Enable cursor color control
-
-    // Reset flip-flop again
-    port_3da.read();
-
-    // Select cursor color register
-    port_3c0.write(0x0F_u8);
-
-    // Set cursor color to white
-    port_3c0.write(0x0F_u8);  // White (0x0F)
+            // Set cursor attribute register
+            port_3d4.write(0x08_u8);
+            port_3d5.write(0x0F_u8);  // White (0x0F)
         }
     });
 }
