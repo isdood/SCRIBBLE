@@ -134,29 +134,6 @@ impl Writer {
         }
     }
 
-    pub fn enable_cursor(&mut self) {
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
-
-            // First disable cursor
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x20_u8);
-
-            // Set cursor shape (white block cursor)
-            port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line (14)
-            port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line (15)
-
-            // Enable cursor (clear bit 5)
-            port_3d4.write(0x0A_u8);
-            let cur_state = port_3d5.read() as u8;
-            port_3d5.write(cur_state & !0x20);
-        }
-    }
-
     fn backspace(&mut self) {
         if self.row_position == 0 && self.column_position <= 2 {
             return;
