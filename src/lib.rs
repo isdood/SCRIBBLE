@@ -1,3 +1,4 @@
+// src/lib.rs
 #![no_std]
 #![cfg_attr(test, no_main)]
 #![feature(custom_test_frameworks)]
@@ -16,25 +17,24 @@ pub mod allocator;
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
 
-pub fn init_heap(boot_info: &'static BootInfo) {
-    use x86_64::structures::paging::PageTable;
-    use memory::BootInfoFrameAllocator;
+pub fn init_heap(_boot_info: &'static BootInfo) {
+    println!("Starting heap initialization...");
 
-    // Initialize a mapper
-    let phys_mem_offset = VirtAddr::new(boot_info.memory_map.as_ptr() as u64);
+    // Initialize memory management
+    let phys_mem_offset = VirtAddr::new(_boot_info.memory_map.as_ptr() as u64);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-
-    // Initialize the frame allocator
     let mut frame_allocator = unsafe {
-        BootInfoFrameAllocator::init(&boot_info.memory_map)
+        memory::BootInfoFrameAllocator::init(&_boot_info.memory_map)
     };
 
     // Initialize the heap
     allocator::init_heap(&mut mapper, &mut frame_allocator)
     .expect("heap initialization failed");
+
+    println!("Heap initialization complete");
 }
 
-pub fn init_kernel(boot_info: &'static BootInfo) {
+pub fn init_kernel(_boot_info: &'static BootInfo) {
     println!("Starting GDT initialization...");
     gdt::init();
     println!("GDT initialized");
@@ -47,34 +47,19 @@ pub fn init_kernel(boot_info: &'static BootInfo) {
     unsafe { interrupts::PICS.lock().initialize() };
     println!("PIC initialized");
 
+    println!("Starting heap initialization...");
+    init_heap(_boot_info);
+    println!("Heap initialized");
+
     println!("Enabling interrupts...");
     x86_64::instructions::interrupts::enable();
     println!("Interrupts enabled");
-
-    // Initialize heap allocation if needed
-    if let Err(e) = init_heap(boot_info) {
-        println!("Failed to initialize heap: {:?}", e);
-    } else {
-        println!("Heap initialized successfully");
-    }
 }
 
 pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
     }
-}
-
-pub fn init_vga() {
-    use vga_buffer::{Color, set_color, clear_screen, enable_cursor};
-
-    enable_cursor();
-    set_color(Color::White, Color::Black);
-    clear_screen();
-    println!("Welcome to Scribble OS");
-    println!("Kernel initialized");
-    println!("");
-    print!("> ");
 }
 
 #[macro_export]
@@ -88,4 +73,8 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
-
+pub fn init_vga() {
+    vga_buffer::enable_cursor();
+    vga_buffer::clear_screen();
+    print!("> ");
+}

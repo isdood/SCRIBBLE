@@ -1,3 +1,4 @@
+// src/main.rs
 #![no_std]
 #![no_main]
 
@@ -9,26 +10,26 @@ entry_point!(kernel_main);
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
+    println!("Kernel panic: {}", info);
     scribble::hlt_loop();
 }
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
+    println!("Booting Scribble OS...");
     println!("Starting kernel initialization...");
 
-    // Initialize kernel with boot info
-    match std::panic::catch_unwind(|| {
-        scribble::init_kernel(boot_info);
-    }) {
-        Ok(_) => println!("Kernel initialization completed successfully"),
-        Err(e) => println!("Kernel initialization failed: {:?}", e),
-    }
+    // Initialize kernel components
+    scribble::init_kernel(boot_info);
 
+    println!("Kernel initialization complete");
     println!("Initializing VGA...");
-    scribble::init_vga();
-    println!("VGA initialized");
 
+    // Initialize VGA after kernel is ready
+    scribble::init_vga();
+
+    println!("Welcome to Scribble OS!");
     print!("> ");
 
+    // Enter main loop
     scribble::hlt_loop();
 }
