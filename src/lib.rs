@@ -35,20 +35,28 @@ pub fn init_heap(boot_info: &'static BootInfo) {
 }
 
 pub fn init_kernel(boot_info: &'static BootInfo) {
-    // Initialize GDT first
+    println!("Starting GDT initialization...");
     gdt::init();
+    println!("GDT initialized");
 
-    // Initialize IDT
+    println!("Starting IDT initialization...");
     interrupts::init_idt();
+    println!("IDT initialized");
 
-    // Initialize heap
-    init_heap(boot_info);
-
-    // Initialize PICS last (before enabling interrupts)
+    println!("Starting PIC initialization...");
     unsafe { interrupts::PICS.lock().initialize() };
+    println!("PIC initialized");
 
-    // Enable interrupts
+    println!("Enabling interrupts...");
     x86_64::instructions::interrupts::enable();
+    println!("Interrupts enabled");
+
+    // Initialize heap allocation if needed
+    if let Err(e) = init_heap(boot_info) {
+        println!("Failed to initialize heap: {:?}", e);
+    } else {
+        println!("Heap initialized successfully");
+    }
 }
 
 pub fn hlt_loop() -> ! {
@@ -79,3 +87,5 @@ macro_rules! println {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
+
+
