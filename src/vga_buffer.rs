@@ -101,13 +101,11 @@ impl Writer {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     unsafe {
-                        // Get the character from the current row
-                        let char_ptr = &self.buffer.chars[row][col] as *const Volatile<ScreenChar>;
-                        let char_val = (*char_ptr).read_volatile();
+                        let char_ptr = &self.buffer.chars[row][col];
+                        let char_val = char_ptr.read_volatile();
 
-                        // Write it to the row above
-                        let dest_ptr = &mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>;
-                        (*dest_ptr).write_volatile(char_val);
+                        let dest_ptr = &mut self.buffer.chars[row - 1][col];
+                        dest_ptr.write_volatile(char_val);
                     }
                 }
             }
@@ -140,6 +138,20 @@ impl Writer {
             self.row_position = row;
             self.column_position = 0;
             self.update_cursor();
+        }
+    }
+
+    pub fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+
+        for col in 0..BUFFER_WIDTH {
+            unsafe {
+                let volatile_cell = &mut self.buffer.chars[row][col];
+                volatile_cell.write_volatile(blank);
+            }
         }
     }
 
@@ -200,7 +212,7 @@ pub fn clear_screen() {
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
         for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
+            Writer::clear_row(&mut *writer, row);
         }
         writer.row_position = 0;
         writer.column_position = 0;
