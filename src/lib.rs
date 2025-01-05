@@ -51,18 +51,24 @@ macro_rules! println {
 }
 
 pub fn init_vga() {
-    vga_buffer::init();  // Initialize VGA hardware first
-    set_color(Color::Green, Color::Black);  // Set initial color
-    clear_screen();  // Clear screen with the set color
+    // First initialize the VGA hardware
+    vga_buffer::init();
 
-    // Set initial prompt row
-    let mut writer = vga_buffer::WRITER.lock();
-    writer.set_prompt_row(3);  // Set initial prompt row after welcome messages
-    drop(writer);
+    // Small delay to ensure VGA is ready
+    for _ in 0..10000 {
+        x86_64::instructions::nop();
+    }
 
+    // Now set up the display
+    vga_buffer::clear_screen();
+    vga_buffer::set_color(Color::Green, Color::Black);
+
+    // Write initial text
     println!("Welcome to Scribble OS");
     println!("Kernel initialized");
-    println!("");  // Blank line
-    enable_cursor();  // Enable cursor with proper settings
-    print!("> ");  // Print prompt
+    println!("");
+
+    // Set up cursor
+    vga_buffer::enable_cursor();
+    print!("> ");
 }

@@ -206,7 +206,108 @@ pub fn enable_cursor() {
 }
 
 pub fn init() {
-    enable_cursor();
+    use x86_64::instructions::interrupts;
+    use x86_64::instructions::port::Port;
+
+    interrupts::without_interrupts(|| {
+        unsafe {
+            // Initialize VGA ports
+            let mut port_3d4: Port<u8> = Port::new(0x3D4);
+            let mut port_3d5: Port<u8> = Port::new(0x3D5);
+            let mut port_3c0: Port<u8> = Port::new(0x3C0);
+            let mut port_3ce: Port<u8> = Port::new(0x3CE);
+            let mut port_3cf: Port<u8> = Port::new(0x3CF);
+
+            // Reset sequencer
+            let mut port_3c4: Port<u8> = Port::new(0x3C4);
+            let mut port_3c5: Port<u8> = Port::new(0x3C5);
+            port_3c4.write(0x00);
+            port_3c5.write(0x03);
+
+            // Set up VGA registers for text mode
+            // Misc Output Register (Read at 3CC, Write at 3C2)
+            let mut port_3c2: Port<u8> = Port::new(0x3C2);
+            port_3c2.write(0x67); // Enable video and set clock
+
+            // Sequencer registers
+            let sequencer_data: [(u8, u8); 5] = [
+                (0x00, 0x03), // Reset
+                                   (0x01, 0x01), // Clock Mode
+                                   (0x02, 0x03), // Plane Enable
+                                   (0x03, 0x00), // Character Map Select
+                                   (0x04, 0x02), // Memory Mode
+            ];
+
+            for (idx, val) in sequencer_data.iter() {
+                port_3c4.write(*idx);
+                port_3c5.write(*val);
+            }
+
+            // Graphics registers
+            let graphics_data: [(u8, u8); 9] = [
+                (0x00, 0x00), // Set/Reset
+                                   (0x01, 0x00), // Enable Set/Reset
+                                   (0x02, 0x00), // Color Compare
+                                   (0x03, 0x00), // Data Rotate
+                                   (0x04, 0x00), // Read Map Select
+                                   (0x05, 0x10), // Graphics Mode
+                                   (0x06, 0x0E), // Misc
+                                   (0x07, 0x00), // Color Don't Care
+                                   (0x08, 0xFF), // Bit Mask
+            ];
+
+            for (idx, val) in graphics_data.iter() {
+                port_3ce.write(*idx);
+                port_3cf.write(*val);
+            }
+
+            // Attribute registers
+            let attr_data: [(u8, u8); 21] = [
+                (0x00, 0x00), // Palette 0
+                                   (0x01, 0x01), // Palette 1
+                                   (0x02, 0x02), // Palette 2
+                                   (0x03, 0x03), // Palette 3
+                                   (0x04, 0x04), // Palette 4
+                                   (0x05, 0x05), // Palette 5
+                                   (0x06, 0x06), // Palette 6
+                                   (0x07, 0x07), // Palette 7
+                                   (0x08, 0x08), // Palette 8
+                                   (0x09, 0x09), // Palette 9
+                                   (0x0A, 0x0A), // Palette A
+                                   (0x0B, 0x0B), // Palette B
+                                   (0x0C, 0x0C), // Palette C
+                                   (0x0D, 0x0D), // Palette D
+                                   (0x0E, 0x0E), // Palette E
+                                   (0x0F, 0x0F), // Palette F
+                                   (0x10, 0x0C), // Mode Control
+                                   (0x11, 0x00), // Overscan Color
+                                   (0x12, 0x0F), // Color Plane Enable
+                                   (0x13, 0x08), // Horizontal Pixel Panning
+                                   (0x14, 0x00), // Color Select
+            ];
+
+            for (idx, val) in attr_data.iter() {
+                port_3c0.write(*idx);
+                port_3c0.write(*val);
+            }
+
+            // Enable display
+            port_3c0.write(0x20);
+
+            // Clear the screen buffer
+            let buffer = 0xb8000 as *mut u8;
+            for i in 0..(BUFFER_HEIGHT * BUFFER_WIDTH * 2) {
+                *buffer.offset(i as isize) = 0;
+            }
+        }
+    });
+
+    // Initialize the writer with default values
+    let mut writer = WRITER.lock();
+    writer.column_position = 0;
+    writer.row_position = 0;
+    writer.prompt_row = 0;
+    writer.color_code = ColorCode::new(Color::Green, Color::Black);
 }
 
 pub fn _print(args: fmt::Arguments) {

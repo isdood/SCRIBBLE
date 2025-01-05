@@ -14,18 +14,17 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn kernel_main(_boot_info: &'static BootInfo) -> ! {
-    println!("Initializing kernel...");  // Add this line
-
-    // Initialize kernel first
+    // Initialize basic hardware first
     scribble::init_kernel(_boot_info);
 
-    println!("Kernel initialized");  // Add this line
+    // Small delay to ensure hardware is ready
+    for _ in 0..10000 {
+        x86_64::instructions::nop();
+    }
 
-    // Initialize VGA (this will handle cursor and prompt)
+    // Now initialize VGA
     scribble::init_vga();
 
-    println!("Welcome to Scribble OS");  // Add this line
-
-    // Use hlt_loop (no need for extra prompt)
+    // Enter main loop
     scribble::hlt_loop();
 }
