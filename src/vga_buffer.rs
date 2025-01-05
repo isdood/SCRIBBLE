@@ -58,6 +58,7 @@ pub struct Writer {
 }
 
 impl Writer {
+
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -75,17 +76,14 @@ impl Writer {
                 };
 
                 unsafe {
-                    core::ptr::write_volatile(
-                        &mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>,
-                        Volatile::new(colored_char)
-                    );
+                    (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)) =
+                    Volatile::new(colored_char);
                 }
 
                 self.column_position += 1;
-                self.move_cursor();
+                self.update_cursor();
             }
         }
-    }
 
     fn move_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;

@@ -106,6 +106,5 @@ pub fn init_vga() {
     vga_buffer::clear_screen();
     vga_buffer::enable_cursor();
     println!("Welcome to Scribble OS");  // This will be on line 0
-    println!("");                        // Move to line 1
     print!("> ");                       // Prompt on line 1
 }
