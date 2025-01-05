@@ -103,9 +103,13 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    // Access the volatile value directly
-                    let character = *self.buffer.chars[row][col];
-                    self.buffer.chars[row - 1][col] = Volatile::new(character);
+                    let character = unsafe {
+                        // Use raw pointer to access the volatile memory
+                        (*(&self.buffer.chars[row][col] as *const Volatile<ScreenChar>)).read()
+                    };
+                    unsafe {
+                        (*(&mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>)).write(character);
+                    }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -120,26 +124,34 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col] = Volatile::new(blank);
+            unsafe {
+                (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)).write(blank);
+            }
         }
     }
 
     pub fn backspace(&mut self) {
         // Check if we're at the prompt position
-        if self.column_position <= 2 &&
-            (*self.buffer.chars[self.row_position][0]).ascii_character == b'>' {
-                return;
-            }
+        if self.column_position <= 2 && unsafe {
+            (*(&self.buffer.chars[self.row_position][0] as *const Volatile<ScreenChar>))
+            .read()
+            .ascii_character == b'>'
+        } {
+            return;
+        }
 
-            if self.column_position > 0 {
-                self.column_position -= 1;
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[self.row_position][self.column_position] = Volatile::new(blank);
-                self.update_cursor();
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            unsafe {
+                (*(&mut self.buffer.chars[self.row_position][self.column_position] as *mut Volatile<ScreenChar>))
+                .write(blank);
             }
+            self.update_cursor();
+        }
     }
 
 
