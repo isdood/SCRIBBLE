@@ -1,5 +1,5 @@
-use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-use crate::print;
+use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1, KeyCode};
+use crate::{print, vga_buffer};
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -21,8 +21,11 @@ pub fn handle_scancode(scancode: u8) {
                         print!("{}", character);
                     }
                 }
-                DecodedKey::RawKey(_key) => {
-                    // Handle special keys if needed
+                DecodedKey::RawKey(key) => {
+                    match key {
+                        KeyCode::Backspace => vga_buffer::backspace(),
+                        _ => {}
+                    }
                 }
             }
         }

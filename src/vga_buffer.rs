@@ -92,31 +92,25 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        if self.column_position == 0 {
-            if self.row_position > 0 {
-                self.row_position -= 1;
-                self.column_position = BUFFER_WIDTH - 1;
+        // Don't backspace if we're at the prompt
+        if self.row_position == BUFFER_HEIGHT - 1 && self.column_position <= 2 {
+            return;
+        }
 
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[self.row_position][self.column_position].write(blank);
-            }
-        } else {
+        // Move cursor back
+        if self.column_position > 0 {
             self.column_position -= 1;
-
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
+        } else if self.row_position > 0 {
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
         }
 
-        if self.row_position == BUFFER_HEIGHT - 1 && self.column_position < 2 {
-            self.column_position = 2;
-        }
-
+        // Clear the character at current position
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        self.buffer.chars[self.row_position][self.column_position].write(blank);
         self.update_cursor();
     }
 
