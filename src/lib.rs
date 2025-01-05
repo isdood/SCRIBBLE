@@ -32,7 +32,7 @@ pub fn init_kernel(_boot_info: &'static BootInfo) {
 pub fn init_vga() {
     vga_buffer::clear_screen();
     vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
-    print!("> ");
+    // Don't print prompt here - let main do it
 }
 
 #[macro_export]
@@ -44,4 +44,10 @@ macro_rules! print {
 macro_rules! println {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
+
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
