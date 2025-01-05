@@ -67,23 +67,9 @@ impl Writer {
                     self.new_line();
                 }
 
-                // Save current character at cursor position
-                let current = self.buffer.chars[self.row_position][self.column_position].read();
-
-                // Restore previous character's color if it exists
-                if self.column_position > 0 {
-                    let prev = self.buffer.chars[self.row_position][self.column_position - 1].read();
-                    let restored_char = ScreenChar {
-                        ascii_character: prev.ascii_character,
-                        color_code: self.color_code,
-                    };
-                    self.buffer.chars[self.row_position][self.column_position - 1].write(restored_char);
-                }
-
-                // Write new character
                 let colored_char = ScreenChar {
                     ascii_character: byte,
-                    color_code: self.cursor_color,  // Use cursor color for current position
+                    color_code: self.color_code,
                 };
                 self.buffer.chars[self.row_position][self.column_position].write(colored_char);
                 self.column_position += 1;
@@ -114,40 +100,6 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        // Remove the prompt from here - we only want it at initialization
-        self.update_cursor();
-    }
-
-    fn do_backspace(&mut self) {
-        // Only protect prompt on first line
-        if self.row_position == 0 && self.column_position <= 2 {
-            return;
-        }
-
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-        } else if self.row_position > 0 {
-            // Move to previous line
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-
-            // Find the last non-space character
-            while self.column_position > 0 {
-                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
-                if char.ascii_character != b' ' {
-                    break;
-                }
-                self.column_position -= 1;
-            }
-
-            self.buffer.chars[self.row_position][self.column_position].write(blank);
-        }
         self.update_cursor();
     }
 
@@ -163,17 +115,6 @@ impl Writer {
 
     fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-
-        // Store current character's color
-        let current = self.buffer.chars[self.row_position][self.column_position].read();
-
-        // Change character to white at cursor position
-        let cursor_char = ScreenChar {
-            ascii_character: current.ascii_character,
-            color_code: self.cursor_color,
-        };
-        self.buffer.chars[self.row_position][self.column_position].write(cursor_char);
-
         unsafe {
             use x86_64::instructions::port::Port;
             let mut port_3d4 = Port::new(0x3D4);
@@ -183,6 +124,22 @@ impl Writer {
             port_3d5.write((pos & 0xFF) as u8);
             port_3d4.write(0x0E_u8);
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
+
+    pub fn backspace(&mut self) {
+        if self.column_position <= 2 {
+            return;
+        }
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+            self.update_cursor();
         }
     }
 }
@@ -199,11 +156,9 @@ lazy_static! {
         column_position: 0,
         row_position: 0,
         color_code: ColorCode::new(Color::Green, Color::Black),
-                                                      cursor_color: ColorCode::new(Color::White, Color::Black),  // Add cursor color
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
-
 
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
@@ -217,7 +172,7 @@ pub fn _print(args: fmt::Arguments) {
 pub fn backspace() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
-        WRITER.lock().do_backspace();
+        WRITER.lock().backspace();
     });
 }
 
@@ -229,22 +184,30 @@ pub fn enable_cursor() {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Set cursor shape to underline (lines 14-15)
+            // Set cursor shape (lines 14-15 for underscore cursor)
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x0E_u8);  // Start scan line
             port_3d4.write(0x0B_u8);
             port_3d5.write(0x0F_u8);  // End scan line
 
-            // Enable cursor and set intensity
+            // Enable cursor
             port_3d4.write(0x0A_u8);
             let current = port_3d5.read();
             port_3d5.write(current & !0x20);
+
+            // Set cursor color (white)
+            let mut port_3c0 = Port::new(0x3C0);
+            port_3c0.write(0x0D_u8);  // Cursor color register
+            port_3c0.write(0x0F_u8);  // White (intensity + RGB)
         }
     });
 }
 
-pub fn init() {
-    enable_cursor();
+pub fn set_color(foreground: Color, background: Color) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().color_code = ColorCode::new(foreground, background);
+    });
 }
 
 pub fn clear_screen() {
@@ -257,4 +220,8 @@ pub fn clear_screen() {
         writer.row_position = 0;
         writer.column_position = 0;
     });
+}
+
+pub fn init() {
+    enable_cursor();
 }
