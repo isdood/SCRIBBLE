@@ -1,5 +1,4 @@
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-use crate::vga_buffer;
 use crate::print;
 use spin::Mutex;
 use lazy_static::lazy_static;
@@ -22,7 +21,7 @@ pub fn handle_scancode(scancode: u8) {
                         print!("{}", character);
                     }
                 }
-                DecodedKey::RawKey(key) => {
+                DecodedKey::RawKey(_key) => {
                     // Handle special keys if needed
                 }
             }
