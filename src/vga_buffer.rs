@@ -68,11 +68,11 @@ impl Writer {
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape
+            // Set cursor shape back to smaller size
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0E_u8);  // Start scan line 14
+            port_3d5.write(0x0E_u8);  // Start at scan line 14 (near bottom)
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line 15
+            port_3d5.write(0x0F_u8);  // End at scan line 15 (bottom)
 
             // Enable cursor
             port_3d4.write(0x0A_u8);
@@ -133,7 +133,7 @@ impl Writer {
             port_3d4.write(0x0E_u8);
             port_3d5.write(((pos >> 8) & 0xFF) as u8);
 
-            // Try to set the character at cursor position to use white background
+            // Set white background for cursor position (keeping this part for the white color)
             let current_char = self.buffer.chars[self.row_position][self.column_position].read();
             let white_bg_char = ScreenChar {
                 ascii_character: current_char.ascii_character,
