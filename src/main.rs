@@ -1,30 +1,28 @@
-#![no_std] // don't link the Rust standard library
-#![no_main] // disable all Rust-level entry points
+#![no_std]
+#![no_main]
 
 use core::panic::PanicInfo;
-use scribble::{print, println};  // Add print macro import
-use scribble::vga_buffer::{self, Color};
+use scribble::{print, println};  // Keep only what we use
 use bootloader::{BootInfo, entry_point};
 
 entry_point!(kernel_main);
 
-/// This function is called on panic.
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    loop {}
+    scribble::hlt_loop();
 }
 
 fn kernel_main(_boot_info: &'static BootInfo) -> ! {
     // Initialize kernel first
     scribble::init_kernel(_boot_info);
 
-    // Initialize VGA and enable cursor
+    // Initialize VGA
     scribble::init_vga();
 
     // Print initial prompt
     print!("> ");
 
-    // Use hlt_loop instead of busy loop
+    // Use hlt_loop
     scribble::hlt_loop();
 }
