@@ -2,6 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
+use core::ops::{Deref, DerefMut};
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -45,6 +46,21 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
+// Implement Deref and DerefMut for ScreenChar
+impl Deref for ScreenChar {
+    type Target = ScreenChar;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl DerefMut for ScreenChar {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
 #[repr(transparent)]
 struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
@@ -81,7 +97,7 @@ impl Writer {
                     color_code: current_color,
                 };
 
-                self.buffer.chars[row][col] = Volatile::new(colored_char);
+                self.buffer.chars[row][col].write(colored_char);
                 self.column_position += 1;
                 self.update_cursor();
             }
@@ -103,13 +119,8 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = unsafe {
-                        // Use raw pointer to access the volatile memory
-                        (*(&self.buffer.chars[row][col] as *const Volatile<ScreenChar>)).read()
-                    };
-                    unsafe {
-                        (*(&mut self.buffer.chars[row - 1][col] as *mut Volatile<ScreenChar>)).write(character);
-                    }
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col].write(character);
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -124,36 +135,27 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            unsafe {
-                (*(&mut self.buffer.chars[row][col] as *mut Volatile<ScreenChar>)).write(blank);
-            }
+            self.buffer.chars[row][col].write(blank);
         }
     }
 
     pub fn backspace(&mut self) {
         // Check if we're at the prompt position
-        if self.column_position <= 2 && unsafe {
-            (*(&self.buffer.chars[self.row_position][0] as *const Volatile<ScreenChar>))
-            .read()
-            .ascii_character == b'>'
-        } {
-            return;
-        }
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            unsafe {
-                (*(&mut self.buffer.chars[self.row_position][self.column_position] as *mut Volatile<ScreenChar>))
-                .write(blank);
+        if self.column_position <= 2 &&
+            self.buffer.chars[self.row_position][0].read().ascii_character == b'>' {
+                return;
             }
-            self.update_cursor();
-        }
-    }
 
+            if self.column_position > 0 {
+                self.column_position -= 1;
+                let blank = ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                };
+                self.buffer.chars[self.row_position][self.column_position].write(blank);
+                self.update_cursor();
+            }
+    }
 
     fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
@@ -198,7 +200,6 @@ pub fn _print(args: fmt::Arguments) {
 
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
-        // Simplified prompt detection
         writer.prompt_active = true;
         writer.write_fmt(args).unwrap();
         writer.prompt_active = false;
