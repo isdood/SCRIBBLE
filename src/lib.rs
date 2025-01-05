@@ -29,19 +29,20 @@ pub fn init_kernel(_boot_info: &'static BootInfo) {
     x86_64::instructions::interrupts::enable();
 }
 
-pub fn init_vga() {
-    let mut writer = vga_buffer::WRITER.lock();
-    writer.enable_cursor(); // Enable hardware cursor
-    drop(writer); // Release the lock
-
-    vga_buffer::clear_screen();
-    vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
-}
-
+// Keep only one definition of hlt_loop
 pub fn hlt_loop() -> ! {
     loop {
         x86_64::instructions::hlt();
     }
+}
+
+pub fn init_vga() {
+    let mut writer = vga_buffer::WRITER.lock();
+    writer.enable_cursor(); // Now public
+    drop(writer);
+
+    vga_buffer::clear_screen();
+    vga_buffer::set_color(vga_buffer::Color::Green, vga_buffer::Color::Black);
 }
 
 #[macro_export]
@@ -53,10 +54,4 @@ macro_rules! print {
 macro_rules! println {
     () => ($crate::print!("\n"));
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
-pub fn hlt_loop() -> ! {
-    loop {
-        x86_64::instructions::hlt();
-    }
 }

@@ -59,24 +59,22 @@ pub struct Writer {
 }
 
 impl Writer {
-    // Add these new methods for hardware cursor control
-    fn enable_cursor(&mut self) {
+    // Make enable_cursor public
+    pub fn enable_cursor(&mut self) {
         unsafe {
             use x86_64::instructions::port::Port;
 
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Enable cursor (clear bit 5)
             port_3d4.write(0x0A_u8);
             let cur_state = port_3d5.read() as u8;
             port_3d5.write((cur_state & !0x20) as u8);
 
-            // Set cursor shape (start and end scanline)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0F_u8); // Scanline start
+            port_3d5.write(0x0F_u8);
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8); // Scanline end
+            port_3d5.write(0x0F_u8);
         }
     }
 
@@ -110,8 +108,27 @@ impl Writer {
 
                 self.buffer.chars[self.row_position][self.column_position].write(colored_char);
                 self.column_position += 1;
-                self.update_cursor(); // Update hardware cursor after each write
+                self.update_cursor();
             }
+        }
+    }
+
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
+    pub fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
         }
     }
 
@@ -128,7 +145,7 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.update_cursor(); // Update hardware cursor after newline
+        self.update_cursor();
     }
 }
 
