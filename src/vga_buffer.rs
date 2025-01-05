@@ -81,7 +81,7 @@ impl Writer {
                 }
 
                 self.column_position += 1;
-                self.update_cursor();
+                self.move_cursor();  // Changed from update_cursor
             }
         }
     }
@@ -103,18 +103,33 @@ impl Writer {
                 for col in 0..BUFFER_WIDTH {
                     unsafe {
                         let char_ptr = &self.buffer.chars[row][col];
-                        let char_val = char_ptr.read_volatile();
+                        let char_val = char_ptr.read();  // Changed from read_volatile
 
                         let dest_ptr = &mut self.buffer.chars[row - 1][col];
-                        dest_ptr.write_volatile(char_val);
+                        dest_ptr.write(char_val);  // Changed from write_volatile
                     }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.update_cursor();
+        self.move_cursor();  // Changed from update_cursor
     }
+
+    fn move_cursor(&mut self) {  // Renamed from update_cursor
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
+
 
     fn move_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
@@ -182,7 +197,7 @@ impl Writer {
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.write_str(s);
+        self.write_string(s);  // This calls the non-recursive write_string method
         Ok(())
     }
 }
