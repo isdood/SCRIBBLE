@@ -64,19 +64,20 @@ impl Writer {
             let mut port_3d4 = Port::new(0x3D4);
             let mut port_3d5 = Port::new(0x3D5);
 
-            // Disable cursor first
+            // First disable cursor
             port_3d4.write(0x0A_u8);
             port_3d5.write(0x20_u8);
 
-            // Set cursor shape (underscore)
+            // Set cursor shape (thin underscore)
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x0F_u8);  // Start scan line 15
+            port_3d5.write(0x0E_u8);  // Start scan line 14
             port_3d4.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line 15 (single line underscore)
+            port_3d5.write(0x0F_u8);  // End scan line 15
 
-            // Enable cursor (high intensity white)
+            // Force high intensity white cursor
             port_3d4.write(0x0A_u8);
-            port_3d5.write(0x00_u8);
+            let cur_state = port_3d5.read() as u8;
+            port_3d5.write(cur_state & 0xDF);  // Clear bit 5 to enable cursor and force high intensity
         }
         self.update_cursor();
     }
