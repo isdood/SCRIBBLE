@@ -90,6 +90,44 @@ impl Writer {
         }
     }
 
+    pub fn set_color(&mut self, foreground: Color, background: Color) {
+        self.color_code = ColorCode::new(foreground, background);
+    }
+
+    fn backspace(&mut self) {
+        if self.row_position == 0 && self.column_position <= 2 {
+            return;
+        }
+
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+        } else if self.row_position > 0 {
+            // Clear current line first
+            self.clear_row(self.row_position);
+
+            // Move to previous line
+            self.row_position -= 1;
+
+            // Find last non-space character
+            self.column_position = BUFFER_WIDTH - 1;
+            while self.column_position > 0 {
+                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
+                if char.ascii_character != b' ' {
+                    break;
+                }
+                self.column_position -= 1;
+            }
+        }
+
+        self.update_cursor();
+    }
+
         pub fn set_color(&mut self, foreground: Color, background: Color) {
         self.color_code = ColorCode::new(foreground, background);
         }
@@ -231,13 +269,6 @@ impl fmt::Write for Writer {
         self.write_string(s);
         Ok(())
     }
-}
-
-pub fn set_color(foreground: Color, background: Color) {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().set_color(foreground, background);
-    });
 }
 
 // Public interface functions
