@@ -5,6 +5,7 @@ use x86_64::{
     },
     VirtAddr, PhysAddr,
 };
+
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use crate::println;
 
