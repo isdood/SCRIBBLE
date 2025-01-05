@@ -2,14 +2,14 @@
 #![no_main]
 
 use core::panic::PanicInfo;
+use scribble::{print, println};
 use bootloader::{BootInfo, entry_point};
-use scribble::serial_println;
 
 entry_point!(kernel_main);
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    serial_println!("[PANIC] {}", info);
+    println!("{}", info);
     scribble::hlt_loop();
 }
 
@@ -22,11 +22,11 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("Kernel initialized");
 
     // Initialize VGA (this will handle cursor and prompt)
-    scribble::init_vga();
+    scribble::vga_buffer::init();
+    scribble::vga_buffer::clear_screen();
 
     println!("Welcome to Scribble OS");
     print!("> ");
 
-    // Use hlt_loop
     scribble::hlt_loop();
 }
