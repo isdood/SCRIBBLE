@@ -104,6 +104,43 @@ impl Writer {
         self.update_cursor();
     }
 
+    pub fn backspace(&mut self) {
+        // Don't backspace past the prompt
+        if self.row_position == 0 && self.column_position <= 2 {
+            return;
+        }
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+            self.update_cursor();
+        } else if self.row_position > 0 {
+            // Move to previous line
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+
+            // Find the last non-space character
+            while self.column_position > 0 {
+                let char = self.buffer.chars[self.row_position][self.column_position - 1].read();
+                if char.ascii_character != b' ' {
+                    break;
+                }
+                self.column_position -= 1;
+            }
+
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
+            self.update_cursor();
+        }
+    }
+
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -223,12 +260,29 @@ pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         let mut writer = WRITER.lock();
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: writer.color_code,
+        };
+
+        // Clear entire screen
         for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
+            for col in 0..BUFFER_WIDTH {
+                writer.buffer.chars[row][col].write(blank);
+            }
         }
+
         writer.row_position = 0;
         writer.column_position = 0;
         enable_cursor();
         writer.write_string("> ");
+    });
+}
+
+pub fn init() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        enable_cursor();
+        clear_screen();
     });
 }

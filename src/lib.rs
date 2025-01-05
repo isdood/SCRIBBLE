@@ -50,5 +50,5 @@ macro_rules! println {
 }
 
 pub fn init_vga() {
-    vga_buffer::init();
+    vga_buffer::clear_screen();  // This already handles cursor and prompt
 }
