@@ -5,6 +5,14 @@ use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 
 // CONSTANTS //
+
+// Software / Harware cursor switch constants
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CursorMode {
+    Hardware,
+    Software,
+}
+
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
 
@@ -140,6 +148,8 @@ pub struct Writer {
     cursor_blink_counter: u8,
     cursor_style: CursorStyle,
     cursor_color: (Color, Color),
+    cursor_mode: CursorMode,
+    hardware_cursor_enabled: bool,
 }
 
 impl Writer {
@@ -344,7 +354,7 @@ impl Writer {
                     color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
                 });
             }
-        }
+    }
 }
 
             // Update software cursor state
