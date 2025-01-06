@@ -8,7 +8,8 @@ pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 const STACK_SIZE: usize = 4096 * 5;
 
 #[repr(align(16))]
-struct Stack([u8; STACK_SIZE]);
+#[derive(Clone, Copy)]  // Add these derives
+struct Stack(#[allow(dead_code)] [u8; STACK_SIZE]);  // Add allow(dead_code) attribute
 
 static DOUBLE_FAULT_STACK: Stack = Stack([0; STACK_SIZE]);
 
