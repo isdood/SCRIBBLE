@@ -11,7 +11,7 @@ const BUFFER_WIDTH: usize = 80;
 const CURSOR_PORT_CTRL: u16 = 0x3D4;
 const CURSOR_PORT_DATA: u16 = 0x3D5;
 
-const CURSOR_START_LINE: u8 = 0;   // Start from top of character
+const CURSOR_START_LINE: u8 = 14;   // Changed from 0
 const CURSOR_END_LINE: u8 = 15;    // End at bottom of character
 ////////////////////////////////
 
@@ -92,16 +92,25 @@ pub struct Writer {
 }
 
 impl Writer {
+    fn is_at_prompt(&self) -> bool {
+        self.row_position == 0 && self.column_position <= self.prompt_length
+    }
+
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            0x08 => self.backspace(),
+            0x08 => {  // Backspace
+                // Only process backspace if we're not at the prompt on the first line
+                if !self.is_at_prompt() {
+                    self.backspace();
+                }
+            },
             b'\n' => {
                 self.new_line();
-                self.is_wrapped = false;  // Reset wrap flag on explicit newline
+                self.is_wrapped = false;
             },
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
-                    self.is_wrapped = true;  // Set wrap flag BEFORE new line
+                    self.is_wrapped = true;
                     self.new_line();
                 }
 
@@ -129,45 +138,60 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
-        // Reset column position before writing prompt
+        // Reset position and state before writing prompt
         self.column_position = 0;
+        self.is_wrapped = false;
+
+        // Write the prompt
         self.write_string("> ");
-        self.column_position = self.prompt_length;  // Ensure we're after the prompt
-        self.is_wrapped = false;  // Reset wrap state when writing prompt
+
+        // Ensure we're after the prompt
+        self.column_position = self.prompt_length;
         self.update_cursor();
     }
 
     pub fn backspace(&mut self) {
-        // First, handle prompt protection
-        if self.row_position == 0 {
-            // On first line, strictly enforce prompt protection
-            if self.column_position <= self.prompt_length {
-                self.column_position = self.prompt_length;  // Ensure we don't go before prompt
-                self.update_cursor();
-                return;
-            }
+        // Early return if we're at the prompt
+        if self.is_at_prompt() {
+            return;
         }
 
-        // Rest of the backspace implementation...
         if self.column_position == 0 && self.row_position > 0 {
+            // Before moving to previous line, clear the current position
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
             };
             self.buffer.chars[self.row_position][0].write_char(blank);
 
+            // Move to end of previous line
             self.row_position -= 1;
             self.column_position = BUFFER_WIDTH - 1;
+
+            // Clear the character at the new position
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+
+            // Check if we're moving to the first line
+            if self.row_position == 0 && self.column_position <= self.prompt_length {
+                self.column_position = self.prompt_length;
+            }
+
             self.update_cursor();
             self.is_wrapped = true;
         } else if self.column_position > 0 {
+            // Normal backspace within the same line
             self.column_position -= 1;
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
             };
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+
+            // Additional prompt protection
+            if self.row_position == 0 && self.column_position < self.prompt_length {
+                self.column_position = self.prompt_length;
+            }
+
             self.update_cursor();
         }
     }
@@ -185,7 +209,6 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.is_wrapped = false;  // Reset wrap state on new line
         self.update_cursor();
     }
 
@@ -219,20 +242,20 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            control_port.write(0x0A_u8);
-            data_port.write(0x20_u8);
+            // Set cursor shape
+            control_port.write(0x0A);
+            let mut cursor_config = data_port.read() & 0xC0;  // Keep the top bits
+            cursor_config |= CURSOR_START_LINE;  // Start scan line
+            data_port.write(cursor_config);
 
-            for _ in 0..100000 {
-                core::hint::spin_loop();
-            }
+            control_port.write(0x0B);
+            cursor_config = data_port.read() & 0xE0;  // Keep the top 3 bits
+            cursor_config |= CURSOR_END_LINE;   // End scan line
+            data_port.write(cursor_config);
 
-            control_port.write(0x0A_u8);
-            data_port.write(CURSOR_START_LINE);
-            control_port.write(0x0B_u8);
-            data_port.write(CURSOR_END_LINE);
-
-            control_port.write(0x0A_u8);
-            data_port.write(CURSOR_START_LINE);
+            // Enable cursor
+            control_port.write(0x0A);
+            data_port.write(0x00);
         }
     }
 }

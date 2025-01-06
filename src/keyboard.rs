@@ -24,10 +24,14 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
                 DecodedKey::Unicode(character) => {
-                    print!("{}", character);
-                    // Add prompt after newline
-                    if character == '\n' {
-                        crate::vga_buffer::write_prompt();
+                    if character == '\u{8}' { // Backspace character
+                        crate::vga_buffer::backspace();
+                    } else {
+                        print!("{}", character);
+                        // Add prompt after newline
+                        if character == '\n' {
+                            crate::vga_buffer::write_prompt();
+                        }
                     }
                 },
                 DecodedKey::RawKey(key) => print!("{:?}", key),
