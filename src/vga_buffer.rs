@@ -133,13 +133,18 @@ impl Writer {
         self.update_cursor();
     }
 
-    // Add the write_prompt method
     pub fn write_prompt(&mut self) {
         self.write_byte(b'>');
         self.write_byte(b' ');
     }
 
-    // Add the update_cursor method
+    pub fn set_input_mode(&mut self, active: bool) {
+        self.input_mode = active;
+        if active {
+            self.write_prompt();  // Ensure this is called only once
+        }
+    }
+
     pub fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
@@ -154,7 +159,6 @@ impl Writer {
         }
     }
 
-    // Add the clear_row method
     pub fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -164,25 +168,6 @@ impl Writer {
             self.buffer.chars[row][col].write(blank);
         }
     }
-
-    // Add the write_string method
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
-        }
-    }
-
-    // Add the set_input_mode method if it doesn't exist
-    pub fn set_input_mode(&mut self, active: bool) {
-        self.input_mode = active;
-        if active {
-            self.write_prompt();
-        }
-    }
-
 }
 
 impl fmt::Write for Writer {
