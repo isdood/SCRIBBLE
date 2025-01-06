@@ -7,7 +7,6 @@ use lazy_static::lazy_static;
 use x86_64::structures::idt::InterruptStackFrame;
 use crate::interrupts::{PICS, InterruptIndex};
 use crate::print;
-use crate::vga_buffer::BUFFER_WIDTH;
 
 //////////// END //////////////
 
