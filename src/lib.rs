@@ -17,7 +17,41 @@ pub mod vga_buffer;
 pub mod keyboard;
 
 use bootloader::BootInfo;
-use core::alloc::Layout;
+use x86_64::VirtAddr;
+
+#[global_allocator]
+static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
+
+pub fn init(boot_info: &'static BootInfo) {
+    gdt::init();
+    interrupts::init_idt();
+    unsafe { interrupts::PICS.lock().initialize() };
+
+    // Get the physical memory offset from bootinfo
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+
+    // Initialize a mapper
+    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+
+    // Initialize the frame allocator
+    let mut frame_allocator = unsafe {
+        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
+    };
+
+    // Initialize the heap
+    allocator::init_heap(&mut mapper, &mut frame_allocator)
+    .expect("heap initialization failed");
+
+    x86_64::instructions::interrupts::enable();
+}
+
+#[alloc_error_handler]
+fn alloc_error_handler(layout: core::alloc::Layout) -> ! {
+    panic!("allocation error: {:?}", layout)
+}
+
+#[global_allocator]
+static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
 
 #[macro_export]
 macro_rules! print {
@@ -33,9 +67,6 @@ macro_rules! println {
         $crate::print!("{}\n", format_args!($($arg)*))
     };
 }
-
-#[global_allocator]
-static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
 
 pub fn init(boot_info: &'static BootInfo) {
     use x86_64::VirtAddr;
@@ -65,9 +96,4 @@ pub fn init(boot_info: &'static BootInfo) {
     .expect("heap initialization failed");
 
     x86_64::instructions::interrupts::enable();
-}
-
-#[alloc_error_handler]
-fn alloc_error_handler(layout: Layout) -> ! {
-    panic!("allocation error: {:?}", layout)
 }
