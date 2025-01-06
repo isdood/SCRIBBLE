@@ -388,6 +388,15 @@ impl Writer {
         self.update_cursor();
     }
 
+    pub fn set_cursor_type(&mut self, cursor_type: CursorType) {
+        self.cursor_color = match cursor_type {
+            CursorType::Normal => NORMAL_CURSOR,
+            CursorType::Insert => INSERT_CURSOR,
+            CursorType::Select => SELECT_CURSOR,
+        };
+        self.update_cursor();
+    }
+
 }
 
 // Write trait implementation
