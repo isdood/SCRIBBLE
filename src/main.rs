@@ -24,16 +24,14 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     scribble::init(boot_info);
     println!("Initialization complete.");
 
-    // Instead of directly calling restore_previous_cursor,
-    // we can force a cursor update which will handle cleanup
+    // Now we can properly manage the cursor
     {
         let mut writer = scribble::vga_buffer::WRITER.lock();
-        writer.update_cursor();
+        writer.restore_previous_cursor();  // Clean up any existing cursor
+        writer.enable_cursor();           // Properly initialize cursor
     }
 
-    // Add an explicit newline before the prompt
     print!("\n");
-    // Write the first prompt
     scribble::vga_buffer::write_prompt();
 
     loop {
