@@ -135,6 +135,7 @@ impl Writer {
         };
         self.buffer.chars[self.row_position][self.column_position] = Volatile::new(blank);
     }
+}
 
 impl Deref for ScreenChar {
     type Target = ScreenChar;
