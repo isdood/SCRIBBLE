@@ -28,7 +28,6 @@ pub fn show_datetime() {
                     year, month, day, hours, minutes, seconds
     );
     crate::println!("Current User's Login: isdood");
-    crate::print!("> ");
 }
 
 //
