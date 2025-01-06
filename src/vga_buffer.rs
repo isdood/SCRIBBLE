@@ -2,11 +2,10 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use core::ops::Deref;
+use x86_64::structures::idt::InterruptStackFrame;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
-
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,14 +60,78 @@ pub struct Writer {
     input_mode: bool,
 }
 
+lazy_static! {
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        row_position: 0,
+        color_code: ColorCode::new(Color::White, Color::Black),
+                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+                                                      prompt_active: false,
+                                                      input_mode: false,
+    });
+}
+
 impl Writer {
-    pub fn new_line(&mut self) {
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col] = Volatile::new(blank);
+        }
+    }
+
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
+
+    fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let row = self.row_position;
+                let col = self.column_position;
+
+                let color_code = if self.input_mode {
+                    ColorCode::new(Color::Green, Color::Black)
+                } else {
+                    self.color_code
+                };
+
+                self.buffer.chars[row][col] = Volatile::new(ScreenChar {
+                    ascii_character: byte,
+                    color_code,
+                });
+                self.column_position += 1;
+                self.update_cursor();
+            }
+        }
+    }
+
+    fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
+                    let character = unsafe {
+                        self.buffer.chars[row][col].read()
+                    };
                     self.buffer.chars[row - 1][col] = Volatile::new(character);
                 }
             }
@@ -78,12 +141,7 @@ impl Writer {
         self.update_cursor();
     }
 
-    pub fn write_prompt(&mut self) {
-        self.write_byte(b'>');
-        self.write_byte(b' ');
-    }
-
-    pub fn write_string(&mut self, s: &str) {
+    fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
@@ -116,16 +174,36 @@ impl Writer {
     pub fn set_input_mode(&mut self, active: bool) {
         self.input_mode = active;
         if active {
-            self.write_prompt();
+            self.write_byte(b'>');
+            self.write_byte(b' ');
         }
     }
 }
 
-// Public interface functions
-pub fn write_string(s: &str) {
+impl fmt::Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_string(s);
+        Ok(())
+    }
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
+
+#[doc(hidden)]
+pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
+    use core::fmt::Write;
     interrupts::without_interrupts(|| {
-        WRITER.lock().write_string(s);
+        WRITER.lock().write_fmt(args).unwrap();
     });
 }
 
@@ -143,44 +221,41 @@ pub fn set_input_mode(active: bool) {
     });
 }
 
-// Update the keyboard handler in interrupts.rs
-pub fn keyboard_interrupt_handler(
-    _stack_frame: InterruptStackFrame
-) {
-    use x86_64::instructions::port::Port;
-    use pc_keyboard::DecodedKey;
-
-    let mut keyboard = KEYBOARD.lock();
-    let mut port = Port::new(0x60);
-
-    let scancode: u8 = unsafe { port.read() };
-
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            crate::vga_buffer::set_input_mode(true);
-            match key {
-                DecodedKey::Unicode(character) => {
-                    match character {
-                        '\n' => {
-                            println!();
-                        },
-                        '\u{8}' => { // Backspace
-                            crate::vga_buffer::backspace();
-                        },
-                        _ => {
-                            print!("{}", character);
-                        }
-                    }
-                },
-                DecodedKey::RawKey(_key) => {
-                    // Handle raw keys if needed
-                }
-            }
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
         }
-    }
+        writer.row_position = 0;
+        writer.column_position = 0;
+        writer.update_cursor();
+    });
+}
 
-    unsafe {
-        PICS.lock()
-        .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
-    }
+pub fn init() {
+    clear_screen();
+    enable_cursor();
+    set_input_mode(true);
+}
+
+pub fn enable_cursor() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(0x0E_u8);
+            port_3d4.write(0x0B_u8);
+            port_3d5.write(0x0F_u8);
+
+            port_3d4.write(0x0A_u8);
+            let current = port_3d5.read();
+            port_3d5.write(current & !0x20);
+        }
+    });
 }
