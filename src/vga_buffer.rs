@@ -1,4 +1,3 @@
-use volatile::Volatile;
 use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
@@ -44,7 +43,7 @@ struct ScreenChar {
 }
 
 struct Buffer {
-    chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
+    chars: [[volatile::Volatile<u16>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
 pub struct Writer {
@@ -55,7 +54,7 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn write_byte(&mut self, byte: u8) {
+    fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
             byte => {
@@ -65,20 +64,30 @@ impl Writer {
 
                 let row = self.row_position;
                 let col = self.column_position;
+                let color_code = self.color_code;
 
-                let screen_char = ScreenChar {
+                self.write_volatile(row, col, ScreenChar {
                     ascii_character: byte,
-                    color_code: self.color_code,
-                };
+                    color_code,
+                });
 
-                unsafe {
-                    // Get a mutable reference to the Volatile<ScreenChar>
-                    let volatile_char = &mut self.buffer.chars[row][col];
-                    // Write the new character
-                    volatile_char.write(screen_char);
-                }
                 self.column_position += 1;
             }
+        }
+    }
+
+    fn write_volatile(&mut self, row: usize, col: usize, char: ScreenChar) {
+        let value = (u16::from(char.color_code.0) << 8) | u16::from(char.ascii_character);
+        unsafe {
+            self.buffer.chars[row][col].write(value);
+        }
+    }
+
+    fn read_volatile(&self, row: usize, col: usize) -> ScreenChar {
+        let value = unsafe { self.buffer.chars[row][col].read() };
+        ScreenChar {
+            ascii_character: (value & 0xFF) as u8,
+            color_code: ColorCode((value >> 8) as u8),
         }
     }
 
@@ -88,18 +97,8 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = unsafe {
-                        // Get a reference to the Volatile<ScreenChar>
-                        let volatile_char = &self.buffer.chars[row][col];
-                        // Read the character
-                        volatile_char.read()
-                    };
-                    unsafe {
-                        // Get a mutable reference to the Volatile<ScreenChar> in the previous row
-                        let volatile_char = &mut self.buffer.chars[row - 1][col];
-                        // Write the character
-                        volatile_char.write(character);
-                    }
+                    let character = self.read_volatile(row, col);
+                    self.write_volatile(row - 1, col, character);
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -113,12 +112,7 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            unsafe {
-                // Get a mutable reference to the Volatile<ScreenChar>
-                let volatile_char = &mut self.buffer.chars[row][col];
-                // Write the blank character
-                volatile_char.write(blank);
-            }
+            self.write_volatile(row, col, blank);
         }
     }
 
