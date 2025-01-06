@@ -1,9 +1,14 @@
 use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
+use x86_64::instructions::port::Port;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
+
+// VGA hardware cursor ports
+const CURSOR_PORT_CTRL: u16 = 0x3D4;
+const CURSOR_PORT_DATA: u16 = 0x3D5;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -35,7 +40,6 @@ impl ColorCode {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
 #[repr(C)]
 struct ScreenChar {
     ascii_character: u8,
@@ -83,14 +87,14 @@ impl Writer {
 
                 let row = self.row_position;
                 let col = self.column_position;
-                let color_code = self.color_code;
 
                 self.write_volatile(row, col, ScreenChar {
                     ascii_character: byte,
-                    color_code,
+                    color_code: self.color_code,
                 });
 
                 self.column_position += 1;
+                self.update_cursor();
             }
         }
     }
@@ -100,27 +104,20 @@ impl Writer {
         self.buffer.chars[row][col].write(value);
     }
 
-    fn read_volatile(&self, row: usize, col: usize) -> ScreenChar {
-        let value = self.buffer.chars[row][col].read();
-        ScreenChar {
-            ascii_character: (value & 0xFF) as u8,
-            color_code: ColorCode((value >> 8) as u8),
-        }
-    }
-
     fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = self.read_volatile(row, col);
-                    self.write_volatile(row - 1, col, character);
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col].write(character);
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
+        self.update_cursor();
     }
 
     fn clear_row(&mut self, row: usize) {
@@ -133,26 +130,33 @@ impl Writer {
         }
     }
 
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+
+        unsafe {
+            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+            // Set cursor position high byte
+            control_port.write(0x0E);
+            data_port.write(((pos >> 8) & 0xFF) as u8);
+
+            // Set cursor position low byte
+            control_port.write(0x0F);
+            data_port.write((pos & 0xFF) as u8);
+        }
+    }
+
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
+                // printable ASCII byte or newline
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
+                // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
         }
     }
-
-    pub fn set_input_mode(&mut self, enabled: bool) {
-        // You can add additional functionality here if needed
-        if enabled {
-            self.write_string("> ");
-        }
-    }
-
-    pub fn new_line_public(&mut self) {
-        self.new_line();
-    }
-
 }
 
 impl fmt::Write for Writer {
@@ -174,6 +178,7 @@ lazy_static! {
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
+
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
     });
