@@ -144,6 +144,7 @@ impl Writer {
     }
 
     pub fn set_input_mode(&mut self, active: bool) {
+        println!("[DEBUG] set_input_mode called with active={}", active);
         self.input_mode = active;
         if active {
             self.write_prompt();  // Ensure this is called only once
@@ -184,7 +185,6 @@ impl Writer {
         Ok(())
     }
 
-    // Use let _ = ... to handle the Result
     pub fn write_string(&mut self, s: &str) {
         let _ = self.write_str(s);
     }
