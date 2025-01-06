@@ -406,8 +406,8 @@ impl Writer {
             });
         }
     }
-
 }
+
 
 // Write trait implementation
 impl fmt::Write for Writer {
