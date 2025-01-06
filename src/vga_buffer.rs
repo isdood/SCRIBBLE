@@ -30,17 +30,17 @@ pub enum Color {
     White = 15,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
 struct ColorCode(u8);
 
 impl ColorCode {
-    const fn new(foreground: Color, background: Color) -> ColorCode {
+    fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
 struct ScreenChar {
     ascii_character: u8,
@@ -91,12 +91,7 @@ lazy_static! {
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            b'\n' => {
-                self.new_line();
-                if self.input_mode {
-                    self.write_prompt(); // Ensure this is called only once per input start
-                }
-            }
+            b'\n' => self.new_line(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
@@ -111,18 +106,18 @@ impl Writer {
                     self.color_code
                 };
 
-                let char_to_write = ScreenChar {
+                self.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: byte,
                     color_code,
-                };
-                self.buffer.chars[row][col].write(char_to_write);
+                });
+
                 self.column_position += 1;
                 self.update_cursor();
             }
         }
     }
 
-    pub fn new_line(&mut self) {
+    fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
@@ -138,19 +133,17 @@ impl Writer {
         self.update_cursor();
     }
 
-    pub fn write_prompt(&mut self) {
-        // Ensure this is called only once per input start
-        self.write_byte(b'>');
-    }
-
-    pub fn set_input_mode(&mut self, active: bool) {
-        self.input_mode = active;
-        if active {
-            self.write_prompt();
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: ColorCode::new(Color::Green, Color::Black),
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
         }
     }
 
-    pub fn update_cursor(&mut self) {
+    fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
             use x86_64::instructions::port::Port;
@@ -164,28 +157,16 @@ impl Writer {
         }
     }
 
-    pub fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
+    pub fn write_prompt(&mut self) {
+        self.write_byte(b'>');
+        self.write_byte(b' ');
     }
 
-    pub fn write_str(&mut self, s: &str) -> fmt::Result {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
+    pub fn set_input_mode(&mut self, active: bool) {
+        self.input_mode = active;
+        if active {
+            self.write_prompt();
         }
-        Ok(())
-    }
-
-    pub fn write_string(&mut self, s: &str) {
-        let _ = self.write_str(s);
     }
 }
 

@@ -23,6 +23,7 @@ pub fn show_datetime() {
     let mut rtc = rtc::RTC_DEVICE.lock();
     let (year, month, day) = rtc.get_date();
     let (hours, minutes, seconds) = rtc.get_time();
+
     crate::println!(
         "Current Date and Time (UTC): {}-{:02}-{:02} {:02}:{:02}:{:02}",
                     year, month, day, hours, minutes, seconds
