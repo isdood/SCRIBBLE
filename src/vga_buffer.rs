@@ -72,7 +72,6 @@ pub struct Writer {
     color_code: ColorCode,
     buffer: &'static mut Buffer,
     prompt_active: bool,
-    input_mode: bool,
 }
 
 lazy_static! {
@@ -81,7 +80,6 @@ lazy_static! {
         row_position: 0,
         color_code: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-                                                      prompt_active: false,
                                                       input_mode: false,
     });
 }

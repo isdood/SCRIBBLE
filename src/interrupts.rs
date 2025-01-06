@@ -2,7 +2,7 @@ use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use spin::Mutex;
-use crate::{print, println};
+use crate::println;
 use crate::gdt;
 
 pub const PIC_1_OFFSET: u8 = 32;
