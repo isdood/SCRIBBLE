@@ -91,6 +91,7 @@ pub struct Writer {
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
+            0x08 | 0x7F => self.backspace(), // Handle both backspace and delete
             b'\n' => self.new_line(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
@@ -190,21 +191,38 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // Check if we're not at the start of the line
-        if self.column_position > 0 {
-            // Move cursor back one position
+        // First store current position
+        let current_row = self.row_position;
+        let current_col = self.column_position;
+
+        // Create blank character
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+
+        // Handle backspace
+        if current_col > 0 {
+            // Move cursor back
             self.column_position -= 1;
 
-            // Write a blank character at the current position
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
+            // Explicitly overwrite the character at the current position
+            self.buffer.chars[current_row][self.column_position].write_char(blank);
+
+            // Force a cursor update
+            self.update_cursor();
+        } else if current_row > 0 {
+            // Move to previous line
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+
+            // Explicitly overwrite the character
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
 
-            // Update cursor position
+            // Force a cursor update
             self.update_cursor();
         }
+    }
         // If we're at start of line and not at top row, move to end of previous line
         else if self.row_position > 0 {
             self.row_position -= 1;
@@ -229,13 +247,6 @@ impl fmt::Write for Writer {
     }
 }
 
-pub fn backspace() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().backspace();
-    });
-}
-
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = {
         let mut writer = Writer {
@@ -253,6 +264,41 @@ lazy_static! {
         writer.update_cursor();
         Mutex::new(writer)
     };
+}
+
+pub fn backspace() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().backspace();
+    });
+}
+
+pub fn set_color(foreground: Color, background: Color) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.color_code = ColorCode::new(foreground, background);
+    });
+}
+
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        writer.row_position = BUFFER_HEIGHT - 1;
+        writer.column_position = 0;
+        writer.update_cursor();
+    });
+}
+
+pub fn enable_cursor() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().enable_cursor();
+    });
 }
 
 #[doc(hidden)]
