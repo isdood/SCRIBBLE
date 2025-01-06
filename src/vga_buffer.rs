@@ -72,18 +72,12 @@ impl Writer {
                 };
 
                 unsafe {
-                    (*self.buffer).chars[row][col].write(screen_char);
+                    core::ptr::write_volatile(
+                        &mut (*self.buffer).chars[row][col] as *mut Volatile<ScreenChar>,
+                                              Volatile::new(screen_char)
+                    );
                 }
                 self.column_position += 1;
-            }
-        }
-    }
-
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
             }
         }
     }
@@ -95,10 +89,13 @@ impl Writer {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     let character = unsafe {
-                        (*self.buffer).chars[row][col].read()
+                        core::ptr::read_volatile(&(*self.buffer).chars[row][col] as *const Volatile<ScreenChar>).read()
                     };
                     unsafe {
-                        (*self.buffer).chars[row - 1][col].write(character);
+                        core::ptr::write_volatile(
+                            &mut (*self.buffer).chars[row - 1][col] as *mut Volatile<ScreenChar>,
+                                                  Volatile::new(character)
+                        );
                     }
                 }
             }
@@ -114,8 +111,12 @@ impl Writer {
         };
         for col in 0..BUFFER_WIDTH {
             unsafe {
-                (*self.buffer).chars[row][col].write(blank);
+                core::ptr::write_volatile(
+                    &mut (*self.buffer).chars[row][col] as *mut Volatile<ScreenChar>,
+                                          Volatile::new(blank)
+                );
             }
         }
     }
 }
+
