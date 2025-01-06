@@ -129,10 +129,9 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = unsafe {
-                        self.buffer.chars[row][col].read()
-                    };
-                    self.buffer.chars[row - 1][col] = Volatile::new(character);
+                    // Instead of trying to read() the Volatile<ScreenChar>, just copy it
+                    let character = self.buffer.chars[row][col];
+                    self.buffer.chars[row - 1][col] = character;
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
