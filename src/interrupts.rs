@@ -64,11 +64,13 @@ extern "x86-interrupt" fn page_fault_handler(
 
 // Timer interrupt handler
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    static mut COUNTER: u32 = 0;
+    static mut COUNTER: u64 = 0;
     unsafe {
-        COUNTER += 1;
-        if COUNTER % 4 == 0 {  // Reduce blink frequency
-            WRITER.lock().blink_cursor();
+        COUNTER = COUNTER.wrapping_add(1);
+        if COUNTER % 50 == 0 {  // Reduce frequency of cursor updates
+            interrupts::without_interrupts(|| {
+                WRITER.lock().blink_cursor();
+            });
         }
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }

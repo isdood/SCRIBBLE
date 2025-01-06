@@ -139,54 +139,68 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub fn write_byte(&mut self, byte: u8) {
-        use x86_64::instructions::interrupts;
+    impl Writer {
+        fn should_wrap(&self) -> bool {
+            self.column_position >= BUFFER_WIDTH
+        }
 
-        // Disable interrupts during write to prevent cursor interference
-        interrupts::without_interrupts(|| {
-            let mut should_update_cursor = true;
+        pub fn write_byte(&mut self, byte: u8) {
+            use x86_64::instructions::interrupts;
 
-            match byte {
-                0x08 => {
-                    // ... backspace handling remains the same ...
-                },
-                b'\n' => {
-                    self.restore_previous_cursor();
-                    self.new_line();
-                    self.is_wrapped = false;
-                    should_update_cursor = false;
-                },
-                byte => {
-                    // Handle line wrapping first
-                    if self.column_position >= BUFFER_WIDTH {
+            interrupts::without_interrupts(|| {
+                match byte {
+                    0x08 => {
+                        let next_pos = if self.column_position == 0 {
+                            if self.row_position > 0 {
+                                (self.row_position - 1, BUFFER_WIDTH - 1)
+                            } else {
+                                (0, self.column_position)
+                            }
+                        } else {
+                            (self.row_position, self.column_position - 1)
+                        };
+
+                        if !self.protected_region.contains(next_pos.0, next_pos.1) {
+                            self.backspace();
+                        }
+                    },
+                    b'\n' => {
                         self.restore_previous_cursor();
-                        self.is_wrapped = true;
                         self.new_line();
-                        // Don't update cursor yet
-                        should_update_cursor = false;
-                    }
+                        self.is_wrapped = false;
+                    },
+                    byte => {
+                        // Use should_wrap() method here
+                        if self.should_wrap() {
+                            self.restore_previous_cursor();
+                            self.is_wrapped = true;
+                            self.new_line();
 
-                    // Only write if we're not in protected region
-                    if !self.protected_region.contains(self.row_position, self.column_position) {
-                        let row = self.row_position;
-                        let col = self.column_position;
-
-                        // Write character
-                        self.buffer.chars[row][col].write_char(ScreenChar {
-                            ascii_character: byte,
-                            color_code: self.color_code,
-                        });
-
-                        self.column_position += 1;
+                            // Write the current character at the start of new line
+                            if !self.protected_region.contains(self.row_position, self.column_position) {
+                                self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
+                                    ascii_character: byte,
+                                    color_code: self.color_code,
+                                });
+                                self.column_position += 1;
+                            }
+                        } else {
+                            // Normal character writing
+                            if !self.protected_region.contains(self.row_position, self.column_position) {
+                                self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
+                                    ascii_character: byte,
+                                    color_code: self.color_code,
+                                });
+                                self.column_position += 1;
+                            }
+                        }
                     }
                 }
-            }
 
-            // Update cursor only once at the end if needed
-            if should_update_cursor {
+                // Update cursor only once at the end
                 self.update_cursor();
-            }
-        });
+            });
+        }
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -289,17 +303,29 @@ impl Writer {
             if self.row_position < BUFFER_HEIGHT - 1 {
                 self.row_position += 1;
             } else {
-                // Scroll content up
+                // More efficient scrolling
+                let mut new_buffer = [[ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                }; BUFFER_WIDTH]; BUFFER_HEIGHT];
+
+                // Copy all but first row
                 for row in 1..BUFFER_HEIGHT {
                     for col in 0..BUFFER_WIDTH {
                         let character = self.buffer.chars[row][col].read_char();
                         self.buffer.chars[row - 1][col].write_char(character);
                     }
                 }
-                self.clear_row(BUFFER_HEIGHT - 1);
+
+                // Clear last row
+                for col in 0..BUFFER_WIDTH {
+                    self.buffer.chars[BUFFER_HEIGHT - 1][col].write_char(ScreenChar {
+                        ascii_character: b' ',
+                        color_code: self.color_code,
+                    });
+                }
             }
             self.column_position = 0;
-            self.update_cursor();
         });
     }
 
@@ -422,10 +448,6 @@ impl Writer {
         // Restore cursor state
         self.cursor_visible = current_visible;
         self.update_cursor();
-    }
-
-    fn should_wrap(&self) -> bool {
-        self.column_position >= BUFFER_WIDTH
     }
 
     pub fn clear_row(&mut self, row: usize) {
