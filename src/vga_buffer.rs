@@ -197,6 +197,10 @@ impl Writer {
         // Save current cursor state
         let current_cursor_visible = self.cursor_visible;
         self.cursor_visible = false;
+
+        // Clean up any stray cursors
+        self.clean_stray_cursors();
+
         self.restore_previous_cursor();
 
         self.column_position = 0;
@@ -224,8 +228,12 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
+
         // Clear current cursor first
         self.restore_previous_cursor();
+
+        // Clean any stray cursors
+        self.clean_stray_cursors();
 
         // Check if we would enter protected region
         let next_pos = if self.column_position == 0 {
@@ -379,12 +387,40 @@ impl Writer {
         let (prev_row, prev_col) = self.previous_cursor_pos;
         if prev_row < BUFFER_HEIGHT && prev_col < BUFFER_WIDTH {
             let prev_char = self.buffer.chars[prev_row][prev_col].read_char();
-            self.buffer.chars[prev_row][prev_col].write_char(ScreenChar {
-                ascii_character: prev_char.ascii_character,
-                color_code: self.previous_char_color,
-            });
+            // Only restore if it was a cursor character
+            if prev_char.ascii_character == b'_' || prev_char.ascii_character == b'|' {
+                let original_char = b' ';  // Default to space if we're unsure
+                self.buffer.chars[prev_row][prev_col].write_char(ScreenChar {
+                    ascii_character: original_char,
+                    color_code: self.previous_char_color,
+                });
+            }
         }
     }
+
+    pub fn clean_stray_cursors(&mut self) {
+        // Save current cursor state
+        let current_visible = self.cursor_visible;
+        self.cursor_visible = false;
+
+        // Clean up current row and the row above
+        for row in self.row_position.saturating_sub(1)..=self.row_position {
+            for col in 0..BUFFER_WIDTH {
+                let char = self.buffer.chars[row][col].read_char();
+                if char.ascii_character == b'_' || char.ascii_character == b'|' {
+                    self.buffer.chars[row][col].write_char(ScreenChar {
+                        ascii_character: b' ',
+                        color_code: self.color_code,
+                    });
+                }
+            }
+        }
+
+        // Restore cursor state
+        self.cursor_visible = current_visible;
+        self.update_cursor();
+    }
+
 }
 
 // Write trait implementation

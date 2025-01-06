@@ -24,11 +24,10 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     scribble::init(boot_info);
     println!("Initialization complete.");
 
-    // Now we can properly manage the cursor
     {
         let mut writer = scribble::vga_buffer::WRITER.lock();
-        writer.restore_previous_cursor();  // Clean up any existing cursor
-        writer.enable_cursor();           // Properly initialize cursor
+        writer.clean_stray_cursors();  // Clean any stray cursors
+        writer.enable_cursor();        // Initialize cursor properly
     }
 
     print!("\n");
