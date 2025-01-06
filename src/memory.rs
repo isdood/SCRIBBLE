@@ -27,7 +27,7 @@ pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static>
 /// complete physical memory is mapped to virtual memory at the passed
 /// `physical_memory_offset`. Also, this function must be only called once
 /// to avoid aliasing `&mut` references (which is undefined behavior).
-unsafe fn active_level_4_table(physical_memory_offset: VirtAddr)
+pub(crate) unsafe fn active_level_4_table(physical_memory_offset: VirtAddr)
 -> &'static mut PageTable
 {
     use x86_64::registers::control::Cr3;
