@@ -15,15 +15,15 @@ Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 #[repr(u8)]
 pub enum InterruptIndex {
     Timer = PIC_1_OFFSET,
-    Keyboard,    // This will be PIC_1_OFFSET + 1
+    Keyboard,
 }
 
 impl InterruptIndex {
-    fn as_u8(self) -> u8 {
+    pub fn as_u8(self) -> u8 {
         self as u8
     }
 
-    fn as_usize(self) -> usize {
+    pub fn as_usize(self) -> usize {
         usize::from(self.as_u8())
     }
 }

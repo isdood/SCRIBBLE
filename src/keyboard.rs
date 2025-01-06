@@ -1,6 +1,6 @@
+use x86_64::structures::idt::InterruptStackFrame;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
-use x86_64::instructions::port::Port;
 use lazy_static::lazy_static;
 use crate::{print, println};
 
@@ -13,7 +13,7 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
     _stack_frame: InterruptStackFrame
 ) {
     let mut keyboard = KEYBOARD.lock();
-    let mut port = Port::new(0x60);
+    let mut port = x86_64::instructions::port::Port::new(0x60);
 
     let scancode: u8 = unsafe { port.read() };
 
@@ -41,6 +41,6 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
 
     unsafe {
         crate::interrupts::PICS.lock()
-        .notify_end_of_interrupt(crate::interrupts::InterruptIndex::Keyboard.as_u8());
+        .notify_end_of_interrupt(PIC_1_OFFSET + 1); // Use direct offset instead of as_u8()
     }
 }
