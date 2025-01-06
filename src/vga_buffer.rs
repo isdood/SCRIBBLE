@@ -5,12 +5,8 @@ use x86_64::instructions::port::Port;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
-// Update these constants at the top
 const CURSOR_PORT_CTRL: u16 = 0x3D4;
 const CURSOR_PORT_DATA: u16 = 0x3D5;
-const CURSOR_START: u8 = 0;    // Change to 0 for a full block cursor
-const CURSOR_END: u8 = 15;     // Keep at 15 for bottom of character
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -50,26 +46,43 @@ struct ScreenChar {
 }
 
 #[repr(transparent)]
-struct Buffer {
-    chars: [[VolatileCell; BUFFER_WIDTH]; BUFFER_HEIGHT],
-}
-
-#[repr(transparent)]
 #[derive(Clone, Copy)]
-struct VolatileCell(u16);
+struct UnstableMatter(u16);
 
-impl VolatileCell {
+impl UnstableMatter {
+    /// Write a character directly to VGA memory
+    fn write_char(&mut self, screen_char: ScreenChar) {
+        let value = (u16::from(screen_char.color_code.0) << 8) | u16::from(screen_char.ascii_character);
+        self.write(value);
+    }
+
+    /// Read a character from VGA memory
+    fn read_char(&self) -> ScreenChar {
+        let value = self.read();
+        ScreenChar {
+            ascii_character: (value & 0xFF) as u8,
+            color_code: ColorCode((value >> 8) as u8),
+        }
+    }
+
+    /// Write a raw u16 value to VGA memory
     fn write(&mut self, value: u16) {
         unsafe {
             core::ptr::write_volatile(&mut self.0, value);
         }
     }
 
+    /// Read a raw u16 value from VGA memory
     fn read(&self) -> u16 {
         unsafe {
             core::ptr::read_volatile(&self.0)
         }
     }
+}
+
+#[repr(transparent)]
+struct Buffer {
+    chars: [[UnstableMatter; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
 pub struct Writer {
@@ -80,7 +93,7 @@ pub struct Writer {
 }
 
 impl Writer {
-    fn write_byte(&mut self, byte: u8) {
+    pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
             byte => {
@@ -91,7 +104,7 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
-                self.write_volatile(row, col, ScreenChar {
+                self.buffer.chars[row][col].write_char(ScreenChar {
                     ascii_character: byte,
                     color_code: self.color_code,
                 });
@@ -102,9 +115,13 @@ impl Writer {
         }
     }
 
-    fn write_volatile(&mut self, row: usize, col: usize, screen_char: ScreenChar) {
-        let value = (u16::from(screen_char.color_code.0) << 8) | u16::from(screen_char.ascii_character);
-        self.buffer.chars[row][col].write(value);
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
     }
 
     fn new_line(&mut self) {
@@ -113,8 +130,8 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
-                    self.buffer.chars[row - 1][col].write(character);
+                    let character = self.buffer.chars[row][col].read_char();
+                    self.buffer.chars[row - 1][col].write_char(character);
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -129,58 +146,38 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            self.write_volatile(row, col, blank);
+            self.buffer.chars[row][col].write_char(blank);
         }
     }
 
-    fn update_cursor(&mut self) {
-        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
-
+    pub fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Set low byte
-            control_port.write(0x0F);
+            control_port.write(0x0F_u8);
             data_port.write((pos & 0xFF) as u8);
-
-            // Set high byte
-            control_port.write(0x0E);
+            control_port.write(0x0E_u8);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
     }
 
-    fn init_cursor(&mut self) {
+    pub fn enable_cursor(&mut self) {
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // First disable the cursor by setting bit 5 of cursor start register
-            control_port.write(0x0A);
-            data_port.write(0x20);  // Bit 5 set to disable
+            // Read current state and clear bit 5 to enable cursor
+            control_port.write(0x0A_u8);
+            let cur_state = data_port.read() as u8;
+            data_port.write((cur_state & !0x20) as u8);
 
-            // Configure cursor shape
-            control_port.write(0x0A);
-            data_port.write(CURSOR_START);  // Start line (top)
-            control_port.write(0x0B);
-            data_port.write(CURSOR_END);    // End line (bottom)
-
-            // Re-enable cursor by clearing bit 5
-            control_port.write(0x0A);
-            data_port.write(CURSOR_START);  // Also sets the start line
-
-            // Initialize cursor position
-            self.update_cursor();
-        }
-    }
-    fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                // printable ASCII byte or newline
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                // not part of printable ASCII range
-                _ => self.write_byte(0xfe),
-            }
+            // Set cursor shape
+            control_port.write(0x0A_u8);
+            port_3d5.write(0x0F_u8);  // Start scan line
+            control_port.write(0x0B_u8);
+            port_3d5.write(0x0F_u8);  // End scan line
         }
     }
 }
@@ -200,7 +197,7 @@ lazy_static! {
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
         };
-        writer.init_cursor();
+        writer.enable_cursor();
         Mutex::new(writer)
     };
 }
