@@ -87,8 +87,15 @@ struct ProtectedRegion {
     end_col: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ProtectedRegion {
+    pub row: usize,
+    pub start_col: usize,
+    pub end_col: usize,
+}
+
 impl ProtectedRegion {
-    fn new(row: usize, start_col: usize, length: usize) -> Self {
+    pub fn new(row: usize, start_col: usize, length: usize) -> Self {
         Self {
             row,
             start_col,
@@ -96,23 +103,23 @@ impl ProtectedRegion {
         }
     }
 
-    fn contains(&self, row: usize, col: usize) -> bool {
+    pub fn contains(&self, row: usize, col: usize) -> bool {
         row == self.row && (col >= self.start_col && col < self.end_col)
     }
 
-    fn is_before(&self, row: usize, col: usize) -> bool {
+    pub fn is_before(&self, row: usize, col: usize) -> bool {
         row == self.row && col <= self.start_col
     }
 }
 
 pub struct Writer {
-    column_position: usize,
-    row_position: usize,
+    pub row_position: usize,      // Make public
+    pub column_position: usize,   // Make public
     color_code: ColorCode,
     buffer: &'static mut Buffer,
     prompt_length: usize,
     is_wrapped: bool,
-    protected_region: ProtectedRegion,
+    pub protected_region: ProtectedRegion,  // Make public
 }
 
 impl Writer {

@@ -24,10 +24,15 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
                 DecodedKey::Unicode(character) => {
-                    // Get current writer position to check prompt
+                    // Get current writer position to check protection
                     let should_handle = {
                         let writer = crate::vga_buffer::WRITER.lock();
-                        !(character == '\u{8}' && writer.is_at_prompt())  // Check if we're trying to backspace at prompt
+                        !writer.protected_region.contains(writer.row_position,
+                                                          if character == '\u{8}' && writer.column_position > 0 {
+                                                              writer.column_position - 1
+                                                          } else {
+                                                              writer.column_position
+                                                          })
                     };
 
                     if should_handle {
@@ -47,7 +52,7 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
     }
 
     unsafe {
-        crate::interrupts::PICS.lock()
-        .notify_end_of_interrupt(PIC_1_OFFSET + 1);
+        PICS.lock()
+        .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
     }
 }
