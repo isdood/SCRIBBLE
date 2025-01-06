@@ -146,14 +146,31 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // Only protect prompt if we're on the first line and not in a wrapped line
-        let prompt_protected = self.row_position == 0 && !self.is_wrapped;
-
-        if (prompt_protected && self.column_position <= self.prompt_length) {
+        // Check for prompt protection when we're at the first line
+        if self.row_position == 0 && self.column_position <= self.prompt_length {
             return;
         }
 
-        if self.column_position > 0 {
+        // Handle backspace at start of line (line wrapping)
+        if self.column_position == 0 && self.row_position > 0 {
+            // Move to the end of previous line
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+
+            // Clear both the current position and the leftover character
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+
+            // Clear character at the end of previous line
+            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+            // Clear the leftover character at the start of the next line
+            self.buffer.chars[self.row_position + 1][0].write_char(blank);
+
+            self.update_cursor();
+        } else if self.column_position > 0 {
+            // Normal backspace within the same line
             self.column_position -= 1;
             let blank = ScreenChar {
                 ascii_character: b' ',
@@ -161,18 +178,6 @@ impl Writer {
             };
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
             self.update_cursor();
-        } else if self.row_position > 0 {
-            // We're at the start of a line, check if it's wrapped
-            if self.is_wrapped {
-                self.row_position -= 1;
-                self.column_position = BUFFER_WIDTH - 1;
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-                self.update_cursor();
-            }
         }
     }
 
