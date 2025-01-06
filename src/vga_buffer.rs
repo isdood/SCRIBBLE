@@ -168,6 +168,17 @@ impl Writer {
             self.buffer.chars[row][col].write(blank);
         }
     }
+
+    // Use write_str instead of write_string
+    pub fn write_str(&mut self, s: &str) -> fmt::Result {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Write for Writer {
