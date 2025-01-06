@@ -194,7 +194,7 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
-        // Save current cursor state and temporarily disable it
+        // Save current cursor state
         let current_cursor_visible = self.cursor_visible;
         self.cursor_visible = false;
         self.restore_previous_cursor();  // Clear current cursor
@@ -226,10 +226,6 @@ impl Writer {
     pub fn backspace(&mut self) {
         // Clear current cursor first
         self.restore_previous_cursor();
-
-        // Save cursor state
-        let current_cursor_visible = self.cursor_visible;
-        self.cursor_visible = false;
 
         // Check if we would enter protected region
         let next_pos = if self.column_position == 0 {
@@ -268,8 +264,6 @@ impl Writer {
                 self.buffer.chars[self.row_position][self.column_position].write_char(blank);
             }
 
-            // Restore cursor visibility and update
-            self.cursor_visible = current_cursor_visible;
             self.update_cursor();
     }
 
@@ -303,13 +297,10 @@ impl Writer {
         // Always clear the previous cursor first
         self.restore_previous_cursor();
 
-        // Update cursor state
-        let new_pos = (self.row_position, self.column_position);
-
         // Get and save current character state before modifying it
         let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
         self.previous_char_color = current_char.color_code;
-        self.previous_cursor_pos = new_pos;
+        self.previous_cursor_pos = (self.row_position, self.column_position);
 
         // Only show cursor if it's visible and not in protected region
         if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
@@ -339,39 +330,26 @@ impl Writer {
         }
     }
 
-            // Update hardware cursor position
-            let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
-            unsafe {
-                let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
-                let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
-
-                control_port.write(CURSOR_LOCATION_LOW_REG);
-                data_port.write((pos & 0xFF) as u8);
-
-                control_port.write(CURSOR_LOCATION_HIGH_REG);
-                data_port.write(((pos >> 8) & 0xFF) as u8);
-            }
-
     pub fn enable_cursor(&mut self) {
         self.cursor_visible = true;
         self.cursor_style = CursorStyle::Underscore;
         self.cursor_color = NORMAL_CURSOR;
-
-        // Initialize with invalid position to force first update
         self.previous_cursor_pos = (BUFFER_HEIGHT, BUFFER_WIDTH);
         self.previous_char_color = ColorCode::new(Color::White, Color::Black);
 
-        // Disable hardware cursor
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
             control_port.write(CURSOR_START_REG);
             data_port.write(0x20);
         }
+
+        // Force an initial cursor update
+        self.update_cursor();
     }
 
     pub fn blink_cursor(&mut self) {
-        self.cursor_blink_counter = (self.cursor_blink_counter + 1) % 16;  // Faster blink rate
+        self.cursor_blink_counter = (self.cursor_blink_counter + 1) % 16;
         if self.cursor_blink_counter == 0 {
             self.cursor_visible = !self.cursor_visible;
             if !self.protected_region.contains(self.row_position, self.column_position) {
@@ -406,7 +384,6 @@ impl Writer {
         }
     }
 }
-
 
 // Write trait implementation
 impl fmt::Write for Writer {

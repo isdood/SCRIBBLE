@@ -65,8 +65,7 @@ extern "x86-interrupt" fn page_fault_handler(
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     {
         // Blink the cursor on timer interrupt
-        let mut writer = crate::vga_buffer::WRITER.lock();
-        writer.blink_cursor();
+        WRITER.lock().blink_cursor();  // This should work now that blink_cursor is properly defined
     }
 
     unsafe {
