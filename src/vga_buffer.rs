@@ -97,12 +97,12 @@ impl Writer {
             0x08 => self.backspace(),
             b'\n' => {
                 self.new_line();
-                self.write_prompt(); // Always write prompt after newline
+                // Remove automatic prompt writing here
             },
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
-                    self.write_prompt(); // Write prompt after wrapping
+                    // Remove automatic prompt writing here
                 }
 
                 let row = self.row_position;

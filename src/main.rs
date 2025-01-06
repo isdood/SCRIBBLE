@@ -4,7 +4,7 @@
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use scribble::{println, vga_buffer}; // Add vga_buffer to the imports
+use scribble::println; // Add vga_buffer to the imports
 
 entry_point!(kernel_main);
 
@@ -14,7 +14,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     scribble::init(boot_info);
     println!("Initialization complete.");
 
-    // Explicitly write the first prompt
+    // Add an explicit newline before the prompt
+    print!("\n");
+    // Write the first prompt
     scribble::vga_buffer::write_prompt();
 
     loop {
