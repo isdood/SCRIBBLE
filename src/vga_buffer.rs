@@ -18,9 +18,15 @@ const CURSOR_END_REG: u8 = 0x0B;
 const CURSOR_LOCATION_HIGH_REG: u8 = 0x0E;
 const CURSOR_LOCATION_LOW_REG: u8 = 0x0F;
 
-// Cursor shape - for underscore cursor
-const CURSOR_START_LINE: u8 = 15;  // Start at the bottom line
-const CURSOR_END_LINE: u8 = 15;    // End at the bottom line
+// Cursor shape
+const CURSOR_START_LINE: u8 = 15;  //
+const CURSOR_END_LINE: u8 = 15;    //
+
+// VGA mode cursor colour
+const CURSOR_COLOR: (Color, Color) = (Color::Yellow, Color::Black);
+const NORMAL_CURSOR: (Color, Color) = (Color::Yellow, Color::Black);
+const INSERT_CURSOR: (Color, Color) = (Color::Green, Color::Black);
+const SELECT_CURSOR: (Color, Color) = (Color::White, Color::Blue);
 
 //  //
 
@@ -114,6 +120,14 @@ impl ProtectedRegion {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum CursorStyle {
+    Block,
+    Underscore,
+    Line
+}
+
+// Writer struct
 pub struct Writer {
     pub row_position: usize,
     pub column_position: usize,
@@ -122,6 +136,11 @@ pub struct Writer {
     prompt_length: usize,
     is_wrapped: bool,
     pub protected_region: ProtectedRegion,
+    previous_cursor_pos: (usize, usize),
+    previous_char_color: ColorCode,
+    cursor_visible: bool,
+    cursor_blink_counter: u8,
+    cursor_style: CursorStyle,
 }
 
 impl Writer {
@@ -277,15 +296,51 @@ impl Writer {
     }
 
     pub fn update_cursor(&mut self) {
-        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+        // Don't update if cursor hasn't moved
+        let new_pos = (self.row_position, self.column_position);
+        if new_pos == self.previous_cursor_pos {
+            return;
+        }
 
+        // Restore the character at the previous cursor position
+        let (prev_row, prev_col) = self.previous_cursor_pos;
+        if prev_row < BUFFER_HEIGHT && prev_col < BUFFER_WIDTH {
+            let prev_char = self.buffer.chars[prev_row][prev_col].read_char();
+            self.buffer.chars[prev_row][prev_col].write_char(ScreenChar {
+                ascii_character: prev_char.ascii_character,
+                color_code: self.previous_char_color,
+            });
+        }
+
+        // Save current character's state before modifying it
+        let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
+        self.previous_char_color = current_char.color_code;
+        self.previous_cursor_pos = (self.row_position, self.column_position);
+
+        // Set new cursor position with colored underscore
+        let cursor_char = if current_char.ascii_character == b' ' {
+            b'_'  // Show underscore on empty space
+        } else {
+            current_char.ascii_character  // Highlight existing character
+        };
+
+        // Using the constant instead of hardcoded colors
+        self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
+            ascii_character: cursor_char,
+            color_code: ColorCode::new(CURSOR_COLOR.0, CURSOR_COLOR.1),
+        });
+
+        // Update hardware cursor position (keep this for compatibility)
+        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
+            // Update low byte
             control_port.write(CURSOR_LOCATION_LOW_REG);
             data_port.write((pos & 0xFF) as u8);
 
+            // Update high byte
             control_port.write(CURSOR_LOCATION_HIGH_REG);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
@@ -296,17 +351,25 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Start cursor shape (register 0x0A)
+            // Hide hardware cursor by moving it off screen
             control_port.write(CURSOR_START_REG);
-            // Clear top bits (visibility flags) and set start line
-            data_port.write(CURSOR_START_LINE);
-
-            // End cursor shape (register 0x0B)
-            control_port.write(CURSOR_END_REG);
-            // Clear top bits and set end line
-            data_port.write(CURSOR_END_LINE);
+            data_port.write(0x20);  // Bit 5 set = cursor disabled
         }
     }
+
+    pub fn blink_cursor(&mut self) {
+        self.cursor_blink_counter = (self.cursor_blink_counter + 1) % 32;
+        if self.cursor_blink_counter == 0 {
+            self.cursor_visible = !self.cursor_visible;
+            self.update_cursor();
+        }
+    }
+
+    pub fn set_cursor_color(&mut self, foreground: Color, background: Color) {
+        self.cursor_color = (foreground, background);
+        self.update_cursor();
+    }
+
 }
 
 // Write trait implementation
@@ -328,6 +391,8 @@ lazy_static! {
             prompt_length: 2,
             is_wrapped: false,
             protected_region: ProtectedRegion::new(0, 0, 2),
+                previous_cursor_pos: (0, 0),
+                previous_char_color: ColorCode::new(Color::White, Color::Black),
         };
         writer.enable_cursor();
         for row in 0..BUFFER_HEIGHT {
