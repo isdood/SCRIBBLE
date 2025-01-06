@@ -345,19 +345,18 @@ impl Writer {
         self.cursor_visible = true;
         self.cursor_style = CursorStyle::Underscore;
         self.cursor_color = NORMAL_CURSOR;
-        self.previous_cursor_pos = (BUFFER_HEIGHT, BUFFER_WIDTH); // Invalid position to force first update
 
+        // Initialize with invalid position to force first update
+        self.previous_cursor_pos = (BUFFER_HEIGHT, BUFFER_WIDTH);
+        self.previous_char_color = ColorCode::new(Color::White, Color::Black);
+
+        // Disable hardware cursor
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
-
-            // Set cursor shape (make hardware cursor invisible)
             control_port.write(CURSOR_START_REG);
-            data_port.write(0x20);  // Bit 5 set = cursor disabled
+            data_port.write(0x20);
         }
-
-        // Force an initial cursor update
-        self.update_cursor();
     }
 
     pub fn blink_cursor(&mut self) {
@@ -384,6 +383,17 @@ impl Writer {
             CursorStyle::Line => SELECT_CURSOR,
         };
         self.update_cursor();
+    }
+
+    fn restore_previous_cursor(&mut self) {
+        let (prev_row, prev_col) = self.previous_cursor_pos;
+        if prev_row < BUFFER_HEIGHT && prev_col < BUFFER_WIDTH {
+            let prev_char = self.buffer.chars[prev_row][prev_col].read_char();
+            self.buffer.chars[prev_row][prev_col].write_char(ScreenChar {
+                ascii_character: prev_char.ascii_character,
+                color_code: self.previous_char_color,
+            });
+        }
     }
 
 }
