@@ -1,27 +1,27 @@
 #![no_std]
 #![no_main]
 
-use core::panic::PanicInfo;
-use scribble::println;
-use bootloader::{BootInfo, entry_point};
+// Assuming this is part of the main entry point of your kernel (e.g., src/main.rs)
 
-entry_point!(kernel_main);
+extern crate scribble;
 
-fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    println!("Booting Scribble OS...");
-    println!("Starting kernel initialization...");
+use scribble::vga_buffer::WRITER;
+use x86_64::instructions::interrupts;
 
-    // Initialize kernel components
-    scribble::init_kernel(boot_info);
+fn main() {
+    // Initialize the VGA buffer and other necessary components
+    scribble::init();
 
-    println!("Kernel initialization complete");
+    // Print initial setup messages
+    println!("Initializing kernel...");
+    println!("Enabling interrupts...");
 
-    // Show initial date/time
-    scribble::show_datetime();
+    // Enable interrupts
+    interrupts::enable();
 
-    println!("Welcome to Scribble OS!");
-
-    scribble::hlt_loop();
+    // Set input mode and print the prompt on a new line
+    WRITER.lock().new_line(); // Ensure we start on a new line for the prompt
+    WRITER.lock().set_input_mode(true);
 }
 
 #[panic_handler]

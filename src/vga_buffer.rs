@@ -140,7 +140,6 @@ impl Writer {
     pub fn set_input_mode(&mut self, active: bool) {
         self.input_mode = active;
         if active {
-            self.new_line(); // Move to a new line before writing the prompt
             self.write_prompt();
         }
     }
