@@ -136,12 +136,12 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // First check: Protect prompt on first line when not wrapped
-        if self.row_position == 0 && !self.is_wrapped && self.column_position <= self.prompt_length {
+        // Protect prompt on first line, regardless of wrap state
+        if self.row_position == 0 && self.column_position <= self.prompt_length {
             return;
         }
 
-        // Handle backspace at start of line (line wrapping)
+        // Rest of the backspace implementation remains the same...
         if self.column_position == 0 && self.row_position > 0 {
             // Before moving to previous line, clear the current position
             let blank = ScreenChar {
@@ -157,11 +157,6 @@ impl Writer {
             // Clear the character at the new position
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
 
-            // If we're moving to the first line, consider prompt protection
-            if self.row_position == 0 && self.column_position <= self.prompt_length {
-                self.column_position = self.prompt_length;
-            }
-
             self.update_cursor();
             self.is_wrapped = true; // Maintain wrapped state when moving up
         } else if self.column_position > 0 {
@@ -173,7 +168,7 @@ impl Writer {
             };
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
 
-            // If we're on the first line, don't go before prompt
+            // Additional protection for prompt
             if self.row_position == 0 && self.column_position < self.prompt_length {
                 self.column_position = self.prompt_length;
             }
