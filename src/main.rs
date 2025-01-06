@@ -24,8 +24,3 @@ fn main() {
     WRITER.lock().set_input_mode(true);
 }
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("Kernel panic: {}", info);
-    scribble::hlt_loop();
-}
