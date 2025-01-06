@@ -135,6 +135,52 @@ impl Writer {
             }
         }
     }
+
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => {
+                self.new_line();
+                if self.input_mode {
+                    self.write_prompt();
+                }
+            }
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let row = self.row_position;
+                let col = self.column_position;
+
+                let color_code = if self.input_mode {
+                    ColorCode::new(Color::Green, Color::Black)
+                } else {
+                    self.color_code
+                };
+
+                let char_to_write = ScreenChar {
+                    ascii_character: byte,
+                    color_code,
+                };
+                self.buffer.chars[row][col].write(char_to_write);
+                self.column_position += 1;
+                self.update_cursor();
+            }
+        }
+    }
+
+    pub fn write_prompt(&mut self) {
+        self.write_byte(b'>');
+        self.write_byte(b' ');
+    }
+
+    pub fn set_input_mode(&mut self, active: bool) {
+        self.input_mode = active;
+        if active {
+            self.write_prompt();
+        }
+    }
+
 }
 
 impl fmt::Write for Writer {
@@ -219,12 +265,16 @@ pub fn backspace() {
             return;
         }
 
-        writer.column_position -= 1;
+        let row = writer.row_position;
+        let col = writer.column_position - 1;  // Store position before modification
+        writer.column_position = col;
+
         let blank = ScreenChar {
             ascii_character: b' ',
-            color_code: ColorCode::new(Color::Green, Color::Black), // Keep green color for input area
+            color_code: ColorCode::new(Color::Green, Color::Black),
         };
-        writer.buffer.chars[writer.row_position][writer.column_position].write(blank);
+
+        writer.buffer.chars[row][col].write(blank);
         writer.update_cursor();
     });
 }
