@@ -158,8 +158,6 @@ impl Writer {
                 }
             },
             b'\n' => {
-                // Clear cursor before newline
-                self.restore_previous_cursor();
                 self.new_line();
                 self.is_wrapped = false;
             },
@@ -171,9 +169,6 @@ impl Writer {
 
                 // Only write if we're not in protected region
                 if !self.protected_region.contains(self.row_position, self.column_position) {
-                    // Clear any existing cursor at the current position
-                    self.restore_previous_cursor();
-
                     let row = self.row_position;
                     let col = self.column_position;
 
@@ -199,12 +194,11 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
-        // Save cursor state and clear existing cursor
+        // Save current cursor state
         let current_cursor_visible = self.cursor_visible;
         self.cursor_visible = false;
         self.restore_previous_cursor();
 
-        // Reset cursor position
         self.column_position = 0;
         self.is_wrapped = false;
 
@@ -216,15 +210,6 @@ impl Writer {
         let prompt_color = ColorCode::new(Color::Yellow, Color::Black);
 
         for (i, &ch) in prompt_chars.iter().enumerate() {
-            // Clear any existing cursor artifacts first
-            let existing = self.buffer.chars[self.row_position][i].read_char();
-            if existing.ascii_character == b'_' || existing.ascii_character == b'|' {
-                self.buffer.chars[self.row_position][i].write_char(ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                });
-            }
-
             self.buffer.chars[self.row_position][i].write_char(ScreenChar {
                 ascii_character: ch,
                 color_code: prompt_color,
@@ -283,7 +268,7 @@ impl Writer {
     }
 
     fn new_line(&mut self) {
-        // Clear cursor at current position before moving
+        // Clear cursor before moving
         self.restore_previous_cursor();
 
         if self.row_position < BUFFER_HEIGHT - 1 {
@@ -312,10 +297,10 @@ impl Writer {
     }
 
     pub fn update_cursor(&mut self) {
-        // Always clear the previous cursor first
+        // First clear any existing cursor
         self.restore_previous_cursor();
 
-        // Get and save current character state before modifying it
+        // Get and save current character state
         let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
         self.previous_char_color = current_char.color_code;
         self.previous_cursor_pos = (self.row_position, self.column_position);
@@ -362,7 +347,6 @@ impl Writer {
             data_port.write(0x20);
         }
 
-        // Force an initial cursor update
         self.update_cursor();
     }
 
@@ -391,7 +375,7 @@ impl Writer {
         self.update_cursor();
     }
 
-    fn restore_previous_cursor(&mut self) {
+    pub fn restore_previous_cursor(&mut self) {
         let (prev_row, prev_col) = self.previous_cursor_pos;
         if prev_row < BUFFER_HEIGHT && prev_col < BUFFER_WIDTH {
             let prev_char = self.buffer.chars[prev_row][prev_col].read_char();
