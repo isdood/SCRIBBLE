@@ -295,9 +295,9 @@ impl Writer {
     }
 
     pub fn update_cursor(&mut self) {
-        // Don't update if cursor hasn't moved
+        // Don't update if cursor hasn't moved and not blinking
         let new_pos = (self.row_position, self.column_position);
-        if new_pos == self.previous_cursor_pos {
+        if new_pos == self.previous_cursor_pos && !self.cursor_visible {
             return;
         }
 
@@ -316,18 +316,21 @@ impl Writer {
         self.previous_char_color = current_char.color_code;
         self.previous_cursor_pos = (self.row_position, self.column_position);
 
-        // Set new cursor position with colored underscore
-        let cursor_char = if current_char.ascii_character == b' ' {
-            b'_'  // Show underscore on empty space
-        } else {
-            current_char.ascii_character  // Highlight existing character
-        };
+        // Only show cursor if it's visible (for blinking)
+        if self.cursor_visible {
+            // Set cursor character based on style
+            let cursor_char = match self.cursor_style {
+                CursorStyle::Block => current_char.ascii_character,
+                CursorStyle::Underscore => if current_char.ascii_character == b' ' { b'_' } else { current_char.ascii_character },
+                CursorStyle::Line => b'|',
+            };
 
-        // Using the constant instead of hardcoded colors
-        self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
-            ascii_character: cursor_char,
-            color_code: ColorCode::new(NORMAL_CURSOR.0, NORMAL_CURSOR.1),
-        });
+            // Write the cursor with appropriate color
+            self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
+                ascii_character: cursor_char,
+                color_code: ColorCode::new(NORMAL_CURSOR.0, NORMAL_CURSOR.1),
+            });
+        }
 
         // Update hardware cursor position (keep this for compatibility)
         let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
@@ -335,11 +338,9 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Update low byte
             control_port.write(CURSOR_LOCATION_LOW_REG);
             data_port.write((pos & 0xFF) as u8);
 
-            // Update high byte
             control_port.write(CURSOR_LOCATION_HIGH_REG);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
@@ -392,6 +393,9 @@ lazy_static! {
             protected_region: ProtectedRegion::new(0, 0, 2),
                 previous_cursor_pos: (0, 0),
                 previous_char_color: ColorCode::new(Color::White, Color::Black),
+                cursor_visible: true,
+                cursor_blink_counter: 0,
+                cursor_style: CursorStyle::Underscore,
         };
         writer.enable_cursor();
         for row in 0..BUFFER_HEIGHT {
