@@ -80,24 +80,42 @@ struct Buffer {
     chars: [[UnstableMatter; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
-// In src/vga_buffer.rs
+#[derive(Debug, Clone, Copy)]
+struct ProtectedRegion {
+    row: usize,
+    start_col: usize,
+    end_col: usize,
+}
+
+impl ProtectedRegion {
+    fn new(row: usize, start_col: usize, length: usize) -> Self {
+        Self {
+            row,
+            start_col,
+            end_col: start_col + length,
+        }
+    }
+
+    fn contains(&self, row: usize, col: usize) -> bool {
+        row == self.row && (col >= self.start_col && col < self.end_col)
+    }
+
+    fn is_before(&self, row: usize, col: usize) -> bool {
+        row == self.row && col <= self.start_col
+    }
+}
 
 pub struct Writer {
     column_position: usize,
     row_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
-    prompt: [ScreenChar; 2],  // Store the actual prompt characters
     prompt_length: usize,
     is_wrapped: bool,
+    protected_region: ProtectedRegion,
 }
 
 impl Writer {
-    pub fn is_at_prompt(&self) -> bool {
-        // Check if we're at the first line AND at or before the prompt
-        self.row_position == 0 && self.column_position <= self.prompt_length
-    }
-
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             0x08 => {
@@ -152,19 +170,6 @@ impl Writer {
         }
     }
 
-    fn init_prompt(&mut self) {
-        self.prompt = [
-            ScreenChar {
-                ascii_character: b'>',
-                color_code: self.color_code,
-            },
-            ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            },
-        ];
-    }
-
     pub fn write_prompt(&mut self) {
         self.column_position = 0;
         self.is_wrapped = false;
@@ -172,20 +177,18 @@ impl Writer {
         // Set up protected region for new prompt
         self.protected_region = ProtectedRegion::new(self.row_position, 0, self.prompt_length);
 
-        // Write prompt
-        self.write_string("> ");
+        // Write prompt characters
+        self.buffer.chars[self.row_position][0].write_char(ScreenChar {
+            ascii_character: b'>',
+            color_code: self.color_code,
+        });
+        self.buffer.chars[self.row_position][1].write_char(ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        });
 
         self.column_position = self.prompt_length;
         self.update_cursor();
-    }
-
-    pub fn restore_prompt(&mut self) {
-        if self.row_position == 0 {
-            // Restore prompt characters if they've been modified
-            for (i, &char) in self.prompt.iter().enumerate() {
-                self.buffer.chars[0][i].write_char(char);
-            }
-        }
     }
 
     pub fn backspace(&mut self) {
@@ -200,32 +203,33 @@ impl Writer {
             (self.row_position, self.column_position - 1)
         };
 
-        if self.protected_region.contains(next_pos.0, next_pos.1) {
-            return;
-        }
+        if self.protected_region.contains(next_pos.0, next_pos.1) ||
+            self.protected_region.is_before(next_pos.0, next_pos.1) {
+                return;
+            }
 
-        // Perform backspace if we're not entering protected region
-        if self.column_position == 0 && self.row_position > 0 {
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][0].write_char(blank);
+            // Perform backspace if we're not entering protected region
+            if self.column_position == 0 && self.row_position > 0 {
+                let blank = ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                };
+                self.buffer.chars[self.row_position][0].write_char(blank);
 
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-            self.is_wrapped = true;
-        } else if self.column_position > 0 {
-            self.column_position -= 1;
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-        }
+                self.row_position -= 1;
+                self.column_position = BUFFER_WIDTH - 1;
+                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+                self.is_wrapped = true;
+            } else if self.column_position > 0 {
+                self.column_position -= 1;
+                let blank = ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                };
+                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+            }
 
-        self.update_cursor();
+            self.update_cursor();
     }
 
     fn new_line(&mut self) {
@@ -312,7 +316,11 @@ lazy_static! {
             is_wrapped: false,
             protected_region: ProtectedRegion::new(0, 0, 2),
         };
-        // Rest of initialization...
+        writer.enable_cursor();
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        writer.update_cursor();
         Mutex::new(writer)
     };
 }
