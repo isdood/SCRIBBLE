@@ -54,15 +54,6 @@ pub struct Writer {
     buffer: &'static mut Buffer,
 }
 
-lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        row_position: 0,
-        color_code: ColorCode::new(Color::White, Color::Black),
-                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
-}
-
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
@@ -75,11 +66,17 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
-                let color_code = self.color_code;
-                self.buffer.chars[row][col] = Volatile::new(ScreenChar {
+                let screen_char = ScreenChar {
                     ascii_character: byte,
-                    color_code,
-                });
+                    color_code: self.color_code,
+                };
+
+                unsafe {
+                    // Get a mutable reference to the Volatile<ScreenChar>
+                    let volatile_char = &mut self.buffer.chars[row][col];
+                    // Write the new character
+                    volatile_char.write(screen_char);
+                }
                 self.column_position += 1;
             }
         }
@@ -91,8 +88,18 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
-                    self.buffer.chars[row - 1][col].write(character);
+                    let character = unsafe {
+                        // Get a reference to the Volatile<ScreenChar>
+                        let volatile_char = &self.buffer.chars[row][col];
+                        // Read the character
+                        volatile_char.read()
+                    };
+                    unsafe {
+                        // Get a mutable reference to the Volatile<ScreenChar> in the previous row
+                        let volatile_char = &mut self.buffer.chars[row - 1][col];
+                        // Write the character
+                        volatile_char.write(character);
+                    }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -106,7 +113,12 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
+            unsafe {
+                // Get a mutable reference to the Volatile<ScreenChar>
+                let volatile_char = &mut self.buffer.chars[row][col];
+                // Write the blank character
+                volatile_char.write(blank);
+            }
         }
     }
 
@@ -127,6 +139,15 @@ impl fmt::Write for Writer {
     }
 }
 
+lazy_static! {
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
+        column_position: 0,
+        row_position: 0,
+        color_code: ColorCode::new(Color::White, Color::Black),
+                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+    });
+}
+
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
@@ -134,4 +155,3 @@ pub fn _print(args: fmt::Arguments) {
         WRITER.lock().write_fmt(args).unwrap();
     });
 }
-
