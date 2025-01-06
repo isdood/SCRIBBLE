@@ -88,20 +88,31 @@ pub struct Writer {
     color_code: ColorCode,
     buffer: &'static mut Buffer,
     prompt_length: usize,
+    is_wrapped: bool,  // Track wrapped lines
 }
 
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            0x08 => self.backspace(),
+            0x08 => {
+                // Check if we're at the start of a wrapped line
+                if self.is_wrapped && self.column_position == 0 {
+                    // Allow backspace to previous line
+                    self.row_position -= 1;
+                    self.column_position = BUFFER_WIDTH - 1;
+                    self.is_wrapped = false;
+                } else {
+                    self.backspace();
+                }
+            },
             b'\n' => {
                 self.new_line();
-                // Remove automatic prompt writing here
+                self.is_wrapped = false;  // Reset wrap flag on explicit newline
             },
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
-                    // Remove automatic prompt writing here
+                    self.is_wrapped = true;  // Set wrap flag when wrapping occurs
                 }
 
                 let row = self.row_position;
@@ -135,20 +146,24 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        if self.column_position <= self.prompt_length &&
-            (self.row_position == 0 || self.column_position == self.prompt_length) {
-                return;
-            }
+        // Only protect prompt if we're on the first line and not in a wrapped line
+        let prompt_protected = self.row_position == 0 && !self.is_wrapped;
 
-            if self.column_position > 0 {
-                self.column_position -= 1;
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-                self.update_cursor();
-            } else if self.row_position > 0 {
+        if (prompt_protected && self.column_position <= self.prompt_length) {
+            return;
+        }
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+            self.update_cursor();
+        } else if self.row_position > 0 {
+            // We're at the start of a line, check if it's wrapped
+            if self.is_wrapped {
                 self.row_position -= 1;
                 self.column_position = BUFFER_WIDTH - 1;
                 let blank = ScreenChar {
@@ -158,6 +173,7 @@ impl Writer {
                 self.buffer.chars[self.row_position][self.column_position].write_char(blank);
                 self.update_cursor();
             }
+        }
     }
 
     fn new_line(&mut self) {
@@ -241,7 +257,7 @@ lazy_static! {
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
             prompt_length: 2,
-            // Remove is_new_line initialization
+            is_wrapped: false,
         };
         for row in 0..BUFFER_HEIGHT {
             writer.clear_row(row);
