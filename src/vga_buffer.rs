@@ -117,7 +117,7 @@ impl Writer {
         }
     }
 
-    fn new_line(&mut self) {
+    pub fn new_line(&mut self) {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
@@ -133,17 +133,19 @@ impl Writer {
         self.update_cursor();
     }
 
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: ColorCode::new(Color::Green, Color::Black),
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
+    pub fn write_prompt(&mut self) {
+        self.write_byte(b'>');
+        self.write_byte(b' ');
+    }
+
+    pub fn set_input_mode(&mut self, active: bool) {
+        self.input_mode = active;
+        if active {
+            self.write_prompt();
         }
     }
 
-    fn update_cursor(&mut self) {
+    pub fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
             use x86_64::instructions::port::Port;
@@ -157,16 +159,29 @@ impl Writer {
         }
     }
 
-    pub fn write_prompt(&mut self) {
-        self.write_byte(b'>');
-        self.write_byte(b' ');
+    pub fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: ColorCode::new(Color::Green, Color::Black),
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
+        }
     }
 
-    pub fn set_input_mode(&mut self, active: bool) {
-        self.input_mode = active;
-        if active {
-            self.write_prompt();
+    // Fix the write_str method to avoid infinite recursion
+    pub fn write_str(&mut self, s: &str) -> fmt::Result {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
         }
+        Ok(())
+    }
+
+    pub fn write_string(&mut self, s: &str) {
+        let _ = self.write_str(s);
     }
 }
 

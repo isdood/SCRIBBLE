@@ -2,7 +2,6 @@ use x86_64::structures::idt::InterruptStackFrame;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::{print, println};
 use crate::interrupts::PIC_1_OFFSET;
 
 lazy_static! {
