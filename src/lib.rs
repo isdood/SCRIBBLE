@@ -7,6 +7,7 @@
 
 extern crate alloc;
 pub mod vga_buffer;
+
 pub mod gdt;
 pub mod interrupts;
 pub mod serial;
@@ -17,8 +18,6 @@ pub mod rtc;
 
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
-
-pub use vga_buffer::{print, println};
 
 pub fn show_datetime() {
     let mut rtc = rtc::RTC_DEVICE.lock();

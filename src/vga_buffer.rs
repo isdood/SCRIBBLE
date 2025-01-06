@@ -87,53 +87,37 @@ impl Writer {
     }
 
     pub fn write_byte(&mut self, byte: u8) {
-        // ... same implementation but remove the unnecessary unsafe block ...
-        let char_to_write = ScreenChar {
-            ascii_character: byte,
-            color_code: color,
-        };
-        self.buffer.chars[row][col] = Volatile::new(char_to_write);
-    }
-
-    fn new_line(&mut self) {
-        if self.row_position < BUFFER_HEIGHT - 1 {
-            self.row_position += 1;
-        } else {
-            for row in 1..BUFFER_HEIGHT {
-                for col in 0..BUFFER_WIDTH {
-                    // Get the character directly from the volatile memory
-                    let character = self.buffer.chars[row][col].read();
-                    // Move it up one row
-                    self.buffer.chars[row - 1][col] = Volatile::new(character);
+        match byte {
+            b'\n' => {
+                self.new_line();
+                if self.input_mode {
+                    self.write_prompt();
                 }
             }
-            self.clear_row(BUFFER_HEIGHT - 1);
-        }
-        self.column_position = 0;
-        self.update_cursor();
-    }
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
 
-    fn write_prompt(&mut self) {
-        self.write_byte(b'>');
-        self.write_byte(b' ');
-    }
+                let row = self.row_position;
+                let col = self.column_position;
 
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
+                let color_code = if self.input_mode {
+                    ColorCode::new(Color::Green, Color::Black)
+                } else {
+                    self.color_code
+                };
+
+                let char_to_write = ScreenChar {
+                    ascii_character: byte,
+                    color_code,  // Use the color_code variable we just created
+                };
+
+                self.buffer.chars[row][col] = Volatile::new(char_to_write);
+                self.column_position += 1;
+                self.update_cursor();
             }
         }
-    }
-
-    pub fn backspace(&mut self) {
-        // ... same implementation but remove the unnecessary unsafe block ...
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        self.buffer.chars[self.row_position][self.column_position] = Volatile::new(blank);
     }
 }
 
