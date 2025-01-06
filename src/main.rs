@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+use alloc::vec::Vec;
 use core::panic::PanicInfo;
 use scribble::println; // Ensure println is imported correctly
 
@@ -25,6 +27,20 @@ pub extern "C" fn _start() -> ! {
         x86_64::instructions::hlt();
     }
 }
+
+#[global_allocator]
+static ALLOCATOR: LockedHeap = LockedHeap::empty();
+
+pub fn init_heap() {
+    // Initialize the heap allocator here, for example using a fixed-size heap
+    // You might need to adjust the heap size and location based on your memory layout
+    let heap_start = ...;
+    let heap_size = ...;
+    unsafe {
+        ALLOCATOR.lock().init(heap_start, heap_size);
+    }
+}
+
 
 // Define the panic handler
 #[panic_handler]
