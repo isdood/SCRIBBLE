@@ -139,7 +139,6 @@ pub struct Writer {
 }
 
 impl Writer {
-    impl Writer {
         fn should_wrap(&self) -> bool {
             self.column_position >= BUFFER_WIDTH
         }
@@ -304,7 +303,7 @@ impl Writer {
                 self.row_position += 1;
             } else {
                 // More efficient scrolling
-                let mut new_buffer = [[ScreenChar {
+                let _new_buffer = [[ScreenChar {
                     ascii_character: b' ',
                     color_code: self.color_code,
                 }; BUFFER_WIDTH]; BUFFER_HEIGHT];

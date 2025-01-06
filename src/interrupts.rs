@@ -8,6 +8,7 @@ use lazy_static::lazy_static;
 use crate::println;
 use crate::keyboard;
 use crate::vga_buffer::WRITER;
+use x86_64::instructions::interrupts;
 
 //////////// END //////////////
 
