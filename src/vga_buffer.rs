@@ -129,9 +129,13 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    // Instead of trying to read() the Volatile<ScreenChar>, just copy it
-                    let character = self.buffer.chars[row][col];
-                    self.buffer.chars[row - 1][col] = character;
+                    // Create a new ScreenChar for the current position
+                    let character = unsafe {
+                        // Read the ScreenChar value from volatile memory
+                        let screen_char = self.buffer.chars[row][col].read();
+                        // Create a new Volatile for the previous row
+                        self.buffer.chars[row - 1][col].write(screen_char);
+                    }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
