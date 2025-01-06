@@ -4,7 +4,7 @@
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use scribble::println; // Add vga_buffer to the imports
+use scribble::{println, print};
 
 entry_point!(kernel_main);
 
