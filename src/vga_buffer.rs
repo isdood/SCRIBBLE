@@ -1,6 +1,7 @@
 use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
+use volatile::Volatile;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -42,8 +43,27 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
+#[repr(transparent)]
 struct Buffer {
-    chars: [[volatile::Volatile<u16>; BUFFER_WIDTH]; BUFFER_HEIGHT],
+    chars: [[VolatileCell; BUFFER_WIDTH]; BUFFER_HEIGHT],
+}
+
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+struct VolatileCell(u16);
+
+impl VolatileCell {
+    fn write(&mut self, value: u16) {
+        unsafe {
+            core::ptr::write_volatile(&mut self.0, value);
+        }
+    }
+
+    fn read(&self) -> u16 {
+        unsafe {
+            core::ptr::read_volatile(&self.0)
+        }
+    }
 }
 
 pub struct Writer {
@@ -76,15 +96,13 @@ impl Writer {
         }
     }
 
-    fn write_volatile(&mut self, row: usize, col: usize, char: ScreenChar) {
-        let value = (u16::from(char.color_code.0) << 8) | u16::from(char.ascii_character);
-        unsafe {
-            self.buffer.chars[row][col].write(value);
-        }
+    fn write_volatile(&mut self, row: usize, col: usize, screen_char: ScreenChar) {
+        let value = (u16::from(screen_char.color_code.0) << 8) | u16::from(screen_char.ascii_character);
+        self.buffer.chars[row][col].write(value);
     }
 
     fn read_volatile(&self, row: usize, col: usize) -> ScreenChar {
-        let value = unsafe { self.buffer.chars[row][col].read() };
+        let value = self.buffer.chars[row][col].read();
         ScreenChar {
             ascii_character: (value & 0xFF) as u8,
             color_code: ColorCode((value >> 8) as u8),
