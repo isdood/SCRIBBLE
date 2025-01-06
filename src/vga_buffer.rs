@@ -26,8 +26,8 @@ const CURSOR_START_SCANLINE: u8 = 14;  // Determines cursor appearance
 const CURSOR_END_SCANLINE: u8 = 15;    // Determines cursor size
 const CURSOR_MODE_REGISTER: u8 = 0x0A;
 const CURSOR_START_REGISTER: u8 = 0x0B;
-//const CURSOR_LOCATION_HIGH_REG: u8 = 0x0E;
-//const CURSOR_LOCATION_LOW_REG: u8 = 0x0F;
+const CURSOR_LOCATION_HIGH_REG: u8 = 0x0E;
+const CURSOR_LOCATION_LOW_REG: u8 = 0x0F;
 
 // VGA mode cursor colour
 const NORMAL_CURSOR: (Color, Color) = (Color::Yellow, Color::Black);
