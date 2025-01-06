@@ -2,7 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use x86_64::structures::idt::InterruptStackFrame;
+use core::ops::{Deref, DerefMut};
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -46,6 +46,21 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
+// Add Deref and DerefMut implementations for ScreenChar
+impl Deref for ScreenChar {
+    type Target = ScreenChar;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl DerefMut for ScreenChar {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
 #[repr(transparent)]
 struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
@@ -78,7 +93,7 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col] = Volatile::new(blank);
+            self.buffer.chars[row][col].write(blank);
         }
     }
 
@@ -98,7 +113,12 @@ impl Writer {
 
     fn write_byte(&mut self, byte: u8) {
         match byte {
-            b'\n' => self.new_line(),
+            b'\n' => {
+                self.new_line();
+                if self.input_mode {
+                    self.write_prompt();
+                }
+            }
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
@@ -113,10 +133,11 @@ impl Writer {
                     self.color_code
                 };
 
-                self.buffer.chars[row][col] = Volatile::new(ScreenChar {
+                let char_to_write = ScreenChar {
                     ascii_character: byte,
                     color_code,
-                });
+                };
+                self.buffer.chars[row][col].write(char_to_write);
                 self.column_position += 1;
                 self.update_cursor();
             }
@@ -129,13 +150,8 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    // Create a new ScreenChar for the current position
-                    let character = unsafe {
-                        // Read the ScreenChar value from volatile memory
-                        let screen_char = self.buffer.chars[row][col].read();
-                        // Create a new Volatile for the previous row
-                        self.buffer.chars[row - 1][col].write(screen_char);
-                    }
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col].write(character);
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -144,7 +160,12 @@ impl Writer {
         self.update_cursor();
     }
 
-    fn write_string(&mut self, s: &str) {
+    fn write_prompt(&mut self) {
+        self.write_byte(b'>');
+        self.write_byte(b' ');
+    }
+
+    pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
@@ -169,16 +190,14 @@ impl Writer {
             ascii_character: b' ',
             color_code: self.color_code,
         };
-
-        self.buffer.chars[self.row_position][self.column_position] = Volatile::new(blank);
+        self.buffer.chars[self.row_position][self.column_position].write(blank);
         self.update_cursor();
     }
 
     pub fn set_input_mode(&mut self, active: bool) {
         self.input_mode = active;
         if active {
-            self.write_byte(b'>');
-            self.write_byte(b' ');
+            self.write_prompt();
         }
     }
 }
@@ -224,6 +243,12 @@ pub fn set_input_mode(active: bool) {
     });
 }
 
+pub fn init() {
+    clear_screen();
+    enable_cursor();
+    set_input_mode(true);
+}
+
 pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
@@ -235,12 +260,6 @@ pub fn clear_screen() {
         writer.column_position = 0;
         writer.update_cursor();
     });
-}
-
-pub fn init() {
-    clear_screen();
-    enable_cursor();
-    set_input_mode(true);
 }
 
 pub fn enable_cursor() {
