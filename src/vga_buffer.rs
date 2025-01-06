@@ -5,13 +5,10 @@ use x86_64::instructions::port::Port;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
-
-const CURSOR_START: u8 = 14;  // Cursor start scan line
-const CURSOR_END: u8 = 15;    // Cursor end scan line
-
-// VGA hardware cursor ports
 const CURSOR_PORT_CTRL: u16 = 0x3D4;
 const CURSOR_PORT_DATA: u16 = 0x3D5;
+const CURSOR_START: u8 = 14;
+const CURSOR_END: u8 = 15;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -43,7 +40,7 @@ impl ColorCode {
     }
 }
 
-#[derive(Debug, Clone, Copy)]  // Added Clone and Copy traits
+#[derive(Debug, Clone, Copy)]
 #[repr(C)]
 struct ScreenChar {
     ascii_character: u8,
@@ -81,32 +78,6 @@ pub struct Writer {
 }
 
 impl Writer {
-
-    fn init_cursor(&mut self) {
-        unsafe {
-            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
-            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
-
-            // Select cursor start register (0x0A)
-            control_port.write(0x0A);
-            // Set cursor start line and disable cursor (clear bit 5)
-            data_port.write(CURSOR_START & 0x1F);
-
-            // Select cursor end register (0x0B)
-            control_port.write(0x0B);
-            // Set cursor end line
-            data_port.write(CURSOR_END & 0x1F);
-
-            // Enable cursor (clear bit 5 of cursor start register)
-            control_port.write(0x0A);
-            let current = data_port.read();
-            data_port.write(current & 0x1F);
-
-            // Initialize cursor position
-            self.update_cursor();
-        }
-    }
-
     fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -175,15 +146,32 @@ impl Writer {
             control_port.write(0x0E);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
+    }
 
-    pub fn write_string(&mut self, s: &str) {
+    fn init_cursor(&mut self) {
+        unsafe {
+            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+            // Enable cursor (clear bit 5 of cursor start register)
+            control_port.write(0x0A);
+            data_port.write(CURSOR_START & 0x1F);
+
+            // Set cursor end line
+            control_port.write(0x0B);
+            data_port.write(CURSOR_END & 0x1F);
+
+            self.update_cursor();
+        }
+    }
+
+    fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
                 // printable ASCII byte or newline
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
                 // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
-                }
             }
         }
     }
@@ -204,7 +192,7 @@ lazy_static! {
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
         };
-        writer.init_cursor();  // Initialize the cursor
+        writer.init_cursor();
         Mutex::new(writer)
     };
 }
