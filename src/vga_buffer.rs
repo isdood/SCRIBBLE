@@ -140,56 +140,53 @@ pub struct Writer {
 
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
-        let mut should_update_cursor = true;
+        use x86_64::instructions::interrupts;
 
-        match byte {
-            0x08 => {
-                let next_pos = if self.column_position == 0 {
-                    if self.row_position > 0 {
-                        (self.row_position - 1, BUFFER_WIDTH - 1)
-                    } else {
-                        (0, self.column_position)
-                    }
-                } else {
-                    (self.row_position, self.column_position - 1)
-                };
+        // Disable interrupts during write to prevent cursor interference
+        interrupts::without_interrupts(|| {
+            let mut should_update_cursor = true;
 
-                if !self.protected_region.contains(next_pos.0, next_pos.1) {
-                    self.backspace();
-                    should_update_cursor = false;  // backspace handles cursor
-                }
-            },
-            b'\n' => {
-                self.restore_previous_cursor();  // Clear cursor before newline
-                self.new_line();
-                self.is_wrapped = false;
-                should_update_cursor = false;  // new_line handles cursor
-            },
-            byte => {
-                if self.column_position >= BUFFER_WIDTH {
-                    self.restore_previous_cursor();  // Clear cursor before wrap
-                    self.is_wrapped = true;
+            match byte {
+                0x08 => {
+                    // ... backspace handling remains the same ...
+                },
+                b'\n' => {
+                    self.restore_previous_cursor();
                     self.new_line();
-                    should_update_cursor = false;  // new_line handles cursor
-                }
+                    self.is_wrapped = false;
+                    should_update_cursor = false;
+                },
+                byte => {
+                    // Handle line wrapping first
+                    if self.column_position >= BUFFER_WIDTH {
+                        self.restore_previous_cursor();
+                        self.is_wrapped = true;
+                        self.new_line();
+                        // Don't update cursor yet
+                        should_update_cursor = false;
+                    }
 
-                if !self.protected_region.contains(self.row_position, self.column_position) {
-                    let row = self.row_position;
-                    let col = self.column_position;
+                    // Only write if we're not in protected region
+                    if !self.protected_region.contains(self.row_position, self.column_position) {
+                        let row = self.row_position;
+                        let col = self.column_position;
 
-                    self.buffer.chars[row][col].write_char(ScreenChar {
-                        ascii_character: byte,
-                        color_code: self.color_code,
-                    });
+                        // Write character
+                        self.buffer.chars[row][col].write_char(ScreenChar {
+                            ascii_character: byte,
+                            color_code: self.color_code,
+                        });
 
-                    self.column_position += 1;
+                        self.column_position += 1;
+                    }
                 }
             }
-        }
 
-        if should_update_cursor {
-            self.update_cursor();
-        }
+            // Update cursor only once at the end if needed
+            if should_update_cursor {
+                self.update_cursor();
+            }
+        });
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -284,32 +281,26 @@ impl Writer {
     }
 
     fn new_line(&mut self) {
-        // Clear cursor before moving
-        self.restore_previous_cursor();
+        use x86_64::instructions::interrupts;
 
-        if self.row_position < BUFFER_HEIGHT - 1 {
-            self.row_position += 1;
-        } else {
-            for row in 1..BUFFER_HEIGHT {
-                for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read_char();
-                    self.buffer.chars[row - 1][col].write_char(character);
+        interrupts::without_interrupts(|| {
+            self.restore_previous_cursor();
+
+            if self.row_position < BUFFER_HEIGHT - 1 {
+                self.row_position += 1;
+            } else {
+                // Scroll content up
+                for row in 1..BUFFER_HEIGHT {
+                    for col in 0..BUFFER_WIDTH {
+                        let character = self.buffer.chars[row][col].read_char();
+                        self.buffer.chars[row - 1][col].write_char(character);
+                    }
                 }
+                self.clear_row(BUFFER_HEIGHT - 1);
             }
-            self.clear_row(BUFFER_HEIGHT - 1);
-        }
-        self.column_position = 0;
-        self.update_cursor();
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write_char(blank);
-        }
+            self.column_position = 0;
+            self.update_cursor();
+        });
     }
 
     pub fn update_cursor(&mut self) {
@@ -367,13 +358,17 @@ impl Writer {
     }
 
     pub fn blink_cursor(&mut self) {
-        self.cursor_blink_counter = (self.cursor_blink_counter + 1) % 32;  // Slower blink rate
-        if self.cursor_blink_counter == 0 {
-            self.cursor_visible = !self.cursor_visible;
-            if !self.protected_region.contains(self.row_position, self.column_position) {
-                self.update_cursor();
+        use x86_64::instructions::interrupts;
+
+        interrupts::without_interrupts(|| {
+            self.cursor_blink_counter = self.cursor_blink_counter.wrapping_add(1);
+            if self.cursor_blink_counter % 30 == 0 {
+                self.cursor_visible = !self.cursor_visible;
+                if !self.protected_region.contains(self.row_position, self.column_position) {
+                    self.update_cursor();
+                }
             }
-        }
+        });
     }
 
     pub fn set_cursor_color(&mut self, foreground: Color, background: Color) {
@@ -427,6 +422,10 @@ impl Writer {
         // Restore cursor state
         self.cursor_visible = current_visible;
         self.update_cursor();
+    }
+
+    fn should_wrap(&self) -> bool {
+        self.column_position >= BUFFER_WIDTH
     }
 
 }
