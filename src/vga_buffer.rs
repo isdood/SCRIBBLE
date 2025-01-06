@@ -114,7 +114,6 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        let current_line_start = self.column_position == 0;
         let at_prompt_position = self.column_position <= self.prompt_length && self.row_position == 0;
 
         // Only allow backspace if we're not at the prompt position
@@ -274,6 +273,7 @@ lazy_static! {
             row_position: 0,
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+            prompt_length: 2,  // Add the prompt_length field
         };
         // Clear screen first
         for row in 0..BUFFER_HEIGHT {
@@ -285,6 +285,7 @@ lazy_static! {
         Mutex::new(writer)
     };
 }
+
 
 pub fn backspace() {
     use x86_64::instructions::interrupts;
