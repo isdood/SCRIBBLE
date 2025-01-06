@@ -24,13 +24,20 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
                 DecodedKey::Unicode(character) => {
-                    if character == '\u{8}' { // Backspace character
-                        crate::vga_buffer::backspace();
-                    } else {
-                        print!("{}", character);
-                        // Add prompt after newline
-                        if character == '\n' {
-                            crate::vga_buffer::write_prompt();
+                    // Get current writer position to check prompt
+                    let should_handle = {
+                        let writer = crate::vga_buffer::WRITER.lock();
+                        !(character == '\u{8}' && writer.is_at_prompt())  // Check if we're trying to backspace at prompt
+                    };
+
+                    if should_handle {
+                        if character == '\u{8}' {
+                            crate::vga_buffer::backspace();
+                        } else {
+                            print!("{}", character);
+                            if character == '\n' {
+                                crate::vga_buffer::write_prompt();
+                            }
                         }
                     }
                 },

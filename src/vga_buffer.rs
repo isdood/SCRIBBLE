@@ -92,7 +92,8 @@ pub struct Writer {
 }
 
 impl Writer {
-    fn is_at_prompt(&self) -> bool {
+    pub fn is_at_prompt(&self) -> bool {
+        // Check if we're at the first line AND at or before the prompt
         self.row_position == 0 && self.column_position <= self.prompt_length
     }
 
@@ -151,13 +152,15 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // Early return if we're at the prompt
+        // Double-check prompt protection
         if self.is_at_prompt() {
+            self.column_position = self.prompt_length;  // Force cursor after prompt
+            self.update_cursor();
             return;
         }
 
         if self.column_position == 0 && self.row_position > 0 {
-            // Before moving to previous line, clear the current position
+            // Before moving to previous line, clear current position
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
@@ -171,27 +174,30 @@ impl Writer {
             // Clear the character at the new position
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
 
-            // Check if we're moving to the first line
-            if self.row_position == 0 && self.column_position <= self.prompt_length {
-                self.column_position = self.prompt_length;
+            // Triple-check prompt protection when moving to first line
+            if self.row_position == 0 {
+                if self.column_position <= self.prompt_length {
+                    self.column_position = self.prompt_length;
+                }
             }
 
             self.update_cursor();
             self.is_wrapped = true;
         } else if self.column_position > 0 {
             // Normal backspace within the same line
-            self.column_position -= 1;
+            let new_col = self.column_position - 1;
+
+            // Check if this backspace would intrude on prompt
+            if self.row_position == 0 && new_col < self.prompt_length {
+                return;
+            }
+
+            self.column_position = new_col;
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
             };
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-
-            // Additional prompt protection
-            if self.row_position == 0 && self.column_position < self.prompt_length {
-                self.column_position = self.prompt_length;
-            }
-
             self.update_cursor();
         }
     }
