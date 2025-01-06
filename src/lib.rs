@@ -6,21 +6,16 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-extern crate alloc;
-
-pub mod vga_buffer;
+pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
-pub mod serial;
 pub mod memory;
+pub mod serial;
+pub mod vga_buffer;
 pub mod keyboard;
-pub mod allocator;
 
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
-
-#[global_allocator]
-static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
 
 pub fn init(boot_info: &'static BootInfo) {
     gdt::init();
@@ -29,8 +24,10 @@ pub fn init(boot_info: &'static BootInfo) {
         interrupts::PICS.lock().initialize();
     }
 
-    // Initialize heap
-    let phys_mem_offset = VirtAddr::new(boot_info.memory_map.start_addr());
+    let phys_mem_offset = VirtAddr::new(unsafe {
+        bootloader::bootinfo::physical_memory_offset(boot_info)
+    });
+
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
@@ -38,6 +35,12 @@ pub fn init(boot_info: &'static BootInfo) {
 
     allocator::init_heap(&mut mapper, &mut frame_allocator)
     .expect("heap initialization failed");
+}
 
-    x86_64::instructions::interrupts::enable();
+#[global_allocator]
+static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
+
+#[alloc_error_handler]
+fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
+    panic!("allocation error: {:?}", layout)
 }

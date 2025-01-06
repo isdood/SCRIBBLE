@@ -31,7 +31,7 @@ pub fn init_heap(
     }
 
     unsafe {
-        crate::ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
+        crate::ALLOCATOR.lock().init(HEAP_START as *mut u8, HEAP_SIZE);
     }
 
     Ok(())

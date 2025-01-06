@@ -3,6 +3,7 @@ use pic8259::ChainedPics;
 use spin::Mutex;
 use lazy_static::lazy_static;
 use crate::println;
+use crate::keyboard;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;

@@ -6,8 +6,8 @@ use crate::interrupts::PIC_1_OFFSET;
 use crate::print;
 
 lazy_static! {
-    static ref KEYBOARD: Mutex<Keyboard<ScancodeSet1, layouts::Us104Key>> =
-    Mutex::new(Keyboard::new(ScancodeSet1::new(), layouts::Us104Key, HandleControl::Ignore));
+    static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
+    Mutex::new(Keyboard::new(ScancodeSet1::new(), layouts::Us104Key::new(), HandleControl::Ignore));
 }
 
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(
