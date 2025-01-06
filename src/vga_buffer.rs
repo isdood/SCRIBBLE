@@ -172,7 +172,7 @@ impl Writer {
             // Initialize cursor position
             self.update_cursor();
         }
-
+    }
     fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
