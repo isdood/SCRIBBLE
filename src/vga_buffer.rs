@@ -17,8 +17,8 @@ const BUFFER_WIDTH: usize = 80;
 const CURSOR_PORT_CTRL: u16 = 0x3D4;
 const CURSOR_PORT_DATA: u16 = 0x3D5;
 
-const CURSOR_START_LINE: u8 = 13;   //
-const CURSOR_END_LINE: u8 = 13;    //
+// const CURSOR_START_LINE: u8 = 13;   //
+// const CURSOR_END_LINE: u8 = 13;    //
 
 //////////////////////////////
 
