@@ -186,6 +186,12 @@ impl Writer {
     }
 }
 
+pub fn init() {
+    clear_screen();
+    enable_cursor();
+    set_input_mode(true);
+}
+
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_str(s);
@@ -253,12 +259,6 @@ pub fn clear_screen() {
         writer.column_position = 0;
         writer.update_cursor();
     });
-}
-
-pub fn init() {
-    clear_screen();
-    enable_cursor();
-    set_input_mode(true);
 }
 
 pub fn enable_cursor() {
