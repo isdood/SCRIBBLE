@@ -351,7 +351,6 @@ impl Writer {
                 control_port.write(CURSOR_LOCATION_HIGH_REG);
                 data_port.write(((pos >> 8) & 0xFF) as u8);
             }
-        }
     }
 
     pub fn enable_cursor(&mut self) {
