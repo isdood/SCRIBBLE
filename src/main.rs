@@ -15,7 +15,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     scribble::init(boot_info);
 
     println!("Initialization complete.");
-    print_prompt();
 
     loop {
         x86_64::instructions::hlt();
