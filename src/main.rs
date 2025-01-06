@@ -1,12 +1,19 @@
-// in main.rs
+/////////////////////////////////
+// Bare metal rust, no standard
+// library.
+
 #![no_std]
 #![no_main]
 
-//\\         IMPORTS         //\\
 /////////////////////////////////
+
+         //IMPORTS\\
+/////////////////////////////////
+
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use scribble::{println, print};
+
 ////////////////////////////////
 
 entry_point!(kernel_main);

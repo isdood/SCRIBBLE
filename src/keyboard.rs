@@ -1,4 +1,4 @@
-//\\         IMPORTS         //\\
+         //IMPORTS\\
 /////////////////////////////////
 
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
