@@ -2,7 +2,6 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use core::fmt::Write;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -67,21 +66,10 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
-    }
-
-    fn update_cursor(&mut self) {
-        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
-
-            port_3d4.write(0x0F_u8);
-            port_3d5.write((pos & 0xFF) as u8);
-            port_3d4.write(0x0E_u8);
-            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+            unsafe {
+                // Use write directly on the Volatile wrapper
+                self.buffer.chars[row][col].write(blank);
+            }
         }
     }
 
@@ -112,23 +100,11 @@ impl Writer {
                     color_code: color,
                 };
 
-                self.buffer.chars[row][col].write(char_to_write);
+                unsafe {
+                    self.buffer.chars[row][col].write(char_to_write);
+                }
                 self.column_position += 1;
                 self.update_cursor();
-            }
-        }
-    }
-
-    fn write_prompt(&mut self) {
-        self.write_byte(b'>');
-        self.write_byte(b' ');
-    }
-
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
             }
         }
     }
@@ -139,8 +115,12 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
-                    self.buffer.chars[row - 1][col].write(character);
+                    let character = unsafe {
+                        self.buffer.chars[row][col].read()
+                    };
+                    unsafe {
+                        self.buffer.chars[row - 1][col].write(character);
+                    }
                 }
             }
             self.clear_row(BUFFER_HEIGHT - 1);
@@ -165,15 +145,11 @@ impl Writer {
             ascii_character: b' ',
             color_code: self.color_code,
         };
-        self.buffer.chars[self.row_position][self.column_position].write(blank);
-        self.update_cursor();
-    }
 
-    pub fn set_input_mode(&mut self, active: bool) {
-        self.input_mode = active;
-        if active {
-            self.write_prompt();
+        unsafe {
+            self.buffer.chars[self.row_position][self.column_position].write(blank);
         }
+        self.update_cursor();
     }
 }
 
