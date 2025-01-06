@@ -322,57 +322,30 @@ impl Writer {
         });
     }
 
-    pub fn enable_cursor(&mut self) {
-        use x86_64::instructions::interrupts;
-
-        interrupts::without_interrupts(|| {
-            unsafe {
-                let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
-                let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
-
-                // Set cursor appearance
-                control_port.write(CURSOR_MODE_REGISTER);
-                data_port.write(CURSOR_START_SCANLINE);  // Start scan line
-
-                control_port.write(CURSOR_START_REGISTER);
-                data_port.write(CURSOR_END_SCANLINE);    // End scan line
-
-                // Set cursor color attribute (yellow on black)
-                let color_attr = ColorCode::new(Color::Yellow, Color::Black).0;
-                // Write to attribute controller to set cursor color
-                let mut attr_port: Port<u8> = Port::new(0x3C0);
-                attr_port.write(0x0B);  // Cursor start register
-                attr_port.write(color_attr);
-            }
-
-            self.cursor_visible = true;
-            self.cursor_style = CursorStyle::Underscore;
-
-            // Update cursor position
-            self.update_cursor();
-        });
-    }
-
     pub fn update_cursor(&mut self) {
         use x86_64::instructions::interrupts;
 
         interrupts::without_interrupts(|| {
-            // Calculate position
-            let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+            // First clear any existing cursor
+            self.restore_previous_cursor();
 
-            unsafe {
-                let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
-                let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+            // Update software cursor state only
+            if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
+                let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
+                self.previous_char_color = current_char.color_code;
+                self.previous_cursor_pos = (self.row_position, self.column_position);
 
-                // Update cursor position
-                control_port.write(CURSOR_LOCATION_LOW_REG);
-                data_port.write((pos & 0xFF) as u8);
-
-                control_port.write(CURSOR_LOCATION_HIGH_REG);
-                data_port.write(((pos >> 8) & 0xFF) as u8);
+                self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
+                    ascii_character: match self.cursor_style {
+                        CursorStyle::Block => current_char.ascii_character,
+                        CursorStyle::Underscore => b'_',
+                        CursorStyle::Line => b'|',
+                    },
+                    color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
+                });
             }
-        });
-    }
+        }
+}
 
             // Update software cursor state
             if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
@@ -389,37 +362,50 @@ impl Writer {
                     color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
                 });
             }
+        });
+    }
 
-            pub fn enable_cursor(&mut self) {
-                use x86_64::instructions::interrupts;
+    pub fn enable_cursor(&mut self) {
+        use x86_64::instructions::interrupts;
 
-                interrupts::without_interrupts(|| {
-                    unsafe {
-                        let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
-                        let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+        interrupts::without_interrupts(|| {
+            unsafe {
+                let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+                let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-                        // Set cursor appearance
-                        control_port.write(CURSOR_MODE_REGISTER);
-                        data_port.write(CURSOR_START_SCANLINE);  // Start scan line
+                // Set cursor start scanline
+                control_port.write(CURSOR_MODE_REGISTER);
+                data_port.write(CURSOR_START_SCANLINE);
 
-                        control_port.write(CURSOR_START_REGISTER);
-                        data_port.write(CURSOR_END_SCANLINE);    // End scan line
-
-                        // Set cursor color attribute (yellow on black)
-                        let color_attr = ColorCode::new(Color::Yellow, Color::Black).0;
-                        // Write to attribute controller to set cursor color
-                        let mut attr_port: Port<u8> = Port::new(0x3C0);
-                        attr_port.write(0x0B);  // Cursor start register
-                        attr_port.write(color_attr);
-                    }
-
-                    self.cursor_visible = true;
-                    self.cursor_style = CursorStyle::Underscore;
-
-                    // Update cursor position
-                    self.update_cursor();
-                });
+                // Set cursor end scanline
+                control_port.write(CURSOR_START_REGISTER);
+                data_port.write(CURSOR_END_SCANLINE);
             }
+
+            self.cursor_visible = true;
+            self.cursor_style = CursorStyle::Underscore;
+            self.cursor_color = NORMAL_CURSOR;
+            self.previous_cursor_pos = (0, 0);  // Start at a known position
+            self.previous_char_color = ColorCode::new(Color::White, Color::Black);
+
+            // Force cursor update
+            self.update_cursor();
+        });
+    }
+
+    pub fn blink_cursor(&mut self) {
+        use x86_64::instructions::interrupts;
+
+        interrupts::without_interrupts(|| {
+            self.cursor_blink_counter = self.cursor_blink_counter.wrapping_add(1);
+            if self.cursor_blink_counter % 30 == 0 {
+                self.cursor_visible = !self.cursor_visible;
+                if !self.protected_region.contains(self.row_position, self.column_position) {
+                    self.update_cursor();
+                }
+            }
+        });
+    }
 
     pub fn set_cursor_color(&mut self, foreground: Color, background: Color) {
         self.cursor_color = (foreground, background);
@@ -435,6 +421,39 @@ impl Writer {
         };
         self.update_cursor();
     }
+
+    pub fn restore_previous_cursor(&mut self) {
+        let (prev_row, prev_col) = self.previous_cursor_pos;
+        if prev_row < BUFFER_HEIGHT && prev_col < BUFFER_WIDTH {
+            let prev_char = self.buffer.chars[prev_row][prev_col].read_char();
+            // Only restore if it was a cursor character
+            if prev_char.ascii_character == b'_' || prev_char.ascii_character == b'|' {
+                let original_char = b' ';  // Default to space if we're unsure
+                self.buffer.chars[prev_row][prev_col].write_char(ScreenChar {
+                    ascii_character: original_char,
+                    color_code: self.previous_char_color,
+                });
+            }
+        }
+    }
+
+    pub fn clean_stray_cursors(&mut self) {
+        // Save current cursor state
+        let current_visible = self.cursor_visible;
+        self.cursor_visible = false;
+
+        // Clean up current row and the row above
+        for row in self.row_position.saturating_sub(1)..=self.row_position {
+            for col in 0..BUFFER_WIDTH {
+                let char = self.buffer.chars[row][col].read_char();
+                if char.ascii_character == b'_' || char.ascii_character == b'|' {
+                    self.buffer.chars[row][col].write_char(ScreenChar {
+                        ascii_character: b' ',
+                        color_code: self.color_code,
+                    });
+                }
+            }
+        }
 
         // Restore cursor state
         self.cursor_visible = current_visible;
