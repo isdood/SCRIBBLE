@@ -14,13 +14,8 @@ const CURSOR_PORT_DATA: u16 = 0x3D5;
 
 // Register numbers
 const CURSOR_START_REG: u8 = 0x0A;
-const CURSOR_END_REG: u8 = 0x0B;
 const CURSOR_LOCATION_HIGH_REG: u8 = 0x0E;
 const CURSOR_LOCATION_LOW_REG: u8 = 0x0F;
-
-// Cursor shape
-const CURSOR_START_LINE: u8 = 15;  //
-const CURSOR_END_LINE: u8 = 15;    //
 
 // VGA mode cursor colour
 const NORMAL_CURSOR: (Color, Color) = (Color::Yellow, Color::Black);
@@ -199,32 +194,34 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
+        // Save current cursor state
+        let current_cursor_visible = self.cursor_visible;
+        self.cursor_visible = false;
+        self.update_cursor();  // Clear current cursor
+
         self.column_position = 0;
         self.is_wrapped = false;
 
         // Set up protected region for new prompt
         self.protected_region = ProtectedRegion::new(self.row_position, 0, self.prompt_length);
 
-        // Save the current color code
-        let original_color = self.color_code;
-
         // Set prompt color to yellow
-        self.color_code = ColorCode::new(Color::Yellow, Color::Black);
+        let prompt_color = ColorCode::new(Color::Yellow, Color::Black);
 
         // Write prompt characters
         self.buffer.chars[self.row_position][0].write_char(ScreenChar {
             ascii_character: b'>',
-            color_code: self.color_code,
+            color_code: prompt_color,
         });
         self.buffer.chars[self.row_position][1].write_char(ScreenChar {
             ascii_character: b' ',
-            color_code: self.color_code,
+            color_code: prompt_color,
         });
 
-        // Restore original color for user input
-        self.color_code = original_color;
-
         self.column_position = self.prompt_length;
+
+        // Restore cursor visibility and update
+        self.cursor_visible = current_cursor_visible;
         self.update_cursor();
     }
 
@@ -296,66 +293,60 @@ impl Writer {
     }
 
     pub fn update_cursor(&mut self) {
-        // Don't update if cursor hasn't moved and not blinking
-        let new_pos = (self.row_position, self.column_position);
-        if new_pos == self.previous_cursor_pos && !self.cursor_visible {
-            return;
-        }
-
-        // Always restore the previous position first
+        // First, restore the previous cursor position if it exists
         let (prev_row, prev_col) = self.previous_cursor_pos;
         if prev_row < BUFFER_HEIGHT && prev_col < BUFFER_WIDTH {
             let prev_char = self.buffer.chars[prev_row][prev_col].read_char();
-            // Important: Restore with the original color, not the cursor color
             self.buffer.chars[prev_row][prev_col].write_char(ScreenChar {
                 ascii_character: prev_char.ascii_character,
                 color_code: self.previous_char_color,
             });
         }
 
-        // Save the current character's state
+        // Get current character and save its state
         let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
-        self.previous_char_color = current_char.color_code;  // Save the original color
+        self.previous_char_color = current_char.color_code;
         self.previous_cursor_pos = (self.row_position, self.column_position);
 
-        // Only update if cursor is visible
+        // Only show cursor if it's visible
         if self.cursor_visible {
-            // Determine cursor character
             let cursor_char = match self.cursor_style {
                 CursorStyle::Block => current_char.ascii_character,
                 CursorStyle::Underscore => if current_char.ascii_character == b' ' { b'_' } else { current_char.ascii_character },
                 CursorStyle::Line => b'|',
             };
 
-            // Update current position with cursor
+            // Write the cursor with current cursor color
             self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
                 ascii_character: cursor_char,
                 color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
             });
         }
 
-        // Update hardware cursor position (only once)
+        // Update hardware cursor
         let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Update low byte
             control_port.write(CURSOR_LOCATION_LOW_REG);
             data_port.write((pos & 0xFF) as u8);
 
-            // Update high byte
             control_port.write(CURSOR_LOCATION_HIGH_REG);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
     }
 
     pub fn enable_cursor(&mut self) {
+        self.cursor_visible = true;
+        self.cursor_style = CursorStyle::Underscore;
+        self.cursor_color = NORMAL_CURSOR;
+
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Hide hardware cursor by moving it off screen
+            // Hide hardware cursor
             control_port.write(CURSOR_START_REG);
             data_port.write(0x20);  // Bit 5 set = cursor disabled
         }
