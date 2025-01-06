@@ -1,15 +1,14 @@
-        //IMPORTS\\
-///////////////////////////////
+// IMPORTS //
 
 use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 
-//////////////////////////////
+// END //
 
-        //CONSTANTS\\
-//////////////////////////////
+
+// CONSTANTS //
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -17,10 +16,17 @@ const BUFFER_WIDTH: usize = 80;
 const CURSOR_PORT_CTRL: u16 = 0x3D4;
 const CURSOR_PORT_DATA: u16 = 0x3D5;
 
-// const CURSOR_START_LINE: u8 = 13;   //
-// const CURSOR_END_LINE: u8 = 13;    //
+const CURSOR_START_REG: u8 = 0x0A;
+const CURSOR_END_REG: u8 = 0x0B;
+const CURSOR_LOCATION_HIGH_REG: u8 = 0x0E;
+const CURSOR_LOCATION_LOW_REG: u8 = 0x0F;
 
-//////////////////////////////
+const CURSOR_START_LINE: u8 = 14;
+const CURSOR_END_LINE: u8 = 15;
+
+// END //
+
+//  //
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -281,10 +287,10 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            control_port.write(0x0F_u8);
+            control_port.write(CURSOR_LOCATION_LOW_REG);
             data_port.write((pos & 0xFF) as u8);
 
-            control_port.write(0x0E_u8);
+            control_port.write(CURSOR_LOCATION_HIGH_REG);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
     }
@@ -295,18 +301,18 @@ impl Writer {
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
             // Set cursor shape
-            control_port.write(0x0A);
+            control_port.write(CURSOR_START_REG);
             let mut cursor_config = data_port.read() & 0xC0;  // Keep the top bits
-            cursor_config |= 13;  // Start scan line, set to near bottom
+            cursor_config |= CURSOR_START_LINE;  // Start scan line
             data_port.write(cursor_config);
 
-            control_port.write(0x0B);
+            control_port.write(CURSOR_END_REG);
             cursor_config = data_port.read() & 0xE0;  // Keep the top 3 bits
-            cursor_config |= 13;  // End scan line, same as start for underscore
+            cursor_config |= CURSOR_END_LINE;  // End scan line
             data_port.write(cursor_config);
 
-            // Enable cursor (register 0x0A, value 0x00 enables cursor)
-            control_port.write(0x0A);
+            // Enable cursor
+            control_port.write(CURSOR_START_REG);
             data_port.write(0x00);
         }
     }
