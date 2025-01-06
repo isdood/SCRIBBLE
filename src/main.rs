@@ -20,15 +20,19 @@ entry_point!(kernel_main);
 
 #[no_mangle]
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
+    use x86_64::instructions::interrupts;
+
     println!("Welcome to Scribble!");
     scribble::init(boot_info);
     println!("Initialization complete.");
 
-    {
+    // Ensure clean initialization of the display
+    interrupts::without_interrupts(|| {
         let mut writer = scribble::vga_buffer::WRITER.lock();
-        writer.clean_stray_cursors();  // Clean any stray cursors
-        writer.enable_cursor();        // Initialize cursor properly
-    }
+        writer.clean_stray_cursors();
+        writer.enable_cursor();
+        writer.update_cursor();
+    });
 
     print!("\n");
     scribble::vga_buffer::write_prompt();
