@@ -226,6 +226,9 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
+        // First, clear current cursor
+        self.restore_previous_cursor();
+
         // Check if we would enter protected region
         let next_pos = if self.column_position == 0 {
             if self.row_position > 0 {
@@ -362,11 +365,17 @@ impl Writer {
     pub fn blink_cursor(&mut self) {
         self.cursor_blink_counter = (self.cursor_blink_counter + 1) % 32;
         if self.cursor_blink_counter == 0 {
+            // Save current state
+            let prev_visible = self.cursor_visible;
+
+            // Toggle visibility
             self.cursor_visible = !self.cursor_visible;
-            // Only update if we're not in a protected region
-            if !self.protected_region.contains(self.row_position, self.column_position) {
-                self.update_cursor();
-            }
+
+            // Only update if not in protected region and state actually changed
+            if !self.protected_region.contains(self.row_position, self.column_position)
+                && prev_visible != self.cursor_visible {
+                    self.update_cursor();
+                }
         }
     }
 
