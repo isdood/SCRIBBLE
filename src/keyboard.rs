@@ -39,15 +39,40 @@ pub fn handle_scancode(scancode: u8) {
     }
 }
 
-pub extern "x86-interrupt" fn keyboard_interrupt_handler(
-    _stack_frame: InterruptStackFrame)
-{
+extern "x86-interrupt" fn keyboard_interrupt_handler(
+    _stack_frame: InterruptStackFrame
+) {
     use x86_64::instructions::port::Port;
+    use pc_keyboard::DecodedKey;
 
+    let mut keyboard = KEYBOARD.lock();
     let mut port = Port::new(0x60);
+
     let scancode: u8 = unsafe { port.read() };
 
-    handle_scancode(scancode);
+    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+        if let Some(key) = keyboard.process_keyevent(key_event) {
+            let mut writer = WRITER.lock();
+            match key {
+                DecodedKey::Unicode(character) => {
+                    match character {
+                        '\n' => {
+                            println!();
+                        },
+                        '\u{8}' => { // Backspace
+                            writer.backspace();
+                        },
+                        _ => {
+                            print!("{}", character);
+                        }
+                    }
+                },
+                DecodedKey::RawKey(_key) => {
+                    // Handle raw keys if needed
+                }
+            }
+        }
+    }
 
     unsafe {
         PICS.lock()
