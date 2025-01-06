@@ -2,7 +2,7 @@
 #![no_main]
 
 use core::panic::PanicInfo;
-use scribble::{println, print};
+use scribble::println;
 use bootloader::{BootInfo, entry_point};
 
 entry_point!(kernel_main);
