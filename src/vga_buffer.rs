@@ -478,6 +478,14 @@ pub fn enable_cursor() {
     });
 }
 
+// Public function to allow setting cursor style from outside
+pub fn set_cursor_style(style: CursorStyle) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().set_cursor_style(style);
+    });
+}
+
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
