@@ -88,7 +88,6 @@ pub struct Writer {
     color_code: ColorCode,
     buffer: &'static mut Buffer,
     prompt_length: usize,
-    is_new_line: bool, // Add this new field to track if we're starting a new line
 }
 
 impl Writer {
@@ -233,7 +232,7 @@ impl fmt::Write for Writer {
     }
 }
 
-// Update the WRITER initialization
+// WRITER initialization
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = {
         let mut writer = Writer {
@@ -242,7 +241,7 @@ lazy_static! {
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
             prompt_length: 2,
-            is_new_line: false, // Start with false since we'll explicitly write prompt
+            // Remove is_new_line initialization
         };
         for row in 0..BUFFER_HEIGHT {
             writer.clear_row(row);
