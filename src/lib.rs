@@ -18,6 +18,8 @@ pub mod rtc;
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
 
+pub use vga_buffer::{print, println};
+
 pub fn show_datetime() {
     let mut rtc = rtc::RTC_DEVICE.lock();
     let (year, month, day) = rtc.get_date();
