@@ -129,47 +129,45 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
-        // Allow writing prompt even if we're not at column 0
+        // Reset column position before writing prompt
+        self.column_position = 0;
         self.write_string("> ");
-        self.column_position = self.prompt_length;
+        self.column_position = self.prompt_length;  // Ensure we're after the prompt
+        self.is_wrapped = false;  // Reset wrap state when writing prompt
         self.update_cursor();
     }
 
     pub fn backspace(&mut self) {
-        // Never allow backspace before or at prompt position on the first line
+        // First, handle prompt protection
         if self.row_position == 0 {
+            // On first line, strictly enforce prompt protection
             if self.column_position <= self.prompt_length {
-                // Prevent backspacing into or before the prompt
+                self.column_position = self.prompt_length;  // Ensure we don't go before prompt
+                self.update_cursor();
                 return;
             }
         }
 
+        // Rest of the backspace implementation...
         if self.column_position == 0 && self.row_position > 0 {
-            // Before moving to previous line, clear the current position
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
             };
             self.buffer.chars[self.row_position][0].write_char(blank);
 
-            // Move to end of previous line
             self.row_position -= 1;
             self.column_position = BUFFER_WIDTH - 1;
-
-            // Clear the character at the new position
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-
             self.update_cursor();
-            self.is_wrapped = true; // Maintain wrapped state when moving up
+            self.is_wrapped = true;
         } else if self.column_position > 0 {
-            // Normal backspace within the same line
             self.column_position -= 1;
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
             };
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-
             self.update_cursor();
         }
     }
@@ -187,6 +185,7 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
+        self.is_wrapped = false;  // Reset wrap state on new line
         self.update_cursor();
     }
 
