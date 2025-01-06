@@ -326,7 +326,7 @@ impl Writer {
         // Using the constant instead of hardcoded colors
         self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
             ascii_character: cursor_char,
-            color_code: ColorCode::new(CURSOR_COLOR.0, CURSOR_COLOR.1),
+            color_code: ColorCode::new(NORMAL_CURSOR.0, NORMAL_CURSOR.1),
         });
 
         // Update hardware cursor position (keep this for compatibility)
