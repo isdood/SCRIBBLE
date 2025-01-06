@@ -95,16 +95,14 @@ impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             0x08 => self.backspace(),
-            b'\n' => self.new_line(),
+            b'\n' => {
+                self.new_line();
+                self.write_prompt(); // Always write prompt after newline
+            },
             byte => {
-                if self.is_new_line {
-                    self.write_prompt();
-                    self.is_new_line = false;
-                }
-
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
-                    return;
+                    self.write_prompt(); // Write prompt after wrapping
                 }
 
                 let row = self.row_position;
@@ -131,11 +129,10 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
-        if self.column_position == 0 {
-            self.write_string("> ");
-            self.column_position = self.prompt_length;
-            self.update_cursor();
-        }
+        // Allow writing prompt even if we're not at column 0
+        self.write_string("> ");
+        self.column_position = self.prompt_length;
+        self.update_cursor();
     }
 
     pub fn backspace(&mut self) {
@@ -177,7 +174,6 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.is_new_line = true;
         self.update_cursor();
     }
 
@@ -246,7 +242,7 @@ lazy_static! {
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
             prompt_length: 2,
-            is_new_line: true, // Initialize as true to print first prompt
+            is_new_line: false, // Start with false since we'll explicitly write prompt
         };
         for row in 0..BUFFER_HEIGHT {
             writer.clear_row(row);
