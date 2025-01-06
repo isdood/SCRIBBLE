@@ -84,6 +84,23 @@ lazy_static! {
 }
 
 impl Writer {
+
+////////// Debug messages \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+    pub fn write_prompt(&mut self) {
+        println!("[DEBUG] write_prompt called");
+        self.write_byte(b'>');
+        self.write_byte(b' ');
+    }
+
+    pub fn set_input_mode(&mut self, active: bool) {
+        println!("[DEBUG] set_input_mode called with active={}", active);
+        self.input_mode = active;
+        if active {
+            self.write_prompt();  // Ensure this is called only once
+        }
+    }
+///////////////// END \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => {
@@ -169,7 +186,6 @@ impl Writer {
         }
     }
 
-    // Use write_str instead of write_string
     pub fn write_str(&mut self, s: &str) -> fmt::Result {
         for byte in s.bytes() {
             match byte {

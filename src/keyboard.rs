@@ -25,7 +25,7 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
                     match character {
                         '\n' => {
                             println!();
-                            crate::vga_buffer::set_input_mode(true);  // Ensure proper handling of input mode
+                            crate::vga_buffer::set_input_mode(true);  // Correctly handle input mode
                         },
                         '\u{8}' => { // Backspace
                             crate::vga_buffer::backspace();
