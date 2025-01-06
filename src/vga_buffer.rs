@@ -139,12 +139,12 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
+        // Ensure this is called only once per input start
         self.write_byte(b'>');
         self.write_byte(b' ');
     }
 
     pub fn set_input_mode(&mut self, active: bool) {
-        println!("[DEBUG] set_input_mode called with active={}", active);
         self.input_mode = active;
         if active {
             self.write_prompt();  // Ensure this is called only once
