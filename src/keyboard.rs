@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 use crate::interrupts::{InterruptIndex, PICS};
 use x86_64::structures::idt::InterruptStackFrame;
 use crate::vga_buffer::WRITER;
+use crate::{print, println};
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
