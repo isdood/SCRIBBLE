@@ -6,6 +6,8 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+extern crate alloc;
+
 pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
@@ -20,13 +22,17 @@ use core::alloc::Layout;
 
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => {
+        $crate::vga_buffer::_print(format_args!($($arg)*))
+    };
 }
 
 #[macro_export]
 macro_rules! println {
     () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+    ($($arg:tt)*) => {
+        $crate::print!("{}\n", format_args!($($arg)*))
+    };
 }
 
 #[global_allocator]
@@ -39,12 +45,9 @@ pub fn init(boot_info: &'static BootInfo) {
         interrupts::PICS.lock().initialize();
     }
 
-    // Use memory_map instead of physical_memory_offset
     let phys_mem_offset = VirtAddr::new(0xffff_8000_0000_0000);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe {
-        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
+    let mut frame_allocator = memory::BootInfoFrameAllocator::init(&boot_info.memory_map);
 
     allocator::init_heap(&mut mapper, &mut frame_allocator)
     .expect("heap initialization failed");

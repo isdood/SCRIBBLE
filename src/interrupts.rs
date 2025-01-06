@@ -2,8 +2,8 @@ use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use pic8259::ChainedPics;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::{print, println};  // Use both print and println
-use crate::keyboard;  // Add this import
+use crate::println;  // Only import what we need
+use crate::keyboard;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
