@@ -120,16 +120,6 @@ pub struct Writer {
     pub protected_region: ProtectedRegion,
 }
 
-pub struct Writer {
-    pub row_position: usize,      // Make public
-    pub column_position: usize,   // Make public
-    color_code: ColorCode,
-    buffer: &'static mut Buffer,
-    prompt_length: usize,
-    is_wrapped: bool,
-    pub protected_region: ProtectedRegion,  // Make public
-}
-
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
