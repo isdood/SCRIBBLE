@@ -60,7 +60,6 @@ impl UnstableMatter {
     fn write_char(&mut self, screen_char: ScreenChar) {
         let value = (u16::from(screen_char.color_code.0) << 8) | u16::from(screen_char.ascii_character);
         unsafe {
-            // Make sure we write the entire 16-bit value atomically
             core::ptr::write_volatile(&mut self.0, value);
         }
     }
@@ -86,13 +85,13 @@ pub struct Writer {
     row_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
-    prompt_length: usize,  // Add this new field
+    prompt_length: usize,
 }
 
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            0x08 => self.backspace(), // Only handle backspace, not delete (0x7F)
+            0x08 => self.backspace(),
             b'\n' => self.new_line(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
@@ -116,34 +115,23 @@ impl Writer {
     pub fn backspace(&mut self) {
         let at_prompt_position = self.column_position <= self.prompt_length && self.row_position == 0;
 
-        // Only allow backspace if we're not at the prompt position
         if !at_prompt_position {
             if self.column_position > 0 {
-                // Move back one position
                 self.column_position -= 1;
-
-                // Write a space at the current position
                 let blank = ScreenChar {
                     ascii_character: b' ',
                     color_code: self.color_code,
                 };
                 self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-
-                // Update cursor to new position
                 self.update_cursor();
             } else if self.row_position > 0 {
-                // Move to end of previous line
                 self.row_position -= 1;
                 self.column_position = BUFFER_WIDTH - 1;
-
-                // Write a space at the current position
                 let blank = ScreenChar {
                     ascii_character: b' ',
                     color_code: self.color_code,
                 };
                 self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-
-                // Update cursor to new position
                 self.update_cursor();
             }
         }
@@ -152,14 +140,12 @@ impl Writer {
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
-                // Only accept printable ASCII bytes and newline
                 0x20..=0x7e | b'\n' | 0x08 => self.write_byte(byte),
-                _ => self.write_byte(0xfe), // Print ■ for invalid characters
+                _ => self.write_byte(0xfe),
             }
         }
     }
 
-    // Public write_prompt method
     pub fn write_prompt(&mut self) {
         self.write_string("> ");
         self.column_position = self.prompt_length;
@@ -179,11 +165,8 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-
-        // Write the prompt at the beginning of the new line
         self.write_string("> ");
         self.column_position = self.prompt_length;
-
         self.update_cursor();
     }
 
@@ -204,11 +187,9 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Set cursor position - low byte first
             control_port.write(0x0F_u8);
             data_port.write((pos & 0xFF) as u8);
 
-            // Then high byte
             control_port.write(0x0E_u8);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
@@ -219,44 +200,22 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // First disable the cursor
             control_port.write(0x0A_u8);
-            data_port.write(0x20_u8);  // Set bit 5 to disable
+            data_port.write(0x20_u8);
 
-            // Small delay
             for _ in 0..100000 {
                 core::hint::spin_loop();
             }
 
-            // Configure cursor shape (block cursor)
             control_port.write(0x0A_u8);
             data_port.write(CURSOR_START_LINE);
             control_port.write(0x0B_u8);
             data_port.write(CURSOR_END_LINE);
 
-            // Re-enable cursor
             control_port.write(0x0A_u8);
-            data_port.write(CURSOR_START_LINE);  // This also clears bit 5, enabling the cursor
+            data_port.write(CURSOR_START_LINE);
         }
     }
-
-    pub static ref WRITER: Mutex<Writer> = {
-        let mut writer = Writer {
-            column_position: 0,
-            row_position: 0,
-            color_code: ColorCode::new(Color::White, Color::Black),
-            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-            prompt_length: 2,  // Length of "> " prompt
-        };
-        // Rest of the initialization remains the same
-        for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
-        }
-        writer.enable_cursor();
-        writer.update_cursor();
-        Mutex::new(writer)
-    };
-
 }
 
 impl fmt::Write for Writer {
@@ -273,19 +232,16 @@ lazy_static! {
             row_position: 0,
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-            prompt_length: 2,  // Add the prompt_length field
+            prompt_length: 2,
         };
-        // Clear screen first
         for row in 0..BUFFER_HEIGHT {
             writer.clear_row(row);
         }
-        // Then enable cursor
         writer.enable_cursor();
         writer.update_cursor();
         Mutex::new(writer)
     };
 }
-
 
 pub fn backspace() {
     use x86_64::instructions::interrupts;
@@ -315,18 +271,18 @@ pub fn clear_screen() {
     });
 }
 
+pub fn write_prompt() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().write_prompt();
+    });
+}
+
 pub fn enable_cursor() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         WRITER.lock().enable_cursor();
     });
-}
-
-// In vga_buffer.rs, add this method
-pub fn write_prompt(&mut self) {
-    self.write_string("> ");
-    self.column_position = self.prompt_length;
-    self.update_cursor();
 }
 
 #[doc(hidden)]
