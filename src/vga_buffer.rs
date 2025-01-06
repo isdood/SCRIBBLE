@@ -404,26 +404,6 @@ impl Writer {
                     // First clear any existing cursor
                     self.restore_previous_cursor();
 
-                    if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
-                        let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
-                        self.previous_char_color = current_char.color_code;
-                        self.previous_cursor_pos = (self.row_position, self.column_position);
-
-                        self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
-                            ascii_character: match self.cursor_style {
-                                CursorStyle::Block => current_char.ascii_character,
-                                CursorStyle::Underscore => b'_',
-                                CursorStyle::Line => b'|',
-                            },
-                            color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
-                        });
-                    }
-                }
-            }
-        });
-    }
-}
-
             // Update software cursor state
             if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
                 let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
