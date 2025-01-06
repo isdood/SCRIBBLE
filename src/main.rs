@@ -1,16 +1,16 @@
 #![no_std]
 #![no_main]
 
-// Assuming this is part of the main entry point of your kernel (e.g., src/main.rs)
-
-extern crate scribble;
-
+use core::panic::PanicInfo;
+use scribble::println;
 use scribble::vga_buffer::WRITER;
 use x86_64::instructions::interrupts;
+use scribble::gdt::init; // Import the correct init function
 
-fn main() {
-    // Initialize the VGA buffer and other necessary components
-    scribble::init();
+#[no_mangle]
+pub extern "C" fn _start() -> ! {
+    // Initialize the kernel
+    init();
 
     // Print initial setup messages
     println!("Initializing kernel...");
@@ -22,5 +22,20 @@ fn main() {
     // Set input mode and print the prompt on a new line
     WRITER.lock().new_line(); // Ensure we start on a new line for the prompt
     WRITER.lock().set_input_mode(true);
+
+    // Halt the CPU
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
+// Define the panic handler
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    // Print the panic information to the VGA buffer
+    println!("{}", _info);
+    // Halt the CPU
+    loop {
+        x86_64::instructions::hlt();
+    }
+}
