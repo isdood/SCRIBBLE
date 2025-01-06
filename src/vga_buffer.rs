@@ -140,10 +140,7 @@ pub struct Writer {
 
 impl Writer {
 
-        fn should_wrap(&self) -> bool {
-            self.column_position >= BUFFER_WIDTH
-        }
-
+        // Wrapper helper method
         fn needs_wrap(&self) -> bool {
             self.column_position >= BUFFER_WIDTH && !self.is_wrapped
         }
