@@ -334,20 +334,7 @@ impl Writer {
             });
         }
 
-        // Update hardware cursor
-        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
-        unsafe {
-            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
-            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
-
-            control_port.write(CURSOR_LOCATION_LOW_REG);
-            data_port.write((pos & 0xFF) as u8);
-
-            control_port.write(CURSOR_LOCATION_HIGH_REG);
-            data_port.write(((pos >> 8) & 0xFF) as u8);
-        }
-
-        // Update hardware cursor position for compatibility
+        // Update hardware cursor position (only once)
         let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
@@ -387,11 +374,12 @@ impl Writer {
         self.update_cursor();
     }
 
-    pub fn set_cursor_type(&mut self, cursor_type: CursorType) {
-        self.cursor_color = match cursor_type {
-            CursorType::Normal => NORMAL_CURSOR,
-            CursorType::Insert => INSERT_CURSOR,
-            CursorType::Select => SELECT_CURSOR,
+    pub fn set_cursor_style(&mut self, style: CursorStyle) {
+        self.cursor_style = style;
+        self.cursor_color = match style {
+            CursorStyle::Block => NORMAL_CURSOR,
+            CursorStyle::Underscore => INSERT_CURSOR,
+            CursorStyle::Line => SELECT_CURSOR,
         };
         self.update_cursor();
     }
