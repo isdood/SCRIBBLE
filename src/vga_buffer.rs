@@ -139,8 +139,13 @@ pub struct Writer {
 }
 
 impl Writer {
-    fn needs_wrap(&self) -> bool {
-        self.column_position >= BUFFER_WIDTH && !self.is_wrapped
+
+        fn should_wrap(&self) -> bool {
+            self.column_position >= BUFFER_WIDTH
+        }
+
+        fn needs_wrap(&self) -> bool {
+            self.column_position >= BUFFER_WIDTH && !self.is_wrapped
         }
 
         pub fn write_byte(&mut self, byte: u8) {
