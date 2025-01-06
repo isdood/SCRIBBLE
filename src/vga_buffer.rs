@@ -10,19 +10,19 @@ use x86_64::instructions::port::Port;
 
 // CONSTANTS //
 
-const BUFFER_HEIGHT: usize = 25;
-const BUFFER_WIDTH: usize = 80;
-
+// VGA cursor control registers and values
 const CURSOR_PORT_CTRL: u16 = 0x3D4;
 const CURSOR_PORT_DATA: u16 = 0x3D5;
 
+// Register numbers
 const CURSOR_START_REG: u8 = 0x0A;
 const CURSOR_END_REG: u8 = 0x0B;
 const CURSOR_LOCATION_HIGH_REG: u8 = 0x0E;
 const CURSOR_LOCATION_LOW_REG: u8 = 0x0F;
 
-const CURSOR_START_LINE: u8 = 14;
-const CURSOR_END_LINE: u8 = 15;
+// Cursor shape - for underscore cursor
+const CURSOR_START_LINE: u8 = 15;  // Start at the bottom line
+const CURSOR_END_LINE: u8 = 15;    // End at the bottom line
 
 // END //
 
@@ -300,20 +300,15 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Set cursor shape
+            // Start cursor shape (register 0x0A)
             control_port.write(CURSOR_START_REG);
-            let mut cursor_config = data_port.read() & 0xC0;  // Keep the top bits
-            cursor_config |= CURSOR_START_LINE;  // Start scan line
-            data_port.write(cursor_config);
+            // Clear top bits (visibility flags) and set start line
+            data_port.write(CURSOR_START_LINE);
 
+            // End cursor shape (register 0x0B)
             control_port.write(CURSOR_END_REG);
-            cursor_config = data_port.read() & 0xE0;  // Keep the top 3 bits
-            cursor_config |= CURSOR_END_LINE;  // End scan line
-            data_port.write(cursor_config);
-
-            // Enable cursor
-            control_port.write(CURSOR_START_REG);
-            data_port.write(0x00);
+            // Clear top bits and set end line
+            data_port.write(CURSOR_END_LINE);
         }
     }
 }
