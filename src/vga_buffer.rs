@@ -84,24 +84,11 @@ lazy_static! {
     });
 }
 
-impl Writer {
-
 ////////// Debug messages \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-    pub fn write_prompt(&mut self) {
-        println!("[DEBUG] write_prompt called");
-        self.write_byte(b'>');
-        self.write_byte(b' ');
-    }
 
-    pub fn set_input_mode(&mut self, active: bool) {
-        println!("[DEBUG] set_input_mode called with active={}", active);
-        self.input_mode = active;
-        if active {
-            self.write_prompt();  // Ensure this is called only once
-        }
-    }
 ///////////////// END \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
+impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => {
@@ -151,6 +138,18 @@ impl Writer {
         self.update_cursor();
     }
 
+    pub fn write_prompt(&mut self) {
+        self.write_byte(b'>');
+        self.write_byte(b' ');
+    }
+
+    pub fn set_input_mode(&mut self, active: bool) {
+        self.input_mode = active;
+        if active {
+            self.write_prompt();  // Ensure this is called only once
+        }
+    }
+
     pub fn update_cursor(&mut self) {
         let pos = self.row_position * BUFFER_WIDTH + self.column_position;
         unsafe {
@@ -183,6 +182,11 @@ impl Writer {
             }
         }
         Ok(())
+    }
+
+    // Use let _ = ... to handle the Result
+    pub fn write_string(&mut self, s: &str) {
+        let _ = self.write_str(s);
     }
 }
 
