@@ -94,24 +94,6 @@ pub struct ProtectedRegion {
     pub end_col: usize,
 }
 
-impl ProtectedRegion {
-    pub fn new(row: usize, start_col: usize, length: usize) -> Self {
-        Self {
-            row,
-            start_col,
-            end_col: start_col + length,
-        }
-    }
-
-    pub fn contains(&self, row: usize, col: usize) -> bool {
-        row == self.row && (col >= self.start_col && col < self.end_col)
-    }
-
-    pub fn is_before(&self, row: usize, col: usize) -> bool {
-        row == self.row && col <= self.start_col
-    }
-}
-
 pub struct Writer {
     pub row_position: usize,      // Make public
     pub column_position: usize,   // Make public
