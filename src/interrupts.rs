@@ -3,6 +3,7 @@ use pic8259::ChainedPics;
 use crate::{print, println};
 use lazy_static::lazy_static;
 use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1};
+use crate::vga_buffer::WRITER;
 
 // Constants for PIC initialization
 pub const PIC_1_OFFSET: u8 = 32;

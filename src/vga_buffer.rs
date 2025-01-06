@@ -2,7 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use core::ops::{Deref, DerefMut};
+use core::fmt::Write;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -46,21 +46,6 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
-// Implement Deref and DerefMut for ScreenChar
-impl Deref for ScreenChar {
-    type Target = ScreenChar;
-
-    fn deref(&self) -> &Self::Target {
-        self
-    }
-}
-
-impl DerefMut for ScreenChar {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self
-    }
-}
-
 #[repr(transparent)]
 struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
@@ -72,27 +57,42 @@ pub struct Writer {
     color_code: ColorCode,
     buffer: &'static mut Buffer,
     prompt_active: bool,
-}
-
-pub struct Writer {
-    column_position: usize,
-    row_position: usize,
-    color_code: ColorCode,
-    buffer: &'static mut Buffer,
-    prompt_active: bool,
-    input_mode: bool,  // Add this new field
+    input_mode: bool,
 }
 
 impl Writer {
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
+        }
+    }
+
+    fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
+
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => {
                 self.new_line();
-                // Only print prompt if we're in input mode
                 if self.input_mode {
                     self.write_prompt();
                 }
-            },
+            }
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
@@ -101,54 +101,22 @@ impl Writer {
                 let row = self.row_position;
                 let col = self.column_position;
 
-                // Determine the color based on whether we're in input mode
                 let color = if self.input_mode {
-                    if col == 0 && byte == b'>' {
-                        ColorCode::new(Color::Green, Color::Black)
-                    } else {
-                        ColorCode::new(Color::Green, Color::Black)  // Use green for all input text
-                    }
+                    ColorCode::new(Color::Green, Color::Black)
                 } else {
                     self.color_code
                 };
 
-                let colored_char = ScreenChar {
+                let char_to_write = ScreenChar {
                     ascii_character: byte,
                     color_code: color,
                 };
 
-                self.buffer.chars[row][col] = Volatile::new(colored_char);
+                self.buffer.chars[row][col].write(char_to_write);
                 self.column_position += 1;
                 self.update_cursor();
             }
         }
-    }
-
-    pub fn backspace(&mut self) {
-        if !self.input_mode {
-            return;
-        }
-
-        // Don't allow backspace before the prompt
-        if self.column_position <= 2 && self.row_position >= 0 {
-            return;
-        }
-
-        if self.column_position > 0 {
-            self.column_position -= 1;
-        } else if self.row_position > 0 {
-            // Handle wrapping to previous line
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-        }
-
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-
-        self.buffer.chars[self.row_position][self.column_position] = Volatile::new(blank);
-        self.update_cursor();
     }
 
     fn write_prompt(&mut self) {
@@ -156,11 +124,12 @@ impl Writer {
         self.write_byte(b' ');
     }
 
-    // Add these new methods
-    pub fn set_input_mode(&mut self, active: bool) {
-        self.input_mode = active;
-        if active {
-            self.write_prompt();
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
         }
     }
 
@@ -168,7 +137,6 @@ impl Writer {
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {
-            // Scroll content up
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     let character = self.buffer.chars[row][col].read();
@@ -180,6 +148,40 @@ impl Writer {
         self.column_position = 0;
         self.update_cursor();
     }
+
+    pub fn backspace(&mut self) {
+        if !self.input_mode || (self.column_position <= 2 && self.row_position >= 0) {
+            return;
+        }
+
+        if self.column_position > 0 {
+            self.column_position -= 1;
+        } else if self.row_position > 0 {
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+        }
+
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        self.buffer.chars[self.row_position][self.column_position].write(blank);
+        self.update_cursor();
+    }
+
+    pub fn set_input_mode(&mut self, active: bool) {
+        self.input_mode = active;
+        if active {
+            self.write_prompt();
+        }
+    }
+}
+
+impl fmt::Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_string(s);
+        Ok(())
+    }
 }
 
 lazy_static! {
@@ -189,7 +191,7 @@ lazy_static! {
         color_code: ColorCode::new(Color::White, Color::Black),
                                                       buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
                                                       prompt_active: false,
-                                                      input_mode: false,  // Initialize input_mode
+                                                      input_mode: false,
     });
 }
 
