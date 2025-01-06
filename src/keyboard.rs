@@ -25,7 +25,7 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
                     match character {
                         '\n' => {
                             println!();
-                            crate::vga_buffer::set_input_mode(true);
+                            crate::vga_buffer::set_input_mode(true);  // Ensure proper handling of input mode
                         },
                         '\u{8}' => { // Backspace
                             crate::vga_buffer::backspace();
@@ -42,6 +42,6 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
 
     unsafe {
         crate::interrupts::PICS.lock()
-        .notify_end_of_interrupt(PIC_1_OFFSET + 1); // Use direct offset instead of as_u8()
+        .notify_end_of_interrupt(PIC_1_OFFSET + 1);
     }
 }
