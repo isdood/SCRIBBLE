@@ -23,7 +23,6 @@ const CURSOR_START_LINE: u8 = 15;  //
 const CURSOR_END_LINE: u8 = 15;    //
 
 // VGA mode cursor colour
-const CURSOR_COLOR: (Color, Color) = (Color::Yellow, Color::Black);
 const NORMAL_CURSOR: (Color, Color) = (Color::Yellow, Color::Black);
 const INSERT_CURSOR: (Color, Color) = (Color::Green, Color::Black);
 const SELECT_CURSOR: (Color, Color) = (Color::White, Color::Blue);
