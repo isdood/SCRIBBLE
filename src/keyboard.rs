@@ -33,20 +33,25 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
                         let writer = crate::vga_buffer::WRITER.lock();
                         let next_pos = if character == '\u{8}' && writer.column_position > 0 {
                             writer.column_position - 1
+                        } else if writer.column_position >= BUFFER_WIDTH {
+                            0 // Allow wrapping to next line
                         } else {
                             writer.column_position
                         };
-                        !writer.protected_region.contains(writer.row_position, next_pos)
+                        !writer.protected_region.contains(
+                            if writer.column_position >= BUFFER_WIDTH { writer.row_position + 1 } else { writer.row_position },
+                                next_pos
+                        )
                     };
 
                     if should_handle {
-                        if character == '\u{8}' {
-                            crate::vga_buffer::backspace();
-                        } else {
-                            print!("{}", character);
-                            if character == '\n' {
+                        match character {
+                            '\u{8}' => crate::vga_buffer::backspace(),
+                            '\n' => {
+                                print!("{}", character);
                                 crate::vga_buffer::write_prompt();
-                            }
+                            },
+                            _ => print!("{}", character),
                         }
                     }
                 },

@@ -139,8 +139,8 @@ pub struct Writer {
 }
 
 impl Writer {
-        fn should_wrap(&self) -> bool {
-            self.column_position >= BUFFER_WIDTH
+    fn needs_wrap(&self) -> bool {
+        self.column_position >= BUFFER_WIDTH && !self.is_wrapped
         }
 
         pub fn write_byte(&mut self, byte: u8) {
@@ -149,6 +149,7 @@ impl Writer {
             interrupts::without_interrupts(|| {
                 match byte {
                     0x08 => {
+                        // Backspace handling remains the same
                         let next_pos = if self.column_position == 0 {
                             if self.row_position > 0 {
                                 (self.row_position - 1, BUFFER_WIDTH - 1)
@@ -169,37 +170,28 @@ impl Writer {
                         self.is_wrapped = false;
                     },
                     byte => {
-                        // Use should_wrap() method here
-                        if self.should_wrap() {
+                        // Handle wrapping before writing
+                        if self.column_position >= BUFFER_WIDTH {
                             self.restore_previous_cursor();
                             self.is_wrapped = true;
                             self.new_line();
+                        }
 
-                            // Write the current character at the start of new line
-                            if !self.protected_region.contains(self.row_position, self.column_position) {
-                                self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
-                                    ascii_character: byte,
-                                    color_code: self.color_code,
-                                });
-                                self.column_position += 1;
-                            }
-                        } else {
-                            // Normal character writing
-                            if !self.protected_region.contains(self.row_position, self.column_position) {
-                                self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
-                                    ascii_character: byte,
-                                    color_code: self.color_code,
-                                });
-                                self.column_position += 1;
-                            }
+                        // Only write if we're not in protected region
+                        if !self.protected_region.contains(self.row_position, self.column_position) {
+                            self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
+                                ascii_character: byte,
+                                color_code: self.color_code,
+                            });
+                            self.column_position += 1;
                         }
                     }
                 }
 
-                // Update cursor only once at the end
+                // Update cursor position after any operation
                 self.update_cursor();
             });
-    }
+        }
 
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
@@ -301,29 +293,18 @@ impl Writer {
             if self.row_position < BUFFER_HEIGHT - 1 {
                 self.row_position += 1;
             } else {
-                // More efficient scrolling
-                let _new_buffer = [[ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                }; BUFFER_WIDTH]; BUFFER_HEIGHT];
-
-                // Copy all but first row
+                // Scroll content up efficiently
                 for row in 1..BUFFER_HEIGHT {
                     for col in 0..BUFFER_WIDTH {
                         let character = self.buffer.chars[row][col].read_char();
                         self.buffer.chars[row - 1][col].write_char(character);
                     }
                 }
-
                 // Clear last row
-                for col in 0..BUFFER_WIDTH {
-                    self.buffer.chars[BUFFER_HEIGHT - 1][col].write_char(ScreenChar {
-                        ascii_character: b' ',
-                        color_code: self.color_code,
-                    });
-                }
+                self.clear_row(BUFFER_HEIGHT - 1);
             }
             self.column_position = 0;
+            self.update_cursor();
         });
     }
 
