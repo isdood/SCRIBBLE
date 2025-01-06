@@ -140,6 +140,8 @@ pub struct Writer {
 
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
+        let mut should_update_cursor = true;
+
         match byte {
             0x08 => {
                 let next_pos = if self.column_position == 0 {
@@ -152,22 +154,25 @@ impl Writer {
                     (self.row_position, self.column_position - 1)
                 };
 
-                // Check if backspace would enter protected region
                 if !self.protected_region.contains(next_pos.0, next_pos.1) {
                     self.backspace();
+                    should_update_cursor = false;  // backspace handles cursor
                 }
             },
             b'\n' => {
+                self.restore_previous_cursor();  // Clear cursor before newline
                 self.new_line();
                 self.is_wrapped = false;
+                should_update_cursor = false;  // new_line handles cursor
             },
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
+                    self.restore_previous_cursor();  // Clear cursor before wrap
                     self.is_wrapped = true;
                     self.new_line();
+                    should_update_cursor = false;  // new_line handles cursor
                 }
 
-                // Only write if we're not in protected region
                 if !self.protected_region.contains(self.row_position, self.column_position) {
                     let row = self.row_position;
                     let col = self.column_position;
@@ -179,8 +184,11 @@ impl Writer {
 
                     self.column_position += 1;
                 }
-                self.update_cursor();
             }
+        }
+
+        if should_update_cursor {
+            self.update_cursor();
         }
     }
 
@@ -359,7 +367,7 @@ impl Writer {
     }
 
     pub fn blink_cursor(&mut self) {
-        self.cursor_blink_counter = (self.cursor_blink_counter + 1) % 16;
+        self.cursor_blink_counter = (self.cursor_blink_counter + 1) % 32;  // Slower blink rate
         if self.cursor_blink_counter == 0 {
             self.cursor_visible = !self.cursor_visible;
             if !self.protected_region.contains(self.row_position, self.column_position) {
