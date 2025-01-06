@@ -1,19 +1,14 @@
-// src/gdt.rs
-use x86_64::VirtAddr;
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor, SegmentSelector};
 use lazy_static::lazy_static;
-
-pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
-const STACK_SIZE: usize = 4096 * 5;
-
-#[repr(align(16))]
-#[derive(Clone, Copy)]  // Add these derives
-struct Stack(#[allow(dead_code)] [u8; STACK_SIZE]);  // Add allow(dead_code) attribute
-
-static DOUBLE_FAULT_STACK: Stack = Stack([0; STACK_SIZE]);
+use x86_64::instructions::segmentation::Segment;
 
 lazy_static! {
+    static ref TSS: TaskStateSegment = {
+        let tss = TaskStateSegment::new();
+        // Initialize TSS here...
+        tss
+    };
     static ref GDT: (GlobalDescriptorTable, Selectors) = {
         let mut gdt = GlobalDescriptorTable::new();
         let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
@@ -28,12 +23,9 @@ struct Selectors {
 }
 
 pub fn init() {
-    use x86_64::instructions::tables::load_tss;
-    use x86_64::instructions::segmentation::{CS, Segment};
-
     GDT.0.load();
     unsafe {
-        CS::set_reg(GDT.1.code_selector);
-        load_tss(GDT.1.tss_selector);
+        x86_64::instructions::segmentation::CS::set_reg(GDT.1.code_selector);
+        x86_64::instructions::tables::load_tss(GDT.1.tss_selector);
     }
 }

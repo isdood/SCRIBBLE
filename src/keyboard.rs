@@ -2,6 +2,7 @@ use x86_64::structures::idt::InterruptStackFrame;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
+use crate::interrupts::PIC_1_OFFSET;
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
@@ -24,7 +25,8 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
                         '\n' => {
                             // Move to a new line
                             crate::vga_buffer::WRITER.lock().new_line();
-                            crate::vga_buffer::WRITER.lock().write_prompt();  // Write prompt only once
+                            // Write a new prompt
+                            crate::vga_buffer::WRITER.lock().write_prompt();
                         },
                         '\u{8}' => { // Backspace
                             crate::vga_buffer::backspace();

@@ -1,5 +1,8 @@
 use x86_64::instructions::port::Port;
 use lazy_static::lazy_static;
+use spin::Mutex; // Add Mutex
+
+// Other code...
 
 pub struct RTC {
     address: Port<u8>,

@@ -1,39 +1,6 @@
-//
-use x86_64::{
-    structures::paging::{PageTable, PhysFrame, Mapper, Size4KiB, FrameAllocator},
-    PhysAddr, VirtAddr,
-};
-use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
-
-/// Initialize a new OffsetPageTable.
-pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
-    println!("Initializing page table at offset: {:#x}", physical_memory_offset.as_u64());
-
-    let level_4_table = active_level_4_table(physical_memory_offset);
-
-    // Debug: Print page table entries
-    for (i, entry) in level_4_table.iter().enumerate() {
-        if !entry.is_unused() {
-            println!("L4 entry {}: {:?}", i, entry);
-        }
-    }
-
-    OffsetPageTable::new(level_4_table, physical_memory_offset)
-}
-
-unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
-    use x86_64::registers::control::Cr3;
-
-    let (level_4_table_frame, _) = Cr3::read();
-    println!("CR3 points to frame: {:?}", level_4_table_frame);
-
-    let phys = level_4_table_frame.start_address();
-    let virt = physical_memory_offset + phys.as_u64();
-    println!("Mapping physical address {:#x} to virtual address {:#x}", phys.as_u64(), virt.as_u64());
-
-    let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
-    &mut *page_table_ptr
-}
+use x86_64::structures::paging::OffsetPageTable;
+use x86_64::VirtAddr;
+use x86_64::structures::paging::PageTable;
 
 pub struct BootInfoFrameAllocator {
     memory_map: &'static MemoryMap,
@@ -41,18 +8,7 @@ pub struct BootInfoFrameAllocator {
 }
 
 impl BootInfoFrameAllocator {
-    /// Create a FrameAllocator from the passed memory map.
-    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
-        // Debug: Print memory map information
-        println!("Memory map regions:");
-        for region in memory_map.iter() {
-            println!("  {:?}: start: {:#x}, size: {:#x}",
-                     region.region_type,
-                     region.range.start_addr(),
-                     region.range.end_addr() - region.range.start_addr()
-            );
-        }
-
+    pub fn init(memory_map: &'static MemoryMap) -> Self {
         BootInfoFrameAllocator {
             memory_map,
             next: 0,
@@ -60,18 +16,11 @@ impl BootInfoFrameAllocator {
     }
 
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
-        // Get usable regions from memory map
         let regions = self.memory_map.iter();
-        let usable_regions = regions
-        .filter(|r| r.region_type == MemoryRegionType::Usable);
-
-        // Transform to frames
-        let addr_ranges = usable_regions
-        .map(|r| r.range.start_addr()..r.range.end_addr());
+        let usable_regions = regions.filter(|r| r.region_type == MemoryRegionType::Usable);
+        let addr_ranges = usable_regions.map(|r| r.range.start_addr()..r.range.end_addr());
         let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
-
-        frame_addresses
-        .map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
+        frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
 }
 
@@ -79,9 +28,18 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
         let frame = self.usable_frames().nth(self.next);
         self.next += 1;
-        if let Some(frame) = frame.as_ref() {
-            println!("Allocated frame at: {:#x}", frame.start_address().as_u64());
-        }
         frame
     }
+}
+
+pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+    let level_4_table = active_level_4_table(physical_memory_offset);
+    OffsetPageTable::new(level_4_table, physical_memory_offset)
+}
+
+unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
+    let phys = x86_64::registers::control::Cr3::read().0.start_address();
+    let virt = physical_memory_offset + phys.as_u64();
+    let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
+    &mut *page_table_ptr
 }
