@@ -188,6 +188,38 @@ impl Writer {
             data_port.write(CURSOR_START_LINE);  // This also clears bit 5, enabling the cursor
         }
     }
+
+    pub fn backspace(&mut self) {
+        // Check if we're not at the start of the line
+        if self.column_position > 0 {
+            // Move cursor back one position
+            self.column_position -= 1;
+
+            // Write a blank character at the current position
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+
+            // Update cursor position
+            self.update_cursor();
+        }
+        // If we're at start of line and not at top row, move to end of previous line
+        else if self.row_position > 0 {
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+
+            self.update_cursor();
+        }
+    }
+
 }
 
 impl fmt::Write for Writer {
@@ -195,6 +227,13 @@ impl fmt::Write for Writer {
         self.write_string(s);
         Ok(())
     }
+}
+
+pub fn backspace() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().backspace();
+    });
 }
 
 lazy_static! {
