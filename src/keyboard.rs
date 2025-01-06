@@ -24,14 +24,16 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
                 DecodedKey::Unicode(character) => {
                     match character {
                         '\n' => {
+                            // Move to a new line
                             println!();
-                            crate::vga_buffer::set_input_mode(true);  // Correctly handle input mode
+                            crate::vga_buffer::WRITER.lock().set_input_mode(true);  // Correctly handle input mode
                         },
                         '\u{8}' => { // Backspace
                             crate::vga_buffer::backspace();
                         },
                         _ => {
-                            print!("{}", character);
+                            // Print the typed character
+                            crate::vga_buffer::WRITER.lock().write_byte(character as u8);
                         }
                     }
                 },

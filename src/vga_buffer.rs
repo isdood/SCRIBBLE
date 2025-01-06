@@ -139,7 +139,6 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
-        // Ensure this is called only once per input start
         self.write_byte(b'>');
         self.write_byte(b' ');
     }
