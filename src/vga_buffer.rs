@@ -3,17 +3,17 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 
-//\\        CONSTANTS         //\\
-/////////////////////////////////\\
-const BUFFER_HEIGHT: usize = 25;  \\
-const BUFFER_WIDTH: usize = 80;    \\
-                                    \\
-const CURSOR_PORT_CTRL: u16 = 0x3D4; \\
-const CURSOR_PORT_DATA: u16 = 0x3D5; //
-                                    //
+//\\        CONSTANTS        //\\
+/////////////////////////////////
+const BUFFER_HEIGHT: usize = 25;
+const BUFFER_WIDTH: usize = 80;
+
+const CURSOR_PORT_CTRL: u16 = 0x3D4;
+const CURSOR_PORT_DATA: u16 = 0x3D5;
+
 const CURSOR_START_LINE: u8 = 0;   // Start from top of character
 const CURSOR_END_LINE: u8 = 15;   //  End at bottom of character
-///////////////////////////////////
+////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
