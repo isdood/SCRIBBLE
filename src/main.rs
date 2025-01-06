@@ -19,8 +19,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Show initial date/time
     scribble::show_datetime();
 
-    println!("Welcome to Scribble OS");
-    print!("> ");
+    println!("Welcome to Scribble OS!");
 
     scribble::hlt_loop();
 }
