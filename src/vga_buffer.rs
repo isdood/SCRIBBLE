@@ -100,9 +100,19 @@ impl Writer {
 
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            0x08 => {  // Backspace
-                // Only process backspace if we're not at the prompt on the first line
-                if !self.is_at_prompt() {
+            0x08 => {
+                let next_pos = if self.column_position == 0 {
+                    if self.row_position > 0 {
+                        (self.row_position - 1, BUFFER_WIDTH - 1)
+                    } else {
+                        (0, self.column_position)
+                    }
+                } else {
+                    (self.row_position, self.column_position - 1)
+                };
+
+                // Check if backspace would enter protected region
+                if !self.protected_region.contains(next_pos.0, next_pos.1) {
                     self.backspace();
                 }
             },
@@ -116,15 +126,18 @@ impl Writer {
                     self.new_line();
                 }
 
-                let row = self.row_position;
-                let col = self.column_position;
+                // Only write if we're not in protected region
+                if !self.protected_region.contains(self.row_position, self.column_position) {
+                    let row = self.row_position;
+                    let col = self.column_position;
 
-                self.buffer.chars[row][col].write_char(ScreenChar {
-                    ascii_character: byte,
-                    color_code: self.color_code,
-                });
+                    self.buffer.chars[row][col].write_char(ScreenChar {
+                        ascii_character: byte,
+                        color_code: self.color_code,
+                    });
 
-                self.column_position += 1;
+                    self.column_position += 1;
+                }
                 self.update_cursor();
             }
         }
@@ -156,10 +169,11 @@ impl Writer {
         self.column_position = 0;
         self.is_wrapped = false;
 
-        // Write prompt characters directly from stored prompt
-        for (i, &char) in self.prompt.iter().enumerate() {
-            self.buffer.chars[self.row_position][i].write_char(char);
-        }
+        // Set up protected region for new prompt
+        self.protected_region = ProtectedRegion::new(self.row_position, 0, self.prompt_length);
+
+        // Write prompt
+        self.write_string("> ");
 
         self.column_position = self.prompt_length;
         self.update_cursor();
@@ -175,61 +189,43 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        if self.row_position == 0 && self.column_position <= self.prompt_length {
-            self.restore_prompt();  // Restore prompt if it was modified
-            self.column_position = self.prompt_length;
-            self.update_cursor();
+        // Check if we would enter protected region
+        let next_pos = if self.column_position == 0 {
+            if self.row_position > 0 {
+                (self.row_position - 1, BUFFER_WIDTH - 1)
+            } else {
+                return; // Can't backspace at start of first line
+            }
+        } else {
+            (self.row_position, self.column_position - 1)
+        };
+
+        if self.protected_region.contains(next_pos.0, next_pos.1) {
             return;
         }
 
-        // Double-check prompt protection
-        if self.is_at_prompt() {
-            self.column_position = self.prompt_length;  // Force cursor after prompt
-            self.update_cursor();
-            return;
-        }
-
+        // Perform backspace if we're not entering protected region
         if self.column_position == 0 && self.row_position > 0 {
-            // Before moving to previous line, clear current position
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
             };
             self.buffer.chars[self.row_position][0].write_char(blank);
 
-            // Move to end of previous line
             self.row_position -= 1;
             self.column_position = BUFFER_WIDTH - 1;
-
-            // Clear the character at the new position
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-
-            // Triple-check prompt protection when moving to first line
-            if self.row_position == 0 {
-                if self.column_position <= self.prompt_length {
-                    self.column_position = self.prompt_length;
-                }
-            }
-
-            self.update_cursor();
             self.is_wrapped = true;
         } else if self.column_position > 0 {
-            // Normal backspace within the same line
-            let new_col = self.column_position - 1;
-
-            // Check if this backspace would intrude on prompt
-            if self.row_position == 0 && new_col < self.prompt_length {
-                return;
-            }
-
-            self.column_position = new_col;
+            self.column_position -= 1;
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
             };
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-            self.update_cursor();
         }
+
+        self.update_cursor();
     }
 
     fn new_line(&mut self) {
@@ -312,19 +308,11 @@ lazy_static! {
             row_position: 0,
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-            prompt: [ScreenChar {
-                ascii_character: b' ',
-                color_code: ColorCode::new(Color::White, Color::Black),
-            }; 2],
             prompt_length: 2,
             is_wrapped: false,
+            protected_region: ProtectedRegion::new(0, 0, 2),
         };
-        writer.init_prompt();  // Initialize the prompt characters
-        for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
-        }
-        writer.enable_cursor();
-        writer.update_cursor();
+        // Rest of initialization...
         Mutex::new(writer)
     };
 }
