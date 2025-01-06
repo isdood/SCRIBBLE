@@ -236,8 +236,6 @@ impl Writer {
 
             self.update_cursor();
         }
-    }
-
 }
 
 impl fmt::Write for Writer {
