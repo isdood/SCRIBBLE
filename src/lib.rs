@@ -39,18 +39,33 @@ macro_rules! println {
 static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
 
 pub fn init(boot_info: &'static BootInfo) {
+    use x86_64::VirtAddr;
+    use x86_64::structures::paging::PageTable;
+    use x86_64::structures::paging::OffsetPageTable;
+
     gdt::init();
     interrupts::init_idt();
-    unsafe {
-        interrupts::PICS.lock().initialize();
-    }
+    unsafe { interrupts::PICS.lock().initialize() };
 
-    let phys_mem_offset = VirtAddr::new(0xffff_8000_0000_0000);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = memory::BootInfoFrameAllocator::init(&boot_info.memory_map);
+    // Get the physical memory offset from bootinfo
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
 
+    // Initialize a mapper
+    let mut mapper = unsafe {
+        let level_4_table = active_level_4_table(phys_mem_offset);
+        OffsetPageTable::new(level_4_table, phys_mem_offset)
+    };
+
+    // Initialize the frame allocator
+    let mut frame_allocator = unsafe {
+        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
+    };
+
+    // Initialize the heap
     allocator::init_heap(&mut mapper, &mut frame_allocator)
     .expect("heap initialization failed");
+
+    x86_64::instructions::interrupts::enable();
 }
 
 #[alloc_error_handler]
