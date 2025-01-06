@@ -24,10 +24,11 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     scribble::init(boot_info);
     println!("Initialization complete.");
 
-    // Clear any potential cursor artifacts
+    // Instead of directly calling restore_previous_cursor,
+    // we can force a cursor update which will handle cleanup
     {
         let mut writer = scribble::vga_buffer::WRITER.lock();
-        writer.restore_previous_cursor();
+        writer.update_cursor();
     }
 
     // Add an explicit newline before the prompt
