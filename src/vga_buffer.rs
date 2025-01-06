@@ -88,31 +88,21 @@ pub struct Writer {
     color_code: ColorCode,
     buffer: &'static mut Buffer,
     prompt_length: usize,
-    is_wrapped: bool,  // Track wrapped lines
+    is_wrapped: bool,
 }
 
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            0x08 => {
-                // Check if we're at the start of a wrapped line
-                if self.is_wrapped && self.column_position == 0 {
-                    // Allow backspace to previous line
-                    self.row_position -= 1;
-                    self.column_position = BUFFER_WIDTH - 1;
-                    self.is_wrapped = false;
-                } else {
-                    self.backspace();
-                }
-            },
+            0x08 => self.backspace(),
             b'\n' => {
                 self.new_line();
                 self.is_wrapped = false;  // Reset wrap flag on explicit newline
             },
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
+                    self.is_wrapped = true;  // Set wrap flag BEFORE new line
                     self.new_line();
-                    self.is_wrapped = true;  // Set wrap flag when wrapping occurs
                 }
 
                 let row = self.row_position;
@@ -146,29 +136,34 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // Check for prompt protection when we're at the first line
-        if self.row_position == 0 && self.column_position <= self.prompt_length {
+        // First check: Protect prompt on first line when not wrapped
+        if self.row_position == 0 && !self.is_wrapped && self.column_position <= self.prompt_length {
             return;
         }
 
         // Handle backspace at start of line (line wrapping)
         if self.column_position == 0 && self.row_position > 0 {
-            // Move to the end of previous line
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-
-            // Clear both the current position and the leftover character
+            // Before moving to previous line, clear the current position
             let blank = ScreenChar {
                 ascii_character: b' ',
                 color_code: self.color_code,
             };
+            self.buffer.chars[self.row_position][0].write_char(blank);
 
-            // Clear character at the end of previous line
+            // Move to end of previous line
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+
+            // Clear the character at the new position
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-            // Clear the leftover character at the start of the next line
-            self.buffer.chars[self.row_position + 1][0].write_char(blank);
+
+            // If we're moving to the first line, consider prompt protection
+            if self.row_position == 0 && self.column_position <= self.prompt_length {
+                self.column_position = self.prompt_length;
+            }
 
             self.update_cursor();
+            self.is_wrapped = true; // Maintain wrapped state when moving up
         } else if self.column_position > 0 {
             // Normal backspace within the same line
             self.column_position -= 1;
@@ -177,6 +172,12 @@ impl Writer {
                 color_code: self.color_code,
             };
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+
+            // If we're on the first line, don't go before prompt
+            if self.row_position == 0 && self.column_position < self.prompt_length {
+                self.column_position = self.prompt_length;
+            }
+
             self.update_cursor();
         }
     }
