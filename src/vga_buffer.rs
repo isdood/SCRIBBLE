@@ -87,6 +87,7 @@ pub struct Writer {
     row_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
+    prompt: [ScreenChar; 2],  // Store the actual prompt characters
     prompt_length: usize,
     is_wrapped: bool,
 }
@@ -138,20 +139,49 @@ impl Writer {
         }
     }
 
+    fn init_prompt(&mut self) {
+        self.prompt = [
+            ScreenChar {
+                ascii_character: b'>',
+                color_code: self.color_code,
+            },
+            ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            },
+        ];
+    }
+
     pub fn write_prompt(&mut self) {
-        // Reset position and state before writing prompt
         self.column_position = 0;
         self.is_wrapped = false;
 
-        // Write the prompt
-        self.write_string("> ");
+        // Write prompt characters directly from stored prompt
+        for (i, &char) in self.prompt.iter().enumerate() {
+            self.buffer.chars[self.row_position][i].write_char(char);
+        }
 
-        // Ensure we're after the prompt
         self.column_position = self.prompt_length;
         self.update_cursor();
     }
 
+    pub fn restore_prompt(&mut self) {
+        if self.row_position == 0 {
+            // Restore prompt characters if they've been modified
+            for (i, &char) in self.prompt.iter().enumerate() {
+                self.buffer.chars[0][i].write_char(char);
+            }
+        }
+    }
+
     pub fn backspace(&mut self) {
+        if self.row_position == 0 && self.column_position <= self.prompt_length {
+            self.restore_prompt();  // Restore prompt if it was modified
+            self.column_position = self.prompt_length;
+            self.update_cursor();
+            return;
+        }
+
         // Double-check prompt protection
         if self.is_at_prompt() {
             self.column_position = self.prompt_length;  // Force cursor after prompt
@@ -282,9 +312,14 @@ lazy_static! {
             row_position: 0,
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+            prompt: [ScreenChar {
+                ascii_character: b' ',
+                color_code: ColorCode::new(Color::White, Color::Black),
+            }; 2],
             prompt_length: 2,
             is_wrapped: false,
         };
+        writer.init_prompt();  // Initialize the prompt characters
         for row in 0..BUFFER_HEIGHT {
             writer.clear_row(row);
         }
