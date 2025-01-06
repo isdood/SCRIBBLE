@@ -3,10 +3,17 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 
-const BUFFER_HEIGHT: usize = 25;
-const BUFFER_WIDTH: usize = 80;
-const CURSOR_PORT_CTRL: u16 = 0x3D4;
-const CURSOR_PORT_DATA: u16 = 0x3D5;
+//\\        CONSTANTS         //\\
+/////////////////////////////////\\
+const BUFFER_HEIGHT: usize = 25;  \\
+const BUFFER_WIDTH: usize = 80;    \\
+                                    \\
+const CURSOR_PORT_CTRL: u16 = 0x3D4; \\
+const CURSOR_PORT_DATA: u16 = 0x3D5; //
+                                    //
+const CURSOR_START_LINE: u8 = 0;   // Start from top of character
+const CURSOR_END_LINE: u8 = 15;   //  End at bottom of character
+///////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -50,32 +57,21 @@ struct ScreenChar {
 struct UnstableMatter(u16);
 
 impl UnstableMatter {
-    /// Write a character directly to VGA memory
     fn write_char(&mut self, screen_char: ScreenChar) {
         let value = (u16::from(screen_char.color_code.0) << 8) | u16::from(screen_char.ascii_character);
-        self.write(value);
-    }
-
-    /// Read a character from VGA memory
-    fn read_char(&self) -> ScreenChar {
-        let value = self.read();
-        ScreenChar {
-            ascii_character: (value & 0xFF) as u8,
-            color_code: ColorCode((value >> 8) as u8),
-        }
-    }
-
-    /// Write a raw u16 value to VGA memory
-    fn write(&mut self, value: u16) {
         unsafe {
+            // Make sure we write the entire 16-bit value atomically
             core::ptr::write_volatile(&mut self.0, value);
         }
     }
 
-    /// Read a raw u16 value from VGA memory
-    fn read(&self) -> u16 {
-        unsafe {
+    fn read_char(&self) -> ScreenChar {
+        let value = unsafe {
             core::ptr::read_volatile(&self.0)
+        };
+        ScreenChar {
+            ascii_character: (value & 0xFF) as u8,
+            color_code: ColorCode((value >> 8) as u8),
         }
     }
 }
@@ -151,13 +147,17 @@ impl Writer {
     }
 
     pub fn update_cursor(&mut self) {
-        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
+            // Set cursor position - low byte first
             control_port.write(0x0F_u8);
             data_port.write((pos & 0xFF) as u8);
+
+            // Then high byte
             control_port.write(0x0E_u8);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
@@ -168,16 +168,24 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Read current state and clear bit 5 to enable cursor
+            // First disable the cursor
             control_port.write(0x0A_u8);
-            let cur_state = data_port.read() as u8;
-            data_port.write((cur_state & !0x20) as u8);
+            data_port.write(0x20_u8);  // Set bit 5 to disable
 
-            // Set cursor shape
+            // Small delay
+            for _ in 0..100000 {
+                core::hint::spin_loop();
+            }
+
+            // Configure cursor shape (block cursor)
             control_port.write(0x0A_u8);
-            data_port.write(0x0F_u8);  // Changed port_3d5 to data_port
+            data_port.write(CURSOR_START_LINE);
             control_port.write(0x0B_u8);
-            data_port.write(0x0F_u8);  // Changed port_3d5 to data_port
+            data_port.write(CURSOR_END_LINE);
+
+            // Re-enable cursor
+            control_port.write(0x0A_u8);
+            data_port.write(CURSOR_START_LINE);  // This also clears bit 5, enabling the cursor
         }
     }
 }
@@ -197,7 +205,13 @@ lazy_static! {
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
         };
+        // Clear screen first
+        for row in 0..BUFFER_HEIGHT {
+            writer.clear_row(row);
+        }
+        // Then enable cursor
         writer.enable_cursor();
+        writer.update_cursor();
         Mutex::new(writer)
     };
 }
