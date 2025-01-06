@@ -1,7 +1,10 @@
+//\\         IMPORTS         //\\
+/////////////////////////////////
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor, SegmentSelector};
 use lazy_static::lazy_static;
 use x86_64::instructions::segmentation::Segment;
+////////////////////////////////
 
 lazy_static! {
     static ref TSS: TaskStateSegment = {

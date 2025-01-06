@@ -1,3 +1,20 @@
+//\\         IMPORTS         //\\
+/////////////////////////////////
+
+use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
+use spin::Mutex;
+use lazy_static::lazy_static;
+use x86_64::structures::idt::InterruptStackFrame;
+use crate::interrupts::{PICS, InterruptIndex};
+use crate::{print, println};
+
+////////////////////////////////
+
+lazy_static! {
+    static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
+    Mutex::new(Keyboard::new(ScancodeSet1::new(), layouts::Us104Key, HandleControl::Ignore));
+}
+
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(
     _stack_frame: InterruptStackFrame
 ) {
@@ -14,12 +31,12 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
                 DecodedKey::Unicode(character) => {
                     let should_handle = {
                         let writer = crate::vga_buffer::WRITER.lock();
-                        !writer.protected_region.contains(writer.row_position,
-                                                          if character == '\u{8}' && writer.column_position > 0 {
-                                                              writer.column_position - 1
-                                                          } else {
-                                                              writer.column_position
-                                                          })
+                        let next_pos = if character == '\u{8}' && writer.column_position > 0 {
+                            writer.column_position - 1
+                        } else {
+                            writer.column_position
+                        };
+                        !writer.protected_region.contains(writer.row_position, next_pos)
                     };
 
                     if should_handle {

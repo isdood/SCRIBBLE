@@ -2,9 +2,12 @@
 #![no_std]
 #![no_main]
 
+//\\         IMPORTS         //\\
+/////////////////////////////////
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use scribble::{println, print};
+////////////////////////////////
 
 entry_point!(kernel_main);
 

@@ -1,9 +1,12 @@
+//\\         IMPORTS         //\\
+/////////////////////////////////
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use pic8259::ChainedPics;
 use spin::Mutex;
 use lazy_static::lazy_static;
 use crate::println;
 use crate::keyboard;
+////////////////////////////////
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -30,12 +33,8 @@ pub enum InterruptIndex {
 }
 
 impl InterruptIndex {
-    fn as_u8(self) -> u8 {
+    pub fn as_u8(self) -> u8 {
         self as u8
-    }
-
-    fn as_usize(self) -> usize {
-        usize::from(self.as_u8())
     }
 }
 
