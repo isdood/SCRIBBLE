@@ -18,8 +18,8 @@ const CURSOR_START_SCANLINE: u8 = 14;  // Determines cursor appearance
 const CURSOR_END_SCANLINE: u8 = 15;    // Determines cursor size
 const CURSOR_MODE_REGISTER: u8 = 0x0A;
 const CURSOR_START_REGISTER: u8 = 0x0B;
-const CURSOR_LOCATION_HIGH_REG: u8 = 0x0E;
-const CURSOR_LOCATION_LOW_REG: u8 = 0x0F;
+//const CURSOR_LOCATION_HIGH_REG: u8 = 0x0E;
+//const CURSOR_LOCATION_LOW_REG: u8 = 0x0F;
 
 // VGA mode cursor colour
 const NORMAL_CURSOR: (Color, Color) = (Color::Yellow, Color::Black);
@@ -329,21 +329,23 @@ impl Writer {
             // First clear any existing cursor
             self.restore_previous_cursor();
 
-            // Calculate position
-            let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+            // Update software cursor state only
+            if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
+                let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
+                self.previous_char_color = current_char.color_code;
+                self.previous_cursor_pos = (self.row_position, self.column_position);
 
-            unsafe {
-                let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
-                let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
-
-                // Low byte
-                control_port.write(CURSOR_LOCATION_LOW_REG);
-                data_port.write((pos & 0xFF) as u8);
-
-                // High byte
-                control_port.write(CURSOR_LOCATION_HIGH_REG);
-                data_port.write(((pos >> 8) & 0xFF) as u8);
+                self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
+                    ascii_character: match self.cursor_style {
+                        CursorStyle::Block => current_char.ascii_character,
+                        CursorStyle::Underscore => b'_',
+                        CursorStyle::Line => b'|',
+                    },
+                    color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
+                });
             }
+        });
+    }
 
             // Update software cursor state
             if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
@@ -371,13 +373,9 @@ impl Writer {
                 let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
                 let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-                // Set cursor start scanline
+                // Disable hardware cursor by setting bit 5 of the cursor start register
                 control_port.write(CURSOR_MODE_REGISTER);
-                data_port.write(CURSOR_START_SCANLINE);
-
-                // Set cursor end scanline
-                control_port.write(CURSOR_START_REGISTER);
-                data_port.write(CURSOR_END_SCANLINE);
+                data_port.write(0x20); // Bit 5 set to disable hardware cursor
             }
 
             self.cursor_visible = true;
