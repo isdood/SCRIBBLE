@@ -332,29 +332,95 @@ impl Writer {
         });
     }
 
+    pub fn switch_cursor_mode(&mut self, mode: CursorMode) {
+        use x86_64::instructions::interrupts;
 
+        interrupts::without_interrupts(|| {
+            match mode {
+                CursorMode::Hardware => {
+                    // Clean up any software cursor
+                    if self.cursor_mode == CursorMode::Software {
+                        self.restore_previous_cursor();
+                    }
+
+                    // Enable hardware cursor
+                    unsafe {
+                        let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+                        let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+                        // Set cursor appearance
+                        control_port.write(CURSOR_MODE_REGISTER);
+                        data_port.write(CURSOR_START_SCANLINE);
+
+                        control_port.write(CURSOR_START_REGISTER);
+                        data_port.write(CURSOR_END_SCANLINE);
+
+                        // Set cursor color (yellow on black)
+                        let mut attr_port: Port<u8> = Port::new(0x3C0);
+                        attr_port.write(0x0B);
+                        attr_port.write(ColorCode::new(Color::Yellow, Color::Black).0);
+                    }
+                    self.hardware_cursor_enabled = true;
+                },
+                CursorMode::Software => {
+                    // Disable hardware cursor
+                    unsafe {
+                        let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+                        let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+                        control_port.write(CURSOR_MODE_REGISTER);
+                        data_port.write(0x20); // Bit 5 set to disable hardware cursor
+                    }
+                    self.hardware_cursor_enabled = false;
+                }
+            }
+
+            self.cursor_mode = mode;
+            self.update_cursor();
+        });
+    }
 
     pub fn update_cursor(&mut self) {
         use x86_64::instructions::interrupts;
 
         interrupts::without_interrupts(|| {
-            // First clear any existing cursor
-            self.restore_previous_cursor();
+            match self.cursor_mode {
+                CursorMode::Hardware => {
+                    if self.hardware_cursor_enabled {
+                        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+                        unsafe {
+                            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+                            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Update software cursor state only
-            if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
-                let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
-                self.previous_char_color = current_char.color_code;
-                self.previous_cursor_pos = (self.row_position, self.column_position);
+                            control_port.write(CURSOR_LOCATION_LOW_REG);
+                            data_port.write((pos & 0xFF) as u8);
 
-                self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
-                    ascii_character: match self.cursor_style {
-                        CursorStyle::Block => current_char.ascii_character,
-                        CursorStyle::Underscore => b'_',
-                        CursorStyle::Line => b'|',
-                    },
-                    color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
-                });
+                            control_port.write(CURSOR_LOCATION_HIGH_REG);
+                            data_port.write(((pos >> 8) & 0xFF) as u8);
+                        }
+                    }
+                },
+                CursorMode::Software => {
+                    // First clear any existing cursor
+                    self.restore_previous_cursor();
+
+                    if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
+                        let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
+                        self.previous_char_color = current_char.color_code;
+                        self.previous_cursor_pos = (self.row_position, self.column_position);
+
+                        self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
+                            ascii_character: match self.cursor_style {
+                                CursorStyle::Block => current_char.ascii_character,
+                                CursorStyle::Underscore => b'_',
+                                CursorStyle::Line => b'|',
+                            },
+                            color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
+                        });
+                    }
+                }
+            }
+        });
     }
 }
 
@@ -495,19 +561,30 @@ impl fmt::Write for Writer {
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = {
         let mut writer = Writer {
-            row_position: 0,
+            // Basic positioning
             column_position: 0,
+            row_position: 0,
+
+            // Default colors and buffer
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+
+            // Prompt settings
             prompt_length: 2,
             is_wrapped: false,
             protected_region: ProtectedRegion::new(0, 0, 2),
+
+                // Cursor state tracking
                 previous_cursor_pos: (0, 0),
                 previous_char_color: ColorCode::new(Color::White, Color::Black),
-                cursor_visible: false,  // Start with cursor disabled
+                cursor_visible: true,
                 cursor_blink_counter: 0,
                 cursor_style: CursorStyle::Underscore,
                 cursor_color: NORMAL_CURSOR,
+
+                // New cursor mode settings
+                cursor_mode: CursorMode::Hardware,
+                hardware_cursor_enabled: false,
         };
 
         // Clear the screen first
@@ -515,14 +592,23 @@ lazy_static! {
             writer.clear_row(row);
         }
 
-        // Now enable the cursor
-        writer.enable_cursor();
+        // Initialize with hardware cursor
+        writer.switch_cursor_mode(CursorMode::Hardware);
 
-        // Force an initial cursor update
+        // Set initial cursor position
         writer.update_cursor();
 
+        // Wrap in Mutex
         Mutex::new(writer)
     };
+}
+
+// Public function to switch cursor modes
+pub fn switch_cursor_mode(mode: CursorMode) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().switch_cursor_mode(mode);
+    });
 }
 
 pub fn backspace() {
