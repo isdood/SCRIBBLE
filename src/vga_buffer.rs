@@ -199,7 +199,6 @@ impl Writer {
                 // Update cursor only once at the end
                 self.update_cursor();
             });
-        }
     }
 
     pub fn write_string(&mut self, s: &str) {
