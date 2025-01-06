@@ -1,6 +1,8 @@
-use x86_64::structures::paging::OffsetPageTable;
-use x86_64::VirtAddr;
-use x86_64::structures::paging::PageTable;
+use x86_64::structures::paging::{
+    FrameAllocator, Mapper, Page, PageTable, PhysFrame, Size4KiB, OffsetPageTable
+};
+use x86_64::{PhysAddr, VirtAddr};
+use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 
 pub struct BootInfoFrameAllocator {
     memory_map: &'static MemoryMap,

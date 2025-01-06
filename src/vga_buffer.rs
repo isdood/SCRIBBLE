@@ -150,3 +150,55 @@ pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
     WRITER.lock().write_fmt(args).unwrap();
 }
+
+pub fn backspace() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        if writer.column_position > 0 {
+            writer.column_position -= 1;
+            writer.buffer.chars[writer.row_position][writer.column_position].write(ScreenChar {
+                ascii_character: b' ',
+                color_code: writer.color_code,
+            });
+            writer.update_cursor();
+        }
+    });
+}
+
+pub fn clear_screen() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        for row in 0..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                writer.buffer.chars[row][col].write(ScreenChar {
+                    ascii_character: b' ',
+                    color_code: writer.color_code,
+                });
+            }
+        }
+        writer.column_position = 0;
+        writer.row_position = 0;
+        writer.update_cursor();
+    });
+}
+
+pub fn enable_cursor() {
+    use x86_64::instructions::interrupts;
+    use x86_64::instructions::port::Port;
+
+    interrupts::without_interrupts(|| {
+        let mut port_3d4 = Port::new(0x3D4);
+        let mut port_3d5 = Port::new(0x3D5);
+
+        unsafe {
+            port_3d4.write(0x0A_u8);
+            port_3d5.write(0x20_u8);
+        }
+    });
+}
+
+pub fn set_input_mode(enabled: bool) {
+    WRITER.lock().set_input_mode(enabled);
+}
