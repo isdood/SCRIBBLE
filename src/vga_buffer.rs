@@ -12,7 +12,7 @@ const CURSOR_PORT_CTRL: u16 = 0x3D4;
 const CURSOR_PORT_DATA: u16 = 0x3D5;
 
 const CURSOR_START_LINE: u8 = 0;   // Start from top of character
-const CURSOR_END_LINE: u8 = 15;   //  End at bottom of character
+const CURSOR_END_LINE: u8 = 15;    // End at bottom of character
 ////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -222,19 +222,7 @@ impl Writer {
             // Force a cursor update
             self.update_cursor();
         }
-        // If we're at start of line and not at top row, move to end of previous line
-        else if self.row_position > 0 {
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-
-            let blank = ScreenChar {
-                ascii_character: b' ',
-                color_code: self.color_code,
-            };
-            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-
-            self.update_cursor();
-        }
+    }
 }
 
 impl fmt::Write for Writer {
@@ -301,7 +289,6 @@ pub fn enable_cursor() {
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
-
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
     });
