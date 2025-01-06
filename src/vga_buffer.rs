@@ -140,6 +140,7 @@ impl Writer {
     pub fn set_input_mode(&mut self, active: bool) {
         self.input_mode = active;
         if active {
+            self.new_line(); // Move to a new line before writing the prompt
             self.write_prompt();
         }
     }
@@ -168,7 +169,7 @@ impl Writer {
         }
     }
 
-    // Fix the write_str method to avoid infinite recursion
+    // Handle the unused result warning
     pub fn write_str(&mut self, s: &str) -> fmt::Result {
         for byte in s.bytes() {
             match byte {
