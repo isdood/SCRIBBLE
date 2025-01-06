@@ -22,8 +22,10 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 }
 
 fn print_prompt() {
-    use scribble::print;
-    print!("> ");
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        WRITER.lock().write_prompt();
+    });
 }
 
 #[panic_handler]
