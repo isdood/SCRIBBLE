@@ -142,6 +142,18 @@ impl Writer {
             }
         }
     }
+
+    pub fn set_input_mode(&mut self, enabled: bool) {
+        // You can add additional functionality here if needed
+        if enabled {
+            self.write_string("> ");
+        }
+    }
+
+    pub fn new_line_public(&mut self) {
+        self.new_line();
+    }
+
 }
 
 impl fmt::Write for Writer {
