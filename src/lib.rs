@@ -17,7 +17,6 @@ pub mod vga_buffer;
 pub mod keyboard;
 
 use bootloader::BootInfo;
-use x86_64::VirtAddr;
 use core::alloc::Layout;
 
 #[macro_export]

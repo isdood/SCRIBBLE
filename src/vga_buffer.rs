@@ -1,7 +1,6 @@
 use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use volatile::Volatile;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
