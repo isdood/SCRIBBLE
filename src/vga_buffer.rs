@@ -92,13 +92,32 @@ pub struct Writer {
 }
 
 impl Writer {
-    fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write_char(blank);
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            0x08 => self.backspace(),
+            b'\n' => self.new_line(),
+            byte => {
+                if self.is_new_line {
+                    self.write_prompt();
+                    self.is_new_line = false;
+                }
+
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                    return;
+                }
+
+                let row = self.row_position;
+                let col = self.column_position;
+
+                self.buffer.chars[row][col].write_char(ScreenChar {
+                    ascii_character: byte,
+                    color_code: self.color_code,
+                });
+
+                self.column_position += 1;
+                self.update_cursor();
+            }
         }
     }
 
@@ -108,6 +127,67 @@ impl Writer {
                 0x20..=0x7e | b'\n' | 0x08 => self.write_byte(byte),
                 _ => self.write_byte(0xfe),
             }
+        }
+    }
+
+    pub fn write_prompt(&mut self) {
+        if self.column_position == 0 {
+            self.write_string("> ");
+            self.column_position = self.prompt_length;
+            self.update_cursor();
+        }
+    }
+
+    pub fn backspace(&mut self) {
+        if self.column_position <= self.prompt_length &&
+            (self.row_position == 0 || self.column_position == self.prompt_length) {
+                return;
+            }
+
+            if self.column_position > 0 {
+                self.column_position -= 1;
+                let blank = ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                };
+                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+                self.update_cursor();
+            } else if self.row_position > 0 {
+                self.row_position -= 1;
+                self.column_position = BUFFER_WIDTH - 1;
+                let blank = ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                };
+                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+                self.update_cursor();
+            }
+    }
+
+    fn new_line(&mut self) {
+        if self.row_position < BUFFER_HEIGHT - 1 {
+            self.row_position += 1;
+        } else {
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    let character = self.buffer.chars[row][col].read_char();
+                    self.buffer.chars[row - 1][col].write_char(character);
+                }
+            }
+            self.clear_row(BUFFER_HEIGHT - 1);
+        }
+        self.column_position = 0;
+        self.is_new_line = true;
+        self.update_cursor();
+    }
+
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write_char(blank);
         }
     }
 
@@ -149,6 +229,7 @@ impl Writer {
     }
 }
 
+// Write trait implementation
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_string(s);
