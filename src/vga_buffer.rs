@@ -235,7 +235,9 @@ impl Writer {
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
 
             self.update_cursor();
+
         }
+    }
 }
 
 impl fmt::Write for Writer {
