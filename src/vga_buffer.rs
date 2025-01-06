@@ -222,7 +222,6 @@ impl Writer {
             // Force a cursor update
             self.update_cursor();
         }
-}
         // If we're at start of line and not at top row, move to end of previous line
         else if self.row_position > 0 {
             self.row_position -= 1;
@@ -235,9 +234,7 @@ impl Writer {
             self.buffer.chars[self.row_position][self.column_position].write_char(blank);
 
             self.update_cursor();
-
         }
-    }
 }
 
 impl fmt::Write for Writer {
