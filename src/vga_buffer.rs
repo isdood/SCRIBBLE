@@ -46,7 +46,6 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
-// Add Deref and DerefMut implementations for ScreenChar
 impl Deref for ScreenChar {
     type Target = ScreenChar;
 
@@ -71,7 +70,7 @@ pub struct Writer {
     row_position: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
-    prompt_active: bool,
+    input_mode: bool,
 }
 
 lazy_static! {
@@ -85,55 +84,6 @@ lazy_static! {
 }
 
 impl Writer {
-    pub fn clear_row(&mut self, row: usize) {
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-        for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
-        }
-    }
-
-    pub fn update_cursor(&mut self) {
-        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
-        unsafe {
-            use x86_64::instructions::port::Port;
-            let mut port_3d4 = Port::new(0x3D4);
-            let mut port_3d5 = Port::new(0x3D5);
-
-            port_3d4.write(0x0F_u8);
-            port_3d5.write((pos & 0xFF) as u8);
-            port_3d4.write(0x0E_u8);
-            port_3d5.write(((pos >> 8) & 0xFF) as u8);
-        }
-    }
-
-    pub fn new_line(&mut self) {
-        if self.row_position < BUFFER_HEIGHT - 1 {
-            self.row_position += 1;
-        } else {
-            for row in 1..BUFFER_HEIGHT {
-                for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
-                    self.buffer.chars[row - 1][col].write(character);
-                }
-            }
-            self.clear_row(BUFFER_HEIGHT - 1);
-        }
-        self.column_position = 0;
-        self.update_cursor();
-    }
-
-    pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
-            }
-        }
-    }
-
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => {
@@ -167,6 +117,41 @@ impl Writer {
         }
     }
 
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
+            }
+        }
+    }
+
+    pub fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write(blank);
+        }
+    }
+
+    pub fn new_line(&mut self) {
+        if self.row_position < BUFFER_HEIGHT - 1 {
+            self.row_position += 1;
+        } else {
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col].write(character);
+                }
+            }
+            self.clear_row(BUFFER_HEIGHT - 1);
+        }
+        self.column_position = 0;
+        self.update_cursor();
+    }
+
     pub fn write_prompt(&mut self) {
         self.write_byte(b'>');
         self.write_byte(b' ');
@@ -179,6 +164,19 @@ impl Writer {
         }
     }
 
+    pub fn update_cursor(&mut self) {
+        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        unsafe {
+            use x86_64::instructions::port::Port;
+            let mut port_3d4 = Port::new(0x3D4);
+            let mut port_3d5 = Port::new(0x3D5);
+
+            port_3d4.write(0x0F_u8);
+            port_3d5.write((pos & 0xFF) as u8);
+            port_3d4.write(0x0E_u8);
+            port_3d5.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
 }
 
 impl fmt::Write for Writer {
@@ -208,6 +206,28 @@ pub fn _print(args: fmt::Arguments) {
     });
 }
 
+pub fn backspace() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        if !writer.input_mode || writer.column_position <= 2 {
+            return;
+        }
+
+        let row = writer.row_position;
+        let col = writer.column_position - 1;
+        writer.column_position = col;
+
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: ColorCode::new(Color::Green, Color::Black),
+        };
+
+        writer.buffer.chars[row][col].write(blank);
+        writer.update_cursor();
+    });
+}
+
 pub fn set_input_mode(active: bool) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
@@ -215,7 +235,6 @@ pub fn set_input_mode(active: bool) {
     });
 }
 
-// And update the public interface functions:
 pub fn clear_screen() {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
@@ -232,7 +251,7 @@ pub fn clear_screen() {
 pub fn init() {
     clear_screen();
     enable_cursor();
-    set_input_mode(true); // This will show the initial prompt
+    set_input_mode(true);
 }
 
 pub fn enable_cursor() {
@@ -252,27 +271,5 @@ pub fn enable_cursor() {
             let current = port_3d5.read();
             port_3d5.write(current & !0x20);
         }
-    });
-}
-
-pub fn backspace() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        let mut writer = WRITER.lock();
-        if !writer.input_mode || writer.column_position <= 2 {
-            return;
-        }
-
-        let row = writer.row_position;
-        let col = writer.column_position - 1;  // Store position before modification
-        writer.column_position = col;
-
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: ColorCode::new(Color::Green, Color::Black),
-        };
-
-        writer.buffer.chars[row][col].write(blank);
-        writer.update_cursor();
     });
 }

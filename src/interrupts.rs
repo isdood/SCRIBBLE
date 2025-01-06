@@ -40,7 +40,7 @@ lazy_static! {
         idt[InterruptIndex::Timer.as_usize()]
         .set_handler_fn(timer_interrupt_handler);
         idt[InterruptIndex::Keyboard.as_usize()]
-        .set_handler_fn(crate::keyboard::keyboard_interrupt_handler); // Use the keyboard handler from keyboard module
+        .set_handler_fn(crate::keyboard::keyboard_interrupt_handler);
         idt.page_fault.set_handler_fn(page_fault_handler);
         idt
     };
@@ -85,6 +85,5 @@ extern "x86-interrupt" fn double_fault_handler(
 
     #[test_case]
     fn test_breakpoint_exception() {
-        // invoke a breakpoint exception
         x86_64::instructions::interrupts::int3();
     }
