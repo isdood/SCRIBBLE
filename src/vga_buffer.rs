@@ -158,6 +158,8 @@ impl Writer {
                 }
             },
             b'\n' => {
+                // Clear cursor before newline
+                self.restore_previous_cursor();
                 self.new_line();
                 self.is_wrapped = false;
             },
@@ -169,6 +171,9 @@ impl Writer {
 
                 // Only write if we're not in protected region
                 if !self.protected_region.contains(self.row_position, self.column_position) {
+                    // Clear any existing cursor at the current position
+                    self.restore_previous_cursor();
+
                     let row = self.row_position;
                     let col = self.column_position;
 
@@ -194,11 +199,12 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
-        // Save current cursor state
+        // Save cursor state and clear existing cursor
         let current_cursor_visible = self.cursor_visible;
         self.cursor_visible = false;
-        self.restore_previous_cursor();  // Clear current cursor
+        self.restore_previous_cursor();
 
+        // Reset cursor position
         self.column_position = 0;
         self.is_wrapped = false;
 
@@ -210,6 +216,15 @@ impl Writer {
         let prompt_color = ColorCode::new(Color::Yellow, Color::Black);
 
         for (i, &ch) in prompt_chars.iter().enumerate() {
+            // Clear any existing cursor artifacts first
+            let existing = self.buffer.chars[self.row_position][i].read_char();
+            if existing.ascii_character == b'_' || existing.ascii_character == b'|' {
+                self.buffer.chars[self.row_position][i].write_char(ScreenChar {
+                    ascii_character: b' ',
+                    color_code: self.color_code,
+                });
+            }
+
             self.buffer.chars[self.row_position][i].write_char(ScreenChar {
                 ascii_character: ch,
                 color_code: prompt_color,
@@ -268,6 +283,9 @@ impl Writer {
     }
 
     fn new_line(&mut self) {
+        // Clear cursor at current position before moving
+        self.restore_previous_cursor();
+
         if self.row_position < BUFFER_HEIGHT - 1 {
             self.row_position += 1;
         } else {

@@ -24,6 +24,12 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     scribble::init(boot_info);
     println!("Initialization complete.");
 
+    // Clear any potential cursor artifacts
+    {
+        let mut writer = scribble::vga_buffer::WRITER.lock();
+        writer.restore_previous_cursor();
+    }
+
     // Add an explicit newline before the prompt
     print!("\n");
     // Write the first prompt
