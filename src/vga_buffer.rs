@@ -1,14 +1,12 @@
 // IMPORTS //
-
 use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 
-// END //
-
-
 // CONSTANTS //
+pub const BUFFER_HEIGHT: usize = 25;
+pub const BUFFER_WIDTH: usize = 80;
 
 // VGA cursor control registers and values
 const CURSOR_PORT_CTRL: u16 = 0x3D4;
@@ -23,8 +21,6 @@ const CURSOR_LOCATION_LOW_REG: u8 = 0x0F;
 // Cursor shape - for underscore cursor
 const CURSOR_START_LINE: u8 = 15;  // Start at the bottom line
 const CURSOR_END_LINE: u8 = 15;    // End at the bottom line
-
-// END //
 
 //  //
 
