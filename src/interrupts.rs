@@ -104,15 +104,17 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
 
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
+            let mut writer = WRITER.lock();
+            writer.set_input_mode(true);  // Ensure we're in input mode for keyboard input
+
             match key {
                 DecodedKey::Unicode(character) => {
                     match character {
                         '\n' => {
                             println!();
-                            print!("> ");
                         },
                         '\u{8}' => { // Backspace
-                            crate::vga_buffer::backspace();
+                            writer.backspace();
                         },
                         _ => {
                             print!("{}", character);
