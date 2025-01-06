@@ -175,9 +175,9 @@ impl Writer {
 
             // Set cursor shape
             control_port.write(0x0A_u8);
-            port_3d5.write(0x0F_u8);  // Start scan line
+            data_port.write(0x0F_u8);  // Changed port_3d5 to data_port
             control_port.write(0x0B_u8);
-            port_3d5.write(0x0F_u8);  // End scan line
+            data_port.write(0x0F_u8);  // Changed port_3d5 to data_port
         }
     }
 }
