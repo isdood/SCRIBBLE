@@ -332,6 +332,8 @@ impl Writer {
         });
     }
 
+
+
     pub fn update_cursor(&mut self) {
         use x86_64::instructions::interrupts;
 
@@ -353,7 +355,6 @@ impl Writer {
                     },
                     color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
                 });
-            }
     }
 }
 
