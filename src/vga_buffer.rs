@@ -362,7 +362,6 @@ impl Writer {
                     color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
                 });
             }
-        });
     }
 
     pub fn enable_cursor(&mut self) {
