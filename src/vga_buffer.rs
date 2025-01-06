@@ -91,7 +91,7 @@ pub struct Writer {
 impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
-            0x08 | 0x7F => self.backspace(), // Handle both backspace and delete
+            0x08 => self.backspace(), // Only handle backspace, not delete (0x7F)
             b'\n' => self.new_line(),
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
@@ -112,11 +112,43 @@ impl Writer {
         }
     }
 
+    pub fn backspace(&mut self) {
+        if self.column_position > 0 {
+            // Move back one position
+            self.column_position -= 1;
+
+            // Write a space at the current position
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+
+            // Update cursor to new position
+            self.update_cursor();
+        } else if self.row_position > 0 {
+            // Move to end of previous line
+            self.row_position -= 1;
+            self.column_position = BUFFER_WIDTH - 1;
+
+            // Write a space at the current position
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+
+            // Update cursor to new position
+            self.update_cursor();
+        }
+    }
+
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                _ => self.write_byte(0xfe),
+                // Only accept printable ASCII bytes and newline
+                0x20..=0x7e | b'\n' | 0x08 => self.write_byte(byte),
+                _ => self.write_byte(0xfe), // Print ■ for invalid characters
             }
         }
     }
@@ -187,40 +219,6 @@ impl Writer {
             // Re-enable cursor
             control_port.write(0x0A_u8);
             data_port.write(CURSOR_START_LINE);  // This also clears bit 5, enabling the cursor
-        }
-    }
-
-    pub fn backspace(&mut self) {
-        // First store current position
-        let current_row = self.row_position;
-        let current_col = self.column_position;
-
-        // Create blank character
-        let blank = ScreenChar {
-            ascii_character: b' ',
-            color_code: self.color_code,
-        };
-
-        // Handle backspace
-        if current_col > 0 {
-            // Move cursor back
-            self.column_position -= 1;
-
-            // Explicitly overwrite the character at the current position
-            self.buffer.chars[current_row][self.column_position].write_char(blank);
-
-            // Force a cursor update
-            self.update_cursor();
-        } else if current_row > 0 {
-            // Move to previous line
-            self.row_position -= 1;
-            self.column_position = BUFFER_WIDTH - 1;
-
-            // Explicitly overwrite the character
-            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-
-            // Force a cursor update
-            self.update_cursor();
         }
     }
 }
