@@ -10,11 +10,11 @@ entry_point!(kernel_main);
 
 #[no_mangle]
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    println!("Hello World!");
+    println!("Welcome to Scribble!");
 
     scribble::init(boot_info);
 
-    println!("Initialization complete!");
+    println!("Initialization complete.");
     print_prompt();
 
     loop {

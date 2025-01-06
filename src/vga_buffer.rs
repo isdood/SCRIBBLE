@@ -113,27 +113,33 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        let at_prompt_position = self.column_position <= self.prompt_length && self.row_position == 0;
+        // First check if we're at or before the prompt position on any line
+        if self.row_position == 0 && self.column_position <= self.prompt_length {
+            return; // Prevent backspace at or before prompt
+        }
 
-        if !at_prompt_position {
-            if self.column_position > 0 {
-                self.column_position -= 1;
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-                self.update_cursor();
-            } else if self.row_position > 0 {
-                self.row_position -= 1;
+        if self.column_position > 0 {
+            self.column_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+            self.update_cursor();
+        } else if self.row_position > 0 {
+            // When going to previous line, check if it's the first line
+            if self.row_position == 1 && self.prompt_length > 0 {
+                self.column_position = self.prompt_length; // Start after prompt
+            } else {
                 self.column_position = BUFFER_WIDTH - 1;
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-                self.update_cursor();
             }
+            self.row_position -= 1;
+            let blank = ScreenChar {
+                ascii_character: b' ',
+                color_code: self.color_code,
+            };
+            self.buffer.chars[self.row_position][self.column_position].write_char(blank);
+            self.update_cursor();
         }
     }
 
@@ -165,8 +171,11 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.column_position = 0;
-        self.write_string("> ");
-        self.column_position = self.prompt_length;
+        // Only write prompt if we're not initializing
+        if self.prompt_length > 0 {
+            self.write_string("> ");
+            self.column_position = self.prompt_length;
+        }
         self.update_cursor();
     }
 
@@ -239,6 +248,7 @@ lazy_static! {
         }
         writer.enable_cursor();
         writer.update_cursor();
+        // Don't write prompt here - let the kernel_main do it
         Mutex::new(writer)
     };
 }
