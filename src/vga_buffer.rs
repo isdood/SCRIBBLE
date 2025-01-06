@@ -302,40 +302,51 @@ impl Writer {
             return;
         }
 
-        // Restore the character at the previous cursor position
+        // Always restore the previous position first
         let (prev_row, prev_col) = self.previous_cursor_pos;
         if prev_row < BUFFER_HEIGHT && prev_col < BUFFER_WIDTH {
             let prev_char = self.buffer.chars[prev_row][prev_col].read_char();
+            // Important: Restore with the original color, not the cursor color
             self.buffer.chars[prev_row][prev_col].write_char(ScreenChar {
                 ascii_character: prev_char.ascii_character,
                 color_code: self.previous_char_color,
             });
         }
 
-        // Save current character's state before modifying it
+        // Save the current character's state
         let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
-        self.previous_char_color = current_char.color_code;
+        self.previous_char_color = current_char.color_code;  // Save the original color
         self.previous_cursor_pos = (self.row_position, self.column_position);
 
-        // Only show cursor if it's visible (for blinking)
+        // Only update if cursor is visible
         if self.cursor_visible {
-            // Determine cursor character based on style and current character
+            // Determine cursor character
             let cursor_char = match self.cursor_style {
                 CursorStyle::Block => current_char.ascii_character,
-                CursorStyle::Underscore => if current_char.ascii_character == b' ' {
-                    b'_'
-                } else {
-                    current_char.ascii_character
-                },
+                CursorStyle::Underscore => if current_char.ascii_character == b' ' { b'_' } else { current_char.ascii_character },
                 CursorStyle::Line => b'|',
             };
 
-            // Write the cursor with current cursor color
+            // Update current position with cursor
             self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
                 ascii_character: cursor_char,
                 color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
             });
         }
+
+        // Update hardware cursor
+        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+        unsafe {
+            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+            control_port.write(CURSOR_LOCATION_LOW_REG);
+            data_port.write((pos & 0xFF) as u8);
+
+            control_port.write(CURSOR_LOCATION_HIGH_REG);
+            data_port.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
 
         // Update hardware cursor position for compatibility
         let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
