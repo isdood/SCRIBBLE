@@ -297,15 +297,15 @@ impl Writer {
             // Set cursor shape
             control_port.write(0x0A);
             let mut cursor_config = data_port.read() & 0xC0;  // Keep the top bits
-            cursor_config |= CURSOR_START_LINE;  // Start scan line
+            cursor_config |= 13;  // Start scan line, set to near bottom
             data_port.write(cursor_config);
 
             control_port.write(0x0B);
             cursor_config = data_port.read() & 0xE0;  // Keep the top 3 bits
-            cursor_config |= CURSOR_END_LINE;   // End scan line
+            cursor_config |= 13;  // End scan line, same as start for underscore
             data_port.write(cursor_config);
 
-            // Enable cursor
+            // Enable cursor (register 0x0A, value 0x00 enables cursor)
             control_port.write(0x0A);
             data_port.write(0x00);
         }
