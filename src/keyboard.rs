@@ -2,10 +2,9 @@ use x86_64::structures::idt::InterruptStackFrame;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::interrupts::PIC_1_OFFSET;
 
 lazy_static! {
-    pub static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
+    static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
     Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore));
 }
 

@@ -1,8 +1,6 @@
 use volatile::Volatile;
-use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use core::ops::{Deref, DerefMut};
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -74,13 +72,7 @@ pub struct Writer {
 }
 
 lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        row_position: 0,
-        color_code: ColorCode::new(Color::White, Color::Black),
-                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-                                                      input_mode: false,
-    });
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer::new());
 }
 
 ////////// Debug messages \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\

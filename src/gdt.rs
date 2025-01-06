@@ -14,16 +14,6 @@ struct Stack(#[allow(dead_code)] [u8; STACK_SIZE]);  // Add allow(dead_code) att
 static DOUBLE_FAULT_STACK: Stack = Stack([0; STACK_SIZE]);
 
 lazy_static! {
-    static ref TSS: TaskStateSegment = {
-        let mut tss = TaskStateSegment::new();
-        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
-            let stack_start = VirtAddr::from_ptr(&DOUBLE_FAULT_STACK);
-            let stack_end = stack_start + STACK_SIZE;
-            stack_end
-        };
-        tss
-    };
-
     static ref GDT: (GlobalDescriptorTable, Selectors) = {
         let mut gdt = GlobalDescriptorTable::new();
         let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());

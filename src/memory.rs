@@ -1,14 +1,9 @@
 //
 use x86_64::{
-    structures::paging::{
-        PageTable, PhysFrame, Size4KiB,
-        FrameAllocator, OffsetPageTable,
-    },
-    VirtAddr, PhysAddr,
+    structures::paging::{PageTable, PhysFrame, Mapper, Size4KiB, FrameAllocator},
+    PhysAddr, VirtAddr,
 };
-
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
-use crate::println;
 
 /// Initialize a new OffsetPageTable.
 pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {

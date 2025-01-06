@@ -1,11 +1,5 @@
-use x86_64::{
-    structures::paging::{
-        mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
-    },
-    VirtAddr,
-};
+use x86_64::structures::paging::{mapper::MapToError, Page, PageTable, PhysFrame, Size4KiB};
 use linked_list_allocator::LockedHeap;
-use crate::println;  // Add this line
 
 pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB

@@ -1,4 +1,5 @@
 use x86_64::instructions::port::Port;
+use lazy_static::lazy_static;
 
 pub struct RTC {
     address: Port<u8>,
@@ -51,6 +52,6 @@ impl RTC {
     }
 }
 
-lazy_static::lazy_static! {
-    pub static ref RTC_DEVICE: spin::Mutex<RTC> = spin::Mutex::new(RTC::new());
+lazy_static! {
+    pub static ref RTC_DEVICE: Mutex<RTC> = Mutex::new(RTC::new());
 }

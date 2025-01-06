@@ -16,8 +16,8 @@ pub mod keyboard;
 pub mod allocator;
 pub mod rtc;
 
-use bootloader::BootInfo;
 use x86_64::VirtAddr;
+use bootloader::BootInfo;
 
 pub fn show_datetime() {
     let mut rtc = rtc::RTC_DEVICE.lock();
