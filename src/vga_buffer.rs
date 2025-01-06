@@ -6,6 +6,9 @@ use x86_64::instructions::port::Port;
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
+const CURSOR_START: u8 = 14;  // Cursor start scan line
+const CURSOR_END: u8 = 15;    // Cursor end scan line
+
 // VGA hardware cursor ports
 const CURSOR_PORT_CTRL: u16 = 0x3D4;
 const CURSOR_PORT_DATA: u16 = 0x3D5;
@@ -78,6 +81,32 @@ pub struct Writer {
 }
 
 impl Writer {
+
+    fn init_cursor(&mut self) {
+        unsafe {
+            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+            // Select cursor start register (0x0A)
+            control_port.write(0x0A);
+            // Set cursor start line and disable cursor (clear bit 5)
+            data_port.write(CURSOR_START & 0x1F);
+
+            // Select cursor end register (0x0B)
+            control_port.write(0x0B);
+            // Set cursor end line
+            data_port.write(CURSOR_END & 0x1F);
+
+            // Enable cursor (clear bit 5 of cursor start register)
+            control_port.write(0x0A);
+            let current = data_port.read();
+            data_port.write(current & 0x1F);
+
+            // Initialize cursor position
+            self.update_cursor();
+        }
+    }
+
     fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -138,15 +167,14 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Set cursor position high byte
-            control_port.write(0x0E);
-            data_port.write(((pos >> 8) & 0xFF) as u8);
-
-            // Set cursor position low byte
+            // Low byte
             control_port.write(0x0F);
             data_port.write((pos & 0xFF) as u8);
+
+            // High byte
+            control_port.write(0x0E);
+            data_port.write(((pos >> 8) & 0xFF) as u8);
         }
-    }
 
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
@@ -168,12 +196,16 @@ impl fmt::Write for Writer {
 }
 
 lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        row_position: 0,
-        color_code: ColorCode::new(Color::White, Color::Black),
-                                                      buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    });
+    pub static ref WRITER: Mutex<Writer> = {
+        let mut writer = Writer {
+            column_position: 0,
+            row_position: 0,
+            color_code: ColorCode::new(Color::White, Color::Black),
+            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+        };
+        writer.init_cursor();  // Initialize the cursor
+        Mutex::new(writer)
+    };
 }
 
 #[doc(hidden)]
