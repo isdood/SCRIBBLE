@@ -140,6 +140,7 @@ pub struct Writer {
     cursor_visible: bool,
     cursor_blink_counter: u8,
     cursor_style: CursorStyle,
+    cursor_color: (Color, Color),
 }
 
 impl Writer {
@@ -318,29 +319,35 @@ impl Writer {
 
         // Only show cursor if it's visible (for blinking)
         if self.cursor_visible {
-            // Set cursor character based on style
+            // Determine cursor character based on style and current character
             let cursor_char = match self.cursor_style {
                 CursorStyle::Block => current_char.ascii_character,
-                CursorStyle::Underscore => if current_char.ascii_character == b' ' { b'_' } else { current_char.ascii_character },
+                CursorStyle::Underscore => if current_char.ascii_character == b' ' {
+                    b'_'
+                } else {
+                    current_char.ascii_character
+                },
                 CursorStyle::Line => b'|',
             };
 
-            // Write the cursor with appropriate color
+            // Write the cursor with current cursor color
             self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
                 ascii_character: cursor_char,
-                color_code: ColorCode::new(NORMAL_CURSOR.0, NORMAL_CURSOR.1),
+                color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
             });
         }
 
-        // Update hardware cursor position (keep this for compatibility)
+        // Update hardware cursor position for compatibility
         let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
+            // Update low byte
             control_port.write(CURSOR_LOCATION_LOW_REG);
             data_port.write((pos & 0xFF) as u8);
 
+            // Update high byte
             control_port.write(CURSOR_LOCATION_HIGH_REG);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
@@ -366,7 +373,7 @@ impl Writer {
     }
 
     pub fn set_cursor_color(&mut self, foreground: Color, background: Color) {
-        self.NORMAL_CURSOR = (foreground, background);
+        self.cursor_color = (foreground, background);
         self.update_cursor();
     }
 
@@ -384,24 +391,40 @@ impl fmt::Write for Writer {
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = {
         let mut writer = Writer {
+            // Basic positioning
             column_position: 0,
             row_position: 0,
+
+            // Default colors and buffer
             color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+
+            // Prompt settings
             prompt_length: 2,
             is_wrapped: false,
             protected_region: ProtectedRegion::new(0, 0, 2),
+
+                // Cursor state tracking
                 previous_cursor_pos: (0, 0),
                 previous_char_color: ColorCode::new(Color::White, Color::Black),
                 cursor_visible: true,
                 cursor_blink_counter: 0,
                 cursor_style: CursorStyle::Underscore,
+                cursor_color: NORMAL_CURSOR,
         };
+
+        // Initialize the display
         writer.enable_cursor();
+
+        // Clear the screen
         for row in 0..BUFFER_HEIGHT {
             writer.clear_row(row);
         }
+
+        // Set initial cursor position
         writer.update_cursor();
+
+        // Wrap in Mutex
         Mutex::new(writer)
     };
 }
