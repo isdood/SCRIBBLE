@@ -194,10 +194,10 @@ impl Writer {
     }
 
     pub fn write_prompt(&mut self) {
-        // Save current cursor state
+        // Save current cursor state and temporarily disable it
         let current_cursor_visible = self.cursor_visible;
         self.cursor_visible = false;
-        self.update_cursor();  // Clear current cursor
+        self.restore_previous_cursor();  // Clear current cursor
 
         self.column_position = 0;
         self.is_wrapped = false;
@@ -205,18 +205,16 @@ impl Writer {
         // Set up protected region for new prompt
         self.protected_region = ProtectedRegion::new(self.row_position, 0, self.prompt_length);
 
-        // Set prompt color to yellow
+        // Write prompt characters in yellow
+        let prompt_chars = [b'>', b' '];
         let prompt_color = ColorCode::new(Color::Yellow, Color::Black);
 
-        // Write prompt characters
-        self.buffer.chars[self.row_position][0].write_char(ScreenChar {
-            ascii_character: b'>',
-            color_code: prompt_color,
-        });
-        self.buffer.chars[self.row_position][1].write_char(ScreenChar {
-            ascii_character: b' ',
-            color_code: prompt_color,
-        });
+        for (i, &ch) in prompt_chars.iter().enumerate() {
+            self.buffer.chars[self.row_position][i].write_char(ScreenChar {
+                ascii_character: ch,
+                color_code: prompt_color,
+            });
+        }
 
         self.column_position = self.prompt_length;
 
@@ -226,8 +224,12 @@ impl Writer {
     }
 
     pub fn backspace(&mut self) {
-        // First, clear current cursor
+        // Clear current cursor first
         self.restore_previous_cursor();
+
+        // Save cursor state
+        let current_cursor_visible = self.cursor_visible;
+        self.cursor_visible = false;
 
         // Check if we would enter protected region
         let next_pos = if self.column_position == 0 {
@@ -245,7 +247,7 @@ impl Writer {
                 return;
             }
 
-            // Perform backspace if we're not entering protected region
+            // Perform backspace
             if self.column_position == 0 && self.row_position > 0 {
                 let blank = ScreenChar {
                     ascii_character: b' ',
@@ -266,6 +268,8 @@ impl Writer {
                 self.buffer.chars[self.row_position][self.column_position].write_char(blank);
             }
 
+            // Restore cursor visibility and update
+            self.cursor_visible = current_cursor_visible;
             self.update_cursor();
     }
 
@@ -296,38 +300,44 @@ impl Writer {
     }
 
     pub fn update_cursor(&mut self) {
+        // Always clear the previous cursor first
+        self.restore_previous_cursor();
+
+        // Update cursor state
         let new_pos = (self.row_position, self.column_position);
 
-        // Only update if position changed or blinking
-        if new_pos != self.previous_cursor_pos || self.cursor_blink_counter == 0 {
-            // First, restore the previous cursor position if it exists and is valid
-            let (prev_row, prev_col) = self.previous_cursor_pos;
-            if prev_row < BUFFER_HEIGHT && prev_col < BUFFER_WIDTH {
-                let prev_char = self.buffer.chars[prev_row][prev_col].read_char();
-                self.buffer.chars[prev_row][prev_col].write_char(ScreenChar {
-                    ascii_character: prev_char.ascii_character,
-                    color_code: self.previous_char_color,
-                });
-            }
+        // Get and save current character state before modifying it
+        let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
+        self.previous_char_color = current_char.color_code;
+        self.previous_cursor_pos = new_pos;
 
-            // Get current character and save its state
-            let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
-            self.previous_char_color = current_char.color_code;
-            self.previous_cursor_pos = new_pos;
+        // Only show cursor if it's visible and not in protected region
+        if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
+            let cursor_char = match self.cursor_style {
+                CursorStyle::Block => current_char.ascii_character,
+                CursorStyle::Underscore => b'_',
+                CursorStyle::Line => b'|',
+            };
 
-            // Only show cursor if it's visible
-            if self.cursor_visible {
-                let cursor_char = match self.cursor_style {
-                    CursorStyle::Block => current_char.ascii_character,
-                    CursorStyle::Underscore => b'_',
-                    CursorStyle::Line => b'|',
-                };
+            self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
+                ascii_character: cursor_char,
+                color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
+            });
+        }
 
-                self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
-                    ascii_character: cursor_char,
-                    color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
-                });
-            }
+        // Update hardware cursor
+        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+        unsafe {
+            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+            control_port.write(CURSOR_LOCATION_LOW_REG);
+            data_port.write((pos & 0xFF) as u8);
+
+            control_port.write(CURSOR_LOCATION_HIGH_REG);
+            data_port.write(((pos >> 8) & 0xFF) as u8);
+        }
+    }
 
             // Update hardware cursor position
             let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
@@ -363,19 +373,12 @@ impl Writer {
     }
 
     pub fn blink_cursor(&mut self) {
-        self.cursor_blink_counter = (self.cursor_blink_counter + 1) % 32;
+        self.cursor_blink_counter = (self.cursor_blink_counter + 1) % 16;  // Faster blink rate
         if self.cursor_blink_counter == 0 {
-            // Save current state
-            let prev_visible = self.cursor_visible;
-
-            // Toggle visibility
             self.cursor_visible = !self.cursor_visible;
-
-            // Only update if not in protected region and state actually changed
-            if !self.protected_region.contains(self.row_position, self.column_position)
-                && prev_visible != self.cursor_visible {
-                    self.update_cursor();
-                }
+            if !self.protected_region.contains(self.row_position, self.column_position) {
+                self.update_cursor();
+            }
         }
     }
 
