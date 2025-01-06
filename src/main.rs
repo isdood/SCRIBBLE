@@ -1,9 +1,10 @@
+// in main.rs
 #![no_std]
 #![no_main]
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use scribble::println;
+use scribble::{println, vga_buffer}; // Add vga_buffer to the imports
 
 entry_point!(kernel_main);
 
@@ -17,21 +18,18 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     print_prompt();
 
     loop {
-        x86_64::instructions::hlt();  // Add this to reduce CPU usage
+        x86_64::instructions::hlt();
     }
 }
 
 fn print_prompt() {
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        WRITER.lock().write_prompt();
-    });
+    vga_buffer::write_prompt(); // Use the public interface function
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
     loop {
-        x86_64::instructions::hlt();  // Add this to reduce CPU usage
+        x86_64::instructions::hlt();
     }
 }
