@@ -346,7 +346,6 @@ impl Writer {
             control_port.write(CURSOR_LOCATION_HIGH_REG);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
-    }
 
         // Update hardware cursor position for compatibility
         let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
