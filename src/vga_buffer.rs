@@ -141,17 +141,17 @@ pub struct Writer {
 impl Writer {
 
         // Wrapper helper method
-        fn needs_wrap(&self) -> bool {
+        pub fn needs_wrap(&self) -> bool {
             self.column_position >= BUFFER_WIDTH && !self.is_wrapped
         }
 
+        // Write byte
         pub fn write_byte(&mut self, byte: u8) {
             use x86_64::instructions::interrupts;
 
             interrupts::without_interrupts(|| {
                 match byte {
                     0x08 => {
-                        // Backspace handling remains the same
                         let next_pos = if self.column_position == 0 {
                             if self.row_position > 0 {
                                 (self.row_position - 1, BUFFER_WIDTH - 1)
@@ -172,8 +172,8 @@ impl Writer {
                         self.is_wrapped = false;
                     },
                     byte => {
-                        // Handle wrapping before writing
-                        if self.column_position >= BUFFER_WIDTH {
+
+                        if self.needs_wrap() {
                             self.restore_previous_cursor();
                             self.is_wrapped = true;
                             self.new_line();
@@ -190,7 +190,6 @@ impl Writer {
                     }
                 }
 
-                // Update cursor position after any operation
                 self.update_cursor();
             });
         }
