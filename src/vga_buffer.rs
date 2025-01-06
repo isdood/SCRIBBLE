@@ -365,7 +365,7 @@ impl Writer {
     }
 
     pub fn set_cursor_color(&mut self, foreground: Color, background: Color) {
-        self.cursor_color = (foreground, background);
+        self.NORMAL_CURSOR = (foreground, background);
         self.update_cursor();
     }
 
