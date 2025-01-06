@@ -92,90 +92,67 @@ pub struct Writer {
 }
 
 impl Writer {
-    fn new_line(&mut self) {
-        if self.row_position < BUFFER_HEIGHT - 1 {
-            self.row_position += 1;
-        } else {
-            for row in 1..BUFFER_HEIGHT {
-                for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read_char();
-                    self.buffer.chars[row - 1][col].write_char(character);
-                }
-            }
-            self.clear_row(BUFFER_HEIGHT - 1);
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col].write_char(blank);
         }
-        self.column_position = 0;
-        self.is_new_line = true; // Mark that we're at a new line
-        self.update_cursor();
     }
 
-    pub fn write_byte(&mut self, byte: u8) {
-        match byte {
-            0x08 => self.backspace(),
-            b'\n' => self.new_line(),
-            byte => {
-                // If we're at a new line, print the prompt first
-                if self.is_new_line {
-                    self.write_prompt();
-                    self.is_new_line = false;
-                }
-
-                if self.column_position >= BUFFER_WIDTH {
-                    self.new_line();
-                    // The new_line() call will have set is_new_line to true,
-                    // so the next iteration will print the prompt
-                    return;
-                }
-
-                let row = self.row_position;
-                let col = self.column_position;
-
-                self.buffer.chars[row][col].write_char(ScreenChar {
-                    ascii_character: byte,
-                    color_code: self.color_code,
-                });
-
-                self.column_position += 1;
-                self.update_cursor();
+    pub fn write_string(&mut self, s: &str) {
+        for byte in s.bytes() {
+            match byte {
+                0x20..=0x7e | b'\n' | 0x08 => self.write_byte(byte),
+                _ => self.write_byte(0xfe),
             }
         }
     }
 
-    pub fn write_prompt(&mut self) {
-        // Don't allow writing prompt if we're in the middle of a line
-        if self.column_position == 0 {
-            self.write_string("> ");
-            self.column_position = self.prompt_length;
-            self.update_cursor();
+    pub fn update_cursor(&mut self) {
+        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+
+        unsafe {
+            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+            control_port.write(0x0F_u8);
+            data_port.write((pos & 0xFF) as u8);
+
+            control_port.write(0x0E_u8);
+            data_port.write(((pos >> 8) & 0xFF) as u8);
         }
     }
 
-    pub fn backspace(&mut self) {
-        // Check if we're at the start of a line with a prompt
-        if self.column_position <= self.prompt_length &&
-            (self.row_position == 0 || self.column_position == self.prompt_length) {
-                return; // Prevent backspace at or before prompt
+    pub fn enable_cursor(&mut self) {
+        unsafe {
+            let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+            let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+            control_port.write(0x0A_u8);
+            data_port.write(0x20_u8);
+
+            for _ in 0..100000 {
+                core::hint::spin_loop();
             }
 
-            if self.column_position > 0 {
-                self.column_position -= 1;
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-                self.update_cursor();
-            } else if self.row_position > 0 {
-                self.row_position -= 1;
-                // When moving to the previous line, go to the last character
-                self.column_position = BUFFER_WIDTH - 1;
-                let blank = ScreenChar {
-                    ascii_character: b' ',
-                    color_code: self.color_code,
-                };
-                self.buffer.chars[self.row_position][self.column_position].write_char(blank);
-                self.update_cursor();
-            }
+            control_port.write(0x0A_u8);
+            data_port.write(CURSOR_START_LINE);
+            control_port.write(0x0B_u8);
+            data_port.write(CURSOR_END_LINE);
+
+            control_port.write(0x0A_u8);
+            data_port.write(CURSOR_START_LINE);
+        }
+    }
+}
+
+impl fmt::Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_string(s);
+        Ok(())
     }
 }
 
