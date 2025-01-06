@@ -1,15 +1,16 @@
-         //IMPORTS\\
-/////////////////////////////////
+        //IMPORTS\\
+///////////////////////////////
 
 use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 
-////////////////////////////////
+//////////////////////////////
 
-//\\        CONSTANTS        //\\
-/////////////////////////////////
+        //CONSTANTS\\
+//////////////////////////////
+
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
@@ -18,7 +19,8 @@ const CURSOR_PORT_DATA: u16 = 0x3D5;
 
 const CURSOR_START_LINE: u8 = 14;   // Changed from 0
 const CURSOR_END_LINE: u8 = 15;    // End at bottom of character
-////////////////////////////////
+
+//////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -182,6 +184,12 @@ impl Writer {
         // Set up protected region for new prompt
         self.protected_region = ProtectedRegion::new(self.row_position, 0, self.prompt_length);
 
+        // Save the current color code
+        let original_color = self.color_code;
+
+        // Set prompt color to yellow
+        self.color_code = ColorCode::new(Color::Yellow, Color::Black);
+
         // Write prompt characters
         self.buffer.chars[self.row_position][0].write_char(ScreenChar {
             ascii_character: b'>',
@@ -191,6 +199,9 @@ impl Writer {
             ascii_character: b' ',
             color_code: self.color_code,
         });
+
+        // Restore original color for user input
+        self.color_code = original_color;
 
         self.column_position = self.prompt_length;
         self.update_cursor();
