@@ -21,10 +21,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     }
 }
 
-fn print_prompt() {
-    vga_buffer::write_prompt(); // Use the public interface function
-}
-
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
