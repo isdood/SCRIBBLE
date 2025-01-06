@@ -18,34 +18,50 @@ pub mod keyboard;
 
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
-use x86_64::structures::paging::OffsetPageTable;
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
+
+#[macro_export]
+macro_rules! serial_print {
+    ($($arg:tt)*) => {
+        $crate::serial::_print(format_args!($($arg)*));
+    };
+}
+
+#[macro_export]
+macro_rules! serial_println {
+    () => ($crate::serial_print!("\n"));
+    ($fmt:expr) => ($crate::serial_print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::serial_print!(
+        concat!($fmt, "\n"), $($arg)*));
+}
 
 #[global_allocator]
 static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
 
-/// Initialize the kernel.
 pub fn init(boot_info: &'static BootInfo) {
-    // Initialize GDT and IDT
     gdt::init();
     interrupts::init_idt();
     unsafe { interrupts::PICS.lock().initialize() };
 
-    // Initialize memory management
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-
-    // Initialize a mapper
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-
-    // Initialize the frame allocator
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
 
-    // Initialize the heap
     allocator::init_heap(&mut mapper, &mut frame_allocator)
     .expect("heap initialization failed");
 
-    // Enable interrupts
     x86_64::instructions::interrupts::enable();
 }
 
@@ -54,20 +70,7 @@ fn alloc_error_handler(layout: core::alloc::Layout) -> ! {
     panic!("allocation error: {:?}", layout)
 }
 
-#[cfg(test)]
-use bootloader::entry_point;
-
-#[cfg(test)]
-entry_point!(test_kernel_main);
-
-/// Entry point for `cargo test`
-#[cfg(test)]
-fn test_kernel_main(_boot_info: &'static BootInfo) -> ! {
-    init(_boot_info);
-    test_main();
-    loop {}
-}
-
+// Test configuration...
 #[cfg(test)]
 pub fn test_runner(tests: &[&dyn Fn()]) {
     serial_println!("Running {} tests", tests.len());
@@ -75,20 +78,6 @@ pub fn test_runner(tests: &[&dyn Fn()]) {
         test();
     }
     exit_qemu(QemuExitCode::Success);
-}
-
-#[cfg(test)]
-pub fn test_panic_handler(info: &PanicInfo) -> ! {
-    serial_println!("[failed]\n");
-    serial_println!("Error: {}\n", info);
-    exit_qemu(QemuExitCode::Failed);
-    loop {}
-}
-
-#[cfg(test)]
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    test_panic_handler(info)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
