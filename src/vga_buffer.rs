@@ -5,10 +5,12 @@ use x86_64::instructions::port::Port;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
+// Update these constants at the top
 const CURSOR_PORT_CTRL: u16 = 0x3D4;
 const CURSOR_PORT_DATA: u16 = 0x3D5;
-const CURSOR_START: u8 = 14;
-const CURSOR_END: u8 = 15;
+const CURSOR_START: u8 = 0;    // Change to 0 for a full block cursor
+const CURSOR_END: u8 = 15;     // Keep at 15 for bottom of character
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -132,17 +134,17 @@ impl Writer {
     }
 
     fn update_cursor(&mut self) {
-        let pos = self.row_position * BUFFER_WIDTH + self.column_position;
+        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
 
         unsafe {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Low byte
+            // Set low byte
             control_port.write(0x0F);
             data_port.write((pos & 0xFF) as u8);
 
-            // High byte
+            // Set high byte
             control_port.write(0x0E);
             data_port.write(((pos >> 8) & 0xFF) as u8);
         }
@@ -153,17 +155,23 @@ impl Writer {
             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-            // Enable cursor (clear bit 5 of cursor start register)
+            // First disable the cursor by setting bit 5 of cursor start register
             control_port.write(0x0A);
-            data_port.write(CURSOR_START & 0x1F);
+            data_port.write(0x20);  // Bit 5 set to disable
 
-            // Set cursor end line
+            // Configure cursor shape
+            control_port.write(0x0A);
+            data_port.write(CURSOR_START);  // Start line (top)
             control_port.write(0x0B);
-            data_port.write(CURSOR_END & 0x1F);
+            data_port.write(CURSOR_END);    // End line (bottom)
 
+            // Re-enable cursor by clearing bit 5
+            control_port.write(0x0A);
+            data_port.write(CURSOR_START);  // Also sets the start line
+
+            // Initialize cursor position
             self.update_cursor();
         }
-    }
 
     fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
