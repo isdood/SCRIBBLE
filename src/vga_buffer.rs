@@ -40,6 +40,7 @@ impl ColorCode {
     }
 }
 
+#[derive(Debug, Clone, Copy)]  // Added Clone and Copy traits
 #[repr(C)]
 struct ScreenChar {
     ascii_character: u8,
