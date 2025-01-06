@@ -138,7 +138,9 @@ impl Writer {
         } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
-                    let character = self.buffer.chars[row][col].read();
+                    // Instead of trying to read directly, we need to get a copy of the character
+                    let character = unsafe { self.buffer.chars[row][col].read() };
+                    // Then create a new Volatile with that character
                     self.buffer.chars[row - 1][col] = Volatile::new(character);
                 }
             }
@@ -146,6 +148,51 @@ impl Writer {
         }
         self.column_position = 0;
         self.update_cursor();
+    }
+
+    // Similarly, update other methods that interact with Volatile<ScreenChar>
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: self.color_code,
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer.chars[row][col] = Volatile::new(blank);
+        }
+    }
+
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => {
+                self.new_line();
+                if self.input_mode {
+                    self.write_prompt();
+                }
+            }
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
+                }
+
+                let row = self.row_position;
+                let col = self.column_position;
+
+                let color = if self.input_mode {
+                    ColorCode::new(Color::Green, Color::Black)
+                } else {
+                    self.color_code
+                };
+
+                let char_to_write = ScreenChar {
+                    ascii_character: byte,
+                    color_code: color,
+                };
+
+                self.buffer.chars[row][col] = Volatile::new(char_to_write);
+                self.column_position += 1;
+                self.update_cursor();
+            }
+        }
     }
 
     pub fn backspace(&mut self) {
@@ -167,13 +214,6 @@ impl Writer {
 
         self.buffer.chars[self.row_position][self.column_position] = Volatile::new(blank);
         self.update_cursor();
-    }
-
-    pub fn set_input_mode(&mut self, active: bool) {
-        self.input_mode = active;
-        if active {
-            self.write_prompt();
-        }
     }
 }
 
