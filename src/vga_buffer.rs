@@ -3,6 +3,7 @@ use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
 use core::ops::{Deref, DerefMut};
+use crate::println;
 
 pub const BUFFER_HEIGHT: usize = 25;
 pub const BUFFER_WIDTH: usize = 80;
@@ -148,18 +149,6 @@ impl Writer {
         }
         self.column_position = 0;
         self.update_cursor();
-    }
-
-    pub fn write_prompt(&mut self) {
-        self.write_byte(b'>');
-        self.write_byte(b' ');
-    }
-
-    pub fn set_input_mode(&mut self, active: bool) {
-        self.input_mode = active;
-        if active {
-            self.write_prompt();  // Ensure this is called only once
-        }
     }
 
     pub fn update_cursor(&mut self) {
