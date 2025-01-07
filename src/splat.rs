@@ -4,7 +4,7 @@ use spin::Mutex;
 use alloc::{string::String, vec::Vec};
 use core::fmt::Write;
 use lazy_static::lazy_static;
-use x86_64::instructions::time::read_rflags;
+use x86_64::registers::rflags;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SplatLevel {
@@ -56,12 +56,15 @@ macro_rules! define_splat_macro {
     ($name:ident, $level:expr) => {
         #[macro_export]
         macro_rules! $name {
-            () => {{
+            () => {
                 $crate::splat::log($level, "")
-            }};
-            ($fmt:expr $(, $($arg:tt)*)?) => {{
-                $crate::splat::log($level, &alloc::format!($fmt $(, $($arg)*)?))
-            }};
+            };
+            ($format_str:expr) => {
+                $crate::splat::log($level, $format_str)
+            };
+            ($format_str:expr, $($arg:tt)*) => {
+                $crate::splat::log($level, &alloc::format!($format_str, $($arg)*))
+            };
         }
     }
 }
@@ -74,8 +77,7 @@ define_splat_macro!(splat_info, SplatLevel::Info);
 define_splat_macro!(splat_debug, SplatLevel::Debug);
 
 fn get_timestamp() -> u64 {
-    // Using CPU flags register as a rough timestamp source
-    unsafe { read_rflags() as u64 }
+    rflags::read_raw()
 }
 
 #[cfg(test)]
