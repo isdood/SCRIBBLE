@@ -8,7 +8,6 @@ use lazy_static::lazy_static;
 
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
-#[derive(Debug)]
 struct Selectors {
     code_selector: SegmentSelector,
     tss_selector: SegmentSelector,
@@ -29,10 +28,42 @@ lazy_static! {
     };
 }
 
+lazy_static! {
+    pub(crate) static ref GDT: (GlobalDescriptorTable, Selectors) = {
+        let mut gdt = GlobalDescriptorTable::new();
+        let code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
+        let tss_selector = gdt.add_entry(Descriptor::tss_segment(&TSS));
+        (
+            gdt,
+         Selectors {
+             code_selector,
+             tss_selector,
+         },
+        )
+    };
+}
+
 pub fn init() {
+    use x86_64::instructions::segmentation::set_cs;
+    use x86_64::instructions::tables::load_tss;
+
+    // Load the GDT
     GDT.0.load();
+
+    // Update segment selectors
     unsafe {
-        CS::set_reg(GDT.1.code_selector);
-        tables::load_tss(GDT.1.tss_selector);
+        set_cs(GDT.1.code_selector);
+        load_tss(GDT.1.tss_selector);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test_case]
+    fn test_gdt_init() {
+        init();
+        // If we reach here, the GDT was loaded successfully
     }
 }
