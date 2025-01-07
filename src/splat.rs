@@ -135,10 +135,14 @@ fn print_log_entry(entry: &LogEntry) {
 #[macro_export]
 macro_rules! define_splat_macro {
     ($name:ident, $level:expr) => {
+        #[macro_export]
         macro_rules! $name {
-            ($($arg:tt)*) => ({
-                $crate::splat::log($level, &alloc::format!($($arg)*))
-            })
+            () => {
+                $crate::splat::log($level, "")
+            };
+            ($($fmt:expr),* $(,)?) => {
+                $crate::splat::log($level, &alloc::format!($($fmt),*))
+            };
         }
     }
 }
