@@ -8,7 +8,7 @@ use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use crate::splat::{self, SplatLevel};
 use core::sync::atomic::{AtomicUsize, Ordering};
 use alloc::format;
-use x86_64::structures::paging::MapToError;
+use x86_64::structures::paging::mapper::MapToError;
 
 // Memory Management Constants
 pub const MAX_FRAMES: usize = 1024 * 1024;  // 4GB limit (with 4KB pages)
@@ -35,20 +35,40 @@ pub struct MemoryStats {
 }
 
 impl MemoryStats {
-    pub fn log_current_usage(&self) {
-        splat::log(
-            if self.usage_percentage > MEMORY_CRITICAL_THRESHOLD {
-                SplatLevel::Critical
-            } else {
-                SplatLevel::BitsNBytes
-            },
-            &format!(
-                "Memory Usage: {:.1}% ({} KB used / {} KB total)",
-                     self.usage_percentage,
-                     self.allocated_frames * PAGE_SIZE / 1024,
-                     self.total_frames * PAGE_SIZE / 1024
-            )
-        );
+    pub fn new(total: usize, allocated: usize) -> Self {
+        let free = total.saturating_sub(allocated);
+        let usage = if total > 0 {
+            (allocated as f32 / total as f32) * 100.0
+        } else {
+            0.0
+        };
+
+        MemoryStats {
+            total_frames: total,
+            allocated_frames: allocated,
+            free_frames: free,
+            usage_percentage: usage,
+            failed_allocations: FAILED_ALLOCATIONS.load(Ordering::Relaxed),
+            high_watermark: ALLOCATION_HIGH_WATERMARK.load(Ordering::Relaxed),
+            timestamp: crate::rtc::DateTime::now().to_string().parse().unwrap_or(0),
+        }
+    }
+
+    pub fn is_healthy(&self) -> bool {
+        self.usage_percentage < MEMORY_WARNING_THRESHOLD &&
+        self.failed_allocations == 0
+    }
+
+    pub fn log_status(&self) {
+        let level = if self.usage_percentage > MEMORY_CRITICAL_THRESHOLD {
+            SplatLevel::Critical
+        } else if self.usage_percentage > MEMORY_WARNING_THRESHOLD {
+            SplatLevel::Warning
+        } else {
+            SplatLevel::BitsNBytes
+        };
+
+        splat::log(level, &format!("Memory Status: {}% used", self.usage_percentage));
     }
 }
 
@@ -187,6 +207,8 @@ pub fn check_memory_health(allocator: &BootInfoFrameAllocator) -> bool {
 }
 
 pub fn init_heap(heap_start: *mut u8, heap_size: usize) -> Result<(), MapToError<Size4KiB>> {
+    use x86_64::structures::paging::{Page, PageTableFlags};
+
     splat::log(
         SplatLevel::BitsNBytes,
         &format!(
@@ -198,7 +220,40 @@ heap_size / 1024
         )
     );
 
-    crate::allocator::init_heap(heap_start, heap_size)
+    // Get the page range for the heap
+    let heap_start_addr = VirtAddr::new(heap_start as u64);
+    let heap_end_addr = heap_start_addr + heap_size - 1u64;
+    let heap_start_page = Page::containing_address(heap_start_addr);
+    let heap_end_page = Page::containing_address(heap_end_addr);
+
+    // Create a temporary frame allocator for heap initialization
+    let mut temp_allocator = unsafe {
+        BootInfoFrameAllocator::init(&bootloader::bootinfo::MemoryMap::new())
+    };
+
+    // Get a mutable mapper reference
+    let mut mapper = unsafe {
+        let phys_mem_offset = VirtAddr::new(bootloader::bootinfo::physical_memory_offset());
+        OffsetPageTable::new(active_level_4_table(phys_mem_offset), phys_mem_offset)
+    };
+
+    // Map all pages in the heap range
+    for page in Page::range_inclusive(heap_start_page, heap_end_page) {
+        let frame = temp_allocator
+        .allocate_frame()
+        .ok_or(MapToError::FrameAllocationFailed)?;
+        let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+        unsafe {
+            mapper.map_to(page, frame, flags, &mut temp_allocator)?.flush();
+        }
+    }
+
+    // Initialize the actual heap allocator
+    unsafe {
+        crate::allocator::ALLOCATOR.lock().init(heap_start, heap_size);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

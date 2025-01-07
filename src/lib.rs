@@ -21,7 +21,8 @@ pub mod splat;
 pub mod stat;
 pub mod vga_buffer;
 
-use bootloader::BootInfo;
+use x86_64::structures::paging::mapper::MapToError;
+use bootloader::bootinfo;
 use x86_64::VirtAddr;
 
 // Re-export commonly used items
@@ -32,7 +33,7 @@ pub use x86_64::instructions::hlt;
 
 #[derive(Debug)]
 pub enum InitError {
-    PagingError,
+    PagingError(MapToError<Size4KiB>),
     HeapError,
 }
 
@@ -51,6 +52,14 @@ const FRAGMENTATION_THRESHOLD: f32 = 0.5;
 fn init_memory_management(boot_info: &'static BootInfo)
 -> Result<(x86_64::structures::paging::OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError> {
     // ... existing implementation ...
+}
+
+fn init_memory_management(boot_info: &'static BootInfo)
+-> Result<(x86_64::structures::paging::OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError> {
+    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mapper = unsafe { memory::init(physical_memory_offset) };
+    let frame_allocator = unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_map) };
+    Ok((mapper, frame_allocator))
 }
 
 fn init_heap_memory(

@@ -27,7 +27,7 @@ pub struct FreezerState {
 
     #[allow(dead_code)]
     created_by: String,
-
+    pub system_init_time: String,
     users: Vec<User>,
     active_user: Option<String>,
     thaw_attempts: AtomicUsize,
@@ -35,22 +35,10 @@ pub struct FreezerState {
 
 impl FreezerState {
     pub fn new() -> Self {
-        let mut state = FreezerState {
-            users: Vec::new(),
-            active_user: None,
+        FreezerState {
+            created_by: String::from("system"),
             system_init_time: String::from(SYSTEM_CREATION_DATE),
-            thaw_attempts: AtomicUsize::new(0),
-        };
-
-        // Add default admin user
-        state.users.push(User {
-            username: String::from("slug"),
-                         is_admin: true,
-                         created_by: String::from(SYSTEM_CREATOR),
-                         created_at: String::from(SYSTEM_CREATION_DATE),
-        });
-
-        state
+        }
     }
 }
 
