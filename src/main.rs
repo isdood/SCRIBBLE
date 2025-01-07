@@ -10,7 +10,7 @@
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use scribble::{println, print};
-use scribble::vga_buffer::Color;
+// use scribble::vga_buffer::Color;
 // END IMPORTS \\
 
 entry_point!(kernel_main);
