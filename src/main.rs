@@ -1,4 +1,3 @@
-// src/main.rs
 #![no_std]
 #![no_main]
 
@@ -6,25 +5,23 @@ extern crate alloc;
 
 use bootloader::{BootInfo, entry_point};
 use core::panic::PanicInfo;
-use alloc::format;
-use scribble::{
-    freezer,
-    gdt,
-    memory,
-    splat::{self, SplatLevel},
-    stat::{self, SystemMetrics, increment_freeze_count},
-};
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
+    // Add debugging output here
+    println!("Entering kernel_main");
+
     match init_system(boot_info) {
-        Ok(_) => splat::log(SplatLevel::Info, "System initialization complete"),
+        Ok(_) => println!("System initialization complete"),
         Err(_) => {
-            splat::log(SplatLevel::Critical, "Kernel initialization failed");
+            println!("Kernel initialization failed");
             kernel_panic("Failed to initialize system");
         }
     }
+
+    // Add more debugging output
+    println!("System initialized");
 
     // Initialize freezer system
     freezer::FreezerState::new();
@@ -32,20 +29,10 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Try initial system thaw
     match freezer::login("slug") {
         true => {
-            let boot_message = format!(
-                "System activated\n\
-Kernel Version: {}\n\
-Boot Time: {}\n\
-Current User: {}",
-env!("CARGO_PKG_VERSION"),
-                                       "2025-01-07 07:49:01",
-                                       "isdood"
-            );
-            splat::log(SplatLevel::Info, &boot_message);
+            println!("System activated");
         }
         false => {
-            splat::log(SplatLevel::Critical, "Initial system thaw failed");
-            increment_freeze_count();
+            println!("Initial system thaw failed");
             kernel_panic("Authentication failure during system initialization");
         }
     }
@@ -59,8 +46,7 @@ env!("CARGO_PKG_VERSION"),
         check_system_status(&current_stats, &mut consecutive_anomalies);
 
         if consecutive_anomalies > 5 {
-            increment_freeze_count();
-            splat::log(SplatLevel::Critical, "System frozen due to anomalies");
+            println!("System frozen due to anomalies");
         }
 
         // Deep sleep between checks
@@ -68,65 +54,16 @@ env!("CARGO_PKG_VERSION"),
     }
 }
 
-fn init_system(boot_info: &'static BootInfo) -> Result<(), &'static str> {
-    gdt::init();
-    unsafe {
-        let phys_mem_offset = x86_64::VirtAddr::new(boot_info.physical_memory_offset as u64);
-        let frame_allocator = memory::init(phys_mem_offset);
-
-        // Initialize heap with proper error handling
-        memory::init_heap(0x4000_0000_0000 as *mut u8, 100 * 1024 * 1024)
-        .map_err(|e| {
-            splat::log(
-                SplatLevel::Critical,
-                &format!("Heap initialization failed: {:?}", e)
-            );
-            "Heap initialization failed"
-        })?;
-    }
-    Ok(())
-}
-
-fn check_system_status(stats: &SystemMetrics, consecutive_anomalies: &mut u32) {
-    // Check memory usage
-    let (total, used) = stat::get_memory_stats();
-    let memory_usage = (used as f32 / total as f32) * 100.0;
-
-    if memory_usage > 90.0 {
-        let msg = format!(
-            "Critical memory usage: {:.1}%", memory_usage
-        );
-        splat::log(SplatLevel::Critical, &msg);
-        *consecutive_anomalies += 1;
-    }
-
-    // Check system metrics
-    perform_detailed_check(stats);
-}
-
-fn perform_detailed_check(stats: &SystemMetrics) {
-    splat::log(SplatLevel::Info, &stats.display());
-}
-
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    let panic_msg = format!("KERNEL PANIC: {}", info);
-    splat::log(SplatLevel::Critical, &panic_msg);
-    increment_freeze_count();
+    println!("KERNEL PANIC: {}", info);
     loop {
         x86_64::instructions::hlt();
     }
 }
 
 fn kernel_panic(msg: &str) -> ! {
-    let panic_msg = format!(
-        "KERNEL PANIC: {}\n\
-System state has been preserved.\n\
-Please contact system administrator.",
-msg
-    );
-    splat::log(SplatLevel::Critical, &panic_msg);
-    increment_freeze_count();
+    println!("KERNEL PANIC: {}", msg);
     loop {
         x86_64::instructions::hlt();
     }
