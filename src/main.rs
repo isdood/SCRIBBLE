@@ -1,17 +1,29 @@
 // src/main.rs
 #![no_std]
 #![no_main]
+#![feature(alloc_error_handler)]
+
+extern crate alloc;
 
 use bootloader::{BootInfo, entry_point};
 use core::panic::PanicInfo;
-use crate::stat::increment_freeze_count;
+use core::alloc::Layout;
+use alloc::{format, string::String};
 use scribble::{
     freezer,
     gdt,
     memory,
     splat::{self, SplatLevel},
-    stat::{self, SystemMetrics},
+    stat::{self, SystemMetrics, increment_freeze_count},
 };
+
+#[global_allocator]
+static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
+
+#[alloc_error_handler]
+fn alloc_error_handler(layout: Layout) -> ! {
+    panic!("Allocation error: {:?}", layout);
+}
 
 entry_point!(kernel_main);
 
@@ -30,14 +42,14 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Try initial system thaw
     match freezer::login("slug") {
         true => {
-            let boot_message = alloc::format!(
+            let boot_message = format!(
                 "System activated\n\
 Kernel Version: {}\n\
 Boot Time: {}\n\
 Current User: {}",
 env!("CARGO_PKG_VERSION"),
-                                              "2025-01-07 07:45:42",
-                                              "isdood"
+                                       "2025-01-07 07:47:11",
+                                       "isdood"
             );
             splat::log(SplatLevel::Info, &boot_message);
         }
@@ -69,7 +81,14 @@ env!("CARGO_PKG_VERSION"),
 fn init_system(boot_info: &'static BootInfo) -> Result<(), &'static str> {
     gdt::init();
     unsafe {
-        memory::init(x86_64::VirtAddr::new(boot_info.physical_memory_offset as u64));
+        let phys_mem_offset = x86_64::VirtAddr::new(boot_info.physical_memory_offset as u64);
+        memory::init(phys_mem_offset);
+
+        // Initialize heap
+        ALLOCATOR.lock().init(
+            boot_info.memory_map.as_ptr() as usize,
+                              boot_info.memory_map.len()
+        );
     }
     Ok(())
 }
@@ -80,7 +99,7 @@ fn check_system_status(stats: &SystemMetrics, consecutive_anomalies: &mut u32) {
     let memory_usage = (used as f32 / total as f32) * 100.0;
 
     if memory_usage > 90.0 {
-        let msg = alloc::format!(
+        let msg = format!(
             "Critical memory usage: {:.1}%", memory_usage
         );
         splat::log(SplatLevel::Critical, &msg);
@@ -97,7 +116,7 @@ fn perform_detailed_check(stats: &SystemMetrics) {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    let panic_msg = alloc::format!("KERNEL PANIC: {}", info);
+    let panic_msg = format!("KERNEL PANIC: {}", info);
     splat::log(SplatLevel::Critical, &panic_msg);
     increment_freeze_count();
     loop {
@@ -106,7 +125,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 fn kernel_panic(msg: &str) -> ! {
-    let panic_msg = alloc::format!(
+    let panic_msg = format!(
         "KERNEL PANIC: {}\n\
 System state has been preserved.\n\
 Please contact system administrator.",
