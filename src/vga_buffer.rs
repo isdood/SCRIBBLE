@@ -174,15 +174,6 @@ impl Writer {
             use x86_64::instructions::interrupts;
 
             interrupts::without_interrupts(|| {
-                // Force write a character to the first position of the buffer to test
-                {
-                    let test_char = ScreenChar {
-                        ascii_character: b'T',
-                        color_code: ColorCode::new(Color::White, Color::Black),
-                    };
-                    (*self.buffer).chars[0][0].write_char(test_char);
-                }
-
                 match byte {
                     0x08 => {
                         let next_pos = if self.column_position == 0 {
@@ -205,7 +196,6 @@ impl Writer {
                         self.is_wrapped = false;
                     },
                     byte => {
-
                         if self.needs_wrap() {
                             self.restore_previous_cursor();
                             self.is_wrapped = true;
@@ -555,7 +545,6 @@ impl fmt::Write for Writer {
 }
 
 // WRITER initialization
-// In src/vga_buffer.rs
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = {
         use x86_64::instructions::interrupts;
@@ -564,7 +553,7 @@ lazy_static! {
         let mut writer = Writer {
             column_position: 0,
             row_position: 0,
-            color_code: ColorCode::new(Color::LightGray, Color::Black), // More visible initial color
+            color_code: ColorCode::new(Color::White, Color::Black),
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
             prompt_length: 2,
             is_wrapped: false,
@@ -576,14 +565,10 @@ lazy_static! {
                 cursor_style: CursorStyle::Underscore,
                 cursor_color: NORMAL_CURSOR,
                 cursor_mode: CursorMode::Hardware,
-                hardware_cursor_enabled: false,
+                hardware_cursor_enabled: true,
         };
 
-        // Force a clean initialization of the screen
         interrupts::without_interrupts(|| {
-            // Write a test character to verify buffer is working
-            writer.write_byte(b'X');
-
             // Clear the screen
             for row in 0..BUFFER_HEIGHT {
                 writer.clear_row(row);
@@ -592,6 +577,23 @@ lazy_static! {
             // Reset position
             writer.column_position = 0;
             writer.row_position = 0;
+
+            // Initialize hardware cursor
+            unsafe {
+                let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+                let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+                // Enable cursor and set appearance
+                control_port.write(CURSOR_MODE_REGISTER);
+                data_port.write(0x0E); // Enable cursor
+
+                // Set cursor position
+                let pos: u16 = 0;
+                control_port.write(CURSOR_LOCATION_HIGH_REG);
+                data_port.write(((pos >> 8) & 0xFF) as u8);
+                control_port.write(CURSOR_LOCATION_LOW_REG);
+                data_port.write((pos & 0xFF) as u8);
+            }
         });
 
         Mutex::new(writer)

@@ -19,6 +19,21 @@ pub mod keyboard;
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
 
+// Macros \\
+#[macro_export]
+macro_rules! debug_print {
+    ($($arg:tt)*) => ({
+        use core::fmt::Write;
+        let _ = write!($crate::serial::SERIAL1.lock(), $($arg)*);
+    });
+}
+
+#[macro_export]
+macro_rules! debug_println {
+    () => ($crate::debug_print!("\n"));
+    ($($arg:tt)*) => ($crate::debug_print!("{}\n", format_args!($($arg)*)));
+}
+
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -86,6 +101,7 @@ pub enum QemuExitCode {
     Success = 0x10,
     Failed = 0x11,
 }
+// END Macros \\
 
 pub fn exit_qemu(exit_code: QemuExitCode) {
     use x86_64::instructions::port::Port;
