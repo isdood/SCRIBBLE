@@ -1,13 +1,25 @@
-// src/interrupts.rs (top of file)
-use alloc::string::String;
+// src/interrupts.rs
+use x86_64::structures::idt::InterruptStackFrame;
 use x86_64::instructions::hlt;
-use crate::alloc::string::ToString;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::pic8259::PICS;
+use core::sync::atomic::Ordering;
 
-// ... (in the timer handler)
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum InterruptIndex {
+    Timer = PIC_1_OFFSET,
+    Keyboard,
+}
+
+impl InterruptIndex {
+    fn as_u8(self) -> u8 {
+        self as u8
+    }
+}
+
 pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     if let Some(mut writer) = crate::vga_buffer::WRITER.try_lock() {
-        writer.as_mut().blink_cursor();
+        writer.blink_cursor();  // Call directly on MutexGuard
     }
     unsafe {
         PICS.lock()
@@ -15,7 +27,6 @@ pub extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptSta
     }
 }
 
-// ... (in any method using hlt)
 pub fn hlt_loop() -> ! {
     loop {
         hlt();
