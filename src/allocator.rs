@@ -1,7 +1,7 @@
 use x86_64::{
     structures::paging::{
         mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
-        PageSize, FrameError
+        PageSize
     },
     VirtAddr,
 };
@@ -11,50 +11,22 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 use alloc::format;
 
-// Heap Configuration
-pub const HEAP_START: usize = 0x_4444_4444_0000;
-pub const HEAP_SIZE: usize = 100 * 1024;  // 100 KB
-pub const PAGE_SIZE: usize = 4096;        // 4 KB
+// Rest of the constants remain the same...
 
-// Memory Thresholds
-const LOW_MEMORY_THRESHOLD: usize = HEAP_SIZE / 10;     // 10% of heap
-const CRITICAL_MEMORY_THRESHOLD: usize = HEAP_SIZE / 20; // 5% of heap
-const FRAGMENTATION_THRESHOLD: f64 = 0.3;               // 30% fragmentation warning
-
-#[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
-
-// Memory Statistics
-#[derive(Debug)]
-struct MemoryMetrics {
-    allocation_count: AtomicUsize,
-    deallocation_count: AtomicUsize,
-    total_allocated: AtomicUsize,
-    peak_usage: AtomicUsize,
-    failed_allocations: AtomicUsize,
+trait HeapAllocator {
+    fn size(&self) -> (usize, usize); // (used, largest_free)
+    fn largest_free_region(&self) -> usize;
 }
 
-lazy_static::lazy_static! {
-    static ref MEMORY_METRICS: Mutex<MemoryMetrics> = Mutex::new(MemoryMetrics {
-        allocation_count: AtomicUsize::new(0),
-                                                                 deallocation_count: AtomicUsize::new(0),
-                                                                 total_allocated: AtomicUsize::new(0),
-                                                                 peak_usage: AtomicUsize::new(0),
-                                                                 failed_allocations: AtomicUsize::new(0),
-    });
-}
+impl HeapAllocator for LockedHeap {
+    fn size(&self) -> (usize, usize) {
+        let stats = self.stats();
+        (stats.used_bytes, stats.largest_free_region)
+    }
 
-#[derive(Debug, Clone, Copy)]
-pub struct HeapStats {
-    pub total_size: usize,
-    pub used_size: usize,
-    pub free_size: usize,
-    pub allocation_count: usize,
-    pub deallocation_count: usize,
-    pub largest_contiguous: usize,
-    pub fragmentation_ratio: f64,
-    pub peak_usage: usize,
-    pub failed_allocations: usize,
+    fn largest_free_region(&self) -> usize {
+        self.stats().largest_free_region
+    }
 }
 
 impl HeapStats {
@@ -62,7 +34,12 @@ impl HeapStats {
         let metrics = MEMORY_METRICS.lock();
         let used_size = metrics.total_allocated.load(Ordering::Relaxed);
         let free_size = HEAP_SIZE.saturating_sub(used_size);
-        let largest_free = unsafe { ALLOCATOR.lock().largest_free_block() };
+
+        // Get heap stats safely
+        let (_, largest_free) = unsafe {
+            ALLOCATOR.lock().size()
+        };
+
         let fragmentation = if free_size > 0 {
             1.0 - (largest_free as f64 / free_size as f64)
         } else {
