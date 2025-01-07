@@ -137,14 +137,6 @@ macro_rules! serial_println {
         concat!($fmt, "\n"), $($arg)*));
 }
 
-#[global_allocator]
-static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
-
-#[alloc_error_handler]
-fn alloc_error_handler(layout: core::alloc::Layout) -> ! {
-    panic!("allocation error: {:?}", layout)
-}
-
 // Test configuration...
 #[cfg(test)]
 pub fn test_runner(tests: &[&dyn Fn()]) {

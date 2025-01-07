@@ -56,21 +56,21 @@ impl BootInfoFrameAllocator {
     }
 
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
-        // Add bounds checking
-        let max_addr = 0x1_0000_0000; // 4GB limit for safety
-
+        // get usable regions from memory map
         let regions = self.memory_map.iter();
         let usable_regions = regions
         .filter(|r| r.region_type == MemoryRegionType::Usable);
+        // map each region to its address range
         let addr_ranges = usable_regions
         .map(|r| r.range.start_addr()..r.range.end_addr())
-        .filter(|r| r.start < max_addr);
+        // Add move keyword to fix lifetime issue
+        .filter(move |r| r.start < 0x1_0000_0000); // 4GB limit
+        // transform to an iterator of frame start addresses
         let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
-
+        // create `PhysFrame` types from the start addresses
         frame_addresses
         .map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
-}
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
