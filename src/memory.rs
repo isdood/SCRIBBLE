@@ -1,7 +1,8 @@
 // src/memory.rs
 
 use x86_64::structures::paging::{FrameAllocator, OffsetPageTable, PageTable, PhysFrame, Size4KiB};
-use x86_64::VirtAddr;
+use x86_64::{PhysAddr, VirtAddr}; // Import PhysAddr
+
 use bootloader::boot_info::{MemoryRegions, MemoryRegionKind};
 
 // Define BootInfoFrameAllocator
