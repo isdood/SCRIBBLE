@@ -125,27 +125,6 @@ macro_rules! serial_println {
 #[global_allocator]
 static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
 
-pub fn init(boot_info: &'static BootInfo) {
-    gdt::init();
-    interrupts::init_idt();
-    unsafe {
-        serial_println!("Initializing PIC");
-        interrupts::PICS.lock().initialize();
-        serial_println!("PIC initialized");
-    }
-
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe {
-        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
-
-    allocator::init_heap(&mut mapper, &mut frame_allocator)
-    .expect("heap initialization failed");
-
-    x86_64::instructions::interrupts::enable();
-}
-
 #[alloc_error_handler]
 fn alloc_error_handler(layout: core::alloc::Layout) -> ! {
     panic!("allocation error: {:?}", layout)
