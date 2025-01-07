@@ -2,7 +2,7 @@
 
 use spin::Mutex;
 use alloc::{string::String, vec::Vec};
-use core::fmt::Write;
+use core::fmt::{self, Write};
 use lazy_static::lazy_static;
 use x86_64::registers::rflags;
 
@@ -41,12 +41,13 @@ pub fn log(level: SplatLevel, message: &str) {
         }
         buffer.push(entry);
 
-        // Print to serial and VGA buffer if available
+        // Print to serial if available
         if let Some(mut serial) = crate::serial::SERIAL1.try_lock() {
             let _ = writeln!(serial, "[{:?}] {}", level, message);
         }
-        if let Some(mut vga) = crate::vga_buffer::WRITER.try_lock() {
-            let _ = writeln!(vga, "[{:?}] {}", level, message);
+        // Print to VGA buffer if available
+        if let Some(mut writer) = crate::vga_buffer::WRITER.try_lock() {
+            let _ = writeln!(writer, "[{:?}] {}", level, message);
         }
     }
 }
@@ -59,24 +60,34 @@ macro_rules! define_splat_macro {
             () => {
                 $crate::splat::log($level, "")
             };
-            ($format_str:expr) => {
-                $crate::splat::log($level, $format_str)
+            ($fmt:expr) => {
+                $crate::splat::log($level, $fmt)
             };
-            ($format_str:expr, $($arg:tt)*) => {
-                $crate::splat::log($level, &alloc::format!($format_str, $($arg)*))
+            ($fmt:expr, $($arg:tt)+) => {
+                $crate::splat::log($level, &alloc::format!($fmt, $($arg)+))
             };
         }
     }
 }
 
-// Define the macros
+// Define the logging macros
 define_splat_macro!(splat_critical, SplatLevel::Critical);
 define_splat_macro!(splat_warn, SplatLevel::Warning);
 define_splat_macro!(splat_bitsnbytes, SplatLevel::BitsNBytes);
 define_splat_macro!(splat_info, SplatLevel::Info);
 define_splat_macro!(splat_debug, SplatLevel::Debug);
 
+#[macro_export]
+macro_rules! serial_println {
+    () => ($crate::serial_print!("\n"));
+    ($fmt:expr) => ($crate::serial_print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ({
+        $crate::serial_print!(concat!($fmt, "\n"), $($arg)*);
+    });
+}
+
 fn get_timestamp() -> u64 {
+    // Using rflags as a simple timestamp source
     rflags::read_raw()
 }
 
