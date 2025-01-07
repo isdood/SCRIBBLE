@@ -1,70 +1,53 @@
+// src/main.rs
+
 #![no_std]
 #![no_main]
 #![feature(alloc)]
-extern crate alloc;
 
-use bootloader::{BootInfo, entry_point};
-use core::panic::PanicInfo;
+use bootloader::{entry_point, BootInfo};
+use scribble::{init_system, check_system_status, freezer, stat, println};
 
 entry_point!(kernel_main);
 
-fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    // Add debugging output here
+fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     println!("Entering kernel_main");
 
     match init_system(boot_info) {
         Ok(_) => println!("System initialization complete"),
         Err(_) => {
             println!("Kernel initialization failed");
-            kernel_panic("Failed to initialize system");
+            return;
         }
     }
 
-    // Add more debugging output
     println!("System initialized");
 
-    // Initialize freezer system
+    // Initialize the freezer state
     freezer::FreezerState::new();
+    let login_result = freezer::login("slug");
 
-    // Try initial system thaw
-    match freezer::login("slug") {
-        true => {
-            println!("System activated");
-        }
-        false => {
-            println!("Initial system thaw failed");
-            kernel_panic("Authentication failure during system initialization");
-        }
+    match login_result {
+        Ok(_) => println!("System activated"),
+        Err(_) => println!("Initial system thaw failed"),
     }
 
-    // Main system loop
-    let mut consecutive_anomalies = 0;
     loop {
+        // Check system status periodically
         let current_stats = stat::SystemMetrics::current();
-
-        // System health checks
         check_system_status(&current_stats, &mut consecutive_anomalies);
 
         if consecutive_anomalies > 5 {
             println!("System frozen due to anomalies");
+            break;
         }
-
-        // Deep sleep between checks
-        x86_64::instructions::hlt();
     }
 }
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    println!("KERNEL PANIC: {}", info);
-    loop {
-        x86_64::instructions::hlt();
-    }
+fn init_system(boot_info: &'static mut BootInfo) -> Result<(), &'static str> {
+    // Initialization logic here
+    Ok(())
 }
 
-fn kernel_panic(msg: &str) -> ! {
-    println!("KERNEL PANIC: {}", msg);
-    loop {
-        x86_64::instructions::hlt();
-    }
+fn check_system_status(current_stats: &stat::SystemMetrics, consecutive_anomalies: &mut u32) {
+    // Check system status logic here
 }
