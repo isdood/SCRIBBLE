@@ -207,7 +207,7 @@ pub fn check_memory_health(allocator: &BootInfoFrameAllocator) -> bool {
 }
 
 pub fn init_heap(heap_start: *mut u8, heap_size: usize) -> Result<(), MapToError<Size4KiB>> {
-    use x86_64::structures::paging::{Page, PageTableFlags};
+    use x86_64::structures::paging::Page;
 
     splat::log(
         SplatLevel::BitsNBytes,
@@ -220,19 +220,12 @@ heap_size / 1024
         )
     );
 
-    // Get the page range for the heap
-    let heap_start_addr = VirtAddr::new(heap_start as u64);
-    let heap_end_addr = heap_start_addr + heap_size - 1u64;
-    let heap_start_page = Page::containing_address(heap_start_addr);
-    let heap_end_page = Page::containing_address(heap_end_addr);
-
     unsafe {
-        // Get the global allocator
-        #[allow(unused_unsafe)]
-        let allocator = &mut *(&crate::allocator::ALLOCATOR as *const _ as *mut _);
+        extern "C" {
+            static mut ALLOCATOR: linked_list_allocator::LockedHeap;
+        }
 
-        // Initialize the heap
-        allocator.lock().init(heap_start, heap_size);
+        ALLOCATOR.lock().init(heap_start, heap_size);
     }
 
     Ok(())

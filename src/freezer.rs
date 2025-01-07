@@ -1,33 +1,32 @@
 // src/freezer.rs
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicU32, Ordering};
+use lazy_static::lazy_static;
 use spin::Mutex;
 
-// Define system constants
-const SYSTEM_CREATOR: &str = "isdood";
-const SYSTEM_CREATION_DATE: &str = "2025-01-07 07:32:34";
-const MAX_THAW_ATTEMPTS: usize = 3;
+const MAX_THAW_ATTEMPTS: u32 = 3;
+const SYSTEM_CREATION_DATE: &str = "2025-01-07 07:49:01";
 
 #[derive(Debug)]
 pub struct User {
-
-    #[allow(dead_code)]
+    pub username: String,
+    pub is_admin: bool,
     created_by: String,
-
-    #[allow(dead_code)]
     created_at: String,
-
-    username: String,
-    is_admin: bool,
 }
 
+#[derive(Debug)]
 pub struct FreezerState {
     pub created_by: String,
     pub system_init_time: String,
     pub active_user: Option<String>,
-    pub thaw_attempts: u32,
-    pub users: Vec<String>,
+    pub thaw_attempts: AtomicU32,
+    pub users: Vec<User>,
+}
+
+lazy_static! {
+    static ref FREEZER_STATE: Mutex<FreezerState> = Mutex::new(FreezerState::new());
 }
 
 impl FreezerState {
@@ -36,29 +35,19 @@ impl FreezerState {
             created_by: String::from("system"),
             system_init_time: String::from(SYSTEM_CREATION_DATE),
             active_user: None,
-            thaw_attempts: 0,
+            thaw_attempts: AtomicU32::new(0),
             users: Vec::new(),
         }
     }
 }
 
-lazy_static::lazy_static! {
-    static ref STATE: Mutex<FreezerState> = Mutex::new(FreezerState::new());
-}
-
-pub fn is_frozen() -> bool {
-    let state = STATE.lock();
-    state.thaw_attempts.load(Ordering::Relaxed) >= MAX_THAW_ATTEMPTS
-}
-
 pub fn login(username: &str) -> bool {
-    let mut state = STATE.lock();
+    let state = FREEZER_STATE.lock();
 
-    if is_frozen() {
+    if state.thaw_attempts.load(Ordering::Relaxed) >= MAX_THAW_ATTEMPTS {
         return false;
     }
 
-    // First find the user and check if they exist
     let user_exists = state.users.iter().any(|u| u.username == username);
 
     if !user_exists {
@@ -66,19 +55,12 @@ pub fn login(username: &str) -> bool {
         return false;
     }
 
-    // If we get here, the user exists, so update the state
-    state.active_user = Some(username.to_string());
+    // Reset thaw attempts on successful login
     state.thaw_attempts.store(0, Ordering::Relaxed);
 
-    // Get admin status after releasing mutable borrow
-    let is_admin = state.users.iter()
+    // Check if user is admin
+    state.users.iter()
     .find(|u| u.username == username)
     .map(|u| u.is_admin)
-    .unwrap_or(false);
-
-    is_admin
-}
-
-pub fn get_active_user() -> Option<String> {
-    STATE.lock().active_user.clone()
+    .unwrap_or(false)
 }
