@@ -8,6 +8,10 @@
 
 extern crate alloc;
 
+// Add required imports
+use bootloader::BootInfo;
+use x86_64::VirtAddr;
+
 // First declare all modules
 pub mod allocator;
 pub mod gdt;
@@ -22,7 +26,7 @@ pub mod stats;
 // Then do any re-exports
 pub use stats::SYSTEM_STATS;
 
-// Macros \\
+// Define macros here
 #[macro_export]
 macro_rules! debug_info {
     ($($arg:tt)*) => {{
@@ -55,6 +59,28 @@ macro_rules! debug_error {
         $crate::debug::log($crate::debug::DebugLevel::Error, &message)
     }};
 }
+
+pub fn init(boot_info: &'static BootInfo) {
+    gdt::init();
+    interrupts::init_idt();
+    unsafe {
+        debug_info!("Initializing PIC");
+        interrupts::PICS.lock().initialize();
+        debug_info!("PIC initialized");
+    }
+
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    let mut frame_allocator = unsafe {
+        memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
+    };
+
+    allocator::init_heap(&mut mapper, &mut frame_allocator)
+    .expect("heap initialization failed");
+
+    x86_64::instructions::interrupts::enable();
+}
+
 
 #[macro_export]
 macro_rules! debug_print {
