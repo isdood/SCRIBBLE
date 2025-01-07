@@ -14,16 +14,18 @@ use scribble::{
     debug_info,
     debug_warn,
     debug_error,
-    stats
+    stats,
+    debug::DebugLevel
 };
 // use scribble::vga_buffer::Color;
 // END IMPORTS \\
 
 entry_point!(kernel_main);
 
-// Add panic handler
+// Panic handler
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
+    // Use explicit debug level for panic
     debug_error!("PANIC: {}", info);
     loop {}
 }
@@ -33,6 +35,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     use x86_64::instructions::{interrupts, hlt};
 
     interrupts::disable();
+    // Use debug levels for different types of messages
     debug_info!("Starting kernel initialization");
 
     scribble::init(boot_info);

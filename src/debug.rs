@@ -8,7 +8,11 @@ pub enum DebugLevel {
 }
 
 pub fn log(level: DebugLevel, message: &str) {
-    serial_println!("[{:?}] {}", level, message);
+    match level {
+        DebugLevel::Info => serial_println!("[INFO] {}", message),
+        DebugLevel::Warning => serial_println!("[WARN] {}", message),
+        DebugLevel::Error => serial_println!("[ERROR] {}", message),
+    }
 }
 
 #[macro_export]
