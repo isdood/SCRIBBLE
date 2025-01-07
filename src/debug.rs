@@ -15,8 +15,7 @@ pub fn log(level: DebugLevel, message: &str) {
 macro_rules! debug_info {
     ($($arg:tt)*) => {{
         use alloc::format;
-        use $crate::debug::DebugLevel;
-        $crate::debug::log(DebugLevel::Info, &format!($($arg)*))
+        $crate::debug::log($crate::debug::DebugLevel::Info, &format!($($arg)*))
     }};
 }
 
@@ -24,8 +23,7 @@ macro_rules! debug_info {
 macro_rules! debug_warn {
     ($($arg:tt)*) => {{
         use alloc::format;
-        use $crate::debug::DebugLevel;
-        $crate::debug::log(DebugLevel::Warning, &format!($($arg)*))
+        $crate::debug::log($crate::debug::DebugLevel::Warning, &format!($($arg)*))
     }};
 }
 
@@ -33,7 +31,6 @@ macro_rules! debug_warn {
 macro_rules! debug_error {
     ($($arg:tt)*) => {{
         use alloc::format;
-        use $crate::debug::DebugLevel;
-        $crate::debug::log(DebugLevel::Error, &format!($($arg)*))
+        $crate::debug::log($crate::debug::DebugLevel::Error, &format!($($arg)*))
     }};
 }

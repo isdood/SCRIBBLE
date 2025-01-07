@@ -5,6 +5,7 @@
 #![no_main]
 //////////////////////
 
+extern crate alloc;
 
 // IMPORTS \\
 use bootloader::{entry_point, BootInfo};
