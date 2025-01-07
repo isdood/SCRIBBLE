@@ -1,15 +1,27 @@
-       //  IMPORTS  \\
+//  IMPORTS  \\
 ///////////////////////////////
 
 use x86_64::structures::idt::InterruptStackFrame;
 use x86_64::instructions::port::Port;
 use crate::interrupts::InterruptIndex;
 use crate::interrupts::PICS;
-use pc_keyboard::DecodedKey;
+use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts};
+use spin::Mutex;
+use lazy_static::lazy_static;
 use crate::vga_buffer::CursorMode;
 use crate::{print, println};
 
 //////////// END //////////////
+
+// Add this lazy_static initialization back
+lazy_static! {
+    static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
+    Mutex::new(Keyboard::new(
+        ScancodeSet1::new(),
+                             layouts::Us104Key,
+                             HandleControl::Ignore
+    ));
+}
 
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
     let mut keyboard = KEYBOARD.lock();
