@@ -21,6 +21,7 @@ pub mod stats;
 
 // Then do any re-exports
 pub use stats::SYSTEM_STATS;
+pub use crate::{debug_info, debug_warn, debug_error};
 
 use bootloader::BootInfo;
 use x86_64::VirtAddr;

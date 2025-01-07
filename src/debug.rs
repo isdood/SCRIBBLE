@@ -1,5 +1,4 @@
 use crate::serial_println;
-use alloc::format;  // Move format import here
 
 #[derive(Debug, Clone, Copy)]
 pub enum DebugLevel {
@@ -18,21 +17,39 @@ pub fn log(level: DebugLevel, message: &str) {
 
 #[macro_export]
 macro_rules! debug_info {
-    ($($arg:tt)*) => {
-        $crate::debug::log($crate::debug::DebugLevel::Info, &format!($($arg)*))
-    };
+    ($($arg:tt)*) => {{
+        use core::fmt::Write;
+        let message = {
+            use alloc::string::String;
+            use alloc::format;
+            format!($($arg)*)
+        };
+        $crate::debug::log($crate::debug::DebugLevel::Info, &message)
+    }};
 }
 
 #[macro_export]
 macro_rules! debug_warn {
-    ($($arg:tt)*) => {
-        $crate::debug::log($crate::debug::DebugLevel::Warning, &format!($($arg)*))
-    };
+    ($($arg:tt)*) => {{
+        use core::fmt::Write;
+        let message = {
+            use alloc::string::String;
+            use alloc::format;
+            format!($($arg)*)
+        };
+        $crate::debug::log($crate::debug::DebugLevel::Warning, &message)
+    }};
 }
 
 #[macro_export]
 macro_rules! debug_error {
-    ($($arg:tt)*) => {
-        $crate::debug::log($crate::debug::DebugLevel::Error, &format!($($arg)*))
-    };
+    ($($arg:tt)*) => {{
+        use core::fmt::Write;
+        let message = {
+            use alloc::string::String;
+            use alloc::format;
+            format!($($arg)*)
+        };
+        $crate::debug::log($crate::debug::DebugLevel::Error, &message)
+    }};
 }
