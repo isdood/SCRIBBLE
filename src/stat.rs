@@ -3,6 +3,10 @@ use spin::Mutex;
 use crate::splat::SplatLevel;
 use alloc::format;
 
+// System constants
+const SYSTEM_CREATION: &str = "2025-01-07 06:12:41";
+const SYSTEM_CREATOR: &str = "isdood";
+
 // System statistics
 static TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 static KEYBOARD_INTERRUPTS: AtomicUsize = AtomicUsize::new(0);
@@ -16,6 +20,11 @@ static USED_MEMORY: AtomicUsize = AtomicUsize::new(0);
 static PAGE_FAULTS: AtomicUsize = AtomicUsize::new(0);
 static HEAP_ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
 
+// CryoSystem statistics
+static THAW_ATTEMPTS: AtomicUsize = AtomicUsize::new(0);
+static FREEZE_COUNT: AtomicUsize = AtomicUsize::new(0);
+static LAST_STATE_CHANGE: AtomicUsize = AtomicUsize::new(0);
+
 #[derive(Debug, Clone, Copy)]
 pub struct SystemStats {
     pub uptime_ticks: usize,
@@ -27,6 +36,9 @@ pub struct SystemStats {
     pub used_memory: usize,
     pub page_faults: usize,
     pub heap_allocations: usize,
+    pub thaw_attempts: usize,
+    pub freeze_count: usize,
+    pub last_state_change: usize,
 }
 
 impl SystemStats {
@@ -35,17 +47,32 @@ impl SystemStats {
             uptime_ticks: TIMER_TICKS.load(Ordering::Relaxed),
             keyboard_interrupts: KEYBOARD_INTERRUPTS.load(Ordering::Relaxed),
             critical_events: CRITICAL_EVENTS.load(Ordering::Relaxed),
-            bitsnbytes_events: BITSNBYTES_EVENTS.load(Ordering::Relaxed), // Fixed: BITS_EVENTS -> BITSNBYTES_EVENTS
+            bitsnbytes_events: BITSNBYTES_EVENTS.load(Ordering::Relaxed),
             warning_events: WARNING_EVENTS.load(Ordering::Relaxed),
             total_memory: TOTAL_MEMORY.load(Ordering::Relaxed),
             used_memory: USED_MEMORY.load(Ordering::Relaxed),
             page_faults: PAGE_FAULTS.load(Ordering::Relaxed),
             heap_allocations: HEAP_ALLOCATIONS.load(Ordering::Relaxed),
+            thaw_attempts: THAW_ATTEMPTS.load(Ordering::Relaxed),
+            freeze_count: FREEZE_COUNT.load(Ordering::Relaxed),
+            last_state_change: LAST_STATE_CHANGE.load(Ordering::Relaxed),
         }
     }
 
     pub fn memory_usage_kb(&self) -> (usize, usize) {
         (self.total_memory / 1024, self.used_memory / 1024)
+    }
+
+    pub fn get_cryo_metrics(&self) -> String {
+        format!(
+            "CryoSystem Metrics:\n\
+└─ Total Thaw Attempts: {}\n\
+└─ Freeze Count: {}\n\
+└─ Last State Change: {} ticks ago",
+self.thaw_attempts,
+self.freeze_count,
+self.uptime_ticks.saturating_sub(self.last_state_change)
+        )
     }
 }
 
@@ -61,10 +88,21 @@ pub fn keyboard_interrupt() {
 pub fn log_event(level: SplatLevel) {
     match level {
         SplatLevel::Critical => CRITICAL_EVENTS.fetch_add(1, Ordering::SeqCst),
-        SplatLevel::BitsNBytes => BITSNBYTES_EVENTS.fetch_add(1, Ordering::SeqCst), // Fixed: BITS_EVENTS -> BITSNBYTES_EVENTS
+        SplatLevel::BitsNBytes => BITSNBYTES_EVENTS.fetch_add(1, Ordering::SeqCst),
         SplatLevel::Warning => WARNING_EVENTS.fetch_add(1, Ordering::SeqCst),
         _ => {}
     };
+}
+
+// CryoSystem event recording
+pub fn record_thaw_attempt() {
+    THAW_ATTEMPTS.fetch_add(1, Ordering::SeqCst);
+    LAST_STATE_CHANGE.store(get_timer_ticks(), Ordering::SeqCst);
+}
+
+pub fn record_freeze() {
+    FREEZE_COUNT.fetch_add(1, Ordering::SeqCst);
+    LAST_STATE_CHANGE.store(get_timer_ticks(), Ordering::SeqCst);
 }
 
 pub fn page_fault() {
@@ -94,7 +132,7 @@ pub fn get_critical_events() -> usize {
 }
 
 pub fn get_bitsnbytes_events() -> usize {
-    BITSNBYTES_EVENTS.load(Ordering::Relaxed) // Fixed: BITS_EVENTS -> BITSNBYTES_EVENTS
+    BITSNBYTES_EVENTS.load(Ordering::Relaxed)
 }
 
 pub fn get_warning_events() -> usize {
@@ -112,28 +150,50 @@ pub fn get_memory_usage() -> (usize, usize) {
 pub fn report_system_status() {
     let stats = SystemStats::current();
     let (total_kb, used_kb) = stats.memory_usage_kb();
+    let cryo_state = if crate::freezer::is_frozen() { "Frozen" } else { "Thawed" };
+    let active_user = crate::freezer::get_active_user()
+    .unwrap_or_else(|| String::from("None"));
 
     crate::splat::log(
         SplatLevel::Info,
         &format!(
-            "System Status Report:\n\
-Uptime Ticks: {}\n\
-Keyboard Interrupts: {}\n\
-Critical Events: {}\n\
-Bits & Bytes Events: {}\n\
-Warnings: {}\n\
-Memory Usage: {}/{} KB\n\
-Page Faults: {}\n\
-Heap Allocations: {}",
-stats.uptime_ticks,
-stats.keyboard_interrupts,
-stats.critical_events,
-stats.bitsnbytes_events,
-stats.warning_events,
-used_kb,
-total_kb,
-stats.page_faults,
-stats.heap_allocations
+            "System Status Report [{}]:\n\
+└─ System Info:\n\
+│  └─ Created: {}\n\
+│  └─ Creator: {}\n\
+│  └─ Active User: {}\n\
+└─ CryoState: {}\n\
+└─ Performance:\n\
+│  └─ Uptime Ticks: {}\n\
+│  └─ Keyboard Events: {}\n\
+│  └─ Critical Events: {}\n\
+│  └─ BitsNBytes Events: {}\n\
+│  └─ Warnings: {}\n\
+└─ Memory:\n\
+│  └─ Usage: {}/{} KB\n\
+│  └─ Page Faults: {}\n\
+│  └─ Heap Allocs: {}\n\
+└─ CryoMetrics:\n\
+│  └─ Thaw Attempts: {}\n\
+│  └─ Freeze Count: {}\n\
+│  └─ Last State Change: {} ticks ago",
+crate::rtc::DateTime::now().to_string(),
+                 SYSTEM_CREATION,
+                 SYSTEM_CREATOR,
+                 active_user,
+                 cryo_state,
+                 stats.uptime_ticks,
+                 stats.keyboard_interrupts,
+                 stats.critical_events,
+                 stats.bitsnbytes_events,
+                 stats.warning_events,
+                 used_kb,
+                 total_kb,
+                 stats.page_faults,
+                 stats.heap_allocations,
+                 stats.thaw_attempts,
+                 stats.freeze_count,
+                 stats.uptime_ticks.saturating_sub(stats.last_state_change)
         )
     );
 }
