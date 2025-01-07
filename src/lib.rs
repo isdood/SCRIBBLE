@@ -21,8 +21,9 @@ pub mod splat;
 pub mod stat;
 pub mod vga_buffer;
 
+use bootloader::BootInfo;
+use x86_64::structures::paging::{Size4KiB, OffsetPageTable};
 use x86_64::structures::paging::mapper::MapToError;
-use bootloader::bootinfo;
 use x86_64::VirtAddr;
 
 // Re-export commonly used items

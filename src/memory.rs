@@ -226,31 +226,13 @@ heap_size / 1024
     let heap_start_page = Page::containing_address(heap_start_addr);
     let heap_end_page = Page::containing_address(heap_end_addr);
 
-    // Create a temporary frame allocator for heap initialization
-    let mut temp_allocator = unsafe {
-        BootInfoFrameAllocator::init(&bootloader::bootinfo::MemoryMap::new())
-    };
-
-    // Get a mutable mapper reference
-    let mut mapper = unsafe {
-        let phys_mem_offset = VirtAddr::new(bootloader::bootinfo::physical_memory_offset());
-        OffsetPageTable::new(active_level_4_table(phys_mem_offset), phys_mem_offset)
-    };
-
-    // Map all pages in the heap range
-    for page in Page::range_inclusive(heap_start_page, heap_end_page) {
-        let frame = temp_allocator
-        .allocate_frame()
-        .ok_or(MapToError::FrameAllocationFailed)?;
-        let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe {
-            mapper.map_to(page, frame, flags, &mut temp_allocator)?.flush();
-        }
-    }
-
-    // Initialize the actual heap allocator
     unsafe {
-        crate::allocator::ALLOCATOR.lock().init(heap_start, heap_size);
+        // Get the global allocator
+        #[allow(unused_unsafe)]
+        let allocator = &mut *(&crate::allocator::ALLOCATOR as *const _ as *mut _);
+
+        // Initialize the heap
+        allocator.lock().init(heap_start, heap_size);
     }
 
     Ok(())

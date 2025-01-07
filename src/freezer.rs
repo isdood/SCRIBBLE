@@ -22,15 +22,12 @@ pub struct User {
     is_admin: bool,
 }
 
-#[derive(Debug)]
 pub struct FreezerState {
-
-    #[allow(dead_code)]
-    created_by: String,
+    pub created_by: String,
     pub system_init_time: String,
-    users: Vec<User>,
-    active_user: Option<String>,
-    thaw_attempts: AtomicUsize,
+    pub active_user: Option<String>,
+    pub thaw_attempts: u32,
+    pub users: Vec<String>,
 }
 
 impl FreezerState {
@@ -38,6 +35,9 @@ impl FreezerState {
         FreezerState {
             created_by: String::from("system"),
             system_init_time: String::from(SYSTEM_CREATION_DATE),
+            active_user: None,
+            thaw_attempts: 0,
+            users: Vec::new(),
         }
     }
 }
