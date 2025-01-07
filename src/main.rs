@@ -25,6 +25,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     freezer::FreezerState::new();
     let login_result = freezer::login("slug");
 
+    // Correctly handle the Result type returned by login
     match login_result {
         Ok(_) => println!("System activated"),
         Err(_) => println!("Initial system thaw failed"),
