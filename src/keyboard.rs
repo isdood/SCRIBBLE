@@ -1,11 +1,11 @@
        //  IMPORTS  \\
 ///////////////////////////////
 
+use x86_64::structures::idt::InterruptStackFrame;
 use crate::interrupts::InterruptIndex;
 use crate::interrupts::PICS;
 use pc_keyboard::DecodedKey;
 use crate::vga_buffer::CursorMode;
-use pc_keyboard::DecodedKey;
 use crate::{print, println};
 
 //////////// END //////////////
