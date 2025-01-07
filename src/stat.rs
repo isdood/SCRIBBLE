@@ -150,6 +150,7 @@ pub fn get_memory_usage() -> (usize, usize) {
 
 pub fn display_status() {
     let cryo_state = if freezer::is_frozen() { "Frozen" } else { "Thawed" };
+}
 
 // System status reporting
 pub fn report_system_status() {
