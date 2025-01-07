@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
+#![feature(abi_x86_interrupt)]
+#![feature(alloc_error_handler)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
@@ -18,15 +20,14 @@ pub mod splat;
 pub mod stat;
 pub mod vga_buffer;
 
-use core::sync::atomic::AtomicBool;
 use bootloader::BootInfo;
+use x86_64::VirtAddr;
 
-// Re-export format! macro from alloc
+// Re-export commonly used items
 pub use alloc::format;
-// Re-export String from alloc
 pub use alloc::string::String;
-// Re-export ToString trait
 pub use alloc::string::ToString;
+pub use crate::splat::SplatLevel;
 
 #[derive(Debug)]
 pub enum InitError {
@@ -34,10 +35,17 @@ pub enum InitError {
     HeapError,
 }
 
+const HEAP_START: usize = 0x_4444_4444_0000;
+const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
+const LOW_MEMORY_THRESHOLD: usize = HEAP_SIZE / 10;
+const CRITICAL_MEMORY_THRESHOLD: usize = HEAP_SIZE / 20;
+const FRAGMENTATION_THRESHOLD: f32 = 0.5;
+
 fn init_memory_management(boot_info: &'static BootInfo)
--> Result<(x86_64::structures::paging::OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError> {
-    let physical_memory_offset = x86_64::VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { memory::init(physical_memory_offset) };
+-> Result<(x86_64::structures::paging::OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError>
+{
+    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let mapper = unsafe { memory::init(physical_memory_offset) };
     let frame_allocator = unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_map) };
     Ok((mapper, frame_allocator))
 }
@@ -49,8 +57,15 @@ fn init_heap_memory(
     allocator::init_heap(mapper, frame_allocator).map_err(|_| InitError::HeapError)
 }
 
-// Add this function that was referenced but missing
-pub fn visualize_memory_map(_start_addr: VirtAddr, _size: usize) {
-    // TODO: Implement memory map visualization
+pub fn visualize_memory_map(start_addr: VirtAddr, size: usize) {
+    use crate::splat::SplatLevel;
     splat::log(SplatLevel::BitsNBytes, "Memory map visualization not yet implemented");
+}
+
+#[cfg(test)]
+fn test_runner(tests: &[&dyn Fn()]) {
+    serial_println!("Running {} tests", tests.len());
+    for test in tests {
+        test();
+    }
 }
