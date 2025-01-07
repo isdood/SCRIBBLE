@@ -173,6 +173,15 @@ impl Writer {
             use x86_64::instructions::interrupts;
 
             interrupts::without_interrupts(|| {
+                // Force write a character to the first position of the buffer to test
+                unsafe {
+                    let test_char = ScreenChar {
+                        ascii_character: b'T',
+                        color_code: ColorCode::new(Color::White, Color::Black),
+                    };
+                    (*self.buffer).chars[0][0].write_char(test_char);
+                }
+
                 match byte {
                     0x08 => {
                         let next_pos = if self.column_position == 0 {
@@ -539,47 +548,45 @@ impl fmt::Write for Writer {
 }
 
 // WRITER initialization
+// In src/vga_buffer.rs
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = {
+        use x86_64::instructions::interrupts;
+
+        // Create writer with safe defaults
         let mut writer = Writer {
-            // Basic positioning
             column_position: 0,
             row_position: 0,
-
-            // Default colors and buffer
-            color_code: ColorCode::new(Color::White, Color::Black),
+            color_code: ColorCode::new(Color::LightGray, Color::Black), // More visible initial color
             buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-
-            // Prompt settings
             prompt_length: 2,
             is_wrapped: false,
             protected_region: ProtectedRegion::new(0, 0, 2),
-
-                // Cursor state tracking
                 previous_cursor_pos: (0, 0),
                 previous_char_color: ColorCode::new(Color::White, Color::Black),
                 cursor_visible: true,
                 cursor_blink_counter: 0,
                 cursor_style: CursorStyle::Underscore,
                 cursor_color: NORMAL_CURSOR,
-
-                // New cursor mode settings
                 cursor_mode: CursorMode::Hardware,
                 hardware_cursor_enabled: false,
         };
 
-        // Clear the screen first
-        for row in 0..BUFFER_HEIGHT {
-            writer.clear_row(row);
-        }
+        // Force a clean initialization of the screen
+        interrupts::without_interrupts(|| {
+            // Write a test character to verify buffer is working
+            writer.write_byte(b'X');
 
-        // Initialize with hardware cursor
-        writer.switch_cursor_mode(CursorMode::Hardware);
+            // Clear the screen
+            for row in 0..BUFFER_HEIGHT {
+                writer.clear_row(row);
+            }
 
-        // Set initial cursor position
-        writer.update_cursor();
+            // Reset position
+            writer.column_position = 0;
+            writer.row_position = 0;
+        });
 
-        // Wrap in Mutex
         Mutex::new(writer)
     };
 }
