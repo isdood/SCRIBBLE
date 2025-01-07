@@ -2,6 +2,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 use crate::splat::SplatLevel;
 use alloc::format;
+use crate::String;
 
 // System constants
 const SYSTEM_CREATION: &str = "2025-01-07 06:12:41";

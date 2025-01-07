@@ -1,57 +1,52 @@
 #![no_std]
-#![cfg_attr(test, no_main)]
+#![no_main]
 #![feature(custom_test_frameworks)]
-#![feature(abi_x86_interrupt)]
-#![feature(alloc_error_handler)]
+#![test_runner(crate::test_runner)]
+#![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
-// Add required imports at the top
-use bootloader::BootInfo;
-use x86_64::VirtAddr;
-use alloc::format;
-use core::sync::atomic::{AtomicBool, Ordering};
-use crate::splat::SplatLevel;
-
-// Module declarations
-pub mod memory;  // Add this - it's referenced but wasn't declared
-pub mod rtc;
+pub mod allocator;
 pub mod freezer;
+pub mod gdt;
+pub mod interrupts;
+pub mod keyboard;
+pub mod memory;
+pub mod rtc;
+pub mod serial;
 pub mod splat;
 pub mod stat;
-pub mod gdt;
-pub mod keyboard;
-pub mod serial;
-pub mod allocator;
 pub mod vga_buffer;
-pub mod interrupts;
 
-// System state tracking
-static SYSTEM_INITIALIZED: AtomicBool = AtomicBool::new(false);
+use core::sync::atomic::AtomicBool;
+use bootloader::BootInfo;
+
+// Re-export format! macro from alloc
+pub use alloc::format;
+// Re-export String from alloc
+pub use alloc::string::String;
+// Re-export ToString trait
+pub use alloc::string::ToString;
 
 #[derive(Debug)]
 pub enum InitError {
-    GDTFailed,
-    MemoryInitFailed,
-    HeapInitFailed,
-    PICInitFailed,
-    LockError(&'static str),
+    PagingError,
+    HeapError,
 }
-
-// Rest of the implementation remains the same...
 
 fn init_memory_management(boot_info: &'static BootInfo)
 -> Result<(x86_64::structures::paging::OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError> {
-    // Changed the return type to use the full path for OffsetPageTable
-    // ... rest of the implementation remains the same
+    let physical_memory_offset = x86_64::VirtAddr::new(boot_info.physical_memory_offset);
+    let mut mapper = unsafe { memory::init(physical_memory_offset) };
+    let frame_allocator = unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_map) };
+    Ok((mapper, frame_allocator))
 }
 
 fn init_heap_memory(
-    mut mapper: x86_64::structures::paging::OffsetPageTable,
-    mut frame_allocator: memory::BootInfoFrameAllocator
+    mapper: &mut x86_64::structures::paging::OffsetPageTable,
+    frame_allocator: &mut memory::BootInfoFrameAllocator,
 ) -> Result<(), InitError> {
-    // Changed the parameter type to use the full path
-    // ... rest of the implementation remains the same
+    allocator::init_heap(mapper, frame_allocator).map_err(|_| InitError::HeapError)
 }
 
 // Add this function that was referenced but missing

@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use x86_64::instructions::interrupts;
 use x86_64::instructions::port::Port;
 use core::sync::atomic::{AtomicU64, Ordering};
+use crate::format;
 use crate::{
     println,
     serial_println,
