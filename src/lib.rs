@@ -12,6 +12,7 @@ extern crate alloc;
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
 use crate::interrupts::{init_idt, PICS};
+use crate::{debug_info, debug_warn, debug_critical};
 
 // First declare all modules
 pub mod allocator;
@@ -64,35 +65,63 @@ macro_rules! debug_error {
 pub fn init(boot_info: &'static BootInfo) {
     use x86_64::instructions::interrupts;
 
+    debug_info!("Starting system initialization");
+
     // Disable interrupts during initialization
     interrupts::disable();
+    debug_info!("Interrupts disabled for initialization");
 
     // Initialize GDT first
+    debug_info!("Initializing GDT...");
     gdt::init();
-    debug_info!("GDT initialized");
+    debug_info!("GDT initialized successfully");
 
     // Initialize memory management
+    debug_info!("Setting up memory management...");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
+    debug_info!("Physical memory offset: {:#x}", boot_info.physical_memory_offset);
+
+    let mut mapper = unsafe {
+        debug_info!("Creating page mapper...");
+        memory::init(phys_mem_offset)
+    };
+
     let mut frame_allocator = unsafe {
+        debug_info!("Initializing frame allocator...");
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
-    debug_info!("Memory mapper initialized");
+    debug_info!("Memory management initialized");
 
-    // Initialize heap with error checking
+    // Initialize heap
+    debug_info!("Initializing heap (size: {} KB)...", allocator::HEAP_SIZE / 1024);
     match allocator::init_heap(&mut mapper, &mut frame_allocator) {
-        Ok(_) => debug_info!("Heap initialization successful: {} KB", allocator::HEAP_SIZE / 1024),
-        Err(e) => panic!("Heap initialization failed: {:?}", e),
+        Ok(_) => debug_info!("Heap initialization successful"),
+        Err(e) => {
+            debug_critical!("Heap initialization failed: {:?}", e);
+            panic!("Heap initialization failed: {:?}", e);
+        }
     }
 
-    // Initialize interrupts after memory is set up
-    init_idt(); // Use imported function directly
+    // Initialize interrupts
+    debug_info!("Loading IDT...");
+    init_idt();
+
+    debug_info!("Initializing PIC...");
     unsafe {
-        PICS.lock().initialize(); // Use imported PICS directly
+        match PICS.try_lock() {
+            Some(mut pics) => {
+                pics.initialize();
+                debug_info!("PIC initialized successfully");
+            },
+            None => {
+                debug_critical!("Failed to acquire PIC lock during initialization");
+                panic!("Failed to acquire PIC lock during initialization");
+            }
+        }
     }
-    debug_info!("Interrupts initialized");
 
     // Enable interrupts
+    debug_info!("Enabling interrupts...");
     interrupts::enable();
     debug_info!("System initialization complete");
 }
