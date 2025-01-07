@@ -26,8 +26,6 @@ use x86_64::VirtAddr;
 
 // Re-export commonly used items
 pub use alloc::format;
-pub use alloc::string::String;
-pub use alloc::string::ToString;
 pub use crate::splat::SplatLevel;
 pub use alloc::string::{String, ToString};
 pub use x86_64::instructions::hlt;

@@ -1,8 +1,6 @@
 // src/interrupts.rs
 use x86_64::structures::idt::InterruptStackFrame;
 use x86_64::instructions::hlt;
-use crate::pic8259::PICS;
-use core::sync::atomic::Ordering;
 use crate::pic8259::{PICS, PIC_1_OFFSET};
 
 #[derive(Debug, Clone, Copy)]

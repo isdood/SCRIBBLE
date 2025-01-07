@@ -1,6 +1,6 @@
 // src/splat.rs
 use spin::Mutex;
-use alloc::{string::String, vec::Vec, format};
+use alloc::{string::String, vec::Vec};
 use core::fmt::Write;
 use lazy_static::lazy_static;
 use x86_64::registers::rflags;
