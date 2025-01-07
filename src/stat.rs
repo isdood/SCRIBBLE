@@ -1,9 +1,6 @@
-use core::sync::atomic::{AtomicUsize, Ordering};
-use spin::Mutex;
-use crate::splat::SplatLevel;
 use crate::freezer;
-use alloc::format;
-use crate::String;
+use crate::splat::SplatLevel;
+use alloc::string::String;
 
 // System constants
 const SYSTEM_CREATION: &str = "2025-01-07 06:12:41";
@@ -149,7 +146,17 @@ pub fn get_memory_usage() -> (usize, usize) {
 }
 
 pub fn display_status() {
-    let cryo_state = if freezer::is_frozen() { "Frozen" } else { "Thawed" };
+    let system_state = if freezer::is_frozen() { "Frozen" } else { "Thawed" };
+    let active_user = freezer::get_active_user()
+    .unwrap_or_else(|| String::from("None"));
+
+    let status_message = alloc::format!(
+        "System Status: {}\nActive User: {}\n",
+        system_state,
+        active_user
+    );
+
+    crate::splat::log(SplatLevel::Info, &status_message);
 }
 
 // System status reporting

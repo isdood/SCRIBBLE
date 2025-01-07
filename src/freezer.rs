@@ -1,7 +1,6 @@
 // src/freezer.rs
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::format;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 
@@ -84,4 +83,6 @@ pub fn login(username: &str) -> bool {
     is_admin
 }
 
-// ... rest of the implementation remains the same ...
+pub fn get_active_user() -> Option<String> {
+    STATE.lock().active_user.clone()
+}
