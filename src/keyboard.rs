@@ -35,13 +35,16 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: Interrupt
                 DecodedKey::Unicode(character) => {
                     // Handle cursor mode switching
                     match character {
+
                         // Ctrl+H for Hardware cursor
                         'H' => {
+                            println!("[DEBUG] Attempting to switch to hardware cursor");
                             crate::vga_buffer::switch_cursor_mode(CursorMode::Hardware);
                             println!("Switched to hardware cursor");
                         },
                         // Ctrl+S for Software cursor
                         'S' => {
+                            println!("[DEBUG] Attempting to switch to software cursor");
                             crate::vga_buffer::switch_cursor_mode(CursorMode::Software);
                             println!("Switched to software cursor");
                         },

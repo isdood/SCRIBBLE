@@ -347,10 +347,14 @@ impl Writer {
         use x86_64::instructions::interrupts;
 
         interrupts::without_interrupts(|| {
+            println!("[DEBUG] Current cursor position: ({}, {})", self.row_position, self.column_position);
+
             match mode {
                 CursorMode::Hardware => {
+                    println!("[DEBUG] Initializing hardware cursor");
                     // Clean up any software cursor
                     if self.cursor_mode == CursorMode::Software {
+                        println!("[DEBUG] Cleaning up software cursor");
                         self.restore_previous_cursor();
                     }
 
@@ -359,6 +363,7 @@ impl Writer {
                         let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
                         let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
+                        println!("[DEBUG] Setting hardware cursor parameters");
                         // Set cursor appearance
                         control_port.write(CURSOR_MODE_REGISTER);
                         data_port.write(CURSOR_START_SCANLINE);
@@ -366,14 +371,18 @@ impl Writer {
                         control_port.write(CURSOR_START_REGISTER);
                         data_port.write(CURSOR_END_SCANLINE);
 
-                        // Set cursor color (yellow on black)
-                        let mut attr_port: Port<u8> = Port::new(0x3C0);
-                        attr_port.write(0x0B);
-                        attr_port.write(ColorCode::new(Color::Yellow, Color::Black).0);
+                        // Force cursor position update
+                        let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+                        control_port.write(CURSOR_LOCATION_HIGH_REG);
+                        data_port.write(((pos >> 8) & 0xFF) as u8);
+                        control_port.write(CURSOR_LOCATION_LOW_REG);
+                        data_port.write((pos & 0xFF) as u8);
                     }
                     self.hardware_cursor_enabled = true;
+                    println!("[DEBUG] Hardware cursor enabled");
                 },
                 CursorMode::Software => {
+                    println!("[DEBUG] Switching to software cursor");
                     // Disable hardware cursor
                     unsafe {
                         let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
@@ -383,10 +392,13 @@ impl Writer {
                         data_port.write(0x20); // Bit 5 set to disable hardware cursor
                     }
                     self.hardware_cursor_enabled = false;
+                    println!("[DEBUG] Hardware cursor disabled");
                 }
             }
 
             self.cursor_mode = mode;
+            // Force a cursor position update
+            println!("[DEBUG] Forcing cursor position update");
             self.update_cursor();
         });
     }
@@ -395,10 +407,13 @@ impl Writer {
         use x86_64::instructions::interrupts;
 
         interrupts::without_interrupts(|| {
+            println!("[DEBUG] Updating cursor position: ({}, {})", self.row_position, self.column_position);
+
             match self.cursor_mode {
                 CursorMode::Hardware => {
                     if self.hardware_cursor_enabled {
                         let pos = (self.row_position * BUFFER_WIDTH + self.column_position) as u16;
+                        println!("[DEBUG] Setting hardware cursor position: {}", pos);
                         unsafe {
                             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
                             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
@@ -413,10 +428,11 @@ impl Writer {
                             control_port.write(CURSOR_LOCATION_LOW_REG);
                             data_port.write((pos & 0xFF) as u8);
                         }
+                        println!("[DEBUG] Hardware cursor position updated");
                     }
                 },
                 CursorMode::Software => {
-                    // ... existing software cursor code ...
+                    println!("[DEBUG] Software cursor update not implemented yet");
                 }
             }
         });
