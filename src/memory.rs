@@ -1,6 +1,5 @@
 // src/memory.rs
 
-use bootloader::BootInfo;
 use x86_64::structures::paging::{FrameAllocator, PhysFrame, Size4KiB};
 use x86_64::PhysAddr;
 use bootloader::boot_info::{MemoryRegions, MemoryRegionKind};
