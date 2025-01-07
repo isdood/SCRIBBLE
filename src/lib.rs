@@ -10,7 +10,7 @@
 
 extern crate alloc;
 
-use bootloader::bootinfo::{BootInfo, MemoryMap, MemoryRegionType};
+use bootloader::BootInfo;
 use x86_64::structures::paging::{OffsetPageTable, PageTable, Size4KiB};
 use x86_64::VirtAddr;
 
