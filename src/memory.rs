@@ -71,6 +71,7 @@ impl BootInfoFrameAllocator {
         frame_addresses
         .map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
+}
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
