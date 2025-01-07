@@ -1,13 +1,10 @@
 //  IMPORTS  \\
+use pc_keyboard::{HandleControl, Keyboard, ScancodeSet1, layouts};
 use x86_64::structures::idt::InterruptStackFrame;
-use x86_64::instructions::port::Port;
 use crate::interrupts::InterruptIndex;
 use crate::interrupts::PICS;
-use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts};
-use spin::Mutex;
-use lazy_static::lazy_static;
-use crate::{debug_info, debug_warn, debug_error};
-use crate::{debug_info, debug_warn, stats::SYSTEM_STATS};
+use crate::stats::SYSTEM_STATS;
+use crate::{debug_info, debug_warn};
 // END IMPORTS \\
 
 lazy_static! {
@@ -29,19 +26,8 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: Interrupt
         let scancode: u8 = unsafe { port.read() };
 
         debug_info!("Scancode: 0x{:02x}", scancode);
-
-        if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-            if let Some(key) = keyboard.process_keyevent(key_event) {
-                debug_info!("Processed key: {:?}", key);
-                // ... rest of key handling
-            }
-        }
+        // ... rest of the handler
     } else {
         debug_warn!("Keyboard locked, skipping interrupt");
-    }
-
-    unsafe {
-        PICS.lock()
-        .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
     }
 }

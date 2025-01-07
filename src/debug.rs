@@ -1,3 +1,5 @@
+use core::fmt;
+use alloc::string::String;
 use crate::serial_println;
 
 #[derive(Debug, Clone, Copy)]
@@ -13,21 +15,27 @@ pub fn log(level: DebugLevel, message: &str) {
 
 #[macro_export]
 macro_rules! debug_info {
-    ($($arg:tt)*) => ({
-        $crate::debug::log(DebugLevel::Info, &format!($($arg)*));
-    })
+    ($($arg:tt)*) => {{
+        use alloc::format;
+        use $crate::debug::DebugLevel;
+        $crate::debug::log(DebugLevel::Info, &format!($($arg)*))
+    }};
 }
 
 #[macro_export]
 macro_rules! debug_warn {
-    ($($arg:tt)*) => ({
-        $crate::debug::log(DebugLevel::Warning, &format!($($arg)*));
-    })
+    ($($arg:tt)*) => {{
+        use alloc::format;
+        use $crate::debug::DebugLevel;
+        $crate::debug::log(DebugLevel::Warning, &format!($($arg)*))
+    }};
 }
 
 #[macro_export]
 macro_rules! debug_error {
-    ($($arg:tt)*) => ({
-        $crate::debug::log(DebugLevel::Error, &format!($($arg)*));
-    })
+    ($($arg:tt)*) => {{
+        use alloc::format;
+        use $crate::debug::DebugLevel;
+        $crate::debug::log(DebugLevel::Error, &format!($($arg)*))
+    }};
 }

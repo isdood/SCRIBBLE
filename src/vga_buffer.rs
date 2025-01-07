@@ -4,7 +4,8 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 use crate::{print, println};
-use crate::{debug_info, debug_warn, debug_error};
+use crate::debug_warn;
+
 // CONSTANTS //
 
 // Software / Harware cursor switch constants
@@ -547,6 +548,7 @@ impl Writer {
             }
         });
     }
+
 }
 
 // Write trait implementation
