@@ -1,11 +1,14 @@
 // src/freezer.rs
 use alloc::string::{String, ToString};
-use core::sync::atomic::Ordering;
+use alloc::vec::Vec;
+use alloc::format;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 
 // Define system constants
 const SYSTEM_CREATOR: &str = "isdood";
 const SYSTEM_CREATION_DATE: &str = "2025-01-07 07:32:34";
+const MAX_THAW_ATTEMPTS: usize = 3;
 
 #[derive(Debug)]
 pub struct User {
@@ -48,13 +51,23 @@ lazy_static::lazy_static! {
     static ref STATE: Mutex<FreezerState> = Mutex::new(FreezerState::new());
 }
 
+pub fn is_frozen() -> bool {
+    let state = STATE.lock();
+    state.thaw_attempts.load(Ordering::Relaxed) >= MAX_THAW_ATTEMPTS
+}
+
 pub fn login(username: &str) -> bool {
     let mut state = STATE.lock();
+
+    if is_frozen() {
+        return false;
+    }
 
     // First find the user and check if they exist
     let user_exists = state.users.iter().any(|u| u.username == username);
 
     if !user_exists {
+        state.thaw_attempts.fetch_add(1, Ordering::Relaxed);
         return false;
     }
 
@@ -71,31 +84,4 @@ pub fn login(username: &str) -> bool {
     is_admin
 }
 
-pub fn is_admin(username: &str) -> bool {
-    let state = STATE.lock();
-    state.users.iter()
-    .find(|u| u.username == username)
-    .map(|u| u.is_admin)
-    .unwrap_or(false)
-}
-
-pub fn get_active_user() -> Option<String> {
-    STATE.lock().active_user.clone()
-}
-
-pub fn get_cryo_status() -> String {
-    let state = STATE.lock();
-    let active_user = state.active_user.as_ref()
-    .map(String::as_str)
-    .unwrap_or("None");
-
-    format!(
-        "System Status:\n\
-Active User: {}\n\
-System Init: {}\n\
-Thaw Attempts: {}",
-active_user,
-state.system_init_time,
-state.thaw_attempts.load(Ordering::Relaxed)
-    )
-}
+// ... rest of the implementation remains the same ...

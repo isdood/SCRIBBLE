@@ -1,6 +1,7 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
 use spin::Mutex;
 use crate::splat::SplatLevel;
+use crate::freezer;
 use alloc::format;
 use crate::String;
 
@@ -146,6 +147,9 @@ pub fn get_memory_usage() -> (usize, usize) {
      USED_MEMORY.load(Ordering::Relaxed)
     )
 }
+
+pub fn display_status() {
+    let cryo_state = if freezer::is_frozen() { "Frozen" } else { "Thawed" };
 
 // System status reporting
 pub fn report_system_status() {
