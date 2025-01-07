@@ -13,7 +13,6 @@ extern crate alloc;
 use bootloader::{BootInfo, entry_point};
 use x86_64::structures::paging::{OffsetPageTable, PageTable, Size4KiB};
 use x86_64::VirtAddr;
-use bootloader::boot_info::MemoryRegions;
 
 pub mod allocator;
 pub mod freezer;
