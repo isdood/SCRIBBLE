@@ -8,13 +8,12 @@
 
 extern crate alloc;
 
-// Add required imports
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
 use alloc::format;
-use crate::interrupts::{init_idt, PICS};
+use core::sync::atomic::{AtomicBool, Ordering};
 
-// First declare all modules
+// Module declarations
 pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
@@ -23,78 +22,137 @@ pub mod serial;
 pub mod vga_buffer;
 pub mod keyboard;
 pub mod splat;
-pub mod stats;
+pub mod stat;
 
-// Re-export stats
-pub use stats::SYSTEM_STATS;
-// Re-export splat macros (don't re-export them, they're already available from the splat module)
-pub use splat::{SplatLevel, log as splat_log};
+// System state tracking
+static SYSTEM_INITIALIZED: AtomicBool = AtomicBool::new(false);
 
-pub fn init(boot_info: &'static BootInfo) {
+#[derive(Debug)]
+pub enum InitError {
+    GDTFailed,
+    MemoryInitFailed,
+    HeapInitFailed,
+    PICInitFailed,
+    LockError(&'static str),
+}
+
+pub fn init(boot_info: &'static BootInfo) -> Result<(), InitError> {
+    if SYSTEM_INITIALIZED.load(Ordering::SeqCst) {
+        splat::log(SplatLevel::Warning, "System initialization already completed");
+        return Ok(());
+    }
+
     use x86_64::instructions::interrupts;
-
-    splat::log(SplatLevel::Info, "Starting system initialization");
-
-    // Disable interrupts during initialization
     interrupts::disable();
-    splat::log(SplatLevel::Info, "Interrupts disabled for initialization");
+    splat::log(SplatLevel::BitsNBytes, "Interrupts disabled for initialization");
 
-    // Initialize GDT first
-    splat::log(SplatLevel::Info, "Initializing GDT...");
+    // Initialize subsystems with proper error handling
+    init_subsystems(boot_info)?;
+
+    // Enable interrupts and finalize initialization
+    interrupts::enable();
+    SYSTEM_INITIALIZED.store(true, Ordering::SeqCst);
+    splat::log(SplatLevel::Info, "System initialization complete");
+
+    // Log initial system state
+    log_system_state();
+
+    Ok(())
+}
+
+fn init_subsystems(boot_info: &'static BootInfo) -> Result<(), InitError> {
+    // GDT Initialization
+    splat::log(SplatLevel::BitsNBytes, "Initializing GDT...");
     gdt::init();
-    splat::log(SplatLevel::Info, "GDT initialized successfully");
 
-    // Initialize memory management
-    splat::log(SplatLevel::Info, "Setting up memory management...");
+    // Memory Management Initialization
+    let (mapper, frame_allocator) = init_memory_management(boot_info)?;
+
+    // Heap Initialization
+    init_heap_memory(mapper, frame_allocator)?;
+
+    // Interrupt System Initialization
+    init_interrupt_system()?;
+
+    Ok(())
+}
+
+fn init_memory_management(boot_info: &'static BootInfo)
+-> Result<(memory::OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError> {
+
+    splat::log(SplatLevel::BitsNBytes, "Setting up memory management");
+
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    splat::log(SplatLevel::Info, &format!("Physical memory offset: {:#x}", boot_info.physical_memory_offset));
+    splat::log(
+        SplatLevel::BitsNBytes,
+        &format!("Physical memory offset: {:#x}", boot_info.physical_memory_offset)
+    );
 
-    let mut mapper = unsafe {
-        splat::log(SplatLevel::Info, "Creating page mapper...");
+    let mapper = unsafe {
         memory::init(phys_mem_offset)
     };
 
-    let mut frame_allocator = unsafe {
-        splat::log(SplatLevel::Info, "Initializing frame allocator...");
+    let frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
-    splat::log(SplatLevel::Info, "Memory management initialized");
 
-    // Initialize heap
-    splat::log(SplatLevel::Info, &format!("Initializing heap (size: {} KB)...", allocator::HEAP_SIZE / 1024));
-    match allocator::init_heap(&mut mapper, &mut frame_allocator) {
-        Ok(_) => splat::log(SplatLevel::Info, "Heap initialization successful"),
-        Err(e) => {
-            splat::log(SplatLevel::Critical, &format!("Heap initialization failed: {:?}", e));
-            panic!("Heap initialization failed: {:?}", e);
-        }
-    }
+    // Initialize memory tracking
+    stat::update_memory_stats(boot_info);
 
-    // Initialize interrupts
-    splat::log(SplatLevel::Info, "Loading IDT...");
-    init_idt();
-
-    splat::log(SplatLevel::Info, "Initializing PIC...");
-    unsafe {
-        match PICS.try_lock() {
-            Some(mut pics) => {
-                pics.initialize();
-                splat::log(SplatLevel::Info, "PIC initialized successfully");
-            },
-            None => {
-                splat::log(SplatLevel::Critical, "Failed to acquire PIC lock during initialization");
-                panic!("Failed to acquire PIC lock during initialization");
-            }
-        }
-    }
-
-    // Enable interrupts
-    splat::log(SplatLevel::Info, "Enabling interrupts...");
-    interrupts::enable();
-    splat::log(SplatLevel::Info, "System initialization complete");
+    Ok((mapper, frame_allocator))
 }
 
-// Keep the existing macro definitions for print/println/serial functions
+fn init_heap_memory(
+    mut mapper: memory::OffsetPageTable,
+    mut frame_allocator: memory::BootInfoFrameAllocator
+) -> Result<(), InitError> {
+    splat::log(
+        SplatLevel::BitsNBytes,
+        &format!("Initializing heap (size: {} KB)", allocator::HEAP_SIZE / 1024)
+    );
+
+    allocator::init_heap(&mut mapper, &mut frame_allocator)
+    .map_err(|_| InitError::HeapInitFailed)?;
+
+    Ok(())
+}
+
+fn init_interrupt_system() -> Result<(), InitError> {
+    splat::log(SplatLevel::BitsNBytes, "Initializing interrupt system");
+
+    // Initialize IDT
+    interrupts::init_idt();
+
+    // Initialize PIC
+    unsafe {
+        interrupts::PICS.try_lock()
+        .ok_or(InitError::LockError("Failed to acquire PIC lock"))?
+        .initialize();
+    }
+
+    Ok(())
+}
+
+fn log_system_state() {
+    let stats = stat::SystemStats::current();
+    splat::log(
+        SplatLevel::BitsNBytes,
+        &format!(
+            "Initial System State:\n\
+└─ Memory: {}KB / {}KB used\n\
+└─ Heap Allocations: {}\n\
+└─ Page Tables: Initialized\n\
+└─ Interrupts: Enabled\n\
+└─ GDT: Loaded\n\
+└─ IDT: Configured",
+stats.used_memory / 1024,
+stats.total_memory / 1024,
+stats.heap_allocations
+        )
+    );
+}
+
+// Standard I/O macros
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
@@ -121,7 +179,7 @@ macro_rules! serial_println {
         concat!($fmt, "\n"), $($arg)*));
 }
 
-// Test configuration
+// Testing infrastructure
 #[cfg(test)]
 pub fn test_runner(tests: &[&dyn Fn()]) {
     serial_println!("Running {} tests", tests.len());
@@ -144,4 +202,16 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
         let mut port = Port::new(0xf4);
         port.write(exit_code as u32);
     }
+}
+
+// Memory management utilities
+pub fn dump_memory_info(start_addr: VirtAddr, size: usize) {
+    if !SYSTEM_INITIALIZED.load(Ordering::Relaxed) {
+        splat::log(SplatLevel::Warning, "Cannot dump memory info: System not initialized");
+        return;
+    }
+
+    splat::log(SplatLevel::BitsNBytes, "=== Memory Information Dump ===");
+    stat::report_system_status();
+    splat::visualize_memory_map(start_addr, size);
 }
