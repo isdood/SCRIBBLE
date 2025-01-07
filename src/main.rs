@@ -1,14 +1,12 @@
 // src/main.rs
 #![no_std]
 #![no_main]
-#![feature(alloc_error_handler)]
 
 extern crate alloc;
 
 use bootloader::{BootInfo, entry_point};
 use core::panic::PanicInfo;
-use core::alloc::Layout;
-use alloc::{format, string::String};
+use alloc::format;
 use scribble::{
     freezer,
     gdt,
@@ -17,20 +15,12 @@ use scribble::{
     stat::{self, SystemMetrics, increment_freeze_count},
 };
 
-#[global_allocator]
-static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::LockedHeap::empty();
-
-#[alloc_error_handler]
-fn alloc_error_handler(layout: Layout) -> ! {
-    panic!("Allocation error: {:?}", layout);
-}
-
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     match init_system(boot_info) {
         Ok(_) => splat::log(SplatLevel::Info, "System initialization complete"),
-        Err(e) => {
+        Err(_) => {
             splat::log(SplatLevel::Critical, "Kernel initialization failed");
             kernel_panic("Failed to initialize system");
         }
@@ -48,7 +38,7 @@ Kernel Version: {}\n\
 Boot Time: {}\n\
 Current User: {}",
 env!("CARGO_PKG_VERSION"),
-                                       "2025-01-07 07:47:11",
+                                       "2025-01-07 07:49:01",
                                        "isdood"
             );
             splat::log(SplatLevel::Info, &boot_message);
@@ -83,12 +73,7 @@ fn init_system(boot_info: &'static BootInfo) -> Result<(), &'static str> {
     unsafe {
         let phys_mem_offset = x86_64::VirtAddr::new(boot_info.physical_memory_offset as u64);
         memory::init(phys_mem_offset);
-
-        // Initialize heap
-        ALLOCATOR.lock().init(
-            boot_info.memory_map.as_ptr() as usize,
-                              boot_info.memory_map.len()
-        );
+        memory::init_heap(0x4000_0000_0000 as *mut u8, 100 * 1024 * 1024).map_err(|_| "Heap initialization failed")?;
     }
     Ok(())
 }
