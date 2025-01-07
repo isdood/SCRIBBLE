@@ -21,12 +21,41 @@ pub mod stats;
 
 // Then do any re-exports
 pub use stats::SYSTEM_STATS;
-pub use crate::{debug_info, debug_warn, debug_error};
-
-use bootloader::BootInfo;
-use x86_64::VirtAddr;
 
 // Macros \\
+#[macro_export]
+macro_rules! debug_info {
+    ($($arg:tt)*) => {{
+        let message = {
+            use alloc::format;
+            format!($($arg)*)
+        };
+        $crate::debug::log($crate::debug::DebugLevel::Info, &message)
+    }};
+}
+
+#[macro_export]
+macro_rules! debug_warn {
+    ($($arg:tt)*) => {{
+        let message = {
+            use alloc::format;
+            format!($($arg)*)
+        };
+        $crate::debug::log($crate::debug::DebugLevel::Warning, &message)
+    }};
+}
+
+#[macro_export]
+macro_rules! debug_error {
+    ($($arg:tt)*) => {{
+        let message = {
+            use alloc::format;
+            format!($($arg)*)
+        };
+        $crate::debug::log($crate::debug::DebugLevel::Error, &message)
+    }};
+}
+
 #[macro_export]
 macro_rules! debug_print {
     ($($arg:tt)*) => ({
