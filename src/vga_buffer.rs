@@ -174,7 +174,7 @@ impl Writer {
 
             interrupts::without_interrupts(|| {
                 // Force write a character to the first position of the buffer to test
-                unsafe {
+                 {
                     let test_char = ScreenChar {
                         ascii_character: b'T',
                         color_code: ColorCode::new(Color::White, Color::Black),
