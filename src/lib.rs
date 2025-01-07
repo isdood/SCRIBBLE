@@ -38,17 +38,19 @@ pub enum InitError {
 
 const HEAP_START: usize = 0x_4444_4444_0000;
 const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
+/// Memory management thresholds
+#[allow(dead_code)]
 const LOW_MEMORY_THRESHOLD: usize = HEAP_SIZE / 10;
+#[allow(dead_code)]
 const CRITICAL_MEMORY_THRESHOLD: usize = HEAP_SIZE / 20;
+#[allow(dead_code)]
 const FRAGMENTATION_THRESHOLD: f32 = 0.5;
 
+/// Initialize the memory management system
+#[allow(dead_code)]
 fn init_memory_management(boot_info: &'static BootInfo)
--> Result<(x86_64::structures::paging::OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError>
-{
-    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mapper = unsafe { memory::init(physical_memory_offset) };
-    let frame_allocator = unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_map) };
-    Ok((mapper, frame_allocator))
+-> Result<(x86_64::structures::paging::OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError> {
+    // ... existing implementation ...
 }
 
 fn init_heap_memory(

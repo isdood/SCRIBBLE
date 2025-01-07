@@ -8,6 +8,7 @@ use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use crate::splat::{self, SplatLevel};
 use core::sync::atomic::{AtomicUsize, Ordering};
 use alloc::format;
+use x86_64::structures::paging::MapToError;
 
 // Memory Management Constants
 pub const MAX_FRAMES: usize = 1024 * 1024;  // 4GB limit (with 4KB pages)
@@ -34,58 +35,20 @@ pub struct MemoryStats {
 }
 
 impl MemoryStats {
-    fn new(total: usize, allocated: usize) -> Self {
-        let free = total.saturating_sub(allocated);
-        let usage = if total > 0 {
-            (allocated as f32 / total as f32) * 100.0
-        } else {
-            0.0
-        };
-
-        MemoryStats {
-            total_frames: total,
-            allocated_frames: allocated,
-            free_frames: free,
-            usage_percentage: usage,
-            failed_allocations: FAILED_ALLOCATIONS.load(Ordering::Relaxed),
-            high_watermark: ALLOCATION_HIGH_WATERMARK.load(Ordering::Relaxed),
-            timestamp: crate::rtc::DateTime::now().to_string().parse().unwrap_or(0),
-        }
-    }
-
-    fn log_status(&self) {
-        let level = if self.usage_percentage > MEMORY_CRITICAL_THRESHOLD {
-            SplatLevel::Critical
-        } else if self.usage_percentage > MEMORY_WARNING_THRESHOLD {
-            SplatLevel::Warning
-        } else {
-            SplatLevel::BitsNBytes
-        };
-
+    pub fn log_current_usage(&self) {
         splat::log(
-            level,
+            if self.usage_percentage > MEMORY_CRITICAL_THRESHOLD {
+                SplatLevel::Critical
+            } else {
+                SplatLevel::BitsNBytes
+            },
             &format!(
-                "Memory Status [{}]:\n\
-└─ Usage: {}/{} MB ({:.1}%)\n\
-└─ Free: {} MB\n\
-└─ High Watermark: {} MB\n\
-└─ Failed Allocations: {}\n\
-└─ Health: {}",
-crate::rtc::DateTime::now().to_string(),
-                     self.allocated_frames * PAGE_SIZE / 1024 / 1024,
-                     self.total_frames * PAGE_SIZE / 1024 / 1024,
+                "Memory Usage: {:.1}% ({} KB used / {} KB total)",
                      self.usage_percentage,
-                     self.free_frames * PAGE_SIZE / 1024 / 1024,
-                     self.high_watermark * PAGE_SIZE / 1024 / 1024,
-                     self.failed_allocations,
-                     if self.is_healthy() { "Good" } else { "Warning" }
+                     self.allocated_frames * PAGE_SIZE / 1024,
+                     self.total_frames * PAGE_SIZE / 1024
             )
         );
-    }
-
-    fn is_healthy(&self) -> bool {
-        self.usage_percentage < MEMORY_WARNING_THRESHOLD &&
-        self.failed_allocations == 0
     }
 }
 
@@ -221,6 +184,21 @@ pub fn log_memory_status(allocator: &BootInfoFrameAllocator) {
 
 pub fn check_memory_health(allocator: &BootInfoFrameAllocator) -> bool {
     allocator.get_stats().is_healthy()
+}
+
+pub fn init_heap(heap_start: *mut u8, heap_size: usize) -> Result<(), MapToError<Size4KiB>> {
+    splat::log(
+        SplatLevel::BitsNBytes,
+        &format!(
+            "Initializing heap:\n\
+└─ Start Address: {:#x}\n\
+└─ Size: {} KB",
+heap_start as u64,
+heap_size / 1024
+        )
+    );
+
+    crate::allocator::init_heap(heap_start, heap_size)
 }
 
 #[cfg(test)]

@@ -11,17 +11,25 @@ const MAX_THAW_ATTEMPTS: usize = 3;
 
 #[derive(Debug)]
 pub struct User {
+
+    #[allow(dead_code)]
+    created_by: String,
+
+    #[allow(dead_code)]
+    created_at: String,
+
     username: String,
     is_admin: bool,
-    created_by: String,
-    created_at: String,
 }
 
 #[derive(Debug)]
 pub struct FreezerState {
+
+    #[allow(dead_code)]
+    created_by: String,
+
     users: Vec<User>,
     active_user: Option<String>,
-    system_init_time: String,
     thaw_attempts: AtomicUsize,
 }
 
