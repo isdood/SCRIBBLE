@@ -12,7 +12,10 @@ x86_64 = "0.14.9"
 pic8259 = "0.10.2"
 uart_16550 = "0.2.14"
 pc_keyboard = "0.5.0"
-alloc = "0.5.2"
+
+[features]
+# Enable the `alloc` feature of the standard library
+alloc = []
 
 [dev-dependencies]
 bootimage = "0.10.2"
