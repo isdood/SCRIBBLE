@@ -8,13 +8,24 @@
 
 // IMPORTS \\
 use bootloader::{entry_point, BootInfo};
-use core::panic::PanicInfo;
-use scribble::{println, print};
-use crate::{debug_info, debug_warn, debug_error};
+use scribble::{
+    println,
+    debug_info,
+    debug_warn,
+    debug_error,
+    stats
+};
 // use scribble::vga_buffer::Color;
 // END IMPORTS \\
 
 entry_point!(kernel_main);
+
+// Add panic handler
+#[panic_handler]
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    debug_error!("PANIC: {}", info);
+    loop {}
+}
 
 #[no_mangle]
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
