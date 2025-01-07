@@ -13,7 +13,6 @@ use crate::{print, println};
 
 //////////// END //////////////
 
-// Add this lazy_static initialization back
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
     Mutex::new(Keyboard::new(
@@ -26,7 +25,9 @@ lazy_static! {
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
     let mut keyboard = KEYBOARD.lock();
     let mut port = Port::new(0x60);
-    let scancode: u8 = port.read(); // Port read is safe in this context as it's the keyboard data port
+
+    // Safe because we're reading from the keyboard data port in the keyboard interrupt handler
+    let scancode: u8 = unsafe { port.read() };
 
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
@@ -82,6 +83,9 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: Interrupt
         }
     }
 
-    PICS.lock()
-    .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
+    // Safe because we're notifying the correct PIC in the keyboard interrupt handler
+    unsafe {
+        PICS.lock()
+        .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
+    }
 }
