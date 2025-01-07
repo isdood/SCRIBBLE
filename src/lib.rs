@@ -11,6 +11,7 @@ extern crate alloc;
 // Add required imports
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
+use crate::interrupts::{init_idt, PICS};
 
 // First declare all modules
 pub mod allocator;
@@ -85,9 +86,9 @@ pub fn init(boot_info: &'static BootInfo) {
     }
 
     // Initialize interrupts after memory is set up
-    interrupts::init_idt();
+    init_idt(); // Use imported function directly
     unsafe {
-        interrupts::PICS.lock().initialize();
+        PICS.lock().initialize(); // Use imported PICS directly
     }
     debug_info!("Interrupts initialized");
 
