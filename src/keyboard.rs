@@ -1,4 +1,15 @@
-// In src/keyboard.rs
+       //  IMPORTS  \\
+///////////////////////////////
+
+use crate::interrupts::InterruptIndex;
+use crate::interrupts::PICS;
+use pc_keyboard::DecodedKey;
+use crate::vga_buffer::CursorMode;
+use pc_keyboard::DecodedKey;
+use crate::{print, println};
+
+//////////// END //////////////
+
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
     let mut keyboard = KEYBOARD.lock();
     let mut port = Port::new(0x60);
