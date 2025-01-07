@@ -40,7 +40,7 @@ lazy_static! {
         idt.page_fault.set_handler_fn(page_fault_handler);
 
         // Make sure keyboard interrupt is properly registered
-        unsafe {
+        {
             idt[InterruptIndex::Keyboard.as_usize()]
             .set_handler_fn(keyboard::keyboard_interrupt_handler)
             .set_present(true);
@@ -86,9 +86,4 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
         }
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }
-}
-
-/// Initializes the Interrupt Descriptor Table
-pub fn init_idt() {
-    IDT.load();
 }

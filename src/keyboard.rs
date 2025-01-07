@@ -1,6 +1,4 @@
 //  IMPORTS  \\
-///////////////////////////////
-
 use x86_64::structures::idt::InterruptStackFrame;
 use x86_64::instructions::port::Port;
 use crate::interrupts::InterruptIndex;
@@ -10,8 +8,8 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use crate::vga_buffer::CursorMode;
 use crate::{print, println};
-
-//////////// END //////////////
+use crate::serial_println;
+// END IMPORTS \\
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
