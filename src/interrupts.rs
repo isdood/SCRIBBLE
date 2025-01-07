@@ -76,7 +76,7 @@ extern "x86-interrupt" fn page_fault_handler(
 }
 
 // Timer interrupt handler
-use crate::{debug_info, stats::SYSTEM_STATS};
+use crate::{stats::SYSTEM_STATS};
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     use x86_64::instructions::interrupts;
