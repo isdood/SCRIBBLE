@@ -20,6 +20,7 @@ pub mod serial;
 pub mod splat;
 pub mod stat;
 pub mod vga_buffer;
+pub use crate::allocator::ALLOCATOR;
 
 use bootloader::BootInfo;
 use x86_64::{
