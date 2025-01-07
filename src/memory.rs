@@ -219,8 +219,7 @@ heap_size / 1024
     );
 
     unsafe {
-        let heap = &mut *(&crate::allocator::ALLOCATOR as *const _ as *mut crate::allocator::Allocator);
-        heap.init(heap_start, heap_size);
+        crate::allocator::ALLOCATOR.lock().init(heap_start, heap_size);
     }
 
     Ok(())
