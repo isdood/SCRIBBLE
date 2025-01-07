@@ -10,6 +10,7 @@
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use scribble::{println, print};
+use crate::{debug_info, debug_warn, debug_error};
 // use scribble::vga_buffer::Color;
 // END IMPORTS \\
 
@@ -18,58 +19,33 @@ entry_point!(kernel_main);
 #[no_mangle]
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     use x86_64::instructions::{interrupts, hlt};
-    use scribble::vga_buffer::{Color, WRITER};
-    use core::fmt::Write;
 
-    // Disable interrupts during initialization
     interrupts::disable();
-    serial_println!("[DEBUG] Starting with interrupts disabled");
+    debug_info!("Starting kernel initialization");
 
-    // Initialize core systems
     scribble::init(boot_info);
-    serial_println!("[DEBUG] Core init complete");
+    debug_info!("Core systems initialized");
 
-    // Test VGA buffer direct write
+    // Test VGA buffer
     unsafe {
         let vga = 0xb8000 as *mut u16;
-        // White on black, character 'T'
-        *vga = 0x0F54; // 0x0F is white on black, 0x54 is ASCII 'T'
-        serial_println!("[DEBUG] Direct VGA write complete");
+        *vga = 0x0F54;
+        debug_info!("Direct VGA write complete");
     }
 
-    // Check PIC and interrupt status
-    unsafe {
-        let mut pics = PICS.lock();
-        serial_println!("[DEBUG] PIC masks: primary={:08b}, secondary={:08b}",
-                        pics.read_mask(pic8259::ChainedPics::PRIMARY),
-                        pics.read_mask(pic8259::ChainedPics::SECONDARY));
-    }
-
-    // Enable interrupts and measure interrupt frequency
     interrupts::enable();
-    serial_println!("[DEBUG] Interrupts enabled");
-
-    let mut last_tick = 0;
-    let mut tick_count = 0;
-    let mut last_diagnostic = 0;
+    debug_info!("Interrupts enabled");
 
     loop {
-        // Use hlt to reduce CPU usage
         hlt();
 
-        // Count timer ticks for diagnostics
-        if let Some(ticks) = get_timer_ticks() {
-            if ticks != last_tick {
-                tick_count += 1;
-                last_tick = ticks;
-
-                // Print diagnostics every 100 ticks
-                if tick_count - last_diagnostic >= 100 {
-                    serial_println!("[DEBUG] Timer ticks: {}, Keyboard interrupts received: {}",
-                                    tick_count, get_keyboard_count());
-                    last_diagnostic = tick_count;
-                }
-            }
+        // Print stats every 100 ticks
+        let stats = stats::SYSTEM_STATS.lock();
+        if stats.get_timer_ticks() % 100 == 0 {
+            debug_info!("Stats - Timer: {}, Keyboard: {}",
+                        stats.get_timer_ticks(),
+                        stats.get_keyboard_interrupts()
+            );
         }
     }
 }

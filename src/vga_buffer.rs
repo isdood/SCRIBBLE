@@ -4,7 +4,7 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 use crate::{print, println};
-
+use crate::{debug_info, debug_warn, debug_error};
 // CONSTANTS //
 
 // Software / Harware cursor switch constants
@@ -543,11 +543,10 @@ impl Writer {
                     writer.write_byte(byte);
                 }
             } else {
-                serial_println!("[WARNING] VGA buffer locked, couldn't write: {}", msg);
+                debug_warn!("VGA buffer locked, couldn't write: {}", msg);
             }
         });
     }
-
 }
 
 // Write trait implementation
