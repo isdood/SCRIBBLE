@@ -7,6 +7,8 @@ use x86_64::instructions::interrupts;
 use x86_64::instructions::port::Port;
 use core::sync::atomic::{AtomicU64, Ordering};
 use crate::format;
+use alloc::string::String;
+use x86_64::instructions::hlt;
 use crate::{
     println,
     serial_println,

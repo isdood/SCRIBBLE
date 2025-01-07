@@ -1,8 +1,7 @@
 // src/keyboard.rs
 use pc_keyboard::{layouts, HandleControl, KeyCode, Keyboard, ScancodeSet1};
-use uart_16550::SerialPort;
-use x86_64::instructions::interrupts;
 use spin::Mutex;
+use x86_64::instructions::port::Port;
 
 #[derive(Debug)]
 pub enum KeyboardError {
@@ -25,12 +24,11 @@ impl KeyboardController {
 
     pub fn process_keyevent(&mut self, scancode: u8) -> Option<KeyCode> {
         if let Ok(Some(key_event)) = self.keyboard.add_byte(scancode) {
-            if let Some(key) = key_event.code {
-                self.last_keycode = Some(key);
-                return Some(key);
-            }
+            self.last_keycode = key_event.code;
+            key_event.code
+        } else {
+            None
         }
-        None
     }
 
     pub fn last_key(&self) -> Option<KeyCode> {
@@ -43,15 +41,13 @@ lazy_static::lazy_static! {
 }
 
 pub fn handle_keyboard_interrupt() {
-    let mut port = unsafe { SerialPort::new(0x60) };
+    let mut port = Port::new(0x60);
     let scancode: u8 = unsafe { port.read() };
 
-    interrupts::without_interrupts(|| {
-        if let Some(mut keyboard) = KEYBOARD.try_lock() {
-            if let Some(key) = keyboard.process_keyevent(scancode) {
-                use crate::splat::SplatLevel;
-                crate::splat::log(SplatLevel::BitsNBytes, &alloc::format!("Key Event: {:?}", key));
-            }
+    if let Some(mut keyboard) = KEYBOARD.try_lock() {
+        if let Some(key) = keyboard.process_keyevent(scancode) {
+            use crate::splat::SplatLevel;
+            crate::splat::log(SplatLevel::BitsNBytes, &alloc::format!("Key Event: {:?}", key));
         }
-    });
+    }
 }
