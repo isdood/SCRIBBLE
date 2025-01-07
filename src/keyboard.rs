@@ -31,12 +31,12 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
                 DecodedKey::Unicode(character) => {
                     // Handle cursor mode switching
                     match character {
-                        // Ctrl+H for Hardware cursor (you'll need to press H)
+                        // Ctrl+H for Hardware cursor
                         'H' => {
                             crate::vga_buffer::switch_cursor_mode(CursorMode::Hardware);
                             println!("Switched to hardware cursor");
                         },
-                        // Ctrl+S for Software cursor (you'll need to press S)
+                        // Ctrl+S for Software cursor
                         'S' => {
                             crate::vga_buffer::switch_cursor_mode(CursorMode::Software);
                             println!("Switched to software cursor");
@@ -59,6 +59,9 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
                             };
 
                             if should_handle {
+                                // Set color to white for user input
+                                crate::vga_buffer::set_color(crate::vga_buffer::Color::White, crate::vga_buffer::Color::Black);
+
                                 match character {
                                     '\u{8}' => crate::vga_buffer::backspace(),
                                     '\n' => {
@@ -73,11 +76,3 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(
                 },
                 DecodedKey::RawKey(key) => print!("{:?}", key),
             }
-        }
-    }
-
-    unsafe {
-        PICS.lock()
-        .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
-    }
-}

@@ -426,29 +426,6 @@ impl Writer {
         use x86_64::instructions::interrupts;
 
         interrupts::without_interrupts(|| {
-            self.cursor_visible = true;
-            self.hardware_cursor_enabled = true;
-
-            unsafe {
-                let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
-                let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
-
-                // Enable cursor and set appearance
-                control_port.write(CURSOR_MODE_REGISTER);
-                data_port.write(0x0E); // Enable cursor, normal size
-
-                control_port.write(CURSOR_START_REGISTER);
-                data_port.write(14); // Start scan line
-            }
-
-            self.update_cursor();
-        });
-    }
-
-    pub fn enable_cursor(&mut self) {
-        use x86_64::instructions::interrupts;
-
-        interrupts::without_interrupts(|| {
             unsafe {
                 let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
                 let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
