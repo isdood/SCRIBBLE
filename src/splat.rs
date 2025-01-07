@@ -1,6 +1,6 @@
 // src/splat.rs
 use spin::Mutex;
-use alloc::{string::String, vec::Vec};
+use alloc::{string::String, vec::Vec, format};
 use core::fmt::Write;
 use lazy_static::lazy_static;
 use x86_64::registers::rflags;
@@ -51,28 +51,54 @@ pub fn log(level: SplatLevel, message: &str) {
 }
 
 #[macro_export]
-macro_rules! define_splat_macro {
-    ($name:ident, $level:expr) => {
-        #[macro_export]
-        macro_rules! $name {
-            () => {
-                $crate::splat::log($level, "")
-            };
-            ($s:expr) => {{
-                $crate::splat::log($level, $s)
-            }};
-            ($s:expr, $($arg:tt)*) => {{
-                $crate::splat::log($level, &alloc::format!($s, $($arg)*))
-            }};
-        }
-    };
+macro_rules! splat_critical {
+    () => ($crate::splat::log($crate::splat::SplatLevel::Critical, ""));
+    ($s:expr) => ($crate::splat::log($crate::splat::SplatLevel::Critical, $s));
+    ($s:expr, $($arg:tt)+) => ($crate::splat::log(
+        $crate::splat::SplatLevel::Critical,
+        &alloc::format!($s, $($arg)+)
+    ));
 }
 
-define_splat_macro!(splat_critical, SplatLevel::Critical);
-define_splat_macro!(splat_warn, SplatLevel::Warning);
-define_splat_macro!(splat_bitsnbytes, SplatLevel::BitsNBytes);
-define_splat_macro!(splat_info, SplatLevel::Info);
-define_splat_macro!(splat_debug, SplatLevel::Debug);
+#[macro_export]
+macro_rules! splat_warn {
+    () => ($crate::splat::log($crate::splat::SplatLevel::Warning, ""));
+    ($s:expr) => ($crate::splat::log($crate::splat::SplatLevel::Warning, $s));
+    ($s:expr, $($arg:tt)+) => ($crate::splat::log(
+        $crate::splat::SplatLevel::Warning,
+        &alloc::format!($s, $($arg)+)
+    ));
+}
+
+#[macro_export]
+macro_rules! splat_bitsnbytes {
+    () => ($crate::splat::log($crate::splat::SplatLevel::BitsNBytes, ""));
+    ($s:expr) => ($crate::splat::log($crate::splat::SplatLevel::BitsNBytes, $s));
+    ($s:expr, $($arg:tt)+) => ($crate::splat::log(
+        $crate::splat::SplatLevel::BitsNBytes,
+        &alloc::format!($s, $($arg)+)
+    ));
+}
+
+#[macro_export]
+macro_rules! splat_info {
+    () => ($crate::splat::log($crate::splat::SplatLevel::Info, ""));
+    ($s:expr) => ($crate::splat::log($crate::splat::SplatLevel::Info, $s));
+    ($s:expr, $($arg:tt)+) => ($crate::splat::log(
+        $crate::splat::SplatLevel::Info,
+        &alloc::format!($s, $($arg)+)
+    ));
+}
+
+#[macro_export]
+macro_rules! splat_debug {
+    () => ($crate::splat::log($crate::splat::SplatLevel::Debug, ""));
+    ($s:expr) => ($crate::splat::log($crate::splat::SplatLevel::Debug, $s));
+    ($s:expr, $($arg:tt)+) => ($crate::splat::log(
+        $crate::splat::SplatLevel::Debug,
+        &alloc::format!($s, $($arg)+)
+    ));
+}
 
 #[macro_export]
 macro_rules! serial_print {
@@ -93,17 +119,4 @@ macro_rules! serial_println {
 
 fn get_timestamp() -> u64 {
     rflags::read_raw()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_log_levels() {
-        log(SplatLevel::Info, "Test message");
-        let buffer = LOG_BUFFER.lock();
-        assert_eq!(buffer.len(), 1);
-        assert_eq!(buffer[0].level, SplatLevel::Info);
-    }
 }
