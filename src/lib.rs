@@ -61,24 +61,39 @@ macro_rules! debug_error {
 }
 
 pub fn init(boot_info: &'static BootInfo) {
-    gdt::init();
-    interrupts::init_idt();
-    unsafe {
-        debug_info!("Initializing PIC");
-        interrupts::PICS.lock().initialize();
-        debug_info!("PIC initialized");
-    }
+    use x86_64::instructions::interrupts;
 
+    // Disable interrupts during initialization
+    interrupts::disable();
+
+    // Initialize GDT first
+    gdt::init();
+    debug_info!("GDT initialized");
+
+    // Initialize memory management
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe {
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
+    debug_info!("Memory mapper initialized");
 
-    allocator::init_heap(&mut mapper, &mut frame_allocator)
-    .expect("heap initialization failed");
+    // Initialize heap with error checking
+    match allocator::init_heap(&mut mapper, &mut frame_allocator) {
+        Ok(_) => debug_info!("Heap initialization successful: {} KB", allocator::HEAP_SIZE / 1024),
+        Err(e) => panic!("Heap initialization failed: {:?}", e),
+    }
 
-    x86_64::instructions::interrupts::enable();
+    // Initialize interrupts after memory is set up
+    interrupts::init_idt();
+    unsafe {
+        interrupts::PICS.lock().initialize();
+    }
+    debug_info!("Interrupts initialized");
+
+    // Enable interrupts
+    interrupts::enable();
+    debug_info!("System initialization complete");
 }
 
 
