@@ -544,7 +544,7 @@ impl Writer {
                     writer.write_byte(byte);
                 }
             } else {
-                debug_warn!("VGA buffer locked, couldn't write: {}", msg);
+                splat_warn!("VGA buffer locked, couldn't write: {}", msg);
             }
         });
     }

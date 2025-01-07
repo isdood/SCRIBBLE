@@ -68,7 +68,7 @@ pub fn init_heap(
 
     // Update system stats with initial heap info
     let heap_stats = get_heap_stats();
-    crate::debug_info!(
+    crate::splat_info!(
         "Heap initialized: Total: {}KB, Used: {}KB, Free: {}KB",
         heap_stats.total_size / 1024,
         heap_stats.used_size / 1024,

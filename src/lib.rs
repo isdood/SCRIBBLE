@@ -11,8 +11,6 @@ extern crate alloc;
 // Add required imports
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
-use crate::interrupts::{init_idt, PICS};
-use crate::{debug_info, debug_warn, debug_critical};
 
 // First declare all modules
 pub mod allocator;
@@ -22,80 +20,50 @@ pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
 pub mod keyboard;
-pub mod debug;
+pub mod splat;
 pub mod stats;
 
 // Then do any re-exports
 pub use stats::SYSTEM_STATS;
+// Re-export debug macros
+pub use crate::{splat_info, splat_warn, splat_error, splat_critical};
 
-// Define macros here
-#[macro_export]
-macro_rules! debug_info {
-    ($($arg:tt)*) => {{
-        let message = {
-            use alloc::format;
-            format!($($arg)*)
-        };
-        $crate::debug::log($crate::debug::DebugLevel::Info, &message)
-    }};
-}
-
-#[macro_export]
-macro_rules! debug_warn {
-    ($($arg:tt)*) => {{
-        let message = {
-            use alloc::format;
-            format!($($arg)*)
-        };
-        $crate::debug::log($crate::debug::DebugLevel::Warning, &message)
-    }};
-}
-
-#[macro_export]
-macro_rules! debug_error {
-    ($($arg:tt)*) => {{
-        let message = {
-            use alloc::format;
-            format!($($arg)*)
-        };
-        $crate::debug::log($crate::debug::DebugLevel::Error, &message)
-    }};
-}
+// Remove the macro definitions that were here before
 
 pub fn init(boot_info: &'static BootInfo) {
     use x86_64::instructions::interrupts;
 
-    debug_info!("Starting system initialization");
+    splat_info!("Starting system initialization");
 
     // Disable interrupts during initialization
     interrupts::disable();
-    debug_info!("Interrupts disabled for initialization");
+    splat_info!("Interrupts disabled for initialization");
 
     // Initialize GDT first
-    debug_info!("Initializing GDT...");
+    splat_info!("Initializing GDT...");
     gdt::init();
-    debug_info!("GDT initialized successfully");
+    splat_info!("GDT initialized successfully");
 
     // Initialize memory management
-    debug_info!("Setting up memory management...");
+    splat_info!("Setting up memory management...");
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    debug_info!("Physical memory offset: {:#x}", boot_info.physical_memory_offset);
+    splat_info!("Physical memory offset: {:#x}", boot_info.physical_memory_offset);
 
     let mut mapper = unsafe {
-        debug_info!("Creating page mapper...");
+        splat_info!("Creating page mapper...");
         memory::init(phys_mem_offset)
     };
 
     let mut frame_allocator = unsafe {
-        debug_info!("Initializing frame allocator...");
+        splat_info!("Initializing frame allocator...");
         memory::BootInfoFrameAllocator::init(&boot_info.memory_map)
     };
-    debug_info!("Memory management initialized");
+    splat_info!("Memory management initialized");
 
     // Initialize heap
-    debug_info!("Initializing heap (size: {} KB)...", allocator::HEAP_SIZE / 1024);
+    splat_info!("Initializing heap (size: {} KB)...", allocator::HEAP_SIZE / 1024);
     match allocator::init_heap(&mut mapper, &mut frame_allocator) {
-        Ok(_) => debug_info!("Heap initialization successful"),
+        Ok(_) => splat_info!("Heap initialization successful"),
         Err(e) => {
             debug_critical!("Heap initialization failed: {:?}", e);
             panic!("Heap initialization failed: {:?}", e);
@@ -103,15 +71,15 @@ pub fn init(boot_info: &'static BootInfo) {
     }
 
     // Initialize interrupts
-    debug_info!("Loading IDT...");
+    splat_info!("Loading IDT...");
     init_idt();
 
-    debug_info!("Initializing PIC...");
+    splat_info!("Initializing PIC...");
     unsafe {
         match PICS.try_lock() {
             Some(mut pics) => {
                 pics.initialize();
-                debug_info!("PIC initialized successfully");
+                splat_info!("PIC initialized successfully");
             },
             None => {
                 debug_critical!("Failed to acquire PIC lock during initialization");
@@ -121,9 +89,9 @@ pub fn init(boot_info: &'static BootInfo) {
     }
 
     // Enable interrupts
-    debug_info!("Enabling interrupts...");
+    splat_info!("Enabling interrupts...");
     interrupts::enable();
-    debug_info!("System initialization complete");
+    splat_info!("System initialization complete");
 }
 
 

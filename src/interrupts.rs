@@ -3,11 +3,10 @@ use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use pic8259::ChainedPics;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::println;
+use crate::{println, debug_info};
 use crate::keyboard;
 use crate::vga_buffer::WRITER;
-use x86_64::instructions::interrupts;
-use crate::serial_println;
+use crate::stats::SYSTEM_STATS;
 // END IMPORTS //
 
 pub const PIC_1_OFFSET: u8 = 32;

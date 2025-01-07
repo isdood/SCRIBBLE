@@ -4,7 +4,7 @@
 extern crate alloc;
 
 use bootloader::{entry_point, BootInfo};
-use scribble::{debug_info, debug_error, stats};
+use scribble::{splat_info, splat_warn, splat_critical};
 use x86_64::instructions::{interrupts, hlt};
 
 /////////////////////////
@@ -13,21 +13,21 @@ entry_point!(kernel_main);
 
 #[no_mangle]
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    debug_info!("Kernel boot started");
+    splat_info!("Kernel boot started");
 
     // Disable interrupts during initialization
     interrupts::disable();
-    debug_info!("Interrupts disabled for kernel initialization");
+    splat_info!("Interrupts disabled for kernel initialization");
 
     // Initialize the system
     scribble::init(boot_info);
-    debug_info!("System initialization completed successfully");
+    splat_info!("System initialization completed successfully");
 
     // Enable interrupts
-    debug_info!("Enabling interrupts for main loop");
+    splat_info!("Enabling interrupts for main loop");
     interrupts::enable();
 
-    debug_info!("Entering main kernel loop");
+    splat_info!("Entering main kernel loop");
     let mut last_tick_count = 0;
     loop {
         hlt(); // CPU sleep until next interrupt
@@ -45,25 +45,25 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
                     (stats.get_keyboard_interrupts(), stats.get_timer_ticks())
                 };
 
-                debug_info!("System Status - Uptime ticks: {}, Keyboard interrupts: {}",
+                splat_info!("System Status - Uptime ticks: {}, Keyboard interrupts: {}",
                             timer_ticks, keyboard_ints);
 
                 // If we're seeing unusually high interrupt counts, log a warning
                 if timer_ticks - last_tick_count > 1100 { // Should be ~1000
-                    debug_warn!("Timer ticks increasing faster than expected");
+                    splat_warn!("Timer ticks increasing faster than expected");
                 }
 
                 last_tick_count = current_ticks;
             }
         } else {
-            debug_critical!("Interrupts disabled unexpectedly in main loop!");
+            splat_critical!("Interrupts disabled unexpectedly in main loop!");
         }
     }
 }
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    debug_critical!("KERNEL PANIC: {}", info);
+    splat_critical!("KERNEL PANIC: {}", info);
     debug::dump_debug_log();
     loop {
         hlt();
