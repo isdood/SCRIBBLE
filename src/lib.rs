@@ -10,9 +10,10 @@
 
 extern crate alloc;
 
-use bootloader::BootInfo;
+use bootloader::{BootInfo, entry_point};
 use x86_64::structures::paging::{OffsetPageTable, PageTable, Size4KiB};
 use x86_64::VirtAddr;
+use bootloader::boot_info::MemoryRegions;
 
 pub mod allocator;
 pub mod freezer;
@@ -41,9 +42,9 @@ pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
 
 pub fn init_memory_management(boot_info: &'static BootInfo)
 -> Result<(OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError> {
-    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset.unwrap_or_else(|| 0) as u64);
+    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset.unwrap_or(0) as u64);
     let mapper = unsafe { init(physical_memory_offset) };
-    let frame_allocator = unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_map) };
+    let frame_allocator = unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_regions) };
     Ok((mapper, frame_allocator))
 }
 
