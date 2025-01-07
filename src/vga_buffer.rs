@@ -3,6 +3,7 @@ use core::fmt::{self, Write};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
+use crate::println;
 
 // CONSTANTS //
 
