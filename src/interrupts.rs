@@ -7,6 +7,7 @@ use crate::println;
 use crate::keyboard;
 use crate::vga_buffer::WRITER;
 use x86_64::instructions::interrupts;
+use crate::serial_println;
 // END IMPORTS //
 
 pub const PIC_1_OFFSET: u8 = 32;

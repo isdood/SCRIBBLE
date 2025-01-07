@@ -7,7 +7,7 @@ use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts};
 use spin::Mutex;
 use lazy_static::lazy_static;
 use crate::vga_buffer::CursorMode;
-use crate::{print, println};
+use crate::print;
 use crate::serial_println;
 // END IMPORTS \\
 
