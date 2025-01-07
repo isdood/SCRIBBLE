@@ -6,6 +6,8 @@ extern crate alloc;
 use bootloader::{entry_point, BootInfo};
 use scribble::{debug_info, debug_error, stats};
 
+pub use stats::debug_info;
+
 entry_point!(kernel_main);
 
 #[panic_handler]
