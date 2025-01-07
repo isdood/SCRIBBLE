@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use crate::interrupts::PICS;
 use crate::interrupts::InterruptIndex;
 use crate::stats::SYSTEM_STATS;
-use crate::{debug_info, debug_warn};
+use crate::{splat_info, splat_warn};
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =

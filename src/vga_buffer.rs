@@ -4,7 +4,7 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use x86_64::instructions::port::Port;
 use crate::{print, println};
-use crate::debug_warn;
+use crate::splat_warn;
 
 // CONSTANTS //
 
