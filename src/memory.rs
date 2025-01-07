@@ -1,7 +1,8 @@
 // src/memory.rs
 
-use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
-use x86_64::{PhysAddr, structures::paging::{FrameAllocator, PhysFrame}};
+use bootloader::BootInfo;
+use x86_64::structures::paging::{FrameAllocator, PhysFrame, Size4KiB};
+use x86_64::PhysAddr;
 
 pub struct BootInfoFrameAllocator {
     memory_map: &'static MemoryMap,

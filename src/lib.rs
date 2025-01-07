@@ -1,3 +1,5 @@
+// src/lib.rs
+
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
@@ -8,11 +10,10 @@
 
 extern crate alloc;
 
-use x86_64::structures::paging::{OffsetPageTable, PageTable, PhysFrame, Size4KiB, FrameAllocator};
-use x86_64::{VirtAddr, PhysAddr};
-use bootloader::bootinfo::{BootInfo, MemoryMap, MemoryRegionType};
-use core::ptr::NonNull;
-use core::fmt;
+// Correct imports
+use bootloader::{BootInfo, entry_point};
+use x86_64::structures::paging::{OffsetPageTable, PageTable, Size4KiB};
+use x86_64::VirtAddr;
 
 pub mod allocator;
 pub mod freezer;
@@ -27,6 +28,7 @@ pub mod splat;
 pub mod stat;
 pub mod vga_buffer;
 pub mod unstable_matter;
+
 pub use crate::allocator::ALLOCATOR;
 
 #[derive(Debug)]
