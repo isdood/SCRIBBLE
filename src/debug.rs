@@ -9,32 +9,32 @@ pub enum DebugLevel {
 
 pub fn log(level: DebugLevel, message: &str) {
     match level {
-        DebugLevel::Info => serial_println!("[INFO] {}", message),
-        DebugLevel::Warning => serial_println!("[WARN] {}", message),
-        DebugLevel::Error => serial_println!("[ERROR] {}", message),
+        DebugLevel::Info => serial_println!("[INFO] {}", message),      // Remove commas
+        DebugLevel::Warning => serial_println!("[WARN] {}", message),   // Remove commas
+        DebugLevel::Error => serial_println!("[ERROR] {}", message)     // Remove commas
     }
 }
 
 #[macro_export]
 macro_rules! debug_info {
-    ($($arg:tt)*) => {{
+    ($($arg:tt)*) => {
         use alloc::format;
         $crate::debug::log($crate::debug::DebugLevel::Info, &format!($($arg)*))
-    }};
+    };
 }
 
 #[macro_export]
 macro_rules! debug_warn {
-    ($($arg:tt)*) => {{
+    ($($arg:tt)*) => {
         use alloc::format;
         $crate::debug::log($crate::debug::DebugLevel::Warning, &format!($($arg)*))
-    }};
+    };
 }
 
 #[macro_export]
 macro_rules! debug_error {
-    ($($arg:tt)*) => {{
+    ($($arg:tt)*) => {
         use alloc::format;
         $crate::debug::log($crate::debug::DebugLevel::Error, &format!($($arg)*))
-    }};
+    };
 }
