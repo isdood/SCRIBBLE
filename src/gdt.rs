@@ -2,10 +2,8 @@
 use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor, SegmentSelector};
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::VirtAddr;
-use x86_64::instructions::segmentation::CS;
+use x86_64::instructions::segmentation::{Segment, CS};
 use lazy_static::lazy_static;
-use x86_64::instructions::segmentation::Segment;
-
 
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
@@ -53,6 +51,7 @@ pub fn init() {
 
     // Update segment registers
     unsafe {
+        // Must use Segment trait for CS
         CS::set_reg(GDT.1.code_selector);
         x86_64::instructions::tables::load_tss(GDT.1.tss_selector);
     }
