@@ -5,10 +5,10 @@
 #![feature(alloc_error_handler)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
-#![feature(format_args_nl)]
 
 extern crate alloc;
 
+// First declare all modules
 pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
@@ -18,6 +18,9 @@ pub mod vga_buffer;
 pub mod keyboard;
 pub mod debug;
 pub mod stats;
+
+// Then do any re-exports
+pub use stats::SYSTEM_STATS;
 
 use bootloader::BootInfo;
 use x86_64::VirtAddr;

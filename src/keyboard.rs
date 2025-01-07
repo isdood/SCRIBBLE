@@ -1,19 +1,16 @@
-//  IMPORTS  \\
-use pc_keyboard::{HandleControl, Keyboard, ScancodeSet1, layouts};
+use x86_64::instructions::port::Port;  // Add Port import
 use x86_64::structures::idt::InterruptStackFrame;
-use crate::interrupts::InterruptIndex;
+use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1};
+use spin::Mutex;
+use lazy_static::lazy_static;
 use crate::interrupts::PICS;
+use crate::interrupts::InterruptIndex;
 use crate::stats::SYSTEM_STATS;
 use crate::{debug_info, debug_warn};
-// END IMPORTS \\
 
 lazy_static! {
     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
-    Mutex::new(Keyboard::new(
-        ScancodeSet1::new(),
-                             layouts::Us104Key,
-                             HandleControl::Ignore
-    ));
+    Mutex::new(Keyboard::new(HandleControl::Ignore));
 }
 
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
@@ -26,8 +23,18 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: Interrupt
         let scancode: u8 = unsafe { port.read() };
 
         debug_info!("Scancode: 0x{:02x}", scancode);
-        // ... rest of the handler
+
+        if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+            if let Some(key) = keyboard.process_keyevent(key_event) {
+                debug_info!("Processed key: {:?}", key);
+            }
+        }
     } else {
         debug_warn!("Keyboard locked, skipping interrupt");
+    }
+
+    unsafe {
+        PICS.lock()
+        .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
     }
 }

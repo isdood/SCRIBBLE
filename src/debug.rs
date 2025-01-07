@@ -1,5 +1,3 @@
-use core::fmt;
-use alloc::string::String;
 use crate::serial_println;
 
 #[derive(Debug, Clone, Copy)]

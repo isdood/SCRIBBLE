@@ -1,5 +1,5 @@
 use spin::Mutex;
-
+use lazy_static::lazy_static;  // Add this import
 
 pub struct SystemStats {
     timer_ticks: u64,
