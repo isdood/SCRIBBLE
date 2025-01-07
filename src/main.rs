@@ -1,6 +1,6 @@
 #![no_std]
 #![no_main]
-
+#![feature(alloc)]
 extern crate alloc;
 
 use bootloader::{BootInfo, entry_point};

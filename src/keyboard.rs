@@ -1,37 +1,31 @@
-// src/keyboard.rs
-use pc_keyboard::{layouts, HandleControl, KeyCode, Keyboard, ScancodeSet1};
+use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1, DecodedKey};
 use spin::Mutex;
 use x86_64::instructions::port::Port;
 
-#[derive(Debug)]
-pub enum KeyboardError {
-    BufferFull,
-    NoData,
-}
-
 pub struct KeyboardController {
     keyboard: Keyboard<layouts::Us104Key, ScancodeSet1>,
-    last_keycode: Option<KeyCode>,
+    last_keycode: Option<DecodedKey>,
 }
 
 impl KeyboardController {
     pub fn new() -> Self {
         KeyboardController {
-            keyboard: Keyboard::new(ScancodeSet1::new(), layouts::Us104Key, HandleControl::Ignore),
+            keyboard: Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore),
             last_keycode: None,
         }
     }
 
-    pub fn add_byte(&mut self, scancode: u8) -> Option<KeyCode> {
+    pub fn add_byte(&mut self, scancode: u8) -> Option<DecodedKey> {
         if let Ok(Some(key_event)) = self.keyboard.add_byte(scancode) {
-            self.last_keycode = Some(key_event.code);
-            Some(key_event.code)
-        } else {
-            None
+            if let Some(decoded_key) = self.keyboard.process_keyevent(key_event) {
+                self.last_keycode = Some(decoded_key);
+                return Some(decoded_key);
+            }
         }
+        None
     }
 
-    pub fn last_key(&self) -> Option<KeyCode> {
+    pub fn last_key(&self) -> Option<DecodedKey> {
         self.last_keycode
     }
 }

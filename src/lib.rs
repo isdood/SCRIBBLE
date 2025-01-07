@@ -1,10 +1,6 @@
 #![no_std]
 #![no_main]
-#![feature(custom_test_frameworks)]
 #![feature(abi_x86_interrupt)]
-#![feature(alloc_error_handler)]
-#![test_runner(crate::test_runner)]
-#![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
@@ -16,120 +12,121 @@ pub mod keyboard;
 pub mod memory;
 pub mod pic8259;
 pub mod rtc;
+pub mod vga_buffer;
 pub mod serial;
 pub mod splat;
 pub mod stat;
-pub mod vga_buffer;
-pub use crate::allocator::ALLOCATOR;
+pub mod unstable_matter;
 
-use bootloader::BootInfo;
-use x86_64::{
-    structures::paging::{
-        OffsetPageTable, Size4KiB,
-        mapper::MapToError,
-    },
-    VirtAddr,
-};
 
-// Re-export commonly used items
-pub use alloc::format;
-pub use crate::splat::SplatLevel;
-pub use alloc::string::{String, ToString};
-pub use x86_64::instructions::hlt;
+use bootloader::{BootInfo, entry_point};
+use core::panic::PanicInfo;
+use x86_64::VirtAddr;
+use alloc::format;
+use crate::stat::{SystemMetrics, increment_freeze_count};
+use crate::splat::SplatLevel;
 
-#[derive(Debug)]
-pub enum InitError {
-    PagingError(MapToError<Size4KiB>),
-    HeapError,
+
+entry_point!(kernel_main);
+
+fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
+    println!("Entering kernel_main");
+
+    match init_system(boot_info) {
+        Ok(_) => println!("System initialization complete"),
+        Err(_) => {
+            println!("Kernel initialization failed");
+            kernel_panic("Failed to initialize system");
+        }
+    }
+
+    println!("System initialized");
+
+    // Initialize freezer system
+    freezer::FreezerState::new();
+
+    // Try initial system thaw
+    match freezer::login("slug") {
+        true => {
+            println!("System activated");
+        }
+        false => {
+            println!("Initial system thaw failed");
+            kernel_panic("Authentication failure during system initialization");
+        }
+    }
+
+    // Main system loop
+    let mut consecutive_anomalies = 0;
+    loop {
+        let current_stats = stat::SystemMetrics::current();
+
+        // System health checks
+        check_system_status(&current_stats, &mut consecutive_anomalies);
+
+        if consecutive_anomalies > 5 {
+            println!("System frozen due to anomalies");
+        }
+
+        // Deep sleep between checks
+        x86_64::instructions::hlt();
+    }
 }
 
-pub const HEAP_START: usize = 0x_4444_4444_0000;
-pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
+fn init_system(boot_info: &'static mut BootInfo) -> Result<(), &'static str> {
+    gdt::init();
+    unsafe {
+        let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset.unwrap_or(0) as u64);
+        let mapper = memory::init(phys_mem_offset);
 
-/// Memory management thresholds
-#[allow(dead_code)]
-const LOW_MEMORY_THRESHOLD: usize = HEAP_SIZE / 10;
-#[allow(dead_code)]
-const CRITICAL_MEMORY_THRESHOLD: usize = HEAP_SIZE / 20;
-#[allow(dead_code)]
-const FRAGMENTATION_THRESHOLD: f32 = 0.5;
+        // Initialize heap with proper error handling
+        allocator::init_heap(0x4000_0000_0000, 100 * 1024 * 1024);
+    }
+    Ok(())
+}
 
-/// Initialize the memory management system
+fn check_system_status(stats: &SystemMetrics, consecutive_anomalies: &mut u32) {
+    // Check memory usage
+    let (total, used) = stat::get_memory_stats();
+    let memory_usage = (used as f32 / total as f32) * 100.0;
+
+    if memory_usage > 90.0 {
+        let msg = format!(
+            "Critical memory usage: {:.1}%", memory_usage
+        );
+        splat::log(SplatLevel::Critical, &msg);
+        *consecutive_anomalies += 1;
+    }
+
+    // Check system metrics
+    perform_detailed_check(stats);
+}
+
 pub fn init_memory_management(boot_info: &'static BootInfo)
 -> Result<(OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError> {
-    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset as u64);
     let mapper = unsafe { memory::init(physical_memory_offset) };
     let frame_allocator = unsafe { memory::BootInfoFrameAllocator::init(&boot_info.memory_map) };
     Ok((mapper, frame_allocator))
 }
 
-pub fn init_heap_memory(
-    mapper: &mut OffsetPageTable,
-    frame_allocator: &mut memory::BootInfoFrameAllocator,
-) -> Result<(), InitError> {
-    allocator::init_heap(mapper, frame_allocator)
-    .map_err(|_| InitError::HeapError)
+fn perform_detailed_check(stats: &SystemMetrics) {
+    splat::log(SplatLevel::Info, &stats.display());
 }
 
-pub fn visualize_memory_map(_start_addr: VirtAddr, _size: usize) {
-    splat::log(
-        SplatLevel::BitsNBytes,
-        "Memory map visualization not yet implemented"
-    );
-}
-
-/// Get the current system timestamp as a formatted string
-pub fn get_system_timestamp() -> String {
-    format!("{}", rtc::DateTime::now().to_string())
-}
-
-/// Get the current system user
-pub fn get_current_user() -> &'static str {
-    "isdood"
-}
-
-/// Get the current kernel version
-pub fn get_kernel_version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
-}
-
-/// Print system information
-pub fn print_system_info() {
-    splat::log(
-        SplatLevel::Info,
-        &format!(
-            "Scribble Kernel\n\
-Version: {}\n\
-User: {}\n\
-Time: {}",
-get_kernel_version(),
-                 get_current_user(),
-                 get_system_timestamp()
-        )
-    );
-}
-
-#[cfg(test)]
-fn test_runner(tests: &[&dyn Fn()]) {
-    serial_println!("Running {} tests", tests.len());
-    for test in tests {
-        test();
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    println!("KERNEL PANIC: {}", info);
+    increment_freeze_count();
+    loop {
+        x86_64::instructions::hlt();
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test_case]
-    fn test_memory_thresholds() {
-        assert!(LOW_MEMORY_THRESHOLD < CRITICAL_MEMORY_THRESHOLD);
-        assert!(FRAGMENTATION_THRESHOLD > 0.0 && FRAGMENTATION_THRESHOLD <= 1.0);
-    }
-
-    #[test_case]
-    fn test_heap_constants() {
-        assert!(HEAP_SIZE > 0);
-        assert!(HEAP_START > 0);
+fn kernel_panic(msg: &str) -> ! {
+    println!("KERNEL PANIC: {}", msg);
+    increment_freeze_count();
+    loop {
+        x86_64::instructions::hlt();
     }
 }

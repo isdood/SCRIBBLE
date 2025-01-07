@@ -1,9 +1,9 @@
 // src/vga_buffer.rs
-use volatile::Volatile;
+
+use crate::unstable_matter::UnstableMatter;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use core::ops::{Deref, DerefMut};
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -57,22 +57,9 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
-impl Deref for ScreenChar {
-    type Target = ScreenChar;
-    fn deref(&self) -> &Self::Target {
-        self
-    }
-}
-
-impl DerefMut for ScreenChar {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self
-    }
-}
-
 #[repr(transparent)]
 struct Buffer {
-    chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
+    chars: [[UnstableMatter<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
 pub struct Writer {
@@ -138,12 +125,8 @@ impl Writer {
     pub fn blink_cursor(&mut self) {
         if self.column_position > 0 {
             let last_pos = self.column_position - 1;
-            let color_code = self.color_code;
             let row = BUFFER_HEIGHT - 1;
-            let screen_char = ScreenChar {
-                ascii_character: self.buffer.chars[row][last_pos].read().ascii_character,
-                color_code,
-            };
+            let screen_char = self.buffer.chars[row][last_pos].read();
             self.buffer.chars[row][last_pos].write(screen_char);
         }
     }
