@@ -2,6 +2,7 @@
 ///////////////////////////////
 
 use x86_64::structures::idt::InterruptStackFrame;
+use x86_64::instructions::port::Port;
 use crate::interrupts::InterruptIndex;
 use crate::interrupts::PICS;
 use pc_keyboard::DecodedKey;
