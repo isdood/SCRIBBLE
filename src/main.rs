@@ -5,24 +5,25 @@ extern crate alloc;
 
 use bootloader::{entry_point, BootInfo};
 use scribble::{debug_info, debug_error, stats};
+use x86_64::instructions::interrupts;
 
 entry_point!(kernel_main);
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     debug_error!("PANIC: {}", info);
-    loop {}
+    loop {
+        x86_64::instructions::hlt();  // Add hlt instruction in panic loop
+    }
 }
 
 #[no_mangle]
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use x86_64::instructions::{interrupts, hlt};
-
-    // Initialize first
-    scribble::init(boot_info);
-
+    // Initialize with interrupts disabled
     interrupts::disable();
-    debug_info!("Starting kernel initialization");
+
+    // Initialize core systems
+    scribble::init(boot_info);
     debug_info!("Core systems initialized");
 
     // Test VGA buffer
@@ -32,18 +33,24 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         debug_info!("Direct VGA write complete");
     }
 
-    interrupts::enable();
+    // Enable interrupts after all initialization is complete
+    interrupts::enable_and_hlt();  // Use enable_and_hlt instead of separate enable/hlt
     debug_info!("Interrupts enabled");
 
+    // Main system loop
     loop {
-        hlt();
+        // Use hlt_loop instead of raw hlt to properly handle interrupts
+        x86_64::instructions::hlt();
 
-        let stats = stats::SYSTEM_STATS.lock();
-        if stats.get_timer_ticks() % 100 == 0 {
-            debug_info!("Stats - Timer: {}, Keyboard: {}",
-                        stats.get_timer_ticks(),
-                        stats.get_keyboard_interrupts()
-            );
+        // Only check stats when interrupts are enabled
+        if interrupts::are_enabled() {
+            let stats = stats::SYSTEM_STATS.lock();
+            if stats.get_timer_ticks() % 100 == 0 {
+                debug_info!("Stats - Timer: {}, Keyboard: {}",
+                            stats.get_timer_ticks(),
+                            stats.get_keyboard_interrupts()
+                );
+            }
         }
     }
 }
