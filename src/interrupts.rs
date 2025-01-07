@@ -79,20 +79,27 @@ extern "x86-interrupt" fn page_fault_handler(
 use crate::{debug_info, stats::SYSTEM_STATS};
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    let mut stats = SYSTEM_STATS.lock();
-    stats.increment_timer();
+    use x86_64::instructions::interrupts;
 
-    if stats.get_timer_ticks() % 50 == 0 {
-        debug_info!("Timer tick: {}", stats.get_timer_ticks());
-        interrupts::without_interrupts(|| {
-            if let Some(mut writer) = WRITER.try_lock() {
-                writer.blink_cursor();
-            }
-        });
+    // Quick increment without holding lock too long
+    {
+        let mut stats = SYSTEM_STATS.lock();
+        stats.increment_timer();
     }
 
+    // Only perform cursor blink and debug output every 100 ticks
+    static mut TICK_COUNT: u64 = 0;
     unsafe {
-        PICS.lock()
-        .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
+        TICK_COUNT = TICK_COUNT.wrapping_add(1);
+        if TICK_COUNT % 100 == 0 {
+            interrupts::without_interrupts(|| {
+                if let Some(mut writer) = WRITER.try_lock() {
+                    writer.blink_cursor();
+                }
+            });
+        }
+
+        // End interrupt quickly
+        PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }
 }

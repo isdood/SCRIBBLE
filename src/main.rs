@@ -30,19 +30,27 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     interrupts::enable();
     debug_info!("Interrupts enabled");
 
-    // Main system loop with controlled memory access
+    // Main system loop with sleep
+    let mut last_stats_print = 0;
     loop {
-        hlt();
+        hlt(); // CPU sleep until next interrupt
 
         if interrupts::are_enabled() {
-            let stats = stats::SYSTEM_STATS.lock();
-            if stats.get_timer_ticks() % 100 == 0 {
-                // Release the lock quickly
-                let ticks = stats.get_timer_ticks();
-                let interrupts = stats.get_keyboard_interrupts();
-                drop(stats); // Release lock before debug output
+            let ticks = {
+                let stats = stats::SYSTEM_STATS.lock();
+                stats.get_timer_ticks()
+            };
 
-                debug_info!("Stats - Timer: {}, Keyboard: {}", ticks, interrupts);
+            // Only print stats every 5000 ticks (approximately every 5 seconds)
+            if ticks >= last_stats_print + 5000 {
+                let (keyboard_ints, timer_ticks) = {
+                    let stats = stats::SYSTEM_STATS.lock();
+                    (stats.get_keyboard_interrupts(), stats.get_timer_ticks())
+                };
+
+                debug_info!("System Stats - Timer: {}, Keyboard: {}",
+                            timer_ticks, keyboard_ints);
+                last_stats_print = ticks;
             }
         }
     }

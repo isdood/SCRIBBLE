@@ -20,27 +20,24 @@ lazy_static! {
 }
 
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    SYSTEM_STATS.lock().increment_keyboard();
+    let mut port = Port::new(0x60);
+    let scancode: u8 = unsafe { port.read() };
 
-    debug_info!("Keyboard interrupt #{}", SYSTEM_STATS.lock().get_keyboard_interrupts());
+    // Quick increment without holding lock
+    {
+        SYSTEM_STATS.lock().increment_keyboard();
+    }
 
+    // Process keyboard input only if we can get the lock immediately
     if let Some(mut keyboard) = KEYBOARD.try_lock() {
-        let mut port = Port::new(0x60);
-        let scancode: u8 = unsafe { port.read() };
-
-        debug_info!("Scancode: 0x{:02x}", scancode);
-
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-            if let Some(key) = keyboard.process_keyevent(key_event) {
-                debug_info!("Processed key: {:?}", key);
+            if let Some(_key) = keyboard.process_keyevent(key_event) {
+                // Handle key event if needed
             }
         }
-    } else {
-        debug_warn!("Keyboard locked, skipping interrupt");
     }
 
     unsafe {
-        PICS.lock()
-        .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
+        PICS.lock().notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
     }
 }
