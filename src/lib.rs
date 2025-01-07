@@ -10,7 +10,7 @@
 
 extern crate alloc;
 
-use bootloader::BootInfo;
+use bootloader::{BootInfo, entry_point};
 use x86_64::structures::paging::{OffsetPageTable, PageTable, Size4KiB};
 use x86_64::VirtAddr;
 
@@ -39,10 +39,18 @@ pub enum InitError {
 pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
 
+// Helper function to convert Optional<u64> to Option<u64>
+fn optional_to_option(opt: Optional<u64>) -> Option<u64> {
+    match opt {
+        Optional::Some(val) => Some(val),
+        Optional::None => None,
+    }
+}
+
 pub fn init_memory_management(boot_info: &'static BootInfo)
 -> Result<(OffsetPageTable<'static>, memory::BootInfoFrameAllocator), InitError> {
-    // Handle the Optional<u64> type using pattern matching
-    let physical_memory_offset = match boot_info.physical_memory_offset {
+    // Handle the Optional<u64> type using the helper function
+    let physical_memory_offset = match optional_to_option(boot_info.physical_memory_offset) {
         Some(offset) => VirtAddr::new(offset),
         None => VirtAddr::new(0),
     };
