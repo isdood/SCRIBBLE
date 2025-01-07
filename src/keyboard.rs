@@ -6,6 +6,9 @@ use crate::interrupts::PICS;
 use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts};
 use spin::Mutex;
 use lazy_static::lazy_static;
+use crate::debug::DebugLevel;
+use alloc::format;
+
 // END IMPORTS \\
 
 lazy_static! {
