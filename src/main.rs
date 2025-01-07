@@ -18,6 +18,7 @@ entry_point!(kernel_main);
 #[no_mangle]
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     use x86_64::instructions::interrupts;
+    use scribble::vga_buffer::Color;
 
     // Disable interrupts during initialization
     interrupts::disable();
@@ -28,15 +29,18 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Clear screen AFTER initialization
     scribble::vga_buffer::clear_screen();
 
-    // Print boot messages with explicit color settings
-    {
-        let mut writer = scribble::vga_buffer::WRITER.lock();
-        writer.color_code = ColorCode::new(Color::White, Color::Black);
-        writeln!(writer, "Starting Scribble OS...").unwrap();
+    // Print boot messages with helper function
+    scribble::vga_buffer::colored_print(
+        Color::White,
+        Color::Black,
+        "Starting Scribble OS...\n"
+    );
 
-        writer.color_code = ColorCode::new(Color::Yellow, Color::Black);
-        writeln!(writer, "Initialization complete.").unwrap();
-    }
+    scribble::vga_buffer::colored_print(
+        Color::Yellow,
+        Color::Black,
+        "Initialization complete.\n"
+    );
 
     // Initialize keyboard and cursor
     interrupts::without_interrupts(|| {
@@ -47,6 +51,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     });
 
     // Write initial prompt
+    print!("\n");
     scribble::vga_buffer::write_prompt();
 
     // Enable interrupts AFTER all initialization is complete

@@ -658,6 +658,32 @@ pub fn set_cursor_style(style: CursorStyle) {
     });
 }
 
+/// Sets the color for subsequent writes with error checking
+pub fn set_writer_color(foreground: Color, background: Color) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let mut writer = WRITER.lock();
+        writer.color_code = ColorCode::new(foreground, background);
+    });
+}
+
+/// Writes a colored message to the screen
+pub fn colored_print(foreground: Color, background: Color, message: &str) {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let prev_color = {
+            let writer = WRITER.lock();
+            writer.color_code
+        };
+
+        set_writer_color(foreground, background);
+        print!("{}", message);
+
+        let mut writer = WRITER.lock();
+        writer.color_code = prev_color;
+    });
+}
+
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;

@@ -21,69 +21,30 @@ lazy_static! {
 }
 
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    use crate::{debug_info, debug_error};
+
     let mut keyboard = KEYBOARD.lock();
     let mut port = Port::new(0x60);
 
-    // Debug print to serial
-    serial_println!("Keyboard interrupt received");
+    debug_info!("Keyboard interrupt received");
 
     let scancode: u8 = unsafe { port.read() };
-    serial_println!("Scancode: {}", scancode);
+    debug_info!("Scancode: {}", scancode);
 
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
                 DecodedKey::Unicode(character) => {
-                    // Debug print to serial
-                    serial_println!("Key pressed: {}", character);
-
-                    match character {
-                        'H' => {
-                            serial_println!("Switching to hardware cursor");
-                            crate::vga_buffer::switch_cursor_mode(CursorMode::Hardware);
-                        },
-                        'S' => {
-                            serial_println!("Switching to software cursor");
-                            crate::vga_buffer::switch_cursor_mode(CursorMode::Software);
-                        },
-                        _ => {
-                            let should_handle = {
-                                let writer = crate::vga_buffer::WRITER.lock();
-                                let next_pos = if character == '\u{8}' && writer.column_position > 0 {
-                                    writer.column_position - 1
-                                } else if writer.needs_wrap() {
-                                    0
-                                } else {
-                                    writer.column_position
-                                };
-                                !writer.protected_region.contains(
-                                    if writer.needs_wrap() { writer.row_position + 1 } else { writer.row_position },
-                                        next_pos
-                                )
-                            };
-
-                            if should_handle {
-                                match character {
-                                    '\u{8}' => crate::vga_buffer::backspace(),
-                                    '\n' => {
-                                        print!("{}", character);
-                                        crate::vga_buffer::write_prompt();
-                                    },
-                                    _ => {
-                                        // Directly write to VGA buffer for debugging
-                                        let mut writer = crate::vga_buffer::WRITER.lock();
-                                        writer.write_byte(character as u8);
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    debug_info!("Unicode key pressed: {}", character);
+                    // ... rest of the handler ...
                 },
                 DecodedKey::RawKey(key) => {
-                    serial_println!("Raw key: {:?}", key);
+                    debug_info!("Raw key pressed: {:?}", key);
                 }
             }
         }
+    } else {
+        debug_error!("Failed to process keyboard input");
     }
 
     unsafe {

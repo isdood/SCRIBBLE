@@ -15,6 +15,7 @@ pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
 pub mod keyboard;
+pub mod debug;
 
 use bootloader::BootInfo;
 use x86_64::VirtAddr;
