@@ -58,17 +58,16 @@ macro_rules! define_splat_macro {
             () => {
                 $crate::splat::log($level, "")
             };
-            ($e:expr) => {
-                $crate::splat::log($level, $e)
-            };
-            ($fmt:expr, $($arg:expr),*) => {
-                $crate::splat::log($level, &alloc::format!($fmt, $($arg),*))
-            };
+            ($s:expr) => {{
+                $crate::splat::log($level, $s)
+            }};
+            ($s:expr, $($arg:tt)*) => {{
+                $crate::splat::log($level, &alloc::format!($s, $($arg)*))
+            }};
         }
-    }
+    };
 }
 
-// Define the logging macros
 define_splat_macro!(splat_critical, SplatLevel::Critical);
 define_splat_macro!(splat_warn, SplatLevel::Warning);
 define_splat_macro!(splat_bitsnbytes, SplatLevel::BitsNBytes);
@@ -77,13 +76,12 @@ define_splat_macro!(splat_debug, SplatLevel::Debug);
 
 #[macro_export]
 macro_rules! serial_print {
-    ($($arg:tt)*) => ({
-        use core::fmt::Write;
-        let _ = write!(
-            $crate::serial::SERIAL1.lock(),
-                       $($arg)*
-        );
-    });
+    ($($arg:tt)*) => {
+        if let Some(mut serial) = $crate::serial::SERIAL1.try_lock() {
+            use core::fmt::Write;
+            let _ = write!(serial, $($arg)*);
+        }
+    };
 }
 
 #[macro_export]
