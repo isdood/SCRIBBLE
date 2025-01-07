@@ -207,8 +207,6 @@ pub fn check_memory_health(allocator: &BootInfoFrameAllocator) -> bool {
 }
 
 pub fn init_heap(heap_start: *mut u8, heap_size: usize) -> Result<(), MapToError<Size4KiB>> {
-    use x86_64::structures::paging::Page;
-
     splat::log(
         SplatLevel::BitsNBytes,
         &format!(
@@ -221,11 +219,8 @@ heap_size / 1024
     );
 
     unsafe {
-        extern "C" {
-            static mut ALLOCATOR: linked_list_allocator::LockedHeap;
-        }
-
-        ALLOCATOR.lock().init(heap_start, heap_size);
+        let heap = &mut *(&crate::allocator::ALLOCATOR as *const _ as *mut crate::allocator::Allocator);
+        heap.init(heap_start, heap_size);
     }
 
     Ok(())
