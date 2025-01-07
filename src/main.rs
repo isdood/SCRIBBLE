@@ -6,8 +6,6 @@ extern crate alloc;
 use bootloader::{entry_point, BootInfo};
 use scribble::{debug_info, debug_error, stats};
 
-pub use stats::debug_info;
-
 entry_point!(kernel_main);
 
 #[panic_handler]
@@ -20,7 +18,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     use x86_64::instructions::{interrupts, hlt};
 
-    // First initialize the kernel before any debug output
+    // Initialize first
     scribble::init(boot_info);
 
     interrupts::disable();
