@@ -149,6 +149,13 @@ define_splat_macro!(splat_warn, SplatLevel::Warning);
 define_splat_macro!(splat_info, SplatLevel::Info);
 define_splat_macro!(splat_debug, SplatLevel::Debug);
 
+#[macro_export]
+macro_rules! splat_warn {
+    ($($arg:tt)*) => {{
+        $crate::splat::log($crate::splat::SplatLevel::Warning, &alloc::format!($($arg)*))
+    }};
+}
+
 pub fn dump_log() {
     if let Some(buffer) = LOG_BUFFER.try_lock() {
         println!("\n=== Log Dump ({} entries) ===", buffer.len());
