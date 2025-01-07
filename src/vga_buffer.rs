@@ -4,7 +4,7 @@ use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use x86_64::instructions::interrupts;
+use core::fmt::Write;
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -86,9 +86,7 @@ impl Writer {
                     color_code: self.color_code,
                 };
 
-                unsafe {
-                    self.buffer.chars[row][col].as_mut_ptr().write(screen_char);
-                }
+                self.buffer.chars[row][col].write(screen_char);
                 self.column_position += 1;
             }
         }
@@ -97,10 +95,8 @@ impl Writer {
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
-                let character = unsafe { self.buffer.chars[row][col].as_ptr().read() };
-                unsafe {
-                    self.buffer.chars[row - 1][col].as_mut_ptr().write(character);
-                }
+                let character = self.buffer.chars[row][col].read();
+                self.buffer.chars[row - 1][col].write(character);
             }
         }
         self.clear_row(BUFFER_HEIGHT - 1);
@@ -113,9 +109,7 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            unsafe {
-                self.buffer.chars[row][col].as_mut_ptr().write(blank);
-            }
+            self.buffer.chars[row][col].write(blank);
         }
     }
 
@@ -148,15 +142,7 @@ lazy_static! {
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
-    interrupts::without_interrupts(|| {
-        if let Some(mut writer) = WRITER.try_lock() {
-            writer.write_fmt(args).unwrap();
-        } else {
-            // Use a direct write to serial port since the VGA buffer is locked
-            use crate::serial;
-            if let Some(mut serial) = serial::SERIAL1.try_lock() {
-                let _ = serial.write_fmt(args);
-            }
-        }
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        WRITER.lock().write_fmt(args).unwrap();
     });
 }
