@@ -1,10 +1,9 @@
 // src/vga_buffer.rs
-
 use volatile::Volatile;
 use core::fmt;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use core::fmt::Write;
+use core::ops::{Deref, DerefMut};
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
@@ -58,6 +57,19 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
+impl Deref for ScreenChar {
+    type Target = ScreenChar;
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl DerefMut for ScreenChar {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
+    }
+}
+
 #[repr(transparent)]
 struct Buffer {
     chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
@@ -81,12 +93,11 @@ impl Writer {
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.column_position;
 
-                let screen_char = ScreenChar {
+                let color_code = self.color_code;
+                self.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: byte,
-                    color_code: self.color_code,
-                };
-
-                self.buffer.chars[row][col].write(screen_char);
+                    color_code,
+                });
                 self.column_position += 1;
             }
         }
@@ -142,7 +153,9 @@ lazy_static! {
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
-    x86_64::instructions::interrupts::without_interrupts(|| {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        use core::fmt::Write;
         WRITER.lock().write_fmt(args).unwrap();
     });
 }
