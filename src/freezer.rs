@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
+use crate::rtc::DateTime;
 
 // System Constants
 const MAX_THAW_ATTEMPTS: u32 = 3;

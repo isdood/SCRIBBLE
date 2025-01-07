@@ -80,9 +80,11 @@ impl SerialController {
         Ok(())
     }
 
-    fn is_port_ready(port: &SerialPort) -> bool {
-        // Basic port status check
-        true // Implement actual check based on uart_16550 capabilities
+    fn is_port_ready(&self) -> bool {
+        unsafe {
+            let mut status_port = Port::new(0x3FD);
+            status_port.read() & 0x20 != 0
+        }
     }
 
     pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), SerialError> {

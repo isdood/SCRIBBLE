@@ -6,6 +6,7 @@ use x86_64::VirtAddr;
 use lazy_static::lazy_static;
 use crate::splat::{self, SplatLevel};
 use core::sync::atomic::{AtomicBool, Ordering};
+use x86_64::structures::gdt::PrivilegeLevel;
 
 // GDT Configuration Constants
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
@@ -93,11 +94,13 @@ impl Selectors {
         Ok(())
     }
 
-    fn verify_privilege_levels(&self) -> bool {
-        self.kernel_code_selector.rpl() == 0 &&
-        self.kernel_data_selector.rpl() == 0 &&
-        self.user_code_selector.rpl() == 3 &&
-        self.user_data_selector.rpl() == 3
+    impl Selectors {
+        fn verify_privilege_levels(&self) -> bool {
+            self.kernel_code_selector.rpl() == PrivilegeLevel::Ring0 &&
+            self.kernel_data_selector.rpl() == PrivilegeLevel::Ring0 &&
+            self.user_code_selector.rpl() == PrivilegeLevel::Ring3 &&
+            self.user_data_selector.rpl() == PrivilegeLevel::Ring3
+        }
     }
 
     fn verify_tss(&self) -> bool {

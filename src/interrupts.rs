@@ -175,12 +175,13 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
 
             match keyboard.add_byte(scancode) {
                 Ok(Some(key_event)) => {
+                    let key_event = key_event.clone(); // Clone the key event
                     if let Some(key) = keyboard.process_keyevent(key_event) {
                         splat::log(SplatLevel::BitsNBytes, &format!("Key Event: {:?}", key));
                     }
                 }
                 Ok(None) => (), // No complete keypress yet
-                Err(e) => splat::log(SplatLevel::Warning, &format!("Keyboard error: {:?}", e)),
+                Err(e) => splat::log(SplatLevel::Warning, &alloc::format!("Keyboard error: {:?}", e)),
             }
         }
         None => splat::log(SplatLevel::Warning, "Keyboard buffer locked"),

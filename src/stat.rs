@@ -85,13 +85,13 @@ pub fn keyboard_interrupt() {
     KEYBOARD_INTERRUPTS.fetch_add(1, Ordering::SeqCst);
 }
 
-pub fn log_event(level: SplatLevel) {
+pub fn log_event(level: SplatLevel) -> usize {
     match level {
         SplatLevel::Critical => CRITICAL_EVENTS.fetch_add(1, Ordering::SeqCst),
         SplatLevel::BitsNBytes => BITSNBYTES_EVENTS.fetch_add(1, Ordering::SeqCst),
         SplatLevel::Warning => WARNING_EVENTS.fetch_add(1, Ordering::SeqCst),
-        _ => {}
-    };
+        _ => BITSNBYTES_EVENTS.fetch_add(0, Ordering::SeqCst), // Return 0 for other levels
+    }
 }
 
 // CryoSystem event recording

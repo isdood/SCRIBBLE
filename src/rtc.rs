@@ -7,6 +7,8 @@ use core::time::Duration;
 use alloc::string::String;
 use alloc::format;
 
+pub mod rtc;
+
 // RTC Hardware Constants
 const RTC_ADDRESS_PORT: u16 = 0x70;
 const RTC_DATA_PORT: u16 = 0x71;

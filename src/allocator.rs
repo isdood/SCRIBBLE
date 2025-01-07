@@ -60,18 +60,13 @@ pub struct HeapStats {
 impl HeapStats {
     fn new() -> Self {
         let metrics = MEMORY_METRICS.lock();
-        let (used, largest_free) = unsafe { ALLOCATOR.lock().size() };
-        let free_size = HEAP_SIZE.saturating_sub(used);
-
-        let fragmentation = if free_size > 0 {
-            1.0 - (largest_free as f64 / free_size as f64)
-        } else {
-            0.0
-        };
+        let total_size = HEAP_SIZE;
+        let used_size = metrics.total_allocated.load(Ordering::Relaxed);
+        let free_size = total_size.saturating_sub(used_size);
 
         HeapStats {
-            total_size: HEAP_SIZE,
-            used_size: used,
+            total_size,
+            used_size,
             free_size,
             allocation_count: metrics.allocation_count.load(Ordering::Relaxed),
             deallocation_count: metrics.deallocation_count.load(Ordering::Relaxed),
