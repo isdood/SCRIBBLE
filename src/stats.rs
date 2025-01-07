@@ -1,5 +1,6 @@
 use spin::Mutex;
 
+
 pub struct SystemStats {
     timer_ticks: u64,
     keyboard_interrupts: u64,
