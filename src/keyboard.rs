@@ -21,30 +21,26 @@ lazy_static! {
 }
 
 pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    use crate::{debug_info, debug_error};
+    unsafe { KEYBOARD_INTERRUPTS += 1 };
 
-    let mut keyboard = KEYBOARD.lock();
-    let mut port = Port::new(0x60);
+    serial_println!("[DEBUG] Keyboard interrupt #{}", unsafe { KEYBOARD_INTERRUPTS });
 
-    debug_info!("Keyboard interrupt received");
+    // Try to acquire keyboard lock without blocking
+    if let Some(mut keyboard) = KEYBOARD.try_lock() {
+        let mut port = Port::new(0x60);
+        let scancode: u8 = unsafe { port.read() };
 
-    let scancode: u8 = unsafe { port.read() };
-    debug_info!("Scancode: {}", scancode);
+        serial_println!("[DEBUG] Scancode: 0x{:02x}", scancode);
 
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            match key {
-                DecodedKey::Unicode(character) => {
-                    debug_info!("Unicode key pressed: {}", character);
-                    // ... rest of the handler ...
-                },
-                DecodedKey::RawKey(key) => {
-                    debug_info!("Raw key pressed: {:?}", key);
-                }
+        // Process key event
+        if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+            if let Some(key) = keyboard.process_keyevent(key_event) {
+                serial_println!("[DEBUG] Processed key: {:?}", key);
+                // ... rest of key handling
             }
         }
     } else {
-        debug_error!("Failed to process keyboard input");
+        serial_println!("[WARNING] Keyboard locked, skipping interrupt");
     }
 
     unsafe {

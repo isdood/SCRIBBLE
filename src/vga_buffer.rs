@@ -534,6 +534,20 @@ impl Writer {
         }
     }
 
+    pub fn try_write_debug(msg: &str) {
+        use x86_64::instructions::interrupts;
+
+        interrupts::without_interrupts(|| {
+            if let Some(mut writer) = WRITER.try_lock() {
+                for byte in msg.bytes() {
+                    writer.write_byte(byte);
+                }
+            } else {
+                serial_println!("[WARNING] VGA buffer locked, couldn't write: {}", msg);
+            }
+        });
+    }
+
 }
 
 // Write trait implementation

@@ -77,14 +77,18 @@ extern "x86-interrupt" fn page_fault_handler(
 
 // Timer interrupt handler
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    static mut COUNTER: u64 = 0;
     unsafe {
-        COUNTER = COUNTER.wrapping_add(1);
-        if COUNTER % 50 == 0 {  // Reduce frequency of cursor updates
+        TIMER_TICKS += 1;
+
+        // Only update cursor every 50 ticks to reduce CPU load
+        if TIMER_TICKS % 50 == 0 {
             interrupts::without_interrupts(|| {
-                WRITER.lock().blink_cursor();
+                if let Some(mut writer) = WRITER.try_lock() {
+                    writer.blink_cursor();
+                }
             });
         }
+
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }
 }
