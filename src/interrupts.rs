@@ -1,6 +1,4 @@
-       //  IMPORTS  \\
-///////////////////////////////
-
+// IMPORTS \\
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use pic8259::ChainedPics;
 use spin::Mutex;
@@ -9,8 +7,7 @@ use crate::println;
 use crate::keyboard;
 use crate::vga_buffer::WRITER;
 use x86_64::instructions::interrupts;
-
-//////////// END //////////////
+// END IMPORTS //
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -41,10 +38,24 @@ lazy_static! {
         let mut idt = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.page_fault.set_handler_fn(page_fault_handler);
-        idt[InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
-        idt[InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard::keyboard_interrupt_handler);
+
+        // Make sure keyboard interrupt is properly registered
+        unsafe {
+            idt[InterruptIndex::Keyboard.as_usize()]
+            .set_handler_fn(keyboard::keyboard_interrupt_handler)
+            .set_present(true);
+        }
+
+        idt[InterruptIndex::Timer.as_usize()]
+        .set_handler_fn(timer_interrupt_handler);
         idt
     };
+}
+
+pub fn init_idt() {
+    IDT.load();
+    // Add debug print to verify IDT loading
+    serial_println!("IDT loaded successfully");
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {

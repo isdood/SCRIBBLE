@@ -26,36 +26,35 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: Interrupt
     let mut keyboard = KEYBOARD.lock();
     let mut port = Port::new(0x60);
 
-    // Safe because we're reading from the keyboard data port in the keyboard interrupt handler
+    // Debug print to serial
+    serial_println!("Keyboard interrupt received");
+
     let scancode: u8 = unsafe { port.read() };
+    serial_println!("Scancode: {}", scancode);
 
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
                 DecodedKey::Unicode(character) => {
-                    // Handle cursor mode switching
-                    match character {
+                    // Debug print to serial
+                    serial_println!("Key pressed: {}", character);
 
-                        // Ctrl+H for Hardware cursor
+                    match character {
                         'H' => {
-                            println!("[DEBUG] Attempting to switch to hardware cursor");
+                            serial_println!("Switching to hardware cursor");
                             crate::vga_buffer::switch_cursor_mode(CursorMode::Hardware);
-                            println!("Switched to hardware cursor");
                         },
-                        // Ctrl+S for Software cursor
                         'S' => {
-                            println!("[DEBUG] Attempting to switch to software cursor");
+                            serial_println!("Switching to software cursor");
                             crate::vga_buffer::switch_cursor_mode(CursorMode::Software);
-                            println!("Switched to software cursor");
                         },
-                        // Normal character handling
                         _ => {
                             let should_handle = {
                                 let writer = crate::vga_buffer::WRITER.lock();
                                 let next_pos = if character == '\u{8}' && writer.column_position > 0 {
                                     writer.column_position - 1
                                 } else if writer.needs_wrap() {
-                                    0 // Allow wrapping to next line
+                                    0
                                 } else {
                                     writer.column_position
                                 };
@@ -66,27 +65,29 @@ pub extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: Interrupt
                             };
 
                             if should_handle {
-                                // Set color to white for user input
-                                crate::vga_buffer::set_color(crate::vga_buffer::Color::White, crate::vga_buffer::Color::Black);
-
                                 match character {
                                     '\u{8}' => crate::vga_buffer::backspace(),
                                     '\n' => {
                                         print!("{}", character);
                                         crate::vga_buffer::write_prompt();
                                     },
-                                    _ => print!("{}", character),
+                                    _ => {
+                                        // Directly write to VGA buffer for debugging
+                                        let mut writer = crate::vga_buffer::WRITER.lock();
+                                        writer.write_byte(character as u8);
+                                    }
                                 }
                             }
                         }
                     }
                 },
-                DecodedKey::RawKey(key) => print!("{:?}", key),
+                DecodedKey::RawKey(key) => {
+                    serial_println!("Raw key: {:?}", key);
+                }
             }
         }
     }
 
-    // Safe because we're notifying the correct PIC in the keyboard interrupt handler
     unsafe {
         PICS.lock()
         .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());

@@ -66,7 +66,11 @@ static ALLOCATOR: linked_list_allocator::LockedHeap = linked_list_allocator::Loc
 pub fn init(boot_info: &'static BootInfo) {
     gdt::init();
     interrupts::init_idt();
-    unsafe { interrupts::PICS.lock().initialize() };
+    unsafe {
+        serial_println!("Initializing PIC");
+        interrupts::PICS.lock().initialize();
+        serial_println!("PIC initialized");
+    }
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };

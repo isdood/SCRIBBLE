@@ -11,7 +11,7 @@ use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use scribble::{println, print};
 use scribble::vga_buffer::Color;
-////////////////////////////////
+// END IMPORTS \\
 
 entry_point!(kernel_main);
 
@@ -19,26 +19,26 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     use x86_64::instructions::interrupts;
 
-    // Temporarily disable interrupts during critical initialization
+    // Disable interrupts during initialization
     interrupts::disable();
 
-    // Initialize first
+    // Initialize core systems
     scribble::init(boot_info);
 
-    // Explicit screen clear
+    // Clear screen AFTER initialization
     scribble::vga_buffer::clear_screen();
 
-    // Basic VGA test with different colors to verify buffer is working
-    scribble::vga_buffer::set_color(Color::White, Color::Black);
-    println!("Starting Scribble OS...");
+    // Print boot messages with explicit color settings
+    {
+        let mut writer = scribble::vga_buffer::WRITER.lock();
+        writer.color_code = ColorCode::new(Color::White, Color::Black);
+        writeln!(writer, "Starting Scribble OS...").unwrap();
 
-    scribble::vga_buffer::set_color(Color::Yellow, Color::Black);
-    println!("Initialization complete.");
+        writer.color_code = ColorCode::new(Color::Yellow, Color::Black);
+        writeln!(writer, "Initialization complete.").unwrap();
+    }
 
-    // Re-enable interrupts
-    interrupts::enable();
-
-    // Initialize cursor after basic setup is confirmed working
+    // Initialize keyboard and cursor
     interrupts::without_interrupts(|| {
         let mut writer = scribble::vga_buffer::WRITER.lock();
         writer.clean_stray_cursors();
@@ -46,8 +46,11 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         writer.update_cursor();
     });
 
-    print!("\n");
+    // Write initial prompt
     scribble::vga_buffer::write_prompt();
+
+    // Enable interrupts AFTER all initialization is complete
+    interrupts::enable();
 
     loop {
         x86_64::instructions::hlt();
