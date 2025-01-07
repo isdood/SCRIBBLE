@@ -134,6 +134,14 @@ impl Writer {
             }
         }
     }
+
+    pub fn blink_cursor(&mut self) {
+        if self.column_position > 0 {
+            let last_pos = self.column_position - 1;
+            let color_code = self.color_code;
+            self.buffer.chars[self.row_position][last_pos].set_color(color_code);
+        }
+    }
 }
 
 impl fmt::Write for Writer {

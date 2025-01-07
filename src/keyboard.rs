@@ -22,10 +22,10 @@ impl KeyboardController {
         }
     }
 
-    pub fn process_keyevent(&mut self, scancode: u8) -> Option<KeyCode> {
+    pub fn add_byte(&mut self, scancode: u8) -> Option<KeyCode> {
         if let Ok(Some(key_event)) = self.keyboard.add_byte(scancode) {
-            self.last_keycode = key_event.code;
-            key_event.code
+            self.last_keycode = Some(key_event.code);
+            Some(key_event.code)
         } else {
             None
         }
@@ -45,7 +45,7 @@ pub fn handle_keyboard_interrupt() {
     let scancode: u8 = unsafe { port.read() };
 
     if let Some(mut keyboard) = KEYBOARD.try_lock() {
-        if let Some(key) = keyboard.process_keyevent(scancode) {
+        if let Some(key) = keyboard.add_byte(scancode) {
             use crate::splat::SplatLevel;
             crate::splat::log(SplatLevel::BitsNBytes, &alloc::format!("Key Event: {:?}", key));
         }

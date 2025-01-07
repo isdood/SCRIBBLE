@@ -20,7 +20,7 @@ pub struct Selectors {
 
 impl Selectors {
     fn verify(&self) -> Result<(), GDTError> {
-        if self.code_selector.rpl() != 0 {
+        if self.code_selector.rpl() != PrivilegeLevel::Ring0 {
             return Err(GDTError::VerificationFailed);
         }
         Ok(())
