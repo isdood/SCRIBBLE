@@ -45,6 +45,14 @@ pub struct SerialController {
 }
 
 impl SerialController {
+
+    pub fn is_transmit_empty(&self) -> bool {
+        unsafe {
+            let mut port = Port::<u8>::new(0x3F8 + 5);
+            (port.read() & 0x20) != 0
+        }
+    }
+
     /// Creates a new SerialController with the specified port address
     pub fn new(address: u16) -> Result<Self, SerialError> {
         let mut port = unsafe { SerialPort::new(address) };
