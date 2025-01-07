@@ -13,6 +13,7 @@
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
 use scribble::{println, print};
+use scribble::vga_buffer::Color;
 
 ////////////////////////////////
 
