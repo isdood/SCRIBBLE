@@ -3,7 +3,7 @@
 use crate::splat::{self, SplatLevel};
 use spin::Mutex;
 use lazy_static::lazy_static;
-use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 use crate::rtc::DateTime;

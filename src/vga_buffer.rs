@@ -139,8 +139,12 @@ impl Writer {
         if self.column_position > 0 {
             let last_pos = self.column_position - 1;
             let color_code = self.color_code;
-            let row = BUFFER_HEIGHT - 1;  // Always blink on the last row
-            self.buffer.chars[row][last_pos].set_color(color_code);
+            let row = BUFFER_HEIGHT - 1;
+            let screen_char = ScreenChar {
+                ascii_character: self.buffer.chars[row][last_pos].read().ascii_character,
+                color_code,
+            };
+            self.buffer.chars[row][last_pos].write(screen_char);
         }
     }
 }

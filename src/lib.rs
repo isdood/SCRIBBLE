@@ -14,6 +14,7 @@ pub mod gdt;
 pub mod interrupts;
 pub mod keyboard;
 pub mod memory;
+pub mod pic8259;
 pub mod rtc;
 pub mod serial;
 pub mod splat;
@@ -28,6 +29,8 @@ pub use alloc::format;
 pub use alloc::string::String;
 pub use alloc::string::ToString;
 pub use crate::splat::SplatLevel;
+pub use alloc::string::{String, ToString};
+pub use x86_64::instructions::hlt;
 
 #[derive(Debug)]
 pub enum InitError {
@@ -57,7 +60,7 @@ fn init_heap_memory(
     allocator::init_heap(mapper, frame_allocator).map_err(|_| InitError::HeapError)
 }
 
-pub fn visualize_memory_map(start_addr: VirtAddr, size: usize) {
+pub fn visualize_memory_map(_start_addr: VirtAddr, _size: usize) {
     use crate::splat::SplatLevel;
     splat::log(SplatLevel::BitsNBytes, "Memory map visualization not yet implemented");
 }
