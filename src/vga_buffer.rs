@@ -242,7 +242,6 @@ impl Writer {
 
         // Clean up any stray cursors
         self.clean_stray_cursors();
-
         self.restore_previous_cursor();
 
         self.column_position = 0;
@@ -263,6 +262,9 @@ impl Writer {
         }
 
         self.column_position = self.prompt_length;
+
+        // Reset color to white for user input
+        self.color_code = ColorCode::new(Color::White, Color::Black);
 
         // Restore cursor visibility and update
         self.cursor_visible = current_cursor_visible;
@@ -401,34 +403,45 @@ impl Writer {
                             let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
                             let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
 
-                            control_port.write(CURSOR_LOCATION_LOW_REG);
-                            data_port.write((pos & 0xFF) as u8);
+                            // Make sure cursor is enabled
+                            control_port.write(CURSOR_MODE_REGISTER);
+                            data_port.write(0x0E); // Enable cursor, normal size
 
+                            // Update position
                             control_port.write(CURSOR_LOCATION_HIGH_REG);
                             data_port.write(((pos >> 8) & 0xFF) as u8);
+                            control_port.write(CURSOR_LOCATION_LOW_REG);
+                            data_port.write((pos & 0xFF) as u8);
                         }
                     }
                 },
                 CursorMode::Software => {
-                    // First clear any existing cursor
-                    self.restore_previous_cursor();
-
-                    if self.cursor_visible && !self.protected_region.contains(self.row_position, self.column_position) {
-                        let current_char = self.buffer.chars[self.row_position][self.column_position].read_char();
-                        self.previous_char_color = current_char.color_code;
-                        self.previous_cursor_pos = (self.row_position, self.column_position);
-
-                        self.buffer.chars[self.row_position][self.column_position].write_char(ScreenChar {
-                            ascii_character: match self.cursor_style {
-                                CursorStyle::Block => current_char.ascii_character,
-                                CursorStyle::Underscore => b'_',
-                                CursorStyle::Line => b'|',
-                            },
-                            color_code: ColorCode::new(self.cursor_color.0, self.cursor_color.1),
-                        });
-                    }
+                    // ... existing software cursor code ...
                 }
             }
+        });
+    }
+
+    pub fn enable_cursor(&mut self) {
+        use x86_64::instructions::interrupts;
+
+        interrupts::without_interrupts(|| {
+            self.cursor_visible = true;
+            self.hardware_cursor_enabled = true;
+
+            unsafe {
+                let mut control_port: Port<u8> = Port::new(CURSOR_PORT_CTRL);
+                let mut data_port: Port<u8> = Port::new(CURSOR_PORT_DATA);
+
+                // Enable cursor and set appearance
+                control_port.write(CURSOR_MODE_REGISTER);
+                data_port.write(0x0E); // Enable cursor, normal size
+
+                control_port.write(CURSOR_START_REGISTER);
+                data_port.write(14); // Start scan line
+            }
+
+            self.update_cursor();
         });
     }
 
