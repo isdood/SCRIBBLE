@@ -71,6 +71,7 @@ env!("CARGO_PKG_VERSION"),
 fn init_system(boot_info: &'static BootInfo) -> Result<(), &'static str> {
     gdt::init();
     unsafe {
+        let phys_mem_offset = x86_64::VirtAddr::new(boot_info.physical_memory_offset as u64);
         let frame_allocator = memory::init(phys_mem_offset);
 
         // Initialize heap with proper error handling
