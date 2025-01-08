@@ -75,8 +75,24 @@ global_asm!(
             real_start = sym real_start,
 );
 
+const VGA_BUFFER: *mut u8 = 0xb8000 as *mut u8;
+
+fn print_at_boot(message: &str) {
+    let color_byte = 0x0f; // White foreground (0x0f) on black background (0x00)
+    for (i, byte) in message.bytes().enumerate() {
+        unsafe {
+            *VGA_BUFFER.add(i * 2) = byte;           // Character byte
+            *VGA_BUFFER.add(i * 2 + 1) = color_byte; // Color byte
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn real_start() -> ! {
+
+    // Display welcome message
+    print_at_boot("Welcome Kleb!");
+
     // Initialize serial port for debugging
     let mut serial_port = unsafe { SerialPort::new(0x3F8) };
     serial_port.init();
