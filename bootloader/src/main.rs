@@ -6,9 +6,9 @@ use core::panic::PanicInfo;
 // Define our assembly code using global_asm
 core::arch::global_asm!(
     // Real mode code
+    ".section .text",
     ".code16",
-    ".section .boot,\"ax\"",
-    ".global _start",
+    ".globl _start",
     "_start:",
     "    cli",                // Disable interrupts
     "    xor ax, ax",        // Zero ax
@@ -28,10 +28,6 @@ core::arch::global_asm!(
     "1:",
     "    hlt",              // Halt the CPU
     "    jmp 1b",           // Jump back to local label 1 if interrupted
-
-    // Ensure we don't overflow the boot sector
-    ".org 510 - (. - _start)",
-                        ".byte 0x55, 0xAA",     // Boot signature inline
 );
 
 #[panic_handler]
