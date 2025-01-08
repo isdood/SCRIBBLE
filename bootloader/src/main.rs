@@ -12,7 +12,19 @@ use x86_64::{
     PhysAddr,
 };
 
-mod boot_params;
+mod boot_params {
+    #[derive(Debug)]
+    pub struct BootParams {
+        pub kernel_load_addr: u32,
+        pub kernel_size: u32,
+    }
+
+    #[no_mangle]
+    pub static mut BOOT_PARAMS: BootParams = BootParams {
+        kernel_load_addr: 0,
+        kernel_size: 0,
+    };
+}
 
 // Include the generated bootloader info
 include!(concat!(env!("OUT_DIR"), "/bootloader_info.rs"));
@@ -23,9 +35,8 @@ const STACK_START: u64 = 0x9000;
 const STACK_SIZE: u64 = 0x4000;
 
 // Stack with proper alignment
-#[repr(align(16))]
-#[used]
-static STACK: [u8; STACK_SIZE as usize] = [0; STACK_SIZE as usize];
+#[link_section = ".bss"]
+static mut STACK: [u8; STACK_SIZE as usize] = [0; STACK_SIZE as usize];
 
 // Helper function to write strings to serial port
 fn write_serial(port: &mut SerialPort, s: &[u8]) {
@@ -81,8 +92,10 @@ pub extern "C" fn real_start() -> ! {
     // Initialize basic page tables
     init_page_tables();
 
-    // Read boot parameters using raw pointer to avoid mutable static warning
-    let boot_params = unsafe { &*(&boot_params::BOOT_PARAMS as *const _) };
+    // Read boot parameters with proper type annotation
+    let boot_params: &boot_params::BootParams = unsafe {
+        &*(&boot_params::BOOT_PARAMS as *const boot_params::BootParams)
+    };
 
     // Initialize essential services
     init_gdt();
