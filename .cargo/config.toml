@@ -3,7 +3,12 @@ build-std = ["core", "compiler_builtins", "alloc"]
 build-std-features = ["compiler-builtins-mem"]
 
 [build]
-target = "x86_64-scribble.json"
+target = "bootloader/x86_64-scribble.json"
+
+[target.x86_64-scribble]
+rustflags = [
+    "-C", "link-arg=-Tbootloader/linker.ld"
+]
 
 [target.'cfg(target_os = "none")']
 runner = "bootimage runner"
