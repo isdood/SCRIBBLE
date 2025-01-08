@@ -22,11 +22,10 @@ const PAGE_TABLE_START: u64 = 0x1000;
 const STACK_START: u64 = 0x9000;
 const STACK_SIZE: u64 = 0x4000;
 
+// Stack with proper alignment
 #[repr(align(16))]
-struct Stack([u8; STACK_SIZE as usize]);
-
 #[used]
-static STACK: Stack = Stack([0; STACK_SIZE as usize]);
+static STACK: [u8; STACK_SIZE as usize] = [0; STACK_SIZE as usize];
 
 // Helper function to write strings to serial port
 fn write_serial(port: &mut SerialPort, s: &[u8]) {
@@ -43,6 +42,12 @@ struct GDTEntry {
     access: u8,
     granularity: u8,
     base_high: u8,
+}
+
+#[repr(C, packed)]
+struct GDTPointer {
+    limit: u16,
+    base: u32,
 }
 
 global_asm!(
@@ -76,8 +81,8 @@ pub extern "C" fn real_start() -> ! {
     // Initialize basic page tables
     init_page_tables();
 
-    // Read boot parameters
-    let boot_params = unsafe { &boot_params::BOOT_PARAMS };
+    // Read boot parameters using raw pointer to avoid mutable static warning
+    let boot_params = unsafe { &*(&boot_params::BOOT_PARAMS as *const _) };
 
     // Initialize essential services
     init_gdt();
@@ -194,10 +199,15 @@ fn init_gdt() {
         },
     ];
 
+    let gdt_ptr = GDTPointer {
+        limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
+        base: unsafe { &GDT as *const _ as u32 },
+    };
+
     unsafe {
         asm!(
-            "lgdt [{}]",
-             in(reg) &GDT,
+            "lgdt [{0}]",
+             in(reg) &gdt_ptr as *const _,
              options(readonly, nostack)
         );
     }
@@ -218,12 +228,12 @@ fn load_kernel(load_addr: u32, _size: u32) -> Result<u32, ()> {
 fn jump_to_kernel(entry_point: u32) -> ! {
     unsafe {
         asm!(
-            "jmp {0:e}",
+            "mov eax, {0}",
+             "jmp eax",
              in(reg) entry_point,
              options(noreturn)
         );
     }
-    unreachable!()
 }
 
 fn halt() -> ! {
