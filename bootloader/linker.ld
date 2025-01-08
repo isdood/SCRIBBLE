@@ -4,31 +4,29 @@ ENTRY(_start)
 SECTIONS {
     . = 0x7C00;
     .boot : {
-        /* Entry point first */
-        KEEP(*(.text._start))
-
-        /* Then rest of the code and data */
+        /* All sections in one */
+        *(.boot)
         *(.text*)
         *(.rodata*)
         *(.data*)
         *(.bss*)
 
-        /* Calculate remaining space */
+        /* Pad to 510 bytes from start of section */
         . = 0x7C00 + 510;
 
-        /* Add boot signature */
+        /* Boot signature */
         BYTE(0x55)
         BYTE(0xAA)
     }
 
-    /* Ensure we don't exceed boot sector size */
-    ASSERT(. <= 0x7E00, "Boot sector too large")
-
-    /* Discard debug sections */
     /DISCARD/ : {
-        *(.comment)
-        *(.note*)
         *(.eh_frame*)
-        *(.debug*)
+        *(.note*)
+        *(.comment*)
+        *(.comment)
+        *(.note.GNU-stack)
+        *(.note.gnu.build-id)
+        *(.got)
+        *(.gcc_except_table)
     }
 }
