@@ -36,6 +36,7 @@ const STACK_SIZE: u64 = 0x4000;
 
 // Stack with proper alignment
 #[link_section = ".bss"]
+#[used]
 static mut STACK: [u8; STACK_SIZE as usize] = [0; STACK_SIZE as usize];
 
 // Helper function to write strings to serial port
@@ -94,7 +95,7 @@ pub extern "C" fn real_start() -> ! {
 
     // Read boot parameters with proper type annotation
     let boot_params: &boot_params::BootParams = unsafe {
-        &*(&boot_params::BOOT_PARAMS as *const boot_params::BootParams)
+        &*(&raw const boot_params::BOOT_PARAMS as *const boot_params::BootParams)
     };
 
     // Initialize essential services
@@ -214,7 +215,7 @@ fn init_gdt() {
 
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
-        base: unsafe { &GDT as *const _ as u32 },
+        base: unsafe { &raw const GDT as *const _ as u32 },
     };
 
     unsafe {
@@ -241,8 +242,9 @@ fn load_kernel(load_addr: u32, _size: u32) -> Result<u32, ()> {
 fn jump_to_kernel(entry_point: u32) -> ! {
     unsafe {
         asm!(
-            "mov eax, {0}",
-             "jmp eax",
+            // Use explicit 32-bit register format
+            "movl {0:e}, %eax",   // Use AT&T syntax with explicit size
+             "jmpl *%eax",         // Use indirect jump with size suffix
              in(reg) entry_point,
              options(noreturn)
         );
