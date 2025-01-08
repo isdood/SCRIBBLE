@@ -4,30 +4,29 @@ SECTIONS {
     /* Load the second stage bootloader right after the MBR */
     . = 0x7E00;
 
-    .boot : ALIGN(4K) {
+    .boot : {
         KEEP(*(.multiboot_header))
         *(.boot)
     }
 
-    .text : ALIGN(4K) {
+    .text : {
         *(.text .text.*)
     }
 
-    .rodata : ALIGN(4K) {
+    .rodata : {
         *(.rodata .rodata.*)
     }
 
-    .data : ALIGN(4K) {
+    .data : {
         *(.data .data.*)
     }
 
-    .bss : ALIGN(4K) {
+    .bss : {
         *(COMMON)
         *(.bss .bss.*)
     }
 
-    /* Add a special section for boot parameters */
-    .bootparams : ALIGN(4K) {
+    .bootparams : {
         *(.bootparams)
     }
 }
