@@ -1,9 +1,13 @@
-use std::process::Command;
+use std::env;
+use std::path::PathBuf;
 
 fn main() {
-    // Build the boot image
-    Command::new("cargo")
-    .args(&["bootimage", "--target", "x86_64-scribble.json"])
-    .status()
-    .unwrap();
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let linker_script = manifest_dir.join("linker.ld");
+
+    // Print the path for debugging
+    eprintln!("Linker script path: {}", linker_script.display());
+
+    println!("cargo:rerun-if-changed=linker.ld");
+    println!("cargo:rustc-link-arg=-T{}", linker_script.display());
 }

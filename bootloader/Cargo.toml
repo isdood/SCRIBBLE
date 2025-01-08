@@ -1,19 +1,15 @@
 [package]
 name = "spinUP"
 version = "0.1.0"
-authors = ["Caleb J.D. Terkovics <calebjdt@gmail.com>"]
-edition = "2018"
-
-[[bin]]
-name = "spinUP"
-path = "src/main.rs"
-
-[dependencies]
-x86_64 = "0.14.9"
-compiler_builtins = { version = "0.1.42", features = ["mem"] }
-
-[profile.dev]
-panic = "abort"
+edition = "2021"
 
 [profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false
+
+[profile.dev]
 panic = "abort"
