@@ -14,10 +14,14 @@
     "features": "-mmx,-sse,+soft-float",
     "pre-link-args": {
         "ld.lld": [
+            "-m", "elf_x86_64",
             "--gc-sections",
-            "--script=linker.ld",
+            "-T", "linker.ld",
             "-z", "max-page-size=0x1000",
-            "-z", "stack-size=0x4000"
+            "-z", "stack-size=0x4000",
+            "--nmagic",
+            "-s",
+            "--no-relax"
         ]
     }
 }
