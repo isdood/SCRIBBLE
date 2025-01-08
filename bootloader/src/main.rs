@@ -215,7 +215,7 @@ fn init_gdt() {
 
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
-        base: unsafe { &raw const GDT as *const _ as u32 },
+        base: (&raw const GDT as *const _ as u32),  // Remove unsafe block
     };
 
     unsafe {
@@ -242,9 +242,9 @@ fn load_kernel(load_addr: u32, _size: u32) -> Result<u32, ()> {
 fn jump_to_kernel(entry_point: u32) -> ! {
     unsafe {
         asm!(
-            // Use explicit 32-bit register format
-            "movl {0:e}, %eax",   // Use AT&T syntax with explicit size
-             "jmpl *%eax",         // Use indirect jump with size suffix
+            "mov [{0}], {1:e}",    // Store jump target in memory
+             "jmp [{0}]",           // Indirect jump through memory
+             in(reg) &entry_point as *const _,
              in(reg) entry_point,
              options(noreturn)
         );
