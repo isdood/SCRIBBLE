@@ -1,14 +1,26 @@
-OUTPUT_FORMAT("binary")
-OUTPUT_ARCH(i386)
 ENTRY(_start)
 
 SECTIONS {
-    . = 0x7C00;
-    .text : {
-        *(.text*)
-        . = ALIGN(2);  /* Ensure alignment */
+    . = 1M;
+
+    .boot : {
+        KEEP(*(.multiboot_header))
     }
 
-    /* Ensure we don't exceed bootloader size */
-    ASSERT(. - 0x7C00 <= 510, "Bootloader too large")
+    .text : {
+        *(.text*)
+    }
+
+    .rodata : {
+        *(.rodata*)
+    }
+
+    .data : {
+        *(.data*)
+    }
+
+    .bss : {
+        *(.bss*)
+        *(COMMON)
+    }
 }
