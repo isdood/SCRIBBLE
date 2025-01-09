@@ -48,16 +48,22 @@ global_asm!(
     "    or al, 2",
     "    out 0x92, al",
 
-    // Load minimal GDT
-    "    lgdt [boot_gdt_desc]",
+    // Set up GDT
+    "    mov ax, cs",          // Get current code segment
+    "    mov ds, ax",          // Set DS to access GDT
+    "    lgdt [boot_gdt_desc]",// Load GDT
 
-    // Switch to protected mode
+    // Prepare for protected mode
     "    mov eax, cr0",
-    "    or al, 1",
-    "    mov cr0, eax",
+    "    or al, 1",            // Set PE bit
+    "    mov cr0, eax",        // Enter protected mode
 
-    // Far jump to protected mode
-    "    .byte 0xEA",          // Far jump instruction
+    // Clear prefetch queue
+    "    jmp 1f",
+    "1:",
+
+    // Far jump to protected mode using absolute addressing
+    "    .byte 0xEA",          // Far jump opcode
     "    .long boot_protected", // 32-bit offset
     "    .word 0x08",          // Code segment selector
 
@@ -70,36 +76,35 @@ global_asm!(
     "    hlt",
 
     ".align 4",
-    ".code32",
+    ".code32",                 // 32-bit protected mode code
     "boot_protected:",
-    // Set up segments
-    "    mov ax, 0x10",
+    // Set up protected mode segments
+    "    mov ax, 0x10",        // Data segment selector
     "    mov ds, ax",
     "    mov es, ax",
     "    mov fs, ax",
     "    mov gs, ax",
     "    mov ss, ax",
+    "    mov esp, 0xD000",     // Set up new stack
 
-    // Write 'G1' directly to video memory to confirm protected mode entry
-    "    mov edi, 0xB8000",
+    // Write 'G1' directly to video memory
+    "    mov edi, 0xB8000",    // VGA text buffer
     "    mov al, 'G'",
     "    mov ah, 0x0F",        // White on black
     "    mov [edi], ax",
     "    mov al, '1'",
     "    mov [edi + 2], ax",
 
-    // Small delay to see the output
+    // Small delay
     "    mov ecx, 0x1000000",
     "boot_delay:",
     "    loop boot_delay",
 
-    // Set up Gear 2 environment
+    // Jump to Gear 2
     "    mov edx, 0x80",       // Boot drive number
-    "    mov esp, 0xD000",     // Initial stack pointer
     "    mov eax, {load_addr}",
-    "    call eax",            // Call Gear 2 instead of jump
+    "    call eax",            // Call Gear 2
 
-    // Should never return, but just in case
     "boot_halt:",
     "    hlt",
     "    jmp boot_halt",
@@ -107,14 +112,15 @@ global_asm!(
     // GDT
     ".align 8",
     "boot_gdt:",
-    "    .quad 0",                    // Null descriptor
-    "    .quad 0x00CF9A000000FFFF",   // Code segment
-    "    .quad 0x00CF92000000FFFF",   // Data segment
-    "boot_gdt_desc:",
-    "    .word 23",                   // GDT limit (3 * 8 - 1)
-"    .long boot_gdt",            // GDT base
+    "    .quad 0x0000000000000000", // Null descriptor
+    "    .quad 0x00CF9A000000FFFF", // Code segment (0x08)
+"    .quad 0x00CF92000000FFFF", // Data segment (0x10)
 
-// Boot signature
+"boot_gdt_desc:",
+"    .word boot_gdt_desc - boot_gdt - 1", // GDT size - 1
+"    .long boot_gdt",                     // GDT base address
+
+// Pad to 510 bytes and add boot signature
 ".org 510",
 "    .word 0xAA55",
 
