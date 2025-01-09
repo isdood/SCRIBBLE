@@ -1,41 +1,26 @@
 ENTRY(_start)
+OUTPUT_FORMAT(elf32-i386)
 
 SECTIONS {
-    /* Second stage bootloader starts at 0x7E00 */
     . = 0x7E00;
 
-    .boot : ALIGN(512) {
-        KEEP(*(.multiboot_header))
-        *(.boot)
+    .start : {
+        *(.start)
     }
 
-    .text : ALIGN(16) {
-        *(.text .text.*)
+    .text : {
+        *(.text*)
     }
 
-    .rodata : ALIGN(16) {
-        *(.rodata .rodata.*)
+    .rodata : {
+        *(.rodata*)
     }
 
-    .data : ALIGN(16) {
-        *(.data .data.*)
+    .data : {
+        *(.data*)
     }
 
-    .bss : ALIGN(16) {
-        *(COMMON)
-        *(.bss .bss.*)
-    }
-
-    .bootparams : ALIGN(16) {
-        *(.bootparams)
-    }
-
-    /* Ensure total size is aligned to sector boundary */
-    . = ALIGN(512);
-
-    /DISCARD/ : {
-        *(.eh_frame*)
-        *(.note*)
-        *(.comment)
+    .bss : {
+        *(.bss*)
     }
 }

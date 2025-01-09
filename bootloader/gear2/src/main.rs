@@ -1,38 +1,77 @@
-#[repr(align(16))]
-#[repr(C)]
-pub struct Registers {
-    eax: u32,
-    ebx: u32,
-    ecx: u32,
-    edx: u32,    // Boot drive number passed from Gear 1
-    esi: u32,
-    edi: u32,
-    ebp: u32,
-    esp: u32,
+#[repr(packed)]
+struct GDTEntry {
+    limit_low: u16,
+    base_low: u16,
+    base_middle: u8,
+    access: u8,
+    granularity: u8,
+    base_high: u8,
 }
 
-static mut REGISTERS: Registers = Registers {
-    eax: 0, ebx: 0, ecx: 0, edx: 0,
-    esi: 0, edi: 0, ebp: 0, esp: 0,
-};
+#[repr(packed)]
+struct GDTDescriptor {
+    size: u16,
+    offset: u32,
+}
+
+static mut GDT: [GDTEntry; 3] = [
+    // Null descriptor
+    GDTEntry {
+        limit_low: 0,
+        base_low: 0,
+        base_middle: 0,
+        access: 0,
+        granularity: 0,
+        base_high: 0,
+    },
+// Code segment
+GDTEntry {
+    limit_low: 0xFFFF,
+    base_low: 0,
+    base_middle: 0,
+    access: 0x9A,       // Present, Ring 0, Code segment, Execute/Read
+    granularity: 0xCF,  // 4KB granularity, 32-bit protected mode
+    base_high: 0,
+},
+// Data segment
+GDTEntry {
+    limit_low: 0xFFFF,
+    base_low: 0,
+    base_middle: 0,
+    access: 0x92,       // Present, Ring 0, Data segment, Read/Write
+    granularity: 0xCF,  // 4KB granularity, 32-bit protected mode
+    base_high: 0,
+},
+];
 
 #[no_mangle]
 #[link_section = ".start"]
 pub extern "C" fn _start() -> ! {
-    // Initial assembly stub to save registers
     unsafe {
+        // Save registers first
         core::arch::asm!(
             // Save all registers
             "mov [{0} + 0], eax",
             "mov [{0} + 4], ebx",
             "mov [{0} + 8], ecx",
-            "mov [{0} + 12], edx",  // Contains boot drive
+            "mov [{0} + 12], edx",
             "mov [{0} + 16], esi",
             "mov [{0} + 20], edi",
             "mov [{0} + 24], ebp",
             "mov [{0} + 28], esp",
-            // Set up stack
+
+            // Reload segments with known good values
+            "mov ax, 0x10",
+            "mov ds, ax",
+            "mov es, ax",
+            "mov fs, ax",
+            "mov gs, ax",
+            "mov ss, ax",
             "mov esp, 0xD000",
+
+            // Clear direction flag
+            "cld",
+
             // Jump to Rust code
             "call {1}",
             sym REGISTERS,
@@ -42,6 +81,34 @@ pub extern "C" fn _start() -> ! {
     }
     unreachable!()
 }
+
+fn init_gdt() {
+    unsafe {
+        let gdt_desc = GDTDescriptor {
+            size: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
+            offset: &GDT as *const _ as u32,
+        };
+
+        core::arch::asm!(
+            "lgdt [{0}]",
+            // Reload CS via far return
+            "push 0x08",           // Code segment selector
+            "push 1f",            // Offset
+            "retf",              // Far return
+            "1:",
+            // Reload data segments
+            "mov ax, 0x10",
+            "mov ds, ax",
+            "mov es, ax",
+            "mov fs, ax",
+            "mov gs, ax",
+            "mov ss, ax",
+            in(reg) &gdt_desc,
+                         options(readonly, nostack)
+        );
+    }
+}
+
 
 #[no_mangle]
 pub extern "C" fn real_start() -> ! {

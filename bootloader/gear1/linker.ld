@@ -1,26 +1,19 @@
 ENTRY(_start)
-OUTPUT_FORMAT(elf32-i386)
+OUTPUT_FORMAT(binary)
 
-SECTIONS {
-    . = 0x7E00;
-
-    .start : {
-        *(.start)
-    }
-
+SECTIONS
+{
+    . = 0x7C00;
     .text : {
         *(.text*)
-    }
-
-    .rodata : {
         *(.rodata*)
-    }
-
-    .data : {
         *(.data*)
     }
 
-    .bss : {
-        *(.bss*)
+    /DISCARD/ : {
+        *(.eh_frame*)
+        *(.note*)
+        *(.comment*)
+        *(.gnu*)
     }
 }
