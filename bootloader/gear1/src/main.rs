@@ -125,8 +125,15 @@ global_asm!(
 "    .long gdt",                // Offset
 
 // Strings
-"boot_msg: .ascii \"G1 \", 0",
-"error_msg: .ascii \"ERR\", 0",
+"boot_msg: .ascii \"G1 \"",    // Remove the 0
+"    .byte 0",                 // Add null terminator as separate byte
+"error_msg: .ascii \"ERR\"",   // Remove the 0
+"    .byte 0",                 // Add null terminator as separate byte
+
+sectors = const(GEAR2_SECTOR_COUNT),
+            start = const(GEAR2_START_SECTOR + 1),
+            load_addr = const(GEAR2_LOAD_ADDR),
+);
 
 sectors = const(GEAR2_SECTOR_COUNT),
             start = const(GEAR2_START_SECTOR + 1),
