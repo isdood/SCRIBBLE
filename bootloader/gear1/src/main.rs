@@ -9,120 +9,124 @@ const GEAR2_SECTOR_COUNT: u8 = 6;
 const GEAR2_LOAD_ADDR: u16 = 0x7E00;
 
 global_asm!(
+    // Start in 16-bit real mode
     ".section .text",
     ".code16",
     ".global _start",
     "_start:",
-    // Basic setup
-    "    cli",                  // Disable interrupts
+    // BIOS Parameter Block to help with booting
+    "    jmp boot",
+    "    nop",
+    ".space 87, 0",          // Space for BPB
+
+    "boot:",
+    // Set up segments
+    "    cli",               // Disable interrupts
     "    xor ax, ax",
     "    mov ds, ax",
     "    mov es, ax",
     "    mov ss, ax",
-    "    mov sp, 0x7C00",
+    "    mov sp, 0x7C00",    // Set up stack
+    "    sti",               // Enable interrupts for BIOS calls
 
-    // Set video mode (80x25 text mode)
-    "    mov ax, 0x0003",      // Standard text mode 3
-    "    int 0x10",
+    // Print boot message
+    "    mov si, boot_msg",
+    "    call print",
 
-    // Print 'G1' to screen to show we're in Gear 1
-    "    mov ah, 0x0E",
-    "    mov al, 'G'",
-    "    int 0x10",
-    "    mov al, '1'",
-    "    int 0x10",
+    // Reset disk system
+    "    xor ah, ah",
+    "    int 0x13",
+    "    jc error",
 
     // Load Gear 2
-    "    mov ah, 0x02",        // Read sectors function
-    "    mov al, {sectors}",   // Number of sectors
-    "    xor ch, ch",          // Cylinder 0
-    "    mov cl, {start}",     // Starting sector
-    "    xor dh, dh",          // Head 0
-    "    mov dl, 0x80",        // First hard disk
+    "    mov ah, 0x02",      // Read sectors
+    "    mov al, {sectors}", // Number of sectors
+    "    xor ch, ch",        // Cylinder 0
+    "    mov cl, {start}",   // Start sector
+    "    xor dh, dh",        // Head 0
+    "    mov dl, 0x80",      // First hard disk
     "    mov bx, {load_addr}", // Load address
-    "    int 0x13",            // BIOS disk read
-    "    jc boot_error",       // If carry set, error occurred
+    "    int 0x13",
+    "    jc error",
 
-    // Enable A20
+    // Enable A20 line
     "    in al, 0x92",
     "    or al, 2",
     "    out 0x92, al",
 
-    // Set up GDT
-    "    mov ax, cs",          // Get current code segment
-    "    mov ds, ax",          // Set DS to access GDT
-    "    lgdt [boot_gdt_desc]",// Load GDT
+    // Load GDT
+    "    cli",               // Disable interrupts for mode switch
+    "    lgdt [gdt_desc]",
 
-    // Prepare for protected mode
+    // Switch to protected mode
     "    mov eax, cr0",
-    "    or al, 1",            // Set PE bit
-    "    mov cr0, eax",        // Enter protected mode
+    "    or al, 1",
+    "    mov cr0, eax",
 
-    // Clear prefetch queue
-    "    jmp 1f",
-    "1:",
+    // Far jump to flush pipeline and load CS
+    "    .byte 0xEA",
+    "    .long protected_mode",
+    "    .word 0x08",
 
-    // Far jump to protected mode using absolute addressing
-    "    .byte 0xEA",          // Far jump opcode
-    "    .long boot_protected", // 32-bit offset
-    "    .word 0x08",          // Code segment selector
+    // Print function (SI = string pointer)
+    "print:",
+    "    push ax",
+    "    mov ah, 0x0E",      // BIOS teletype
+    "print_loop:",
+    "    lodsb",             // Load byte from SI
+    "    test al, al",       // Check for null
+    "    jz print_done",
+    "    int 0x10",          // Print character
+    "    jmp print_loop",
+    "print_done:",
+    "    pop ax",
+    "    ret",
 
     // Error handler
-    "boot_error:",
-    "    mov ah, 0x0E",
-    "    mov al, 'E'",         // Print 'E' for error
-    "    int 0x10",
+    "error:",
+    "    mov si, error_msg",
+    "    call print",
+    "halt:",
     "    cli",
     "    hlt",
+    "    jmp halt",
 
+    // 32-bit protected mode code
+    ".code32",
     ".align 4",
-    ".code32",                 // 32-bit protected mode code
-    "boot_protected:",
-    // Set up protected mode segments
-    "    mov ax, 0x10",        // Data segment selector
+    "protected_mode:",
+    // Set up segment registers
+    "    mov ax, 0x10",      // Data segment
     "    mov ds, ax",
     "    mov es, ax",
     "    mov fs, ax",
     "    mov gs, ax",
     "    mov ss, ax",
-    "    mov esp, 0xD000",     // Set up new stack
+    "    mov esp, 0xD000",   // New stack
 
-    // Write 'G1' directly to video memory
-    "    mov edi, 0xB8000",    // VGA text buffer
-    "    mov al, 'G'",
-    "    mov ah, 0x0F",        // White on black
+    // Print 'P' to show we're in protected mode
+    "    mov edi, 0xB8000",  // VGA text buffer
+    "    mov al, 'P'",
+    "    mov ah, 0x0F",      // White on black
     "    mov [edi], ax",
-    "    mov al, '1'",
-    "    mov [edi + 2], ax",
-
-    // Small delay
-    "    mov ecx, 0x1000000",
-    "boot_delay:",
-    "    loop boot_delay",
 
     // Jump to Gear 2
-    "    mov edx, 0x80",       // Boot drive number
     "    mov eax, {load_addr}",
-    "    call eax",            // Call Gear 2
-
-    "boot_halt:",
-    "    hlt",
-    "    jmp boot_halt",
+    "    call eax",
 
     // GDT
     ".align 8",
-    "boot_gdt:",
+    "gdt:",
     "    .quad 0x0000000000000000", // Null descriptor
     "    .quad 0x00CF9A000000FFFF", // Code segment (0x08)
 "    .quad 0x00CF92000000FFFF", // Data segment (0x10)
+"gdt_desc:",
+"    .word gdt_desc - gdt - 1", // Size
+"    .long gdt",                // Offset
 
-"boot_gdt_desc:",
-"    .word boot_gdt_desc - boot_gdt - 1", // GDT size - 1
-"    .long boot_gdt",                     // GDT base address
-
-// Pad to 510 bytes and add boot signature
-".org 510",
-"    .word 0xAA55",
+// Strings
+"boot_msg: .ascii \"G1 \", 0",
+"error_msg: .ascii \"ERR\", 0",
 
 sectors = const(GEAR2_SECTOR_COUNT),
             start = const(GEAR2_START_SECTOR + 1),
