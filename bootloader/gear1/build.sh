@@ -24,4 +24,5 @@ qemu-system-i386 \
     -vga std \
     -display gtk \
     -monitor stdio \
+    -d cpu_reset,int,guest_errors \
     -no-reboot

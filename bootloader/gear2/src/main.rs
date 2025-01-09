@@ -1,80 +1,67 @@
-#![no_std]
-#![no_main]
-
-use core::arch::{asm, global_asm};
-use core::panic::PanicInfo;
-use uart_16550::SerialPort;
-
-mod boot_params;
-
-// Change stack location to match what's actually being used
-const STACK_START: u64 = 0xD000;  // Updated to match actual value
-const STACK_SIZE: u64 = 0x4000;
-
-
-// Serial port functions
-fn write_serial(serial: &mut SerialPort, bytes: &[u8]) {
-    for &byte in bytes {
-        serial.send(byte);
-    }
+#[repr(align(16))]
+#[repr(C)]
+pub struct Registers {
+    eax: u32,
+    ebx: u32,
+    ecx: u32,
+    edx: u32,    // Boot drive number passed from Gear 1
+    esi: u32,
+    edi: u32,
+    ebp: u32,
+    esp: u32,
 }
 
-fn print_boot_info(serial: &mut SerialPort) {
-    write_serial(serial, b"[spinUP! Gear 2] Starting...\n");
-}
+static mut REGISTERS: Registers = Registers {
+    eax: 0, ebx: 0, ecx: 0, edx: 0,
+    esi: 0, edi: 0, ebp: 0, esp: 0,
+};
 
-fn enable_a20() -> Result<(), ()> {
+#[no_mangle]
+#[link_section = ".start"]
+pub extern "C" fn _start() -> ! {
+    // Initial assembly stub to save registers
     unsafe {
-        // Try enable A20 through BIOS
-        outb(0x92, inb(0x92) | 2);
-        Ok(())
+        core::arch::asm!(
+            // Save all registers
+            "mov [{0} + 0], eax",
+            "mov [{0} + 4], ebx",
+            "mov [{0} + 8], ecx",
+            "mov [{0} + 12], edx",  // Contains boot drive
+            "mov [{0} + 16], esi",
+            "mov [{0} + 20], edi",
+            "mov [{0} + 24], ebp",
+            "mov [{0} + 28], esp",
+            // Set up stack
+            "mov esp, 0xD000",
+            // Jump to Rust code
+            "call {1}",
+            sym REGISTERS,
+            sym real_start,
+            options(noreturn),
+        );
     }
+    unreachable!()
 }
-
-fn init_page_tables() {
-    // Basic identity mapping for now
-    // You'll want to implement proper paging later
-}
-
-fn init_gdt() {
-    // Basic GDT setup
-    // You'll want to implement this properly
-}
-
-fn init_idt() {
-    // Basic IDT setup
-    // You'll want to implement this properly
-}
-
-fn load_kernel(load_addr: u64, size: u64) -> Result<u64, ()> {
-    // Basic validation
-    if load_addr == 0 || size == 0 {
-        return Err(());
-    }
-
-    // For now, we'll just verify the addresses are valid
-    // Later, you'll want to actually load the kernel from disk
-    if load_addr >= 0x100000 && // Above 1MB
-        load_addr + size <= 0xFFFFFFFF { // Within 4GB limit
-            Ok(load_addr) // Return entry point (same as load address for now)
-        } else {
-            Err(())
-        }
-}
-
 
 #[no_mangle]
 pub extern "C" fn real_start() -> ! {
+    // First, write directly to VGA buffer as a sanity check
+    unsafe {
+        let vga = 0xB8000 as *mut u16;
+        *vga = 0x0F47;       // White 'G' on black
+        *(vga.add(1)) = 0x0F32; // White '2' on black
+    }
+
+    // Initialize serial port for debugging
     let mut serial_port = unsafe { SerialPort::new(0x3F8) };
     serial_port.init();
-    // At the start of Gear 2
-    debug_print!("Gear 2 initialized");
-    debug_print!("VGA buffer at 0xB8000");
 
-    write_serial(&mut serial_port, b"[spinUP! Gear 2] Starting at 0x7E00...\n");
-    write_serial(&mut serial_port, b"[spinUP! Gear 2] Stack at 0xD000\n");
+    write_serial(&mut serial_port, b"[spinUP! Gear 2] Starting...\n");
 
-    print_boot_info(&mut serial_port);
+    // Get boot drive number passed from Gear 1
+    let boot_drive = unsafe { REGISTERS.edx & 0xFF };
+    write_serial(&mut serial_port, b"[spinUP! Gear 2] Boot drive: ");
+    write_serial(&mut serial_port, &[b'0' + (boot_drive / 10) as u8, b'0' + (boot_drive % 10) as u8, b'\n']);
 
     if let Err(()) = enable_a20() {
         write_serial(&mut serial_port, b"[spinUP! Gear 2] Failed to enable A20 line\n");
@@ -90,7 +77,6 @@ pub extern "C" fn real_start() -> ! {
     init_gdt();
     init_idt();
 
-    // We know the types match now
     match load_kernel(boot_params.kernel_load_addr, boot_params.kernel_size) {
         Ok(entry_point) => {
             write_serial(&mut serial_port, b"[spinUP! Gear 2] Kernel loaded successfully. Shifting into high gear...\n");
@@ -101,84 +87,12 @@ pub extern "C" fn real_start() -> ! {
             halt();
         }
     }
-}
 
-global_asm!(
-    ".code32",
-    "protected_mode:",
-    "    mov ax, 0x10",        // Data segment
-    "    mov ds, ax",
-    "    mov es, ax",
-    "    mov fs, ax",
-    "    mov gs, ax",
-    "    mov ss, ax",
-
-    // Clear VGA buffer and set initial state
-    "    mov edi, 0xB8000",
-    "    mov ecx, 2000",       // 80*25 screen size
-    "    mov ax, 0x0720",      // White on black, space character
-    "clear_screen:",
-    "    mov [edi], ax",
-    "    add edi, 2",
-    "    loop clear_screen",
-
-    // Set VGA cursor position to top of screen
-    "    mov dx, 0x3D4",
-    "    mov al, 0x0F",
-    "    out dx, al",
-    "    mov dx, 0x3D5",
-    "    mov al, 0",
-    "    out dx, al",
-    "    mov dx, 0x3D4",
-    "    mov al, 0x0E",
-    "    out dx, al",
-    "    mov dx, 0x3D5",
-    "    mov al, 0",
-    "    out dx, al",
-
-    // Jump to Gear 2
-    "    mov edx, 0x80",       // Boot drive
-    "    mov eax, {load_addr}",
-    "    jmp eax",             // Direct jump to Gear 2
-    const(STACK_START + STACK_SIZE),
-            sym real_start,
-);
-
-#[inline(never)]
-fn jump_to_kernel(entry_point: u64) -> ! {
-    unsafe {
-        asm!(
-            "jmp {}",
-             in(reg) entry_point,
-             options(noreturn)
-        );
-    }
-}
-
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {
-        unsafe {
-            asm!("hlt", options(nomem, nostack));
-        }
-    }
-}
-
-// Port I/O functions
-pub unsafe fn inb(port: u16) -> u8 {
-    let value: u8;
-    asm!("in al, dx", out("al") value, in("dx") port, options(nomem, nostack));
-    value
-}
-
-pub unsafe fn outb(port: u16, value: u8) {
-    asm!("out dx, al", in("dx") port, in("al") value, options(nomem, nostack));
+    halt();
 }
 
 fn halt() -> ! {
-    loop {
-        unsafe {
-            asm!("hlt", options(nomem, nostack));
-        }
+    unsafe {
+        core::arch::asm!("cli; hlt", options(noreturn));
     }
 }
