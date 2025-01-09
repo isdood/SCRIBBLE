@@ -67,6 +67,9 @@ fn load_kernel(load_addr: u64, size: u64) -> Result<u64, ()> {
 pub extern "C" fn real_start() -> ! {
     let mut serial_port = unsafe { SerialPort::new(0x3F8) };
     serial_port.init();
+    // At the start of Gear 2
+    debug_print!("Gear 2 initialized");
+    debug_print!("VGA buffer at 0xB8000");
 
     write_serial(&mut serial_port, b"[spinUP! Gear 2] Starting at 0x7E00...\n");
     write_serial(&mut serial_port, b"[spinUP! Gear 2] Stack at 0xD000\n");
@@ -101,18 +104,42 @@ pub extern "C" fn real_start() -> ! {
 }
 
 global_asm!(
-    ".section .text._start",
-    ".global _start",
-    "_start:",
-    // Set up stack
-    "    mov esp, {0}",
-    "    mov ebp, esp",
-    "    call {1}",
-    "1:  hlt",
-    "    jmp 1b",
-    // Add boot signature at the end of first sector
-    ".org 0x1FE",  // Position at end of first sector
-    ".word 0xAA55", // Boot signature
+    ".code32",
+    "protected_mode:",
+    "    mov ax, 0x10",        // Data segment
+    "    mov ds, ax",
+    "    mov es, ax",
+    "    mov fs, ax",
+    "    mov gs, ax",
+    "    mov ss, ax",
+
+    // Clear VGA buffer and set initial state
+    "    mov edi, 0xB8000",
+    "    mov ecx, 2000",       // 80*25 screen size
+    "    mov ax, 0x0720",      // White on black, space character
+    "clear_screen:",
+    "    mov [edi], ax",
+    "    add edi, 2",
+    "    loop clear_screen",
+
+    // Set VGA cursor position to top of screen
+    "    mov dx, 0x3D4",
+    "    mov al, 0x0F",
+    "    out dx, al",
+    "    mov dx, 0x3D5",
+    "    mov al, 0",
+    "    out dx, al",
+    "    mov dx, 0x3D4",
+    "    mov al, 0x0E",
+    "    out dx, al",
+    "    mov dx, 0x3D5",
+    "    mov al, 0",
+    "    out dx, al",
+
+    // Jump to Gear 2
+    "    mov edx, 0x80",       // Boot drive
+    "    mov eax, {load_addr}",
+    "    jmp eax",             // Direct jump to Gear 2
     const(STACK_START + STACK_SIZE),
             sym real_start,
 );

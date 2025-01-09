@@ -1,21 +1,19 @@
-OUTPUT_FORMAT(binary)
 ENTRY(_start)
+OUTPUT_FORMAT(binary)
 
 SECTIONS
 {
-    . = 0x7c00;
+    . = 0x7C00;
     .text : {
-        *(.boot)
         *(.text*)
         *(.rodata*)
         *(.data*)
-        . = 510;
-        SHORT(0xaa55)
     }
 
     /DISCARD/ : {
         *(.eh_frame*)
         *(.note*)
         *(.comment*)
+        *(.gnu*)
     }
 }
