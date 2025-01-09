@@ -1,17 +1,21 @@
+OUTPUT_FORMAT(binary)
 ENTRY(_start)
 
-SECTIONS {
-    /* First stage bootloader must start at 0x7C00 (BIOS load address) */
-    . = 0x7C00;
-
-    .boot : {
+SECTIONS
+{
+    . = 0x7c00;
+    .text : {
         *(.boot)
-        *(.text)
-        *(.rodata)
-        *(.data)
-
-        /* Ensure boot signature is at the right place */
+        *(.text*)
+        *(.rodata*)
+        *(.data*)
         . = 510;
-        SHORT(0xAA55)
+        SHORT(0xaa55)
+    }
+
+    /DISCARD/ : {
+        *(.eh_frame*)
+        *(.note*)
+        *(.comment*)
     }
 }
