@@ -1,0 +1,18 @@
+[package]
+name = "spinUP-gear1"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[build-dependencies]
+compiler_builtins = { version = "0.1.142", features = ["mem"] }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = "z"  # Optimize for size
+lto = true       # Enable link-time optimization
+codegen-units = 1  # Use single codegen unit for better optimization
