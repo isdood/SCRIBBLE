@@ -4,14 +4,13 @@
 use core::arch::global_asm;
 use core::panic::PanicInfo;
 
-// Constants for Gear 2 loading
-const GEAR2_START_SECTOR: u8 = 1;  // Sector where Gear 2 starts
-const GEAR2_SECTOR_COUNT: u8 = 6;  // Number of sectors to load (based on your Gear 2 size)
-const GEAR2_LOAD_ADDR: u16 = 0x7E00;  // Where to load Gear 2
+const GEAR2_START_SECTOR: u8 = 1;
+const GEAR2_SECTOR_COUNT: u8 = 6;
+const GEAR2_LOAD_ADDR: u16 = 0x7E00;
 
 global_asm!(
     ".section .boot, \"ax\"",
-    ".code16",  // Start in 16-bit real mode
+    ".code16",
     ".global _start",
     "_start:",
     // Set up segments
@@ -40,8 +39,8 @@ global_asm!(
 // Check for errors
 "    jc error",
 
-// Jump to Gear 2
-"    jmp 0:{load_addr}",
+// Jump to Gear 2 (fixed syntax)
+"    ljmp 0x0000, {load_addr}",  // Far jump with correct syntax
 
 "error:",
 "    mov si, offset error_msg",
