@@ -3,29 +3,41 @@ ENTRY(_start)
 SECTIONS {
     . = 0x7E00;
 
-    .boot : {
-        *(.boot)
-        *(.boot.*)
+    .start : ALIGN(4K) {
+        KEEP(*(.start))
+        *(.text._start)
+        *(.text.enter_protected_mode)
+        *(.text*)
     }
 
-    .text : {
-        *(.text .text.*)
+    .rodata : ALIGN(4K) {
+        *(.rodata*)
     }
 
-    .rodata : {
-        *(.rodata .rodata.*)
+    .gdt : ALIGN(8) {
+        KEEP(*(.gdt))
     }
 
-    .data : {
-        *(.data .data.*)
+    .page_tables : ALIGN(4K) {
+        KEEP(*(.page_tables))
     }
 
-    .bss : {
+    .data : ALIGN(4K) {
+        *(.data*)
+    }
+
+    .bss : ALIGN(4K) {
         *(COMMON)
-        *(.bss .bss.*)
+        *(.bss*)
+    }
+
+    .stack : ALIGN(16) {
+        KEEP(*(.stack))
     }
 
     /DISCARD/ : {
         *(.eh_frame*)
+        *(.note*)
+        *(.comment*)
     }
 }

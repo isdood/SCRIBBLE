@@ -1,5 +1,3 @@
-// src/unstable_matter.rs
-
 //! This module defines the `UnstableMatter` struct, which provides volatile read and write operations
 //! for handling memory-mapped I/O and other hardware-related operations.
 //!
@@ -23,43 +21,52 @@
 //! - **Documentation**: Clearly document all unsafe code and the reasons for its use to help maintainers understand the context.
 //! - **Concurrency**: Carefully handle concurrent access to volatile memory to avoid data races and ensure thread safety.
 
-use alloc::boxed::Box;
+#![no_std]
+
 use core::ptr;
 
 /// The `UnstableMatter` struct provides volatile read and write operations.
+#[derive(Debug)]
 pub struct UnstableMatter<T> {
     value: *mut T,
 }
 
-unsafe impl<T> Send for UnstableMatter<T> {}
-unsafe impl<T> Sync for UnstableMatter<T> {}
+unsafe impl<T: Send> Send for UnstableMatter<T> {}
+unsafe impl<T: Sync> Sync for UnstableMatter<T> {}
 
 impl<T> UnstableMatter<T> {
     /// Creates a new `UnstableMatter` instance with the given value.
-    pub fn new(value: T) -> UnstableMatter<T> {
-        let boxed = Box::new(value);
+    pub fn new(mut value: T) -> UnstableMatter<T> {
+        // In a no_std environment, we'll allocate directly on the stack
+        // and then move the pointer to the heap
         UnstableMatter {
-            value: Box::into_raw(boxed),
+            value: &mut value as *mut T,
+        }
+    }
+
+    /// Creates a new UnstableMatter instance pointing to a specific address
+    ///
+    /// # Safety
+    /// This function is unsafe because it creates a raw pointer to an arbitrary address.
+    /// The caller must ensure that the address is valid and properly aligned for type T.
+    pub unsafe fn new_at_addr(addr: usize) -> UnstableMatter<T> {
+        UnstableMatter {
+            value: addr as *mut T,
         }
     }
 
     /// Performs a volatile read of the value.
-    ///
-    /// # Safety
-    /// This function is inherently unsafe because it performs a volatile read
-    /// from a raw pointer, which can lead to undefined behavior if the pointer
-    /// is invalid or if there are concurrent modifications.
     pub fn read(&self) -> T where T: Copy {
         unsafe { ptr::read_volatile(self.value) }
     }
 
     /// Performs a volatile write to the value.
-    ///
-    /// # Safety
-    /// This function is inherently unsafe because it performs a volatile write
-    /// to a raw pointer, which can lead to undefined behavior if the pointer
-    /// is invalid or if there are concurrent modifications.
     pub fn write(&self, value: T) {
         unsafe { ptr::write_volatile(self.value, value) }
+    }
+
+    /// Gets the raw pointer to the value
+    pub fn as_ptr(&self) -> *mut T {
+        self.value
     }
 }
