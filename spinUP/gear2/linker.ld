@@ -1,29 +1,31 @@
 ENTRY(_start)
-OUTPUT_FORMAT(elf64-x86-64)
-OUTPUT_ARCH(i386:x86-64)
 
-SECTIONS
-{
-    . = 0x7E00;    /* Where Gear1 loads us */
+SECTIONS {
+    . = 0x7E00;
+
+    .boot : {
+        *(.boot)
+        *(.boot.*)
+    }
 
     .text : {
-        *(.text*)
-        *(.rodata*)
+        *(.text .text.*)
+    }
+
+    .rodata : {
+        *(.rodata .rodata.*)
     }
 
     .data : {
-        *(.data*)
+        *(.data .data.*)
     }
 
     .bss : {
-        *(.bss*)
         *(COMMON)
+        *(.bss .bss.*)
     }
 
     /DISCARD/ : {
         *(.eh_frame*)
-        *(.note*)
-        *(.comment*)
-        *(.gnu*)
     }
 }
