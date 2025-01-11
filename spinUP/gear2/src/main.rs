@@ -435,21 +435,21 @@ pub unsafe extern "C" fn _start() -> ! {
     init_serial();
     write_serial(b"Serial initialized\r\n");
 
+    // Print debug message at the start of gear2
+    write_serial(b"Gear2 started\r\n");
+
     disable_interrupts();
     write_serial(b"Interrupts disabled\r\n");
 
-    // Check if long mode is available
     if !check_long_mode() {
         write_serial(b"Long mode not supported\r\n");
         loop { core::arch::asm!("hlt"); }
     }
     write_serial(b"Long mode supported\r\n");
 
-    // Set up paging structures
     setup_page_tables();
     write_serial(b"Page tables set up\r\n");
 
-    // Enable PAE
     core::arch::asm!(
         ".code32",
         "mov eax, cr4",
@@ -459,7 +459,6 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"PAE enabled\r\n");
 
-    // Load CR3 with PML4
     core::arch::asm!(
         ".code32",
         "mov {tmp:e}, {addr:e}",
@@ -470,7 +469,6 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"CR3 loaded\r\n");
 
-    // Enable long mode
     core::arch::asm!(
         ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
@@ -481,7 +479,6 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"Long mode enabled in EFER\r\n");
 
-    // Enable paging
     core::arch::asm!(
         ".code32",
         "mov eax, cr0",
@@ -491,7 +488,6 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"Paging enabled\r\n");
 
-    // Jump to long mode
     core::arch::asm!(
         ".code32",
         "push 0x08",          // Code segment

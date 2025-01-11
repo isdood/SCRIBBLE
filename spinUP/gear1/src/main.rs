@@ -51,6 +51,11 @@ pub extern "C" fn _start() -> ! {
             "int 0x13",
             "jc 2f",
 
+            // Print debug message before retf
+            "mov al, 'X'",
+            "mov ah, 0x0E",
+            "int 0x10",
+
             // Jump to gear2
             "push word ptr 0x07E0",
             "push word ptr 0",
@@ -66,4 +71,3 @@ pub extern "C" fn _start() -> ! {
                          options(noreturn)
         );
     }
-}
