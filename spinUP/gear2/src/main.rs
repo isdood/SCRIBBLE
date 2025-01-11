@@ -162,16 +162,18 @@ unsafe fn setup_gdt() {
         base: gdt.addr() as u32,
     };
 
+    // Allocate space on stack for GDTR
+    let mut gdtr_space: [u8; 6] = [0; 6];
+    let gdtr_ptr = &mut gdtr_space as *mut _ as u32;
+
     core::arch::asm!(
         ".code32",
-        "sub $6, %esp",           // Make space for GDTR
-        "movw {1:x}, (%esp)",     // Store limit
-                     "movl {2:e}, 2(%esp)",    // Store base
-                     "lgdt (%esp)",           // Load GDT
-                     "add $6, %esp",          // Restore stack
-                     in("esp") _,
-                     in("eax") gdt_ptr.limit,
-                     in("ebx") gdt_ptr.base,
+        "movw {1:x}, ({0:e})",     // Store limit
+                     "movl {2:e}, 2({0:e})",    // Store base
+                     "lgdt ({0:e})",            // Load GDT
+                     in(reg) gdtr_ptr,
+                     in(reg) gdt_ptr.limit,
+                     in(reg) gdt_ptr.base,
                      options(att_syntax)
     );
 }
