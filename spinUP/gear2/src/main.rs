@@ -509,7 +509,7 @@ unsafe fn enter_long_mode() -> ! {
 unsafe extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: InterruptStackFrame
 ) {
-    core::arch::asm!(
+    core::arch::naked_asm!(
         ".code64",
         "push rax",
         "push rcx",
@@ -528,7 +528,6 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(
         "pop rcx",
         "pop rax",
         "iretq",
-        options(noreturn)
     );
 }
 
@@ -541,7 +540,6 @@ unsafe extern "x86-interrupt" fn page_fault_handler(
         ".code64",
         "cli",
         "hlt",
-        options(noreturn)
     );
 }
 
