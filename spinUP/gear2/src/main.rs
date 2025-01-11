@@ -559,8 +559,8 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // 9. Long mode jump and final setup
     core::arch::asm!(
-        "ljmp $0x08, $1f",
-        "1:",
+        "ljmp $0x08, $2f",  // Changed from 1f to 2f
+        "2:",               // Changed from 1: to 2:
         ".code64",
 
         // 10. Set up segment registers
