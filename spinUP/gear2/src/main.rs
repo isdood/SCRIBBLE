@@ -144,8 +144,7 @@ unsafe fn disable_interrupts() {
 }
 
 unsafe fn setup_page_tables() {
-    // Get pointers to the whole tables
-    let tables_ptr = &mut PAGE_TABLES as *mut PageTables;
+    let tables_ptr = &raw mut PAGE_TABLES as *mut PageTables;
 
     // Clear all tables
     (*tables_ptr).pml4.entries.fill(0);
@@ -205,21 +204,21 @@ unsafe fn jump_to_long_mode() -> ! {
         ".code32",
         "andl $-16, %esp",
         "pushl $0x08",
-        "pushl $label_64",
-        "lret",
-        ".align 8",
-        "label_64:",           // Changed from "1:" to "label_64:"
-        ".code64",
-        "mov $0x10, %ax",
-        "mov %ax, %ds",
-        "mov %ax, %es",
-        "mov %ax, %fs",
-        "mov %ax, %gs",
-        "mov %ax, %ss",
-        "movabs {stack}, %rsp",
-        "movabs {target}, %rax",
-        "jmp *%rax",
-        stack = in(reg) (&raw const STACK.data as *const u8 as u64 + 4096),
+        "pushl $2f",           // Use 2: as the label (greater than 1)
+    "lret",
+    ".align 8",
+    "2:",                  // Changed to numeric local label
+    ".code64",
+    "mov $0x10, %ax",
+    "mov %ax, %ds",
+    "mov %ax, %es",
+    "mov %ax, %fs",
+    "mov %ax, %gs",
+    "mov %ax, %ss",
+    "movabs {stack}, %rsp",
+    "movabs {target}, %rax",
+    "jmp *%rax",
+    stack = in(reg) (&raw const STACK.data as *const u8 as u64 + 4096),
                      target = in(reg) rust_main as u64,
                      options(noreturn)
     );
