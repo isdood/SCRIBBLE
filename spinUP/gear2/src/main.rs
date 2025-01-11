@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
 mod serial;
@@ -66,6 +67,7 @@ static mut STAGE_INFO: StageInfo = StageInfo {
 
 // Add this struct for IDT entries
 #[repr(C, packed)]
+#[derive(Copy, Clone)]  // Add these derives
 struct IDTEntry {
     offset_low: u16,
     segment: u16,
@@ -75,21 +77,23 @@ struct IDTEntry {
     reserved: u32,
 }
 
-// Add this as a static
 #[repr(C, align(16))]
 struct IDT {
     entries: [IDTEntry; 256]
 }
 
+// Initialize IDT with a const default entry
+const DEFAULT_IDT_ENTRY: IDTEntry = IDTEntry {
+    offset_low: 0,
+    segment: 0,
+    flags: 0,
+    offset_middle: 0,
+    offset_high: 0,
+    reserved: 0
+};
+
 static mut IDT: IDT = IDT {
-    entries: [IDTEntry {
-        offset_low: 0,
-        segment: 0,
-        flags: 0,
-        offset_middle: 0,
-        offset_high: 0,
-        reserved: 0
-    }; 256]
+    entries: [DEFAULT_IDT_ENTRY; 256]
 };
 
 static mut PAGE_TABLES: PageTables = PageTables {
@@ -458,17 +462,39 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
+#[no_mangle]
+unsafe extern "x86-interrupt" fn timer_handler() {
+    write_serial(b"Timer tick\r\n");
+}
+
+#[no_mangle]
+unsafe extern "x86-interrupt" fn page_fault_handler() {
+    write_serial(b"Page fault\r\n");
+    loop { core::arch::asm!("hlt"); }
+}
+
 unsafe fn setup_idt() {
-    // Set up a minimal IDT with just the critical handlers
     let code_segment = 0x08;
 
     // Timer interrupt handler (IRQ0)
-    IDT.entries[0x08].segment = code_segment;
-    IDT.entries[0x08].flags = 0x8E00;  // Present, Ring 0, Interrupt Gate
+    IDT.entries[0x08] = IDTEntry {
+        offset_low: (timer_handler as usize & 0xFFFF) as u16,
+        segment: code_segment,
+        flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
+        offset_middle: ((timer_handler as usize >> 16) & 0xFFFF) as u16,
+        offset_high: (timer_handler as usize >> 32) as u32,
+        reserved: 0
+    };
 
     // Page fault handler
-    IDT.entries[0x0E].segment = code_segment;
-    IDT.entries[0x0E].flags = 0x8E00;  // Present, Ring 0, Interrupt Gate
+    IDT.entries[0x0E] = IDTEntry {
+        offset_low: (page_fault_handler as usize & 0xFFFF) as u16,
+        segment: code_segment,
+        flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
+        offset_middle: ((page_fault_handler as usize >> 16) & 0xFFFF) as u16,
+        offset_high: (page_fault_handler as usize >> 32) as u32,
+        reserved: 0
+    };
 
     // Load the IDT
     let idtr = GDTPointer {
@@ -498,23 +524,25 @@ pub unsafe extern "C" fn _start() -> ! {
     write_serial(b"Gear2 started\r\n");
 
     // Check if we're in protected mode
+    let cr0_value: u32;
     core::arch::asm!(
-        ".code32",        // Changed from .code16
+        ".code32",
         "mov eax, cr0",
-        out("eax") cr0,
+        out("eax") cr0_value,
+                     options(nomem, nostack)
     );
 
-    // Add IDT setup before enabling paging
-    setup_idt();
-    write_serial(b"IDT set up\r\n");
-
-    if cr0 & 1 == 0 {
+    if cr0_value & 1 == 0 {
         write_serial(b"Error: Not in protected mode\r\n");
         loop { core::arch::asm!("hlt"); }
     }
 
     disable_interrupts();
     write_serial(b"Interrupts disabled\r\n");
+
+    // Add IDT setup before enabling paging
+    setup_idt();
+    write_serial(b"IDT set up\r\n");
 
     // Check if long mode is available
     if !check_long_mode() {
@@ -569,9 +597,24 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"Paging enabled\r\n");
 
+    // Setup GDT for long mode
+    setup_gdt();
+    write_serial(b"GDT loaded\r\n");
+
     // Jump to long mode
+    write_serial(b"Jumping to 64-bit mode...\r\n");
     core::arch::asm!(
         ".code32",
+        // Ensure stack alignment
+        "and esp, -16",
+        // Setup segment registers
+        "mov ax, 0x10",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+        // Push code segment and return address
         "push 0x08",          // Code segment
         "lea eax, [2f]",      // Get address of label
         "push eax",           // Push address
@@ -579,16 +622,19 @@ pub unsafe extern "C" fn _start() -> ! {
         ".align 8",
         "2:",
         ".code64",
-        "mov ax, 0x10",       // Data segment
-        "mov ds, ax",
+        // Now in 64-bit mode
+        "xor rax, rax",       // Clear RAX
+        "mov ds, ax",         // Clear segment registers
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
-        "mov rsp, {0}",
-        "jmp {1}",
-        in(reg) &raw const STACK.data as *const _ as u64 + 4096,
-                     sym rust_main,
+        // Set up final stack
+        "mov rsp, {stack}",
+        // Jump to Rust main
+        "jmp {target}",
+        stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
+                     target = sym rust_main,
                      options(noreturn)
     );
 }
