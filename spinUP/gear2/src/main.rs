@@ -534,62 +534,62 @@ pub unsafe extern "C" fn _start() -> ! {
     // 5. Enable PAE (required for long mode)
     core::arch::asm!(
         ".code32",
-        "mov %cr4, %eax",
-        "or $0x20, %eax",  // PAE
-        "mov %eax, %cr4",
+        "mov eax, cr4",
+        "or eax, 0x20",  // PAE
+        "mov cr4, eax",
     );
 
     // 6. Load CR3 with page table
     core::arch::asm!(
         ".code32",
-        "mov {}, %eax",
-        "mov %eax, %cr3",
+        "mov eax, {0:e}",
+        "mov cr3, eax",
         in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
     );
 
     // 7. Enable long mode in EFER
     core::arch::asm!(
         ".code32",
-        "mov $0xC0000080, %ecx", // EFER MSR
+        "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or $0x100, %eax",      // LME
+        "or eax, 0x100",      // LME
         "wrmsr",
     );
 
     // 8. Enable paging and protection
     core::arch::asm!(
         ".code32",
-        "mov %cr0, %eax",
-        "or $0x80000001, %eax", // PG | PE
-        "mov %eax, %cr0",
+        "mov eax, cr0",
+        "or eax, 0x80000001", // PG | PE
+        "mov cr0, eax",
     );
 
     // 9. Long mode jump and final setup
     core::arch::asm!(
         ".code32",
-        "push $0x08",              // Push code segment
-        "lea 2f(%rip), %eax",      // Get address of label
-                     "push %eax",               // Push target address
-                     "retf",                    // Far return to long mode
-                     "2:",
-                     ".code64",                 // Switch assembler to 64-bit mode
-                     "mov $0x10, %ax",         // Data segment
-                     "mov %ax, %ds",
-                     "mov %ax, %es",
-                     "mov %ax, %fs",
-                     "mov %ax, %gs",
-                     "mov %ax, %ss",
+        "push 0x08",              // Code segment
+        "lea eax, [rel 2f]",      // Get address of label
+        "push eax",               // Push target address
+        "retf",                   // Far return to long mode
+        "2:",
+        ".code64",                // Switch to 64-bit mode
+        "mov ax, 0x10",          // Data segment
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
 
-                     // Set up stack
-                     "mov {}, %rsp",           // Load 64-bit stack pointer
+        // Set up stack
+        "mov rsp, {0:r}",         // Load 64-bit stack pointer
 
-                     // Enable interrupts
-                     "sti",
+        // Enable interrupts
+        "sti",
 
-                     // Jump to Rust main
-                     "jmp *{}",                // Indirect jump to main
+        // Jump to Rust main
+        "jmp {1:r}",              // Jump to main
 
-                     in(reg) &raw const STACK.data as *const _ as u64 + 4096,
+        in(reg) &raw const STACK.data as *const _ as u64 + 4096,
                      in(reg) rust_main as u64,
     );
 
