@@ -3,14 +3,9 @@ name = "spinup-gear1"
 version = "0.1.0"
 edition = "2021"
 
-[profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
-overflow-checks = false
+[build-dependencies]
+cc = "1.0"
 
 [[bin]]
 name = "spinup-gear1"
-path = "src/main.rs"
+path = "src/dummy.rs"  # This is just a placeholder

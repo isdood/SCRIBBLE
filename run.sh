@@ -3,6 +3,8 @@
 # Exit on any error
 set -e
 
+clear;
+
 # Colors for output
 RED="\033[0;31m"
 GREEN="\033[0;32m"
@@ -44,15 +46,23 @@ trap cleanup EXIT
 # Build Gear1
 status "Building Gear1..."
 cd spinUP/gear1
-./build.sh || error "Failed to build Gear1"
+
+# Check if NASM is installed
+if ! command -v nasm &> /dev/null; then
+    error "NASM is not installed. Please install it first."
+fi
+
+# Assemble Gear1
+status "=== Building ScribbleOS SpinUP Gear1 ==="
+nasm -f bin src/boot.asm -o gear1.bin || error "Failed to assemble Gear1"
 
 # Verify Gear1
-GEAR1_SIZE=$(stat -c%s "target/i686-spinup/release/spinUP-gear1")
-if [ "$GEAR1_SIZE" -gt 512 ]; then
-    error "Gear1 is larger than 512 bytes ($GEAR1_SIZE bytes)"
+GEAR1_SIZE=$(stat -c%s "gear1.bin")
+if [ "$GEAR1_SIZE" -ne 512 ]; then
+    error "SpinUP size ($GEAR1_SIZE bytes) exceeds 512 bytes"
 fi
 status "Gear1 size: $GEAR1_SIZE bytes"
-hexdump -C -n 512 target/i686-spinup/release/spinUP-gear1
+hexdump -C -n 512 gear1.bin
 success "Gear1 built successfully"
 
 # Build Gear2
@@ -68,7 +78,7 @@ cd ../..
 dd if=/dev/zero of=combined.img bs=512 count=2880 2>/dev/null
 
 # Write Gear1 to first sector
-dd if=spinUP/gear1/target/i686-spinup/release/spinUP-gear1 of=combined.img conv=notrunc bs=512 count=1 2>/dev/null
+dd if=spinUP/gear1/gear1.bin of=combined.img conv=notrunc bs=512 count=1 2>/dev/null
 
 # Write Gear2 starting at second sector
 dd if=spinUP/gear2/disk.img of=combined.img conv=notrunc bs=512 seek=1 2>/dev/null
