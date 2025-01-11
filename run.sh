@@ -3,6 +3,11 @@
 # Exit on any error
 set -e
 
+#Push to github
+git add -A
+git commit -m "dbg."
+git push
+
 # Colors for output
 RED="\033[0;31m"
 GREEN="\033[0;32m"
