@@ -277,25 +277,40 @@ unsafe fn jump_to_long_mode() -> ! {
 unsafe fn enter_long_mode() -> ! {
     // Disable interrupts first
     core::arch::asm!("cli");
+    write_serial(b"Disabled interrupts\r\n");
 
+    // Setup page tables
     write_serial(b"Setting up page tables...\r\n");
     setup_page_tables();
 
-    write_serial(b"Setting up GDT...\r\n");
-    setup_gdt();
-
-    write_serial(b"Enabling long mode...\r\n");
+    // Verify CR0 is in a known state
+    core::arch::asm!(
+        ".code32",
+        "mov eax, cr0",
+        "and eax, 0x7fffffff", // Clear PG
+        "or eax, 1",           // Set PE
+        "mov cr0, eax",
+        options(nomem, nostack)
+    );
+    write_serial(b"Set initial CR0 state\r\n");
 
     // Enable PAE
     core::arch::asm!(
         ".code32",
         "mov eax, cr4",
-        "or eax, 1 << 5",     // PAE bit
+        "or eax, 1 << 5",      // Set PAE
         "mov cr4, eax",
+        "mov eax, cr4",        // Verify PAE was set
+        "test eax, 1 << 5",
+        "jz 1f",               // If PAE not set, halt
+        "jmp 2f",
+        "1: hlt",
+        "2:",
         options(nomem, nostack)
     );
+    write_serial(b"Enabled PAE\r\n");
 
-    // Load PML4
+    // Load CR3 with PML4
     let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
     core::arch::asm!(
         ".code32",
@@ -304,25 +319,39 @@ unsafe fn enter_long_mode() -> ! {
         in(reg) pml4_addr as u32,
                      options(nomem, nostack)
     );
+    write_serial(b"Loaded CR3\r\n");
 
-    // Enable long mode in EFER
+    // Enable long mode in EFER MSR
     core::arch::asm!(
         ".code32",
-        "mov ecx, 0xC0000080",
+        "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or eax, 1 << 8",     // LME bit
+        "or eax, 1 << 8",      // Set LME
         "wrmsr",
+        // Verify EFER.LME was set
+        "rdmsr",
+        "test eax, 1 << 8",
+        "jz 1f",               // If LME not set, halt
+        "jmp 2f",
+        "1: hlt",
+        "2:",
         options(nomem, nostack)
     );
+    write_serial(b"Enabled long mode in EFER\r\n");
 
-    // Enable paging and protected mode
+    // Load GDT for long mode
+    setup_gdt();
+    write_serial(b"Loaded GDT\r\n");
+
+    // Enable paging to activate long mode
     core::arch::asm!(
         ".code32",
         "mov eax, cr0",
-        "or eax, 0x80000001", // PG | PE
+        "or eax, 0x80000000",  // Set PG
         "mov cr0, eax",
         options(nomem, nostack)
     );
+    write_serial(b"Enabled paging\r\n");
 
     write_serial(b"Jumping to 64-bit mode...\r\n");
 
@@ -331,22 +360,22 @@ unsafe fn enter_long_mode() -> ! {
         ".code32",
         // Ensure stack alignment
         "and esp, -16",
-        // Set up far jump
-        "push dword ptr 0x08", // New CS value
-        "lea eax, [2f]",      // Load address of 64-bit code
-        "push eax",           // Push return address
-        "retf",               // Far return to load CS and jump
+        // Prepare far jump
+        "push dword ptr 0x08",  // CS selector
+        "lea eax, [2f]",       // Target address
+        "push eax",
+        "retf",                // Far return to 64-bit code
         ".align 8",
         "2:",
         ".code64",
-        // Set up segment registers
-        "xor ax, ax",         // Clear AX
-        "mov ds, ax",         // Clear segment registers
+        // Zero segment registers
+        "xor ax, ax",
+        "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
-        // Set up stack and jump to Rust
+        // Set up final stack and jump to Rust
         "mov rsp, {stack}",
         "jmp {target}",
         stack = in(reg) (&raw const STACK.data as *const u8 as u64 + 4096),
