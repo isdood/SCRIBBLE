@@ -1,12 +1,14 @@
 [build]
-rustflags = [
-    "-C", "link-args=-nostartfiles -Wl,--gc-sections -Wl,-T../linker.ld",
-    "-C", "link-args=--no-eh-frame-hdr",
-    "-C", "link-args=--build-id=none",
-    "-C", "relocation-model=static",
-    "-C", "opt-level=z"
-]
+target = "i686-spinup"
 
 [unstable]
 build-std = ["core"]
 build-std-features = ["compiler-builtins-mem"]
+
+[target.i686-spinup]
+rustflags = [
+    "-C", "link-arg=-nostartfiles",
+    "-C", "link-arg=-static",
+    "-C", "link-arg=-Tlinker.ld",
+    "-C", "code-model=small"
+]

@@ -1,15 +1,20 @@
 ENTRY(_start)
+
 SECTIONS {
     . = 0x7C00;
-    .boot.text : {
+    .boot : {
         *(.boot.text)
-        . = 510;
-        SHORT(0xaa55)
+        *(.rodata*)
+        . = ALIGN(510);
+        BYTE(0x55)
+        BYTE(0xAA)
     }
+
     /DISCARD/ : {
         *(.comment)
-        *(.eh_frame)
-        *(.note.*)
-        *(.debug_*)
+        *(.note*)
+        *(.eh_frame*)
+        *(.debug*)
+        *(*)
     }
 }

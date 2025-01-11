@@ -9,10 +9,9 @@ fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
 pub extern "C" fn _start() -> ! {
     unsafe {
         core::arch::asm!(
-            // Initialize segments and stack
+            // Setup stack
             "xor ax, ax",
             "mov ds, ax",
-            "mov es, ax",
             "mov ss, ax",
             "mov sp, 0x7C00",
 
@@ -24,38 +23,32 @@ pub extern "C" fn _start() -> ! {
             "or al, 2",
             "out 0x92, al",
 
-            // Set up disk read
-            "push ax",         // Reserve space for DAP
-            "push ax",
-            "push ax",
-            "push ax",
-            "mov si, sp",      // SI points to DAP
-            "mov byte ptr [si], 16",     // DAP size
-            "mov byte ptr [si + 1], 0",  // Padding
-            "mov word ptr [si + 2], 16", // Sector count
-            "mov word ptr [si + 4], 0",  // Offset
-            "mov word ptr [si + 6], 0x07E0", // Segment
-            "mov dword ptr [si + 8], 1",  // LBA
+            // Setup DAP on stack
+            "push dword ptr 0", // _pad2
+            "push dword ptr 1", // LBA = 1
+            "push dword ptr 0x07E0_0000", // seg:off
+            "push word ptr 16", // count = 16 sectors
+            "push word ptr 0x10", // sz = 16, _pad = 0
+            "mov si, sp", // SI points to DAP
 
-            // Read sectors
+            // Load sectors
             "mov ah, 0x42",
             "int 0x13",
-            "add sp, 8",       // Clean up DAP
-            "jc 2f",          // Jump if error
+            "add sp, 16", // Clean stack
+            "jc 2f",
 
             // Jump to gear2
             "push word ptr 0x07E0",
             "push word ptr 0",
-            "retf",           // Far return to gear2
+            "retf",
 
-            // Error handler
-            "2:",
-            "mov ax, 0x0E45", // Print 'E'
-        "int 0x10",
-        "cli",
-        "hlt",
+            // Error: print 'E' and halt
+            "2: mov ax, 0x0E45",
+            "int 0x10",
+            "cli",
+            "hlt",
 
-        options(noreturn)
+            options(noreturn)
         );
     }
 }
