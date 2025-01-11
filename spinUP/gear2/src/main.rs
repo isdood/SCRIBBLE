@@ -167,20 +167,6 @@ unsafe fn setup_page_tables() {
     core::arch::asm!("mfence");
 }
 
-unsafe fn setup_gdt() {
-    let gdt_ptr = GDTPointer {
-        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: &raw const GDT as *const _ as u32,
-    };
-
-    core::arch::asm!(
-        ".code32",
-        "lgdt [{0:e}]",  // Use 32-bit register (eax) with :e suffix
-                     in(reg) &gdt_ptr,
-                     options(readonly, nostack)
-    );
-}
-
 #[allow(dead_code)]
 fn get_cpuid() -> (u32, u32, u32, u32) {
     let eax: u32;
