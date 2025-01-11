@@ -215,6 +215,7 @@ unsafe fn check_long_mode() -> bool {
         inlateout("eax") 0x80000000 => max_cpuid,
                      lateout("ecx") _,
                      lateout("edx") _,
+                     // Remove ebx output completely as it's not needed
     );
 
     if max_cpuid < 0x80000001 {
@@ -228,6 +229,7 @@ unsafe fn check_long_mode() -> bool {
         inlateout("eax") 0x80000001 => _,
                      lateout("ecx") _,
                      lateout("edx") edx,
+                     // Remove ebx output completely as it's not needed
     );
 
     (edx & (1 << 29)) != 0 // LM bit
@@ -415,9 +417,10 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Load CR3 with PML4
     core::arch::asm!(
-        "mov eax, {0:e}",
-        "mov cr3, eax",
-        in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+        "mov {tmp}, {addr:e}",  // Use temporary register with proper formatting
+        "mov cr3, {tmp}",
+        addr = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+                     tmp = out(reg) _,
                      options(nomem, nostack)
     );
     write_serial(b"CR3 loaded\r\n");
