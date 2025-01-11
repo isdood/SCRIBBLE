@@ -18,8 +18,8 @@ struct Dap {
 #[repr(C, packed)]
 pub struct StageInfo {
     boot_drive: u8,
-    flags: u8,     // Reduced to u8
-    stage2_addr: u16, // Reduced size and combined purpose
+    flags: u8,
+    stage2_addr: u16,
 }
 
 #[no_mangle]
@@ -40,8 +40,8 @@ pub extern "C" fn _start() -> ! {
             "mov ss, ax",
             "mov sp, 0x7C00",
             // Store boot drive directly
-            "mov [{0}], dl",
-            in(reg) &STAGE_INFO.boot_drive,
+            "mov [{addr}], dl",
+            addr = in(reg) &raw const STAGE_INFO.boot_drive,
         );
 
         // Quick A20 check/enable
@@ -63,8 +63,10 @@ pub extern "C" fn _start() -> ! {
             "mov si, {0:x}",
             "int 0x13",
             "jc 2f",
-            // Jump to gear2 if successful
-            "jmp 0x07E0:0000",
+            // Fixed far jump syntax
+            "push word ptr 0x07E0",
+            "push word ptr 0",
+            "retf",
             "2:",
             "mov ax, 0x0E45",
             "int 0x10",
