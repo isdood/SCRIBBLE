@@ -517,7 +517,10 @@ unsafe fn enter_long_mode() -> ! {
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
     // 1. Disable interrupts first thing
-    core::arch::asm!("cli");
+    core::arch::asm!(
+        ".code32",
+        "cli",
+    );
 
     // 2. Set up IDT before enabling any hardware
     setup_idt();
@@ -530,58 +533,64 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // 5. Enable PAE (required for long mode)
     core::arch::asm!(
-        "mov eax, cr4",
-        "or eax, 1 << 5",  // PAE
-        "mov cr4, eax",
+        ".code32",
+        "mov %cr4, %eax",
+        "or $0x20, %eax",  // PAE
+        "mov %eax, %cr4",
     );
 
     // 6. Load CR3 with page table
     core::arch::asm!(
-        "mov eax, {pml4:e}",
-        "mov cr3, eax",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+        ".code32",
+        "mov {}, %eax",
+        "mov %eax, %cr3",
+        in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
     );
 
     // 7. Enable long mode in EFER
     core::arch::asm!(
-        "mov ecx, 0xC0000080", // EFER MSR
+        ".code32",
+        "mov $0xC0000080, %ecx", // EFER MSR
         "rdmsr",
-        "or eax, 1 << 8",      // LME
+        "or $0x100, %eax",      // LME
         "wrmsr",
     );
 
     // 8. Enable paging and protection
     core::arch::asm!(
-        "mov eax, cr0",
-        "or eax, 1 << 31 | 1", // PG | PE
-        "mov cr0, eax",
+        ".code32",
+        "mov %cr0, %eax",
+        "or $0x80000001, %eax", // PG | PE
+        "mov %eax, %cr0",
     );
 
     // 9. Long mode jump and final setup
     core::arch::asm!(
-        "ljmp $0x08, $2f",  // Changed from 1f to 2f
-        "2:",               // Changed from 1: to 2:
-        ".code64",
+        ".code32",
+        "push $0x08",              // Push code segment
+        "lea 2f(%rip), %eax",      // Get address of label
+                     "push %eax",               // Push target address
+                     "retf",                    // Far return to long mode
+                     "2:",
+                     ".code64",                 // Switch assembler to 64-bit mode
+                     "mov $0x10, %ax",         // Data segment
+                     "mov %ax, %ds",
+                     "mov %ax, %es",
+                     "mov %ax, %fs",
+                     "mov %ax, %gs",
+                     "mov %ax, %ss",
 
-        // 10. Set up segment registers
-        "mov ax, 0x10",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
+                     // Set up stack
+                     "mov {}, %rsp",           // Load 64-bit stack pointer
 
-        // 11. Set up stack
-        "mov rsp, {stack:e}",
+                     // Enable interrupts
+                     "sti",
 
-        // 12. Enable interrupts
-        "sti",
+                     // Jump to Rust main
+                     "jmp *{}",                // Indirect jump to main
 
-        // 13. Jump to Rust main
-        "jmp {main}",
-
-        stack = in(reg) &raw const STACK.data as *const _ as u32 + 4096,
-                     main = sym rust_main,
+                     in(reg) &raw const STACK.data as *const _ as u64 + 4096,
+                     in(reg) rust_main as u64,
     );
 
     core::hint::unreachable_unchecked();
