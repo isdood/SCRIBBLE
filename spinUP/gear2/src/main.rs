@@ -107,7 +107,21 @@ static mut IDT: IDT = IDT {
 #[repr(C, packed)]
 struct GDTPointer {
     limit: u16,
-    base: u64,  // Changed to u64 for 64-bit compatibility
+    base: u64,  // Changed from u32 to u64
+}
+
+unsafe fn setup_gdt() {
+    let gdt_ptr = GDTPointer {
+        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
+        base: &raw const GDT as *const _ as u64,  // Changed from u32 to u64
+    };
+
+    core::arch::asm!(
+        ".code32",
+        "lgdt [{0:e}]",
+        in(reg) &gdt_ptr,
+                     options(readonly)
+    );
 }
 
 static mut PAGE_TABLES: PageTables = PageTables {
@@ -118,15 +132,13 @@ static mut PAGE_TABLES: PageTables = PageTables {
 
 static mut GDT: GDTTable = GDTTable {
     entries: [
-        // Null descriptor
-        GDTEntry { /* ... */ },
-        // 64-bit code segment
+        // Null descriptor - properly initialized with all fields
         GDTEntry {
-            limit_low: 0xFFFF,
+            limit_low: 0,
             base_low: 0,
             base_middle: 0,
-            access: 0x9A,      // Present | DPL0 | S | Code | Read
-            granularity: 0xAF, // 4K unit | 64-bit | Limit(0xF)
+            access: 0,
+            granularity: 0,
             base_high: 0,
         },
         // Data segment
@@ -219,20 +231,6 @@ unsafe fn setup_page_tables() {
         "mov cr3, eax",
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
                      options(nostack)
-    );
-}
-
-unsafe fn setup_gdt() {
-    let gdt_ptr = GDTPointer {
-        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: &raw const GDT as *const _ as u32,  // Fixed warning
-    };
-
-    core::arch::asm!(
-        ".code32",
-        "lgdt [{0:e}]",  // Use 32-bit addressing
-        in(reg) &gdt_ptr,
-                     options(readonly)
     );
 }
 
@@ -613,6 +611,17 @@ unsafe fn setup_idt() {
     };
 
     // Load IDT
+    core::arch::asm!(
+        "lidt [{0}]",
+        in(reg) &idtr,
+                     options(readonly, nostack)
+    );
+
+    let idtr = GDTPointer {
+        limit: (core::mem::size_of::<IDT>() - 1) as u16,
+        base: &raw const IDT as *const _ as u64,  // Changed from u32 to u64
+    };
+
     core::arch::asm!(
         "lidt [{0}]",
         in(reg) &idtr,
