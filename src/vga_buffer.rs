@@ -102,6 +102,7 @@ impl Writer {
                     data_port.write(0x03_u8); // Text mode 80x25
                 }
             }
+        }
         match byte {
             b'\n' => self.new_line(),
             byte => {

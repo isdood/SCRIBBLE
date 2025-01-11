@@ -2,25 +2,9 @@
 #![no_main]
 
 use core::panic::PanicInfo;
-use core::ptr;
-use unstable_matter::UnstableMatter;
 
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
-}
-
-const VGA_BUFFER: usize = 0xb8000;
-
-// GDT structures
-#[repr(C, packed(1))]
-struct GDTDescriptor {
-    size: u16,
-    offset: u32,
-}
-
-#[repr(C, packed(1))]
-#[derive(Clone, Copy)]
+// GDT setup
+#[repr(C, packed)]
 struct GDTEntry {
     limit_low: u16,
     base_low: u16,
@@ -30,169 +14,213 @@ struct GDTEntry {
     base_high: u8,
 }
 
+#[repr(C, packed)]
+struct GDTPointer {
+    limit: u16,
+    base: u32,
+}
+
+#[repr(C, align(8))]
+struct GDTTable {
+    entries: [GDTEntry; 3]
+}
+
 // Page table structures
 #[repr(C, align(4096))]
 struct PageTable {
     entries: [u64; 512],
 }
 
-#[link_section = ".gdt"]
-static GDT: [GDTEntry; 4] = [
-    // Null descriptor
-    GDTEntry {
-        limit_low: 0,
-        base_low: 0,
-        base_middle: 0,
-        access: 0,
-        granularity: 0,
-        base_high: 0,
-    },
-// 32-bit Code segment
-GDTEntry {
-    limit_low: 0xFFFF,
-    base_low: 0,
-    base_middle: 0,
-    access: 0x9A,     // Present, Ring 0, Code
-    granularity: 0xCF, // 4KB granularity, 32-bit protected mode
-    base_high: 0,
-},
-// 64-bit Code segment
-GDTEntry {
-    limit_low: 0,
-    base_low: 0,
-    base_middle: 0,
-    access: 0x9A,     // Present, Ring 0, Code
-    granularity: 0x20, // Long mode
-    base_high: 0,
-},
-// Data segment
-GDTEntry {
-    limit_low: 0,
-    base_low: 0,
-    base_middle: 0,
-    access: 0x92,     // Present, Ring 0, Data
-    granularity: 0,
-    base_high: 0,
-},
-];
+#[repr(C, align(4096))]
+struct PageTables {
+    pml4: PageTable,
+    pdpt: PageTable,
+    pd: PageTable,
+}
 
-// Aligned page tables
-#[link_section = ".page_tables"]
-static mut PML4: PageTable = PageTable { entries: [0; 512] };
-#[link_section = ".page_tables"]
-static mut PDPT: PageTable = PageTable { entries: [0; 512] };
-#[link_section = ".page_tables"]
-static mut PD: PageTable = PageTable { entries: [0; 512] };
+// Static structures
+static mut GDT: GDTTable = GDTTable {
+    entries: [
+        // Null descriptor
+        GDTEntry {
+            limit_low: 0,
+            base_low: 0,
+            base_middle: 0,
+            access: 0,
+            granularity: 0,
+            base_high: 0
+        },
+        // Code segment (0x08)
+        GDTEntry {
+            limit_low: 0xFFFF,
+            base_low: 0,
+            base_middle: 0,
+            access: 0x9A,     // Present, Ring 0, Code Segment, Executable, Direction 0, Readable
+            granularity: 0xAF, // 4k blocks, 64-bit mode, limit 0xF
+            base_high: 0
+        },
+        // Data segment (0x10)
+        GDTEntry {
+            limit_low: 0xFFFF,
+            base_low: 0,
+            base_middle: 0,
+            access: 0x92,     // Present, Ring 0, Data Segment, Writable
+            granularity: 0xAF, // 4k blocks, 64-bit mode, limit 0xF
+            base_high: 0
+        },
+    ]
+};
 
+static mut PAGE_TABLES: PageTables = PageTables {
+    pml4: PageTable { entries: [0; 512] },
+    pdpt: PageTable { entries: [0; 512] },
+    pd: PageTable { entries: [0; 512] },
+};
+
+#[repr(align(16))]
+struct Stack {
+    data: [u8; 4096]
+}
+
+static mut STACK: Stack = Stack {
+    data: [0; 4096]
+};
+
+// Entry point - This is where execution begins after bootloader handoff
 #[no_mangle]
-#[link_section = ".start"]
 pub extern "C" fn _start() -> ! {
     unsafe {
-        // Disable interrupts
-        core::arch::asm!("cli");
-
-        // Enable A20 line
-        enable_a20();
-
-        // Enter protected mode
-        enter_protected_mode();
-
-        // We should never reach here
-        loop {}
+        enter_long_mode();
     }
 }
 
-unsafe fn enable_a20() {
-    const FAST_A20_PORT: usize = 0x92;
-    let port = UnstableMatter::<u8>::at(FAST_A20_PORT);
-    let val = port.read() | 2;
-    port.write(val);
-}
+unsafe fn enter_long_mode() -> ! {
+    // First, disable all interrupts properly
+    core::arch::asm!("cli");
 
-unsafe fn enter_protected_mode() {
-    let gdt_desc = GDTDescriptor {
-        size: (core::mem::size_of::<[GDTEntry; 4]>() - 1) as u16,
-        offset: &GDT as *const _ as u32,
+    // Disable PIC interrupts
+    disable_pic();
+
+    // Prepare GDT
+    let gdt_ptr = GDTPointer {
+        limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
+        base: &GDT.entries as *const _ as u32,
     };
 
-    // Setup initial identity mapping for first 2MB
-    setup_page_tables();
+    // Identity map first 2MB
+    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
+    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3;
+    PAGE_TABLES.pd.entries[0] = 0x83;  // Present + Write + Huge (2MB)
+
+    let stack_top = &STACK.data as *const u8 as u64 + 4096;
 
     core::arch::asm!(
-        // 16-bit code
-        ".code16",
-        // Load GDT
-        "lgdt [{0:e}]",  // Use :e modifier to force 32-bit addressing
-        // Enable protected mode
-        "mov eax, cr0",
-        "or al, 1",
-        "mov cr0, eax",
-        // Far jump to 32-bit code
-        ".byte 0xEA",       // Far jump opcode
-        ".long 2f",         // 32-bit offset
-        ".word 0x08",       // Code segment selector
-        // 32-bit protected mode
         ".code32",
-        "2:",
-        // Set up segment registers
-        "mov ax, 0x10",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-        // Enable PAE
-        "mov eax, cr4",
-        "or eax, 1 << 5",
-        "mov cr4, eax",
-        // Load page table
-        "mov eax, {1:e}",  // Use :e modifier for 32-bit value
-        "mov cr3, eax",
-        // Enable long mode
-        "mov ecx, 0xC0000080",
-        "rdmsr",
-        "or eax, 1 << 8",
-        "wrmsr",
-        // Enable paging
-        "mov eax, cr0",
-        "or eax, 1 << 31",
-        "mov cr0, eax",
-        // Jump to 64-bit mode
-        ".byte 0xEA",       // Far jump opcode
-        ".long 3f",         // 32-bit offset
-        ".word 0x10",       // Code segment selector
-        ".code64",
-        "3:",
-        // Now in 64-bit mode
-        "mov rax, {2}",
-        "jmp rax",
-        in(reg) &gdt_desc,
-                     in(reg) &raw const PML4 as *const PageTable,
+
+        // Load GDT before we do anything else
+        "lgdtl ({0:r})",
+
+                     // Enable PAE first
+                     "movl %cr4, %eax",
+                     "btsl $5, %eax",      // Set PAE bit (bit 5)
+    "movl %eax, %cr4",
+
+    // Load CR3 with PML4 table
+    "movl {1:r}, %eax",
+    "movl %eax, %cr3",
+
+    // Enable long mode
+    "movl $0xC0000080, %ecx",
+    "rdmsr",
+    "btsl $8, %eax",      // Set LME bit (bit 8)
+    "wrmsr",
+
+    // Enable paging and protection
+    "movl %cr0, %eax",
+    "btsl $31, %eax",     // Enable paging (bit 31)
+    "btsl $0, %eax",      // Enable protected mode (bit 0)
+    "movl %eax, %cr0",
+
+    // Reload code segment
+    "pushw $0x08",
+    "pushl $1f",
+    "lretl",
+
+    ".align 8",
+    ".code64",
+    "1:",
+
+    // Load data segments
+    "movw $0x10, %ax",
+    "movw %ax, %ds",
+    "movw %ax, %es",
+    "movw %ax, %fs",
+    "movw %ax, %gs",
+    "movw %ax, %ss",
+
+    // Set up stack
+    "movq {2}, %rsp",
+    "xorq %rbp, %rbp",
+
+    // Jump to Rust
+    "jmpq *{3}",
+
+    in(reg) &gdt_ptr,
+                     in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+                     in(reg) stack_top,
                      sym rust_main,
-                     options(noreturn)
+                     options(noreturn, att_syntax)
     );
 }
 
-unsafe fn setup_page_tables() {
-    PML4.entries[0] = (&raw const PDPT as *const PageTable as u64) | 0x3;
-    PDPT.entries[0] = (&raw const PD as *const PageTable as u64) | 0x3;
-    PD.entries[0] = 0x83;  // Present + Write + Huge (2MB)
+// Separate function to disable PIC
+unsafe fn disable_pic() {
+    // Remap PIC to avoid conflicts
+    core::arch::asm!(
+        "movb $0x11, %al",
+        "outb %al, $0x20",    // Start PIC1 initialization
+        "outb %al, $0xA0",    // Start PIC2 initialization
+        "movb $0x20, %al",
+        "outb %al, $0x21",    // Map PIC1 to 0x20-0x27
+        "movb $0x28, %al",
+        "outb %al, $0xA1",    // Map PIC2 to 0x28-0x2F
+        "movb $0x04, %al",
+        "outb %al, $0x21",    // PIC1 is master
+        "movb $0x02, %al",
+        "outb %al, $0xA1",    // PIC2 is slave
+        "movb $0x01, %al",
+        "outb %al, $0x21",    // 8086 mode for PIC1
+        "outb %al, $0xA1",    // 8086 mode for PIC2
+        "movb $0xFF, %al",
+        "outb %al, $0x21",    // Mask all interrupts on PIC1
+        "outb %al, $0xA1",    // Mask all interrupts on PIC2
+        options(att_syntax, nomem, nostack)
+    );
 }
 
 #[no_mangle]
-extern "C" fn rust_main() -> ! {
-    let vga = unsafe { UnstableMatter::<u16>::at(VGA_BUFFER) };
+pub extern "C" fn rust_main() -> ! {
+    let vga = 0xb8000 as *mut u16;
+    let msg = b"Long Mode OK!";
 
-    // Write "G2" to screen (White on black)
-    vga.write(0x0F47);
     unsafe {
-        let next_char = vga.as_ptr().add(1);
-        ptr::write_volatile(next_char, 0x0F32);
-    }
+        // Clear screen
+        for i in 0..80*25 {
+            *vga.add(i) = 0x0F00;
+        }
 
-    loop {}
+        // Write message
+        for (i, &byte) in msg.iter().enumerate() {
+            *vga.add(i) = 0x0F00 | byte as u16;
+        }
+
+        loop {
+            core::arch::asm!("hlt", options(nomem, nostack));
+        }
+    }
 }
 
-#[used]
-#[link_section = ".stack"]
-static mut STACK: [u8; 4096] = [0; 4096];
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
+}
