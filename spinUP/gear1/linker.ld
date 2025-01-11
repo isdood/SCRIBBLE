@@ -1,39 +1,39 @@
-ENTRY(_start)
+OUTPUT_FORMAT(binary)
+OUTPUT_ARCH(i386)
 
 SECTIONS {
     . = 0x7C00;
 
     .text : {
         *(.boot.text)
-        *(.text*)
-    }
-
-    .rodata : {
-        *(.rodata*)
+        *(.text)
     }
 
     .data : {
-        *(.data*)
+        *(.rodata)
+        *(.data)
     }
 
-    .bss : {
-        *(.bss*)
-        *(COMMON)
-    }
-
+    /* Pad to boot signature */
     . = 0x7DFE;
-    .boot_signature : {
+
+    /* Add boot signature */
+    .signature : {
         SHORT(0xaa55)
     }
 
-    /* Ensure we don't exceed the 512 byte limit */
-    . = 0x7E00;
-
-    /* Keep .shstrtab but discard other unnecessary sections */
-    .shstrtab : {
-        *(.shstrtab)
+    /* Discard everything else */
+    /DISCARD/ : {
+        *(.eh_frame*)
+        *(.comment*)
+        *(.note*)
+        *(.debug*)
+        *(.gcc_except_table*)
+        *(.gnu.attributes*)
+        *(.jcr*)
+        *(.got*)
+        *(.got.plt*)
+        *(.data.rel.ro*)
+        *(.bss*)
     }
 }
-
-/* Ensure the binary doesn't exceed 512 bytes */
-ASSERT(. <= 0x7E00, "Error: Boot sector exceeds 512 bytes")
