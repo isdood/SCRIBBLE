@@ -1,55 +1,48 @@
 #![no_std]
 #![no_main]
+#![no_mangle]
+
+#[panic_handler]
+fn panic(_: &PanicInfo) -> ! { loop {} }
 
 use core::panic::PanicInfo;
 
-#[panic_handler]
-fn panic(_: &PanicInfo) -> ! {
-    loop {}
-}
-
 #[no_mangle]
-pub unsafe extern "C" fn _start() -> ! {
+#[link_section = ".start"]
+#[export_name = "_start"]
+pub unsafe extern "C" fn _real_start() -> ! {
     core::arch::asm!(
-        // Setup segments and stack
+        // Init segments
         "xor ax, ax",
         "mov ds, ax",
-        "mov es, ax",
         "mov ss, ax",
         "mov sp, 0x7c00",
 
-        // Build disk packet on stack
-        "push word ptr 0",      // Upper LBA bits
-        "push word ptr 0",
-        "push word ptr 0",      // Lower LBA bits
-        "push word ptr 1",      // Starting at sector 1
-        "push word ptr 0x07e0", // Buffer segment
-        "push word ptr 0",      // Buffer offset
-        "push word ptr 63",     // Sector count
-        "push word ptr 16",     // Packet size
+        // Packet: size=16, sectors=63, dest=0x7e00, lba=1
+        "push 0",
+        "push 0",
+        "push 0",
+        "push 1",
+        "push 0x07e0",
+        "push 0",
+        "push 63",
+        "push 16",
 
         // Read disk
-        "mov si, sp",          // Packet pointer
-        "mov ah, 0x42",        // Extended read
-        "mov dl, 0x80",        // First hard drive
+        "mov si, sp",
+        "mov dl, 0x80",
+        "mov ah, 0x42",
         "int 0x13",
-        "jc 2f",              // On error, halt
+        "jc 2f",
 
         // Jump to Gear2
-        "add sp, 16",          // Clean stack
-        "push word ptr 0",     // CS = 0
-        "push word ptr 0x7e00", // IP = 0x7e00
-        "retf",                // Far jump
+        "jmp 0:0x7e00",
 
-        // Error handler
-        "2: cli",
-        "hlt",
+        "2: hlt",
         options(nomem, nostack)
     );
-
     loop {}
 }
 
-#[link_section = ".signature"]
-#[no_mangle]
-pub static BOOT_SIGNATURE: [u8; 2] = [0x55, 0xaa];
+#[link_section = ".sig"]
+pub static SIG: [u8; 2] = [0x55, 0xaa];
