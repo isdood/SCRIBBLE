@@ -470,9 +470,9 @@ pub unsafe extern "C" fn _start() -> ! {
         // Verify PAE was set
         "mov eax, cr4",
         "test eax, 1 << 5",
-        "jnz 1f",
+        "jnz 2f",
         "hlt",                 // Halt if PAE not set
-        "1:",
+        "2:",
         options(nomem, nostack)
     );
     write_serial(b"PAE enabled\r\n");
@@ -491,9 +491,9 @@ pub unsafe extern "C" fn _start() -> ! {
         // Verify LME was set
         "rdmsr",
         "test eax, 1 << 8",
-        "jnz 1f",
+        "jnz 3f",
         "hlt",                 // Halt if LME not set
-        "1:",
+        "3:",
         options(nomem, nostack)
     );
     write_serial(b"Long mode enabled in EFER\r\n");
@@ -507,9 +507,9 @@ pub unsafe extern "C" fn _start() -> ! {
         // Verify paging was enabled
         "mov eax, cr0",
         "test eax, 1 << 31",
-        "jnz 1f",
+        "jnz 4f",
         "hlt",                 // Halt if paging not set
-        "1:",
+        "4:",
         options(nomem, nostack)
     );
     write_serial(b"Paging enabled\r\n");
@@ -523,11 +523,11 @@ pub unsafe extern "C" fn _start() -> ! {
         "and esp, -16",
         // Far jump preparation
         "push dword ptr 0x08", // Long mode code segment
-        "lea eax, [1f]",      // Get address of 64-bit code
+        "lea eax, [5f]",      // Get address of 64-bit code
         "push eax",
         "retf",               // Far return to load CS with 64-bit segment
         ".align 8",
-        "1:",                 // 64-bit code starts here
+        "5:",                 // 64-bit code starts here
         ".code64",
         // Initialize segment registers
         "mov ax, 0x10",       // Data segment selector
