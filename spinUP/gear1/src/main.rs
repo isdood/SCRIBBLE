@@ -33,7 +33,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov ah, 0x42",        // Extended read
         "mov dl, 0x80",        // First hard drive
         "int 0x13",
-        "jc 1f",              // On error, halt
+        "jc 2f",              // On error, halt
 
         // Jump to Gear2
         "add sp, 16",          // Clean stack
@@ -42,7 +42,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "retf",                // Far jump
 
         // Error handler
-        "1: cli",
+        "2: cli",
         "hlt",
         options(nomem, nostack)
     );
