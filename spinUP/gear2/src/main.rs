@@ -454,6 +454,9 @@ pub unsafe extern "C" fn _start() -> ! {
     // Set up page tables
     setup_page_tables();
 
+    // Load GDT before enabling long mode
+    setup_gdt();
+
     // Enable PAE
     core::arch::asm!(
         ".code32",
@@ -466,8 +469,8 @@ pub unsafe extern "C" fn _start() -> ! {
     // Load CR3
     core::arch::asm!(
         ".code32",
-        "mov ecx, {pml4:e}",
-        "mov cr3, ecx",
+        "mov eax, {pml4:e}",
+        "mov cr3, eax",
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
                      options(nomem, nostack)
     );
@@ -491,38 +494,71 @@ pub unsafe extern "C" fn _start() -> ! {
         options(nomem, nostack)
     );
 
-    // Load 64-bit GDT
-    setup_gdt();
-
-    // Switch to long mode
+    // Jump to long mode
     core::arch::asm!(
         ".code32",
-        // Build far return stack frame
-        "push word ptr 0x8",   // Code segment
-        "push word ptr 2f",    // Return address
-        // Switch mode
-        "retf",
-        // Long mode entry point
+        // Long jump to 64-bit code
+        "jmp 0x08:2f",          // 0x08 is the code segment selector
+        ".align 8",
         "2:",
-        ".code64",            // Switch assembler to 64-bit mode
-        "mov rsp, 0x7c00",    // Reset stack pointer
+        ".code64",
+        // Set up 64-bit environment
+        "lgdt [{gdt}]",         // Reload GDT
+        "mov rsp, 0x7c00",      // Reset stack
         // Clear segment registers
         "xor ax, ax",
+        "mov ss, ax",
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
-        "mov ss, ax",
+        // Set up IDT to handle interrupts
+        "lidt [{idt}]",
         // Jump to Rust main
         "jmp {target}",
+        gdt = sym GDT_DESC,
+        idt = sym IDT_DESC,
         target = sym rust_main,
         options(noreturn)
     );
 }
 
+#[repr(C, packed(2))]
+struct DescriptorTablePointer {
+    limit: u16,
+    base: u64,
+}
+
+static mut GDT: [u64; 3] = [
+    0,                                                  // Null descriptor
+0x00AF9A000000FFFF,                                // Code segment
+0x00CF92000000FFFF,                                // Data segment
+];
+
+static GDT_DESC: DescriptorTablePointer = DescriptorTablePointer {
+    limit: (3 * 8 - 1) as u16,
+    base: unsafe { &GDT as *const _ as u64 },
+};
+
+static mut IDT: [u64; 256] = [0; 256];
+
+static IDT_DESC: DescriptorTablePointer = DescriptorTablePointer {
+    limit: (256 * 8 - 1) as u16,
+    base: unsafe { &IDT as *const _ as u64 },
+};
+
+unsafe fn setup_gdt() {
+    // GDT is already set up statically
+    lgdt(&GDT_DESC);
+}
+
+unsafe fn lgdt(gdt: &DescriptorTablePointer) {
+    core::arch::asm!("lgdt [{0}]", in(reg) gdt, options(readonly, nostack));
+}
+
 // Required panic handler
 #[panic_handler]
-fn panic(_: &core::panic::PanicInfo) -> ! {
+fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {
         unsafe {
             core::arch::asm!("hlt", options(nomem, nostack));
