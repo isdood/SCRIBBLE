@@ -202,23 +202,25 @@ unsafe fn enable_paging() {
 unsafe fn jump_to_long_mode() -> ! {
     core::arch::asm!(
         ".code32",
-        "andl $-16, %esp",
-        "pushl $0x08",
-        "pushl $2f",           // Use 2: as the label (greater than 1)
-    "lret",
-    ".align 8",
-    "2:",                  // Changed to numeric local label
-    ".code64",
-    "mov $0x10, %ax",
-    "mov %ax, %ds",
-    "mov %ax, %es",
-    "mov %ax, %fs",
-    "mov %ax, %gs",
-    "mov %ax, %ss",
-    "movabs {stack}, %rsp",
-    "movabs {target}, %rax",
-    "jmp *%rax",
-    stack = in(reg) (&raw const STACK.data as *const u8 as u64 + 4096),
+        "and esp, -16",              // Stack alignment
+        "push 0x08",                 // Code segment
+        "push 2f",                   // Target address
+        "retf",                      // Far return
+        ".align 8",
+        "2:",
+        ".code64",
+        // Load data segments
+        "mov ax, 0x10",             // Data segment selector
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+        // Set up stack and jump to rust_main
+        "mov rsp, {stack}",
+        "mov rax, {target}",
+        "jmp rax",
+        stack = in(reg) (&raw const STACK.data as *const u8 as u64 + 4096),
                      target = in(reg) rust_main as u64,
                      options(noreturn)
     );
