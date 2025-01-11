@@ -13,4 +13,4 @@ rustflags = [
     "-C", "link-arg=--oformat=binary",
     "-C", "link-arg=--strip-all"
 ]
-linker = "ld"  # Changed from ld.lld to ld
+linker = "ld.lld"
