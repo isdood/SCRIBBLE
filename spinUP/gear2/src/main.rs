@@ -33,6 +33,12 @@ struct GDTTable {
     entries: [GDTEntry; 3]
 }
 
+#[repr(C, packed)]
+struct GDTPointer {
+    limit: u16,
+    base: u32,
+}
+
 #[repr(C, align(4096))]
 struct Stack {
     data: [u8; 4096]
