@@ -628,7 +628,7 @@ pub unsafe extern "C" fn _start() -> ! {
     // Load CR3
     core::arch::asm!(
         ".code32",
-        "mov eax, {pml4}",
+        "mov eax, {pml4:e}",  // Use :e for 32-bit register formatting
         "mov cr3, eax",
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
                      options(nomem, nostack)
@@ -668,16 +668,16 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         ".code32",
         // Set up stack
-        "mov esp, {stack}",
+        "mov esp, {stack:e}",  // Use :e for 32-bit register formatting
 
         // Far jump to 64-bit code
-        "push 0x08",       // Code segment
-        "lea eax, [1f]",   // Get address of label
+        "push 0x08",        // Code segment
+        "lea eax, [2f]",    // Get address of label using numeric label
         "push eax",
-        "retf",            // Far return
+        "retf",             // Far return
 
         // 64-bit code
-        "long_mode_entry:",
+        "2:",               // Numeric label instead of named label
         ".code64",
         // Set up segment registers
         "mov ax, 0x10",
