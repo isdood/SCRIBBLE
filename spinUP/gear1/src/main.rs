@@ -77,3 +77,4 @@ pub extern "C" fn _start() -> ! {
                          options(noreturn)
         );
     }
+}
