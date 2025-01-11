@@ -1,4 +1,3 @@
-// Updated gear1/src/main.rs
 #![no_std]
 #![no_main]
 
@@ -34,6 +33,7 @@ static mut STAGE_INFO: StageInfo = StageInfo {
 };
 
 // Buffer for memory map (placed at a known location)
+#[no_mangle]
 static mut MEMORY_MAP_BUFFER: [u8; 2048] = [0; 2048];
 
 #[no_mangle]
@@ -54,9 +54,10 @@ pub extern "C" fn _start() -> ! {
         // Enable A20 line
         enable_a20();
 
-        // Detect memory and store info
-        STAGE_INFO.memory_map_addr = MEMORY_MAP_BUFFER.as_ptr() as u32;
-        STAGE_INFO.memory_entries = detect_memory(&mut MEMORY_MAP_BUFFER) as u16;
+        // Update STAGE_INFO with memory map information
+        let buffer_ptr = (&raw mut MEMORY_MAP_BUFFER) as *mut [u8; 2048];
+        STAGE_INFO.memory_map_addr = buffer_ptr as u32;
+        STAGE_INFO.memory_entries = detect_memory(buffer_ptr) as u16;
 
         // Load gear2
         let dap = Dap {
@@ -73,14 +74,14 @@ pub extern "C" fn _start() -> ! {
             "mov ah, 0x42",
             "mov si, {0:x}",
             "int 0x13",
-            "jc error",     // Changed label name
+            "jc 2f",         // Using numeric labels
             "cmp ah, 0",
-            "jne error",    // Changed label name
+            "jne 2f",
             "push word ptr 0x07E0",
             "push word ptr 0",
             "mov dl, {1}",
             "retf",
-            "error:",       // Changed label name
+            "2:",           // Error handler using numeric label
             "mov ax, 0x0E45",
             "int 0x10",
             "hlt",
@@ -95,9 +96,9 @@ unsafe fn enable_a20() {
     core::arch::asm!(
         "mov ax, 0x2401",
         "int 0x15",
-        "jc fallback",      // Changed label name
+        "jc 2f",         // Using numeric labels
         "ret",
-        "fallback:",        // Changed label name
+        "2:",           // Using numeric label >= 2
         "in al, 0x92",
         "or al, 2",
         "out 0x92, al",
@@ -105,7 +106,7 @@ unsafe fn enable_a20() {
     );
 }
 
-unsafe fn detect_memory(buffer: &mut [u8]) -> u32 {
+unsafe fn detect_memory(buffer: *mut [u8; 2048]) -> u32 {
     let mut entries = 0;
     let continuation_id = 0;
 
@@ -113,17 +114,17 @@ unsafe fn detect_memory(buffer: &mut [u8]) -> u32 {
         let mut result: u32;
         core::arch::asm!(
             "int 0x15",
-            "jc done",        // Changed label name
+            "jc 2f",          // Using numeric labels
             "mov eax, 1",
-            "jmp next",       // Changed label name
-            "done:",          // Changed label name
+            "jmp 3f",
+            "2:",             // Using numeric label >= 2
             "mov eax, 0",
-            "next:",          // Changed label name
+            "3:",             // Using numeric label >= 2
             inout("eax") 0xE820 => result,
                          in("ebx") continuation_id,
                          in("ecx") 24,
                          in("edx") 0x534D4150,
-                         in("di") buffer.as_mut_ptr(),
+                         in("di") buffer as *mut u8,
                          options(nostack)
         );
 
