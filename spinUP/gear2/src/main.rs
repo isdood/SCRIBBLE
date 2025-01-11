@@ -191,6 +191,7 @@ fn get_cpuid() -> (u32, u32, u32, u32) {
 
     unsafe {
         core::arch::asm!(
+            ".code32",
             "mov edi, ebx",    // Save ebx
             "cpuid",
             "xchg edi, ebx",   // Restore ebx and get its value
@@ -258,6 +259,7 @@ unsafe fn check_long_mode() -> bool {
 }
 
 // Fix other CR register operations
+#[allow(dead_code)]
 unsafe fn enable_pae() {
     core::arch::asm!(
         ".code32",
@@ -268,6 +270,7 @@ unsafe fn enable_pae() {
     );
 }
 
+#[allow(dead_code)]
 unsafe fn enable_paging() {
     core::arch::asm!(
         ".code32",
@@ -285,6 +288,7 @@ unsafe fn setup_long_mode() {
 
     // Load PML4 table
     core::arch::asm!(
+        ".code32",
         "mov eax, {pml4}",
         "mov cr3, eax",
         pml4 = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
@@ -293,6 +297,7 @@ unsafe fn setup_long_mode() {
 
     // Enable long mode in EFER MSR
     core::arch::asm!(
+        ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
         "or eax, 0x100",       // Set LME bit (1 << 8)
@@ -305,9 +310,11 @@ unsafe fn setup_long_mode() {
 unsafe fn enter_long_mode() -> ! {
     // Disable interrupts first
     core::arch::asm!("cli");
+    ".code32",
     write_serial(b"Disabled interrupts\r\n");
 
     // Setup page tables
+    ".code32",
     write_serial(b"Setting up page tables...\r\n");
     setup_page_tables();
 
@@ -340,6 +347,7 @@ unsafe fn enter_long_mode() -> ! {
 
     // Load CR3 with PML4
     core::arch::asm!(
+        ".code32",
         "mov {tmp:e}, {pml4:e}",
         "mov cr3, {tmp:e}",
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
