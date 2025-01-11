@@ -12,7 +12,6 @@ struct Dap {
     off: u16,
     seg: u16,
     lba: u32,
-    _pad2: u32,
 }
 
 #[no_mangle]
@@ -21,26 +20,25 @@ pub extern "C" fn _start() -> ! {
     let dap = Dap {
         sz: 16,
         _pad: 0,
-        cnt: 16,        // Reduce from 32 to 16 sectors (8KB)
-        off: 0,
-        seg: 0x07E0,    // Loading to 0x7E00
-        lba: 1,
-        _pad2: 0,
+        cnt: 16,    // Load 16 sectors (8KB)
+        off: 0,     // Offset 0
+        seg: 0x07E0,// Segment 0x07E0 (physical addr: 0x7E00)
+        lba: 1,     // Start from sector 1
     };
 
     unsafe {
         core::arch::asm!(
-            // Initialize segments
+            // Quick segment init
             "xor ax, ax",
             "mov ds, ax",
             "mov es, ax",
             "mov ss, ax",
             "mov sp, 0x7C00",
 
-            // Store boot drive
-            "mov byte ptr [0x7E00], dl",
+            // Save boot drive
+            "mov [0x7E00], dl",
 
-            // Enable A20
+            // Enable A20 (fast method)
             "in al, 0x92",
             "or al, 2",
             "out 0x92, al",
@@ -49,31 +47,20 @@ pub extern "C" fn _start() -> ! {
             "mov si, {0:x}",
             "mov ah, 0x42",
             "int 0x13",
-            "jc 2f",         // Jump if carry flag set (error)
-        "test ah, ah",   // Check status
-        "jnz 2f",        // Jump if not zero (error)
+            "jc 2f",
 
-        // Set up segment registers for gear2
-        "xor ax, ax",    // Clear AX
-        "mov ds, ax",    // Set DS to 0
-        "mov es, ax",    // Set ES to 0
-        "mov fs, ax",    // Set FS to 0
-        "mov gs, ax",    // Set GS to 0
-        "mov ss, ax",    // Set SS to 0
+            // Jump to gear2
+            "push word ptr 0x07E0",
+            "push word ptr 0",
+            "retf",
 
-        // Jump to gear2
-        "mov ax, 0x07E0",
-        "push ax",       // Push segment
-        "xor ax, ax",
-        "push ax",       // Push offset
-        "retf",          // Far return to gear2
+            // Error: Print 'E' and halt
+            "2: mov ax, 0x0E45",
+            "int 0x10",
+            "cli",
+            "hlt",
 
-        "2:",           // Error handler
-        "mov al, 'E'",
-        "mov ah, 0x0E",
-        "int 0x10",
-        "jmp 2b",      // Loop on error
-        in(reg) &dap,
+            in(reg) &dap,
                          options(noreturn)
         );
     }
