@@ -464,9 +464,10 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Load CR3
     core::arch::asm!(
-        "mov eax, {pml4}",
-        "mov cr3, eax",
-        pml4 = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+        "mov {tmp:e}, {pml4:e}",  // Fixed register formatting
+        "mov cr3, {tmp:e}",
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,  // Fixed static ref
+                     tmp = out(reg) _,
                      options(nomem, nostack)
     );
 
@@ -494,24 +495,24 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         // Build far return stack frame
         "push word 0x8",      // Code segment
-        "push word 1f",       // Return address
-        // Switch mode
-        "retf",
-        // Long mode entry point
-        "1:",
-        ".code64",            // Switch assembler to 64-bit mode
-        "mov rsp, 0x7c00",    // Reset stack pointer
-        // Clear segment registers
-        "xor ax, ax",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-        // Jump to Rust main
-        "jmp {target}",
-        target = sym rust_main,
-        options(noreturn)
+        "push word 2f",       // Return address (using 2 instead of 1)
+    // Switch mode
+    "retf",
+    // Long mode entry point
+    "2:",                 // Changed label from 1 to 2
+    ".code64",            // Switch assembler to 64-bit mode
+    "mov rsp, 0x7c00",    // Reset stack pointer
+    // Clear segment registers
+    "xor ax, ax",
+    "mov ds, ax",
+    "mov es, ax",
+    "mov fs, ax",
+    "mov gs, ax",
+    "mov ss, ax",
+    // Jump to Rust main
+    "jmp {target}",
+    target = sym rust_main,
+    options(noreturn)
     );
 }
 
