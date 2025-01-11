@@ -44,7 +44,9 @@ trap cleanup EXIT
 # Build Gear1
 status "Building Gear1..."
 cd spinUP/gear1
-./build.sh || error "Failed to build Gear1"
+
+# Ensure the build script uses the -C strip flag to reduce binary size
+RUSTFLAGS="-C opt-level=s -C lto -C codegen-units=1 -C panic=abort -C strip=debuginfo" cargo build --release || error "Failed to build Gear1"
 
 # Strip debug symbols from Gear1 binary
 strip --strip-all target/i686-spinup/release/spinUP-gear1
