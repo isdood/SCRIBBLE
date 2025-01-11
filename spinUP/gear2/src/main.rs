@@ -451,10 +451,13 @@ pub unsafe extern "C" fn _start() -> ! {
     // Jump to long mode
     core::arch::asm!(
         ".code32",
-        // Load temporary GDT pointer
-        "lgdt [{gdt_ptr}]",
-        // Long jump to 64-bit code
-        "jmp 0x08:2f",          // 0x08 is the code segment selector
+        // Load GDT
+        "lgdt [{gdt_ptr:e}]",
+        // Far jump to 64-bit code
+        "push $0x08",           // Code segment
+        "lea eax, [2f]",        // Get address of label
+        "push eax",             // Push target address
+        "retf",                 // Far return to switch modes
         ".align 8",
         "2:",
         ".code64",
@@ -469,7 +472,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov gs, ax",
         // Jump to Rust main
         "jmp {target}",
-        gdt_ptr = in(reg) &GDT_PTR,
+        gdt_ptr = in(reg) &raw const GDT_PTR,
                      target = sym rust_main,
                      options(noreturn)
     );
@@ -493,8 +496,7 @@ static mut GDT_PTR: DescriptorTablePointer = DescriptorTablePointer {
 };
 
 unsafe fn setup_gdt() {
-    // Set up GDT pointer
-    GDT_PTR.base = &GDT as *const _ as u32;
+    GDT_PTR.base = &raw const GDT as *const _ as u32;
 }
 
 // Required panic handler
@@ -506,4 +508,3 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
         }
     }
 }
-
