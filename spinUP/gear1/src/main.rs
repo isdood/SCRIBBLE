@@ -49,22 +49,24 @@ pub extern "C" fn _start() -> ! {
 
             // Load sectors
             "mov ah, 0x42",
-            "mov si, {dap}",
+            "mov {tmp:x}, {dap}",  // Load DAP address into temporary register
+            "mov si, {tmp:x}",     // Move to SI for int 13h
             "int 0x13",
-            "jc 2f",           // Changed to numeric label
+            "jc 2f",
 
             // Jump to gear2
             "push word ptr 0x07E0",
             "push word ptr 0",
             "retf",
 
-            "2:",             // Changed to numeric label
+            "2:",
             "mov al, 'E'",
             "mov ah, 0x0E",
             "int 0x10",
             "cli",
             "hlt",
             dap = in(reg) &dap.0,
+                         tmp = out(reg) _,      // Temporary register for address handling
                          options(noreturn)
         );
     }
