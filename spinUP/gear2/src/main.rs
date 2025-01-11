@@ -107,7 +107,7 @@ static mut IDT: IDT = IDT {
 #[repr(C, packed)]
 struct GDTPointer {
     limit: u16,
-    base: u32,
+    base: u64,  // Changed to u64 for 64-bit compatibility
 }
 
 static mut PAGE_TABLES: PageTables = PageTables {
@@ -119,21 +119,14 @@ static mut PAGE_TABLES: PageTables = PageTables {
 static mut GDT: GDTTable = GDTTable {
     entries: [
         // Null descriptor
-        GDTEntry {
-            limit_low: 0,
-            base_low: 0,
-            base_middle: 0,
-            access: 0,
-            granularity: 0,
-            base_high: 0,
-        },
+        GDTEntry { /* ... */ },
         // 64-bit code segment
         GDTEntry {
             limit_low: 0xFFFF,
             base_low: 0,
             base_middle: 0,
-            access: 0x9A,      // Present(1) | DPL(00) | S(1) | Type(1010)
-            granularity: 0xA0, // G(1) | L(1) | Limit(0000)
+            access: 0x9A,      // Present | DPL0 | S | Code | Read
+            granularity: 0xAF, // 4K unit | 64-bit | Limit(0xF)
             base_high: 0,
         },
         // Data segment
@@ -141,8 +134,8 @@ static mut GDT: GDTTable = GDTTable {
             limit_low: 0xFFFF,
             base_low: 0,
             base_middle: 0,
-            access: 0x92,      // Present(1) | DPL(00) | S(1) | Type(0010)
-            granularity: 0xC0, // G(1) | D/B(1) | Limit(0000)
+            access: 0x92,      // Present | DPL0 | S | Data | Write
+            granularity: 0xCF, // 4K unit | 32-bit | Limit(0xF)
             base_high: 0,
         },
     ]
@@ -205,18 +198,27 @@ unsafe fn disable_interrupts() {
 }
 
 unsafe fn setup_page_tables() {
-    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
-    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
-    PAGE_TABLES.pd.entries[0] = 0x83;
+    // Clear tables first
+    PAGE_TABLES.pml4.entries.fill(0);
+    PAGE_TABLES.pdpt.entries.fill(0);
+    PAGE_TABLES.pd.entries.fill(0);
 
-    // Load CR3
+    // PML4 -> PDPT (Present + Write)
+    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
+
+    // PDPT -> PD (Present + Write)
+    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
+
+    // PD -> First 2MB (Present + Write + Huge)
+    PAGE_TABLES.pd.entries[0] = 0x83;  // Map first 2MB with huge pages
+
+    // Ensure CR3 gets the physical address
     core::arch::asm!(
         ".code32",
-        "mov {tmp:e}, {addr:e}",
-        "mov cr3, {tmp:e}",
-        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     tmp = out(reg) _,
-                     options(nomem, nostack)
+        "mov eax, {pml4:e}",
+        "mov cr3, eax",
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+                     options(nostack)
     );
 }
 
@@ -568,32 +570,29 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         ".code32",
         "push 0x08",              // Code segment
-        "lea eax, [2f]",          // Get address of label 2
-        "push eax",               // Push target address
-        "retf",                   // Far return to long mode
-        "2:",                     // Using numeric local label
-        ".code64",                // Switch to 64-bit mode
-        "mov ax, 0x10",          // Data segment
+        "mov eax, 1f",           // Get address of forward label
+        "push eax",              // Push target address
+        "retf",                  // Far return to long mode
+
+        // Forward local label
+        "1:",
+        ".code64",               // Switch to 64-bit mode
+        "mov ax, 0x10",         // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
 
-        // Set up stack
-        "mov rsp, {0:r}",         // Load 64-bit stack pointer
-
-        // Enable interrupts
-        "sti",
-
-        // Jump to Rust main
-        "jmp {1:r}",              // Jump to main
+        "mov rsp, {0:r}",       // Load 64-bit stack pointer
+        "mov rcx, {1:r}",       // Load jump target into register
+        "sti",                  // Enable interrupts
+        "jmp rcx",              // Indirect jump to main
 
         in(reg) &raw const STACK.data as *const _ as u64 + 4096,
                      in(reg) rust_main as u64,
+                     options(noreturn)
     );
-
-    core::hint::unreachable_unchecked();
 }
 
 unsafe fn setup_idt() {
