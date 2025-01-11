@@ -153,6 +153,25 @@ unsafe fn disable_interrupts() {
     core::arch::asm!("cli");
 }
 
+unsafe fn setup_page_tables() {
+    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
+    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
+    PAGE_TABLES.pd.entries[0] = 0x83;
+}
+
+unsafe fn setup_gdt() {
+    let gdt_ptr = GDTPointer {
+        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
+        base: &raw const GDT as *const _ as u32,
+    };
+
+    core::arch::asm!(
+        "lgdt [{0}]",
+        in(reg) &gdt_ptr,
+                     options(readonly)
+    );
+}
+
 fn get_cpuid() -> (u32, u32, u32, u32) {
     let eax: u32;
     let ecx: u32;
@@ -173,20 +192,6 @@ fn get_cpuid() -> (u32, u32, u32, u32) {
     // Since we can't directly use ebx, we'll return 0 for that value
     // as it's not critical for our long mode check
     (eax, 0, ecx, edx)
-}
-
-
-unsafe fn setup_gdt() {
-    let gdt_ptr = GDTPointer {
-        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: &GDT as *const _ as u32,
-    };
-
-    core::arch::asm!(
-        "lgdt [{0}]",
-        in(reg) &gdt_ptr,
-                     options(readonly)
-    );
 }
 
 unsafe fn check_long_mode() -> bool {
@@ -216,10 +221,9 @@ unsafe fn check_long_mode() -> bool {
     let max_cpuid: u32;
     core::arch::asm!(
         "cpuid",
-        inlateout("eax") 0x80000000 => max_cpuid,
+        inlateout("eax") 0x80000000u32 => max_cpuid,
                      lateout("ecx") _,
                      lateout("edx") _,
-                     // Remove ebx output completely as it's not needed
     );
 
     if max_cpuid < 0x80000001 {
@@ -230,20 +234,12 @@ unsafe fn check_long_mode() -> bool {
     let edx: u32;
     core::arch::asm!(
         "cpuid",
-        inlateout("eax") 0x80000001 => _,
+        inlateout("eax") 0x80000001u32 => _,
                      lateout("ecx") _,
                      lateout("edx") edx,
-                     // Remove ebx output completely as it's not needed
     );
 
     (edx & (1 << 29)) != 0 // LM bit
-}
-
-unsafe fn setup_page_tables() {
-    // Identity map first 2MB of memory
-    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3; // Present + R/W
-    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3;   // Present + R/W
-    PAGE_TABLES.pd.entries[0] = 0x83;  // Present + R/W + PS (2MB page)
 }
 
 unsafe fn setup_long_mode() {
@@ -321,11 +317,11 @@ unsafe fn enter_long_mode() -> ! {
     write_serial(b"Enabled PAE\r\n");
 
     // Load CR3 with PML4
-    let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
     core::arch::asm!(
-        "mov eax, {0:e}",  // Use explicit 32-bit register format
-        "mov cr3, eax",
-        in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+        "mov {tmp:e}, {addr:e}",
+        "mov cr3, {tmp:e}",
+        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+                     tmp = out(reg) _,
                      options(nomem, nostack)
     );
     write_serial(b"Loaded CR3\r\n");
@@ -457,21 +453,21 @@ pub unsafe extern "C" fn _start() -> ! {
     // Jump to long mode
     core::arch::asm!(
         "push 0x08",          // Code segment
-        "lea eax, [1f]",      // Get address of label
-        "push eax",           // Push address
-        "retf",               // Far return to 64-bit mode
-        ".align 8",
-        "1:",
-        ".code64",
-        "mov ax, 0x10",       // Data segment
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-        "mov rsp, {0}",
-        "jmp {1}",
-        in(reg) (&STACK.data as *const _ as u64 + 4096),
+        "lea eax, [2f]",      // Get address of label (using 2 instead of 1)
+    "push eax",           // Push address
+    "retf",               // Far return to 64-bit mode
+    ".align 8",
+    "2:",                 // Changed from 1: to 2:
+    ".code64",
+    "mov ax, 0x10",       // Data segment
+    "mov ds, ax",
+    "mov es, ax",
+    "mov fs, ax",
+    "mov gs, ax",
+    "mov ss, ax",
+    "mov rsp, {0}",
+    "jmp {1}",
+    in(reg) (&raw const STACK.data as *const _ as u64 + 4096),
                      sym rust_main,
                      options(noreturn)
     );
