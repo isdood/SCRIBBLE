@@ -1,42 +1,32 @@
 ENTRY(_start)
 OUTPUT_FORMAT(elf32-i386)
-OUTPUT_ARCH(i386)
 
 SECTIONS {
-    /* Start of boot sector */
     . = 0x7C00;
 
+    /* Combine everything into a single bootable section */
     .boot : {
-        /* First include the boot text */
-        *(.text.start)
-        *(.text*)
-        *(.rodata*)
-        *(.data*)
+        KEEP(*(.boot.text))  /* Our entry point */
+        *(.text*)            /* Other code */
+        *(.rodata*)          /* Read-only data */
+        *(.data*)            /* Data */
+        . = 510 - (. - 0x7C00);  /* Pad to boot signature */
+        SHORT(0xaa55)            /* Boot signature */
+    } =0
 
-        /* Pad up to boot signature location */
-        . = 0x7DFE - 0x7C00;
+    /* These sections must exist for the linker but won't be in final binary */
+    .shstrtab 0 : { *(.shstrtab) }
+    .symtab 0 : { *(.symtab) }
+    .strtab 0 : { *(.strtab) }
 
-        /* Add boot signature */
-        SHORT(0xaa55)
-    }
-
-    /* Place metadata sections after boot sector */
-    . = 0x7E00;
-
-    /* Keep but move these sections after our boot code */
-    .shstrtab : { *(.shstrtab) }
-    .symtab : { *(.symtab) }
-    .strtab : { *(.strtab) }
-
-    /* These can be safely discarded */
     /DISCARD/ : {
         *(.eh_frame*)
         *(.note*)
         *(.comment*)
-        *(.rel.*)
-        *(.rela.*)
+        *(.rel*)
+        *(.rela*)
+        *(.bss*)
     }
 }
 
-/* Verify boot sector size */
 ASSERT(SIZEOF(.boot) <= 512, "Error: Boot sector exceeds 512 bytes")

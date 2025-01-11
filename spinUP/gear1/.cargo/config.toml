@@ -9,8 +9,9 @@ build-std-features = ["compiler-builtins-mem"]
 rustflags = [
     "-C", "opt-level=z",
     "-C", "no-redzone",
-    "-C", "link-arg=-Tlinker.ld",
-    "-C", "link-arg=--oformat=binary",
-    "-C", "link-arg=-n"
+    "-C", "link-args=-Tlinker.ld",
+    "-C", "link-args=--oformat=binary",
+    "-C", "link-args=-static",
+    "-C", "link-args=--nmagic"
 ]
 linker = "ld.lld"
