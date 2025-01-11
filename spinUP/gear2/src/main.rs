@@ -125,10 +125,9 @@ unsafe fn setup_gdt() {
         limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
         base: gdt.addr() as u32,
     };
-    // Use the 32-bit lgdt instruction with correct size suffix
     core::arch::asm!(
         ".code32",
-        "lgdtl [{0}]",  // Added 'l' suffix for 32-bit operation
+        "lgdt [{0:e}]",  // Use 32-bit addressing
         in(reg) &gdt_ptr,
                      options(att_syntax)
     );
@@ -138,9 +137,9 @@ unsafe fn enable_paging() {
     let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u32;
 
     core::arch::asm!(
-        ".code32",  // Explicitly set 32-bit mode
+        ".code32",
         "mov %cr4, %eax",
-        "or $0x20, %eax",  // Set PAE flag (bit 5)
+        "or $0x20, %eax",     // Set PAE flag (bit 5)
     "mov %eax, %cr4",
 
     "mov {0:e}, %eax",
@@ -148,11 +147,11 @@ unsafe fn enable_paging() {
 
     "mov $0xC0000080, %ecx",
     "rdmsr",
-    "or $0x100, %eax",  // Set LME flag (bit 8)
+    "or $0x100, %eax",    // Set LME flag (bit 8)
     "wrmsr",
 
     "mov %cr0, %eax",
-    "or $0x80000001, %eax",  // Set PG and PE flags
+    "or $0x80000001, %eax", // Set PG and PE flags
     "mov %eax, %cr0",
     in(reg) pml4_addr,
                      options(att_syntax)
@@ -190,77 +189,60 @@ unsafe fn jump_to_long_mode() -> ! {
     );
 }
 
+#[no_mangle]
+pub extern "C" fn _start() -> ! {
+    unsafe {
+        SERIAL.init();
+        for &b in b"Gear2 starting...\r\n" {
+            SERIAL.write_byte(b);
+        }
+        enter_long_mode();
+    }
+}
+
 unsafe fn enter_long_mode() -> ! {
     disable_interrupts();
     {
-        let mut serial = SerialPort::new(0x3F8);
         for &b in b"Disabled interrupts\r\n" {
-            serial.write_byte(b);
+            SERIAL.write_byte(b);
         }
     }
 
     setup_page_tables();
     {
-        let mut serial = SerialPort::new(0x3F8);
         for &b in b"Page tables setup\r\n" {
-            serial.write_byte(b);
+            SERIAL.write_byte(b);
         }
     }
 
     setup_gdt();
     {
-        let mut serial = SerialPort::new(0x3F8);
         for &b in b"GDT setup\r\n" {
-            serial.write_byte(b);
+            SERIAL.write_byte(b);
         }
     }
 
     enable_paging();
     {
-        let mut serial = SerialPort::new(0x3F8);
         for &b in b"Paging enabled\r\n" {
-            serial.write_byte(b);
+            SERIAL.write_byte(b);
         }
     }
 
     {
-        let mut serial = SerialPort::new(0x3F8);
         for &b in b"Jumping to long mode...\r\n" {
-            serial.write_byte(b);
+            SERIAL.write_byte(b);
         }
     }
 
     jump_to_long_mode()
 }
 
-#[no_mangle]
-pub extern "C" fn rust_main() -> ! {
-    unsafe {
-        let mut vga = UnstableMatter::<u16>::at(0xB8000);
-        let msg = b"Long Mode OK!";
-
-        // Clear screen
-        for _ in 0..80*25 {
-            vga.write(0x0F00);
-        }
-
-        // Write message
-        for (_, &byte) in msg.iter().enumerate() {
-            vga.write(0x0F00 | byte as u16);
-        }
-
-        loop {
-            core::arch::asm!("hlt", options(nomem, nostack));
-        }
-    }
-}
-
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     unsafe {
-        let mut serial = SerialPort::new(0x3F8);
         for &b in b"PANIC in gear2!\r\n" {
-            serial.write_byte(b);
+            SERIAL.write_byte(b);
         }
     }
     loop {}
