@@ -432,8 +432,29 @@ unsafe fn enter_long_mode() -> ! {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
+    // Write to VGA to confirm we're running
+    let vga = 0xB8000 as *mut u16;
+    let msg = b"G2 Start";
+    for (i, &byte) in msg.iter().enumerate() {
+        *vga.offset(i as isize) = 0x0F00 | byte as u16;
+    }
+
+    // Initialize serial port
     init_serial();
-    write_serial(b"Serial initialized\r\n");
+    write_serial(b"Gear2 started\r\n");
+
+    // Check if we're in protected mode
+    let cr0: u32;
+    core::arch::asm!(
+        ".code16",
+        "mov eax, cr0",
+        out("eax") cr0,
+    );
+
+    if cr0 & 1 == 0 {
+        write_serial(b"Error: Not in protected mode\r\n");
+        loop { core::arch::asm!("hlt"); }
+    }
 
     disable_interrupts();
     write_serial(b"Interrupts disabled\r\n");

@@ -68,7 +68,7 @@ cd ../..
 dd if=/dev/zero of=combined.img bs=512 count=2880 2>/dev/null
 
 # Write Gear1 to first sector
-dd if=spinUP/gear1/target/i686-spinup/release/spinUP-gear1 of=combined.img conv=notrunc bs=512 count=1 2>/dev/null
+dd if=spinUP/gear2/target/i686-spinup/release/spinUP-gear2 of=combined.img bs=512 seek=1 conv=notrunc
 
 # Write Gear2 starting at second sector
 dd if=spinUP/gear2/disk.img of=combined.img conv=notrunc bs=512 seek=1 2>/dev/null
