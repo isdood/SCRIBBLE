@@ -313,7 +313,6 @@ unsafe fn enter_long_mode() -> ! {
     write_serial(b"Disabled interrupts\r\n");
 
     // Setup page tables
-    ".code32",
     write_serial(b"Setting up page tables...\r\n");
     setup_page_tables();
 
