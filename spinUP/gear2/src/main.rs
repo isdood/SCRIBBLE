@@ -209,12 +209,12 @@ unsafe fn setup_page_tables() {
 unsafe fn setup_gdt() {
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: &raw const GDT as *const _ as u32,
+        base: &raw const GDT as *const _ as u32,  // Fixed warning
     };
 
     core::arch::asm!(
         ".code32",
-        "lgdt [{0}]",
+        "lgdt [{0:e}]",  // Use 32-bit addressing
         in(reg) &gdt_ptr,
                      options(readonly)
     );
@@ -499,12 +499,12 @@ unsafe fn setup_idt() {
     // Load the IDT
     let idtr = GDTPointer {
         limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &IDT as *const _ as u32,
+        base: &raw const IDT as *const _ as u32,  // Fixed warning
     };
 
     core::arch::asm!(
         ".code32",
-        "lidt [{0}]",
+        "lidt [{0:e}]",  // Use 32-bit addressing
         in(reg) &idtr,
                      options(readonly)
     );
