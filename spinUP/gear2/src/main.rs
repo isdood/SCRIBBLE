@@ -516,20 +516,33 @@ unsafe fn enter_long_mode() -> ! {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    // Disable interrupts
+    // 1. Disable interrupts first thing
     core::arch::asm!("cli");
 
-    // Set up paging structures
+    // 2. Set up IDT before enabling any hardware
+    setup_idt();
+
+    // 3. Set up and remap PIC (but keep interrupts disabled)
+    setup_pic();
+
+    // 4. Set up paging structures
     setup_page_tables();
 
-    // Enable PAE
+    // 5. Enable PAE (required for long mode)
     core::arch::asm!(
         "mov eax, cr4",
         "or eax, 1 << 5",  // PAE
         "mov cr4, eax",
     );
 
-    // Set up long mode
+    // 6. Load CR3 with page table
+    core::arch::asm!(
+        "mov eax, {pml4:e}",
+        "mov cr3, eax",
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+    );
+
+    // 7. Enable long mode in EFER
     core::arch::asm!(
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
@@ -537,33 +550,20 @@ pub unsafe extern "C" fn _start() -> ! {
         "wrmsr",
     );
 
-    // Load CR3 with page table
-    core::arch::asm!(
-        "mov eax, {pml4:e}",
-        "mov cr3, eax",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-    );
-
-    // Set up IDT
-    setup_idt();
-
-    // Set up PIC
-    setup_pic();
-
-    // Enable paging and protection
+    // 8. Enable paging and protection
     core::arch::asm!(
         "mov eax, cr0",
         "or eax, 1 << 31 | 1", // PG | PE
         "mov cr0, eax",
     );
 
-    // Long mode jump
+    // 9. Long mode jump and final setup
     core::arch::asm!(
         "ljmp $0x08, $1f",
         "1:",
         ".code64",
 
-        // Set up segment registers
+        // 10. Set up segment registers
         "mov ax, 0x10",
         "mov ds, ax",
         "mov es, ax",
@@ -571,19 +571,22 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov gs, ax",
         "mov ss, ax",
 
-        // Set up stack
+        // 11. Set up stack
         "mov rsp, {stack:e}",
 
-        // Enable interrupts
+        // 12. Enable interrupts
         "sti",
 
-        // Jump to Rust main
+        // 13. Jump to Rust main
         "jmp {main}",
 
         stack = in(reg) &raw const STACK.data as *const _ as u32 + 4096,
                      main = sym rust_main,
-                     options(noreturn)
+                     options(nostack)  // Changed from noreturn
     );
+
+    // We need this unreachable to satisfy the ! return type
+    core::hint::unreachable_unchecked();
 }
 
 unsafe fn setup_idt() {
@@ -639,7 +642,7 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
         "popfq",
 
         "iretq",
-        options(noreturn)
+        options(nostack)  // Changed from noreturn
     );
 }
 
