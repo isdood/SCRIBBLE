@@ -260,12 +260,23 @@ unsafe fn setup_long_mode() {
     );
 }
 
-unsafe fn validate_cpu_features() -> bool {
-    let mut cpuid_result: u32;
-    core::arch::asm!(
-        "mov edx, eax",  // Use direct register names instead of template arguments
-        out("eax") cpuid_result,
-    );
+fn get_cpuid() -> (u32, u32, u32, u32) {
+    let eax: u32;
+    let ebx: u32;
+    let ecx: u32;
+    let edx: u32;
+
+    unsafe {
+        core::arch::asm!(
+            "cpuid",
+            inout("eax") 0 => eax,    // Input function 0, output to eax
+                         out("ebx") ebx,           // Output to ebx
+                         out("ecx") ecx,           // Output to ecx
+                         out("edx") edx,           // Output to edx
+        );
+    }
+
+    (eax, ebx, ecx, edx)
 }
 
 unsafe fn jump_to_long_mode() -> ! {
