@@ -28,7 +28,7 @@ struct GDTEntry {
     base_high: u8,
 }
 
-#[repr(C, packed)]
+#[repr(C, align(8))]  // Ensure 8-byte alignment for the GDT
 struct GDTTable {
     entries: [GDTEntry; 3]
 }
@@ -36,7 +36,7 @@ struct GDTTable {
 #[repr(C, packed)]
 struct GDTPointer {
     limit: u16,
-    base: u32,
+    base: u32,  // Using u32 for 32-bit mode
 }
 
 #[repr(C, align(4096))]
@@ -182,9 +182,9 @@ unsafe fn setup_gdt() {
 
     core::arch::asm!(
         ".code32",
-        "lgdt [{0}]",
-        in(reg) &gdt_ptr,
-                     options(readonly)
+        "lgdt [{0:e}]",  // Use 32-bit register (eax) with :e suffix
+                     in(reg) &gdt_ptr,
+                     options(readonly, nostack)
     );
 }
 
