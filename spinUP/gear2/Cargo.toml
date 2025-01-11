@@ -10,7 +10,7 @@ unstable_matter = { path = "../../lib/unstable_matter" }
 panic = "abort"
 
 [profile.release]
-opt-level = z
+opt-level = "z"
 debug = false
 lto = true
 codegen-units = 1
