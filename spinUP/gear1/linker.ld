@@ -3,33 +3,40 @@ OUTPUT_FORMAT(elf32-i386)
 OUTPUT_ARCH(i386)
 
 SECTIONS {
-    /* Force location counter to start of boot sector */
+    /* Start of boot sector */
     . = 0x7C00;
 
-    .boottext : AT(0x7C00) {
+    .boot : {
+        /* First include the boot text */
         *(.text.start)
-        *(.text)
-    }
+        *(.text*)
+        *(.rodata*)
+        *(.data*)
 
-    .bootdata : {
-        *(.rodata)
-        *(.data)
-        . = ALIGN(16);
-    }
+        /* Pad up to boot signature location */
+        . = 0x7DFE - 0x7C00;
 
-    /* Ensure we have room for boot signature */
-    .sig : AT(0x7DFE) {
+        /* Add boot signature */
         SHORT(0xaa55)
     }
 
-    /* Everything else can be discarded */
+    /* Place metadata sections after boot sector */
+    . = 0x7E00;
+
+    /* Keep but move these sections after our boot code */
+    .shstrtab : { *(.shstrtab) }
+    .symtab : { *(.symtab) }
+    .strtab : { *(.strtab) }
+
+    /* These can be safely discarded */
     /DISCARD/ : {
-        *(.comment)
-        *(.eh_frame)
+        *(.eh_frame*)
         *(.note*)
-        *(*)
+        *(.comment*)
+        *(.rel.*)
+        *(.rela.*)
     }
 }
 
-/* Ensure total size doesn't exceed one sector */
-ASSERT(SIZEOF(.boottext) + SIZEOF(.bootdata) + 2 <= 512, "Error: Boot sector exceeds 512 bytes")
+/* Verify boot sector size */
+ASSERT(SIZEOF(.boot) <= 512, "Error: Boot sector exceeds 512 bytes")
