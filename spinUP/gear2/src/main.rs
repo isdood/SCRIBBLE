@@ -161,23 +161,17 @@ unsafe fn setup_page_tables() {
 unsafe fn setup_gdt() {
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: (&GDT as *const GDTTable) as u32,
+        base: (&raw const GDT as *const GDTTable) as u32,
     };
 
     core::arch::asm!(
         ".code32",
-        // Create space on stack and ensure alignment
         "subl $8, %esp",
         "andl $-8, %esp",
-
-        // Store GDTR data
-        "movw {limit:x}, (%esp)",     // Store limit
-                     "movl {base:e}, 2(%esp)",     // Store base
-                     "lgdt (%esp)",                // Load GDT
-
-                     // Restore stack
+        "movw {limit:x}, (%esp)",
+                     "movl {base:e}, 2(%esp)",
+                     "lgdt (%esp)",
                      "addl $8, %esp",
-
                      limit = in(reg) gdt_ptr.limit,
                      base = in(reg) gdt_ptr.base,
                      options(att_syntax)
@@ -185,30 +179,22 @@ unsafe fn setup_gdt() {
 }
 
 unsafe fn enable_paging() {
-    let pml4_addr = &PAGE_TABLES.pml4 as *const PageTable as u64;
+    let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
 
     core::arch::asm!(
         ".code32",
-        // Enable PAE first
         "movl %cr4, %eax",
-        "orl $0x20, %eax",      // Set PAE bit
+        "orl $0x20, %eax",
         "movl %eax, %cr4",
-
-        // Load PML4 address
         "movl {addr:e}, %eax",
         "movl %eax, %cr3",
-
-        // Enable long mode in EFER MSR
         "movl $0xC0000080, %ecx",
         "rdmsr",
-        "orl $0x100, %eax",    // Set LME bit
+        "orl $0x100, %eax",
         "wrmsr",
-
-        // Enable paging and protection
         "movl %cr0, %eax",
-        "orl $0x80000001, %eax",  // Set PG and PE bits
+        "orl $0x80000001, %eax",
         "movl %eax, %cr0",
-
         addr = in(reg) pml4_addr as u32,
                      options(att_syntax, nomem, nostack)
     );
@@ -217,32 +203,23 @@ unsafe fn enable_paging() {
 unsafe fn jump_to_long_mode() -> ! {
     core::arch::asm!(
         ".code32",
-        // Ensure stack is aligned
         "andl $-16, %esp",
-
-        // Far jump to 64-bit code
-        "pushl $0x08",          // Push code segment
-        "pushl $1f",            // Push return address
-        "lret",                 // Far return to load CS and jump
-
+        "pushl $0x08",
+        "pushl $label_64",
+        "lret",
         ".align 8",
-        "1:",
+        "label_64:",           // Changed from "1:" to "label_64:"
         ".code64",
-
-        // Load data segment registers
         "mov $0x10, %ax",
         "mov %ax, %ds",
         "mov %ax, %es",
         "mov %ax, %fs",
         "mov %ax, %gs",
         "mov %ax, %ss",
-
-        // Set up stack and jump to Rust
         "movabs {stack}, %rsp",
         "movabs {target}, %rax",
         "jmp *%rax",
-
-        stack = in(reg) (&STACK.data as *const u8 as u64 + 4096),
+        stack = in(reg) (&raw const STACK.data as *const u8 as u64 + 4096),
                      target = in(reg) rust_main as u64,
                      options(noreturn)
     );
