@@ -71,8 +71,8 @@ cd ../gear2
 ./build.sh || error "Failed to build Gear2"
 
 # Verify Gear2 output
-if [ ! -f "gear2.bin" ]; then
-    error "gear2.bin not found. Build might have failed."
+if [ ! -f "disk.img" ]; then
+    error "disk.img not found. Build might have failed."
 fi
 
 # Create disk image
@@ -81,7 +81,7 @@ cd ../..
 
 # Combine Gear1 and Gear2 into one disk image
 dd if=spinUP/gear1/gear1.bin of=combined.img bs=512 count=1
-dd if=spinUP/gear2/gear2.bin of=combined.img bs=512 seek=1
+dd if=spinUP/gear2/disk.img of=combined.img bs=512 seek=1
 
 success "Created disk image"
 
