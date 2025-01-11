@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
-#![feature(asm_const)]
+
+use core::arch::global_asm;
 
 // Tell the compiler we're targeting i686 initially
 #[cfg(target_arch = "x86_64")]
