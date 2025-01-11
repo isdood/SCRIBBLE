@@ -3,8 +3,7 @@
 
 use core::panic::PanicInfo;
 
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
+#[repr(C, align(4))]
 struct Dap {
     sz: u8,
     _pad: u8,
@@ -18,7 +17,10 @@ struct Dap {
 #[link_section = ".boot.text"]
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
-    let dap = Dap {
+    #[repr(C, align(4))]
+    struct DapWrapper(Dap);
+
+    let dap = DapWrapper(Dap {
         sz: 16,
         _pad: 0,
         cnt: 32,
@@ -26,7 +28,7 @@ pub extern "C" fn _start() -> ! {
         seg: 0x07E0,
         lba: 1,
         _pad2: 0,
-    };
+    });
 
     unsafe {
         core::arch::asm!(
@@ -38,7 +40,7 @@ pub extern "C" fn _start() -> ! {
             "mov sp, 0x7C00",
 
             // Store boot drive
-            "mov [0x7E00], dl",
+            "mov byte ptr [0x7E00], dl",
 
             // Enable A20
             "in al, 0x92",
@@ -47,28 +49,29 @@ pub extern "C" fn _start() -> ! {
 
             // Load sectors
             "mov ah, 0x42",
-            "mov si, {0:x}",  // Fixed: proper syntax for register
+            "mov si, {dap}",
             "int 0x13",
-            "jc 2f",
+            "jc error",
 
             // Jump to gear2
-            "push word ptr 0x07E0",  // Fixed: proper push syntax
-            "push word ptr 0",       // Fixed: proper push syntax
+            "push word ptr 0x07E0",
+            "push word ptr 0",
             "retf",
 
-            "2:",
+            "error:",
             "mov al, 'E'",
             "mov ah, 0x0E",
             "int 0x10",
             "cli",
             "hlt",
-            in(reg) &dap,
+            dap = in(reg) &dap.0,
                          options(noreturn)
         );
     }
 }
 
 #[panic_handler]
+#[no_mangle]
 #[link_section = ".boot.text"]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
