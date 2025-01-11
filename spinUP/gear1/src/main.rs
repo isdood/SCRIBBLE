@@ -101,22 +101,24 @@ unsafe fn enable_a20() {
 // Proper memory detection
 unsafe fn detect_memory(buffer: &mut [u8]) -> u32 {
     let mut entries = 0;
-    let mut continuation_id = 0;
+    let continuation_id = 0; // Removed mut as it wasn't needed
 
     loop {
         let mut result: u32;
         core::arch::asm!(
             "int 0x15",
             "jc 1f",
-            "mov {0:e}, 1",
+            "mov eax, 1",  // Direct register reference instead of template
             "jmp 2f",
-            "1: mov {0:e}, 0",
+            "1:",
+            "mov eax, 0",  // Direct register reference instead of template
             "2:",
             inout("eax") 0xE820 => result,
                          in("ebx") continuation_id,
                          in("ecx") 24,
-                         in("edx") 0x534D4150,
-                         in("di") buffer.as_mut_ptr(),
+                         in("edx") 0x534D4150,  // 'SMAP'
+        in("di") buffer.as_mut_ptr(),
+                         options(nostack)
         );
 
         if result == 0 { break; }
