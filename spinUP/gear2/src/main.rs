@@ -158,6 +158,16 @@ unsafe fn setup_page_tables() {
     PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
     PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
     PAGE_TABLES.pd.entries[0] = 0x83;
+
+    // Load CR3
+    core::arch::asm!(
+        ".code32",
+        "mov {tmp:e}, {addr:e}",
+        "mov cr3, {tmp:e}",
+        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+                     tmp = out(reg) _,
+                     options(nomem, nostack)
+    );
 }
 
 unsafe fn setup_gdt() {
@@ -200,6 +210,7 @@ unsafe fn check_long_mode() -> bool {
     // Check CPUID presence
     let mut flags: u32;
     core::arch::asm!(
+        ".code32",
         "pushfd",
         "pop eax",
         "mov ecx, eax",
@@ -222,6 +233,7 @@ unsafe fn check_long_mode() -> bool {
     // Check for extended processor info
     let max_cpuid: u32;
     core::arch::asm!(
+        ".code32",
         "cpuid",
         inlateout("eax") 0x80000000u32 => max_cpuid,
                      lateout("ecx") _,
@@ -235,6 +247,7 @@ unsafe fn check_long_mode() -> bool {
     // Check for long mode support
     let edx: u32;
     core::arch::asm!(
+        ".code32",
         "cpuid",
         inlateout("eax") 0x80000001u32 => _,
                      lateout("ecx") _,
@@ -244,18 +257,31 @@ unsafe fn check_long_mode() -> bool {
     (edx & (1 << 29)) != 0 // LM bit
 }
 
+// Fix other CR register operations
+unsafe fn enable_pae() {
+    core::arch::asm!(
+        ".code32",
+        "mov eax, cr4",
+        "or eax, 1 << 5",     // Set PAE bit
+        "mov cr4, eax",
+        options(nomem, nostack)
+    );
+}
+
+unsafe fn enable_paging() {
+    core::arch::asm!(
+        ".code32",
+        "mov eax, cr0",
+        "or eax, 0x80000001", // Set PG and PE bits
+        "mov cr0, eax",
+        options(nomem, nostack)
+    );
+}
+
 #[allow(dead_code)]
 unsafe fn setup_long_mode() {
     // Disable interrupts
     core::arch::asm!("cli");
-
-    // Enable PAE
-    core::arch::asm!(
-        "mov eax, cr4",
-        "or eax, 0x20",       // Set PAE bit (1 << 5)
-    "mov cr4, eax",
-    options(nomem, nostack)
-    );
 
     // Load PML4 table
     core::arch::asm!(
@@ -272,14 +298,6 @@ unsafe fn setup_long_mode() {
         "or eax, 0x100",       // Set LME bit (1 << 8)
     "wrmsr",
     options(nomem, nostack)
-    );
-
-    // Enable paging and protection
-    core::arch::asm!(
-        "mov eax, cr0",
-        "or eax, 0x80000001",  // Set PG and PE bits
-        "mov cr0, eax",
-        options(nomem, nostack)
     );
 }
 
