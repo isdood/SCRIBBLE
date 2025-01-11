@@ -144,15 +144,20 @@ unsafe fn disable_interrupts() {
 }
 
 unsafe fn setup_page_tables() {
-    // First clear all tables
-    PAGE_TABLES.pml4.entries.fill(0);
-    PAGE_TABLES.pdpt.entries.fill(0);
-    PAGE_TABLES.pd.entries.fill(0);
+    // Use raw pointers instead of references
+    let pml4_ptr = &raw mut PAGE_TABLES.pml4.entries[0] as *mut [u64; 512];
+    let pdpt_ptr = &raw mut PAGE_TABLES.pdpt.entries[0] as *mut [u64; 512];
+    let pd_ptr = &raw mut PAGE_TABLES.pd.entries[0] as *mut [u64; 512];
 
-    // Set up identity mapping for first 2MB
-    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const PageTable as u64) | 0x3;
-    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const PageTable as u64) | 0x3;
-    PAGE_TABLES.pd.entries[0] = 0x83; // Present + Write + Huge (2MB)
+    // Clear tables using raw pointers
+    (*pml4_ptr).fill(0);
+    (*pdpt_ptr).fill(0);
+    (*pd_ptr).fill(0);
+
+    // Set up identity mapping using raw pointers
+    (*pml4_ptr)[0] = (&raw const PAGE_TABLES.pdpt as *const PageTable as u64) | 0x3;
+    (*pdpt_ptr)[0] = (&raw const PAGE_TABLES.pd as *const PageTable as u64) | 0x3;
+    (*pd_ptr)[0] = 0x83; // Present + Write + Huge (2MB)
 }
 
 unsafe fn setup_gdt() {
@@ -179,7 +184,7 @@ unsafe fn setup_gdt() {
 }
 
 unsafe fn enable_paging() {
-    let pml4_addr = &PAGE_TABLES.pml4 as *const PageTable as u64;
+    let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
 
     core::arch::asm!(
         ".code32",
@@ -208,18 +213,18 @@ unsafe fn enable_paging() {
 }
 
 unsafe fn jump_to_long_mode() -> ! {
-    let stack_top = &STACK.data as *const u8 as u64 + 4096;
+    let stack_top = &raw const STACK.data as *const u8 as u64 + 4096;
 
     core::arch::asm!(
         ".code32",
-        // Load new code segment
-        "push $0x08",         // New CS value (1st GDT entry)
-    "lea 1f(%eip), %eax", // Get address of label 1
-                     "push %eax",          // Push return address
-                     "retf",               // Far return to load CS and jump
+        // Far jump to 64-bit code
+        "push $0x08",              // New CS value (1st GDT entry)
+    "push $1f",               // Push address of label 1
+    "ljmp *(%esp)",          // Far jump using stack
 
+                     ".align 8",
                      ".code64",
-                     "1:",                 // Long mode entry point
+                     "1:",                     // Long mode entry point
                      // Load data segments
                      "mov $0x10, %ax",
                      "mov %ax, %ds",
