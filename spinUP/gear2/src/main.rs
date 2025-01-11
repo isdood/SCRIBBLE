@@ -205,32 +205,40 @@ unsafe fn setup_long_mode() {
 
     // Enable PAE
     core::arch::asm!(
+        ".code32",            // Explicitly set 32-bit mode
         "mov eax, cr4",
         "or eax, 1 << 5",     // Set PAE bit
-        "mov cr4, eax"
+        "mov cr4, eax",
+        options(nomem, nostack)
     );
 
     // Load PML4 table
     let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
     core::arch::asm!(
+        ".code32",
         "mov eax, {0:e}",
         "mov cr3, eax",
-        in(reg) pml4_addr as u32
+        in(reg) pml4_addr as u32,
+                     options(nomem, nostack)
     );
 
     // Enable long mode in EFER MSR
     core::arch::asm!(
+        ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
         "or eax, 1 << 8",      // Set LME bit
-        "wrmsr"
+        "wrmsr",
+        options(nomem, nostack)
     );
 
     // Enable paging and protection
     core::arch::asm!(
+        ".code32",
         "mov eax, cr0",
         "or eax, 1 << 31 | 1", // Set PG and PE bits
-        "mov cr0, eax"
+        "mov cr0, eax",
+        options(nomem, nostack)
     );
 }
 
@@ -239,7 +247,11 @@ unsafe fn jump_to_long_mode() -> ! {
     setup_gdt();
 
     core::arch::asm!(
-        "push 0x08",           // Code segment selector
+        ".code32",
+        // Ensure stack alignment
+        "and esp, -16",
+        // Far jump to 64-bit code
+        "push dword ptr 0x08", // Code segment selector
         "lea eax, [2f]",       // Get address of label
         "push eax",            // Push target address
         "retf",                // Far return to 64-bit code
