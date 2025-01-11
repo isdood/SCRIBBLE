@@ -5,35 +5,32 @@ SECTIONS {
     . = 0x7C00;
 
     .text : {
-        *(.boot.text)
-        *(.text)
+        *(.text.start)
+        *(.text*)
+    }
+
+    .rodata : {
+        *(.rodata*)
     }
 
     .data : {
-        *(.rodata)
-        *(.data)
+        *(.data*)
     }
 
-    /* Pad to boot signature */
     . = 0x7DFE;
 
-    /* Add boot signature */
-    .signature : {
+    .boot_sig : {
         SHORT(0xaa55)
     }
 
-    /* Discard everything else */
     /DISCARD/ : {
         *(.eh_frame*)
-        *(.comment*)
-        *(.note*)
-        *(.debug*)
-        *(.gcc_except_table*)
-        *(.gnu.attributes*)
-        *(.jcr*)
-        *(.got*)
-        *(.got.plt*)
-        *(.data.rel.ro*)
-        *(.bss*)
+        *(.note.*)
+        *(.comment)
+        *(.shstrtab)
+        *(.symtab)
+        *(.strtab)
     }
 }
+
+ASSERT(. <= 0x7E00, "Error: Binary exceeds 512 bytes")
