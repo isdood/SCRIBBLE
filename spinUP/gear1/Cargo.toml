@@ -4,15 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [profile.release]
-opt-level = "z"  # Optimize for size
-debug = false
-lto = true
-codegen-units = 1
-panic = "abort"
+opt-level = "z"     # Optimize for size
+lto = true         # Enable link-time optimization
+codegen-units = 1  # Optimize for size
+panic = "abort"    # Remove panic formatting code
+strip = true       # Remove debug symbols
 
 [profile.dev]
 panic = "abort"
 
-[lib]
+[[bin]]
+name = "spinup-gear1"
 path = "src/main.rs"
-crate-type = ["staticlib"]
