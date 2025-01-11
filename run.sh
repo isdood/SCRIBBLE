@@ -70,6 +70,11 @@ status "Building Gear2..."
 cd ../gear2
 ./build.sh || error "Failed to build Gear2"
 
+# Verify Gear2 output
+if [ ! -f "gear2.bin" ]; then
+    error "gear2.bin not found. Build might have failed."
+fi
+
 # Create disk image
 status "Creating disk image..."
 cd ../..
