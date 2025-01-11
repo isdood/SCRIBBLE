@@ -152,38 +152,24 @@ pub extern "C" fn rust_main() -> ! {
 unsafe fn disable_interrupts() {
     core::arch::asm!("cli");
 }
-unsafe fn setup_page_tables() {
-    // Clear tables first
-    for table in &mut PAGE_TABLES.pdpt.entries {
-        *table = 0;
+
+fn get_cpuid() -> (u32, u32, u32, u32) {
+    let eax: u32;
+    let ebx: u32;
+    let ecx: u32;
+    let edx: u32;
+
+    unsafe {
+        core::arch::asm!(
+            "cpuid",
+            inout("eax") 0 => eax,
+                         out("ebx") ebx,
+                         out("ecx") ecx,
+                         out("edx") edx,
+        );
     }
 
-    // Identity map first 2MB
-    PAGE_TABLES.pml4.entries[0] =
-    (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
-    PAGE_TABLES.pdpt.entries[0] =
-    (&PAGE_TABLES.pd as *const _ as u64) | 0x3;
-    PAGE_TABLES.pd.entries[0] = 0x83; // PS=1, RW=1, P=1
-}
-
-unsafe fn setup_gdt() {
-    let gdt_ptr = GDTPointer {
-        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: (&raw const GDT as *const GDTTable) as u32,
-    };
-
-    core::arch::asm!(
-        ".code32",
-        "subl $8, %esp",
-        "andl $-8, %esp",
-        "movw {limit:x}, (%esp)",
-                     "movl {base:e}, 2(%esp)",
-                     "lgdt (%esp)",
-                     "addl $8, %esp",
-                     limit = in(reg) gdt_ptr.limit,
-                     base = in(reg) gdt_ptr.base,
-                     options(att_syntax)
-    );
+    (eax, ebx, ecx, edx)
 }
 
 unsafe fn setup_page_tables() {
@@ -193,9 +179,22 @@ unsafe fn setup_page_tables() {
     PAGE_TABLES.pd.entries[0] = 0x83;  // Present + R/W + PS (2MB page)
 }
 
+unsafe fn setup_gdt() {
+    let gdt_ptr = GDTPointer {
+        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
+        base: &GDT as *const _ as u32,
+    };
+
+    core::arch::asm!(
+        "lgdt [{0}]",
+        in(reg) &gdt_ptr,
+                     options(readonly)
+    );
+}
+
 unsafe fn check_long_mode() -> bool {
     // Check CPUID presence
-    let has_cpuid: bool;
+    let mut flags: u32;
     core::arch::asm!(
         "pushfd",
         "pop eax",
@@ -208,11 +207,11 @@ unsafe fn check_long_mode() -> bool {
         "xor eax, ecx",
         "shr eax, 21",
         "and eax, 1",
-        out("eax") has_cpuid,
+        out("eax") flags,
                      out("ecx") _,
     );
 
-    if !has_cpuid {
+    if flags == 0 {
         return false;
     }
 
@@ -221,9 +220,8 @@ unsafe fn check_long_mode() -> bool {
     core::arch::asm!(
         "cpuid",
         inout("eax") 0x80000000 => max_cpuid,
-                     out("ebx") _,
-                     out("ecx") _,
-                     out("edx") _,
+                     lateout("ecx") _,
+                     lateout("edx") _,
     );
 
     if max_cpuid < 0x80000001 {
@@ -234,10 +232,9 @@ unsafe fn check_long_mode() -> bool {
     let mut edx: u32;
     core::arch::asm!(
         "cpuid",
-        inout("eax") 0x80000001 => _,
-                     out("ebx") _,
-                     out("ecx") _,
-                     out("edx") edx,
+        in("eax") 0x80000001,
+                     lateout("ecx") _,
+                     lateout("edx") edx,
     );
 
     (edx & (1 << 29)) != 0 // LM bit
@@ -278,38 +275,6 @@ unsafe fn setup_long_mode() {
         "or eax, 0x80000001",  // Set PG and PE bits
         "mov cr0, eax",
         options(nomem, nostack)
-    );
-}
-
-fn get_cpuid() -> (u32, u32, u32, u32) {
-    let eax: u32;
-    let ebx: u32;
-    let ecx: u32;
-    let edx: u32;
-
-    unsafe {
-        core::arch::asm!(
-            "cpuid",
-            inout("eax") 0 => eax,
-                         out("ebx") ebx,
-                         out("ecx") ecx,
-                         out("edx") edx,
-        );
-    }
-
-    (eax, ebx, ecx, edx)
-}
-
-unsafe fn setup_gdt() {
-    let gdt_ptr = GDTPointer {
-        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: &GDT as *const _ as u32,
-    };
-
-    core::arch::asm!(
-        "lgdt [{0}]",
-        in(reg) &gdt_ptr,
-                     options(readonly)
     );
 }
 
@@ -451,8 +416,9 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Load CR3 with PML4
     core::arch::asm!(
-        "mov cr3, {0}",
-        in(reg) &PAGE_TABLES.pml4 as *const _ as u64,
+        "mov eax, {0:e}",
+        "mov cr3, eax",
+        in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
                      options(nomem, nostack)
     );
     write_serial(b"CR3 loaded\r\n");
@@ -482,24 +448,26 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Jump to long mode
     core::arch::asm!(
+        // Far jump to 64-bit code
         "push 0x08",          // Code segment
-        "lea {tmp}, [1f]",    // Get address of label
-        "push {tmp}",         // Push address
-        "retf",              // Far return to 64-bit mode
+        "lea eax, [1f]",      // Get address of label
+        "push eax",           // Push address
+        "retf",               // Far return to 64-bit mode
+        ".align 8",
         "1:",
         ".code64",
-        "mov ax, 0x10",      // Data segment
+        // Set up segment registers
+        "mov ax, 0x10",       // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
         // Set up stack and jump to Rust
-        "mov rsp, {stack}",
-        "jmp {target}",
-        tmp = out(reg) _,
-                     stack = in(reg) (&STACK.data as *const _ as u64 + 4096),
-                     target = sym rust_main,
+        "mov rsp, {0}",
+        "jmp {1}",
+        in(reg) (&STACK.data as *const _ as u64 + 4096),
+                     sym rust_main,
                      options(noreturn)
     );
 }
