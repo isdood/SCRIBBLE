@@ -22,10 +22,10 @@ pub extern "C" fn _start() -> ! {
             "out 0x92, al",
 
             // Load sectors using DAP
-            "mov si, dap",
+            "mov si, 2f",          // Point to DAP
             "mov ah, 0x42",
             "int 0x13",
-            "jc error",
+            "jc 1f",              // Jump to error if carry set
 
             // Jump to gear2
             "push word ptr 0x07E0",
@@ -33,21 +33,21 @@ pub extern "C" fn _start() -> ! {
             "retf",
 
             // Error handler
-            "error:",
-            "mov ax, 0x0E45",
-            "int 0x10",
-            "cli",
-            "hlt",
+            "1:",
+            "mov ax, 0x0E45",     // Print 'E'
+        "int 0x10",
+        "cli",
+        "hlt",
 
-            // Disk Address Packet (DAP)
-            "dap:",
-            ".byte 16",         // size of DAP
-            ".byte 0",          // unused
-            ".word 16",         // sectors to read
-            ".word 0",          // offset
-            ".word 0x07E0",     // segment
-            ".quad 1",          // LBA
-            options(noreturn)
+        // Disk Address Packet (DAP)
+        "2:",
+        ".byte 16",           // size of DAP
+        ".byte 0",            // unused
+        ".word 16",           // sectors to read
+        ".word 0",            // offset
+        ".word 0x07E0",       // segment
+        ".quad 1",            // LBA
+        options(noreturn)
         );
     }
 }
