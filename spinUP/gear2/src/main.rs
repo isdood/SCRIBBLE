@@ -442,7 +442,7 @@ unsafe fn check_paging_enabled() -> bool {
 }
 
 #[no_mangle]
-unsafe fn _start() -> ! {
+pub unsafe extern "C" fn _start() -> ! {
     init_serial();
     write_serial(b"Serial initialized\r\n");
 
@@ -492,6 +492,40 @@ unsafe fn _start() -> ! {
         options(nomem, nostack)
     );
     write_serial(b"Paging enabled\r\n");
+
+    // Add the long mode jump here
+    core::arch::asm!(
+        ".code32",
+        // Ensure stack alignment
+        "and esp, -16",
+        // Prepare far jump
+        "push dword ptr 0x08",  // CS selector
+        "lea eax, [2f]",       // Target address
+        "push eax",
+        "retf",                // Far return to 64-bit code
+        ".align 8",
+        "2:",
+        ".code64",
+        // Zero segment registers
+        "xor ax, ax",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+        // Set up final stack and jump to Rust
+        "mov rsp, {stack}",
+        "jmp {target}",
+        stack = in(reg) &raw const STACK.data as *const u8 as u64 + 4096,
+                     target = sym rust_main,
+                     options(noreturn)
+    );
+
+    // This code will never be reached due to the noreturn jump,
+    // but we add it to satisfy the type system
+    loop {
+        core::arch::asm!("hlt", options(nomem, nostack));
+    }
 }
 
 #[panic_handler]
