@@ -216,12 +216,14 @@ unsafe fn check_long_mode() -> bool {
     }
 
     // Check for extended processor info
-    let mut max_cpuid: u32;
+    let max_cpuid: u32;
+    let mut scratch: u32;
     core::arch::asm!(
         "cpuid",
-        inout("eax") 0x80000000 => max_cpuid,
-                     lateout("ecx") _,
-                     lateout("edx") _,
+        inlateout("eax") 0x80000000 => max_cpuid,
+                     out("ecx") _,
+                     out("edx") _,
+                     out("eax") scratch,
     );
 
     if max_cpuid < 0x80000001 {
@@ -229,12 +231,13 @@ unsafe fn check_long_mode() -> bool {
     }
 
     // Check for long mode support
-    let mut edx: u32;
+    let edx: u32;
     core::arch::asm!(
         "cpuid",
         in("eax") 0x80000001,
-                     lateout("ecx") _,
-                     lateout("edx") edx,
+                     out("ecx") _,
+                     out("edx") edx,
+                     out("eax") scratch,
     );
 
     (edx & (1 << 29)) != 0 // LM bit
@@ -317,10 +320,9 @@ unsafe fn enter_long_mode() -> ! {
     // Load CR3 with PML4
     let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
     core::arch::asm!(
-        ".code32",
-        "mov eax, {0:e}",
+        "mov eax, {0:e}",  // Use explicit 32-bit register format
         "mov cr3, eax",
-        in(reg) pml4_addr as u32,
+        in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
                      options(nomem, nostack)
     );
     write_serial(b"Loaded CR3\r\n");
