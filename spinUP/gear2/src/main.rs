@@ -144,6 +144,28 @@ unsafe fn enable_paging() {
     );
 }
 
+#[no_mangle]
+pub extern "C" fn rust_main() -> ! {
+    unsafe {
+        let mut vga = UnstableMatter::<u16>::at(0xB8000);
+        let msg = b"Long Mode OK!";
+
+        // Clear screen
+        for _ in 0..80*25 {
+            vga.write(0x0F00);
+        }
+
+        // Write message
+        for (_, &byte) in msg.iter().enumerate() {
+            vga.write(0x0F00 | byte as u16);
+        }
+
+        loop {
+            core::arch::asm!("hlt", options(nomem, nostack));
+        }
+    }
+}
+
 unsafe fn jump_to_long_mode() -> ! {
     let stack_top = &raw const STACK.data as *const u8 as u64 + 4096;
 
