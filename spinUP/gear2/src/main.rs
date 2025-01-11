@@ -90,14 +90,16 @@ static mut SERIAL_PORT: Option<SerialPort> = None;
 
 // Helper function to safely initialize and use the serial port
 unsafe fn init_serial() {
-    SERIAL_PORT = Some(SerialPort::new(0x3F8));
-    if let Some(serial) = &mut SERIAL_PORT {
+    let serial_ptr = &raw mut SERIAL_PORT;
+    *serial_ptr = Some(SerialPort::new(0x3F8));
+    if let Some(serial) = &raw mut (*serial_ptr) {
         serial.init();
     }
 }
 
 unsafe fn write_serial(msg: &[u8]) {
-    if let Some(serial) = &mut SERIAL_PORT {
+    let serial_ptr = &raw mut SERIAL_PORT;
+    if let Some(serial) = &raw mut (*serial_ptr) {
         for &b in msg {
             serial.write_byte(b);
         }
@@ -159,10 +161,12 @@ unsafe fn setup_gdt() {
         base: gdt.addr() as u32,
     };
 
+    // Using a similar approach to Gear1's assembly style
     core::arch::asm!(
         ".code32",
-        "lgdtw [{0:e}]",  // Use 16-bit operand size for LGDT in protected mode
-        in(reg) &gdt_ptr,
+        "mov {0:e}, %esi",  // Load pointer to GDTR into ESI
+        "lgdt (%esi)",      // Load GDT using indirect addressing
+                     in(reg) &gdt_ptr,
                      options(att_syntax)
     );
 }
