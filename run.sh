@@ -3,11 +3,6 @@
 # Exit on any error
 set -e
 
-#Push to github
-git add -A;
-git commit -m "dbg.";
-git push;
-
 # Colors for output
 RED="\033[0;31m"
 GREEN="\033[0;32m"
@@ -33,6 +28,10 @@ error() {
 # Cleanup function
 cleanup() {
     status "Cleaning up..."
+    #Push to github
+    git add -A
+    git commit -m "dbg."
+    git push
     killall qemu-system-x86_64 2>/dev/null || true
     rm -f serial.log combined.img qemu.log
 }
