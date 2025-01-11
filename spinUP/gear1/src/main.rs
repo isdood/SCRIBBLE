@@ -22,10 +22,10 @@ pub extern "C" fn _start() -> ! {
             "out 0x92, al",
 
             // Load sectors using DAP
-            "mov si, 2f",          // Point to DAP
+            "mov si, 3f",          // Point to DAP
             "mov ah, 0x42",
             "int 0x13",
-            "jc 1f",              // Jump to error if carry set
+            "jc 2f",              // Jump to error if carry set
 
             // Jump to gear2
             "push word ptr 0x07E0",
@@ -33,14 +33,14 @@ pub extern "C" fn _start() -> ! {
             "retf",
 
             // Error handler
-            "1:",
+            "2:",
             "mov ax, 0x0E45",     // Print 'E'
         "int 0x10",
         "cli",
         "hlt",
 
         // Disk Address Packet (DAP)
-        "2:",
+        "3:",
         ".byte 16",           // size of DAP
         ".byte 0",            // unused
         ".word 16",           // sectors to read
