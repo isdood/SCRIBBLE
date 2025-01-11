@@ -71,7 +71,7 @@ dd if=/dev/zero of=combined.img bs=512 count=2880 2>/dev/null
 dd if=spinUP/gear1/target/i686-spinup/release/spinUP-gear1 of=combined.img bs=512 conv=notrunc
 
 # Write Gear2 starting at second sector
-dd if=spinUP/gear2/target/i686-spinup/release/spinUP-gear2 of=combined.img bs=512 seek=1 conv=notrunc
+dd if=spinUP/gear2/target/x86_64-spinUP/release/spinUP of=combined.img bs=512 seek=1 conv=notrunc
 
 success "Created disk image"
 

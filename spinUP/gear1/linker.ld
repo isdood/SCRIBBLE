@@ -1,20 +1,20 @@
-OUTPUT_FORMAT(binary)
-OUTPUT_ARCH(i386)
-
 SECTIONS {
     . = 0x7C00;
+
     .text : {
         *(.boot.text)
-        *(.text)
-        . = 0x1FE;
-        SHORT(0xaa55)
+        *(.text*)
+        . = 510 - (. - 0x7C00);  /* Pad to 510 bytes */
+        SHORT(0xaa55)            /* Boot signature */
     }
+
     /DISCARD/ : {
         *(.comment)
         *(.note*)
         *(.eh_frame*)
-        *(.debug*)
+        *(.debug_*)
         *(.shstrtab)
-        *(*)
+        *(.symtab)
+        *(.strtab)
     }
 }
