@@ -1,6 +1,6 @@
+// In lib/unstable_matter/src/lib.rs
 #![no_std]
 
-// In lib/unstable_matter/src/lib.rs or similar:
 pub struct UnstableMatter<T> {
     addr: *mut T,
 }
@@ -18,5 +18,15 @@ impl<T> UnstableMatter<T> {
 
     pub fn write(&mut self, value: T) {
         unsafe { core::ptr::write_volatile(self.addr, value) }
+    }
+
+    pub fn addr(&self) -> usize {
+        self.addr as usize
+    }
+}
+
+impl UnstableMatter<u8> {
+    pub fn write_byte(&mut self, value: u8) {
+        self.write(value)
     }
 }
