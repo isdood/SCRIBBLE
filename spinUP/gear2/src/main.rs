@@ -102,68 +102,6 @@ pub extern "C" fn _start() -> ! {
     }
 }
 
-unsafe fn enter_long_mode() -> ! {
-    disable_interrupts();
-    {
-        let mut serial = SerialPort::new(0x3F8);
-        for &b in b"Disabled interrupts\r\n" {
-            serial.write_byte(b);
-        }
-    }
-
-    setup_page_tables();
-    {
-        let mut serial = SerialPort::new(0x3F8);
-        for &b in b"Page tables setup\r\n" {
-            serial.write_byte(b);
-        }
-    }
-
-    unsafe fn setup_gdt() {
-        // Specify the concrete type [GDTEntry; 3] for the UnstableMatter
-        let gdt: UnstableMatter<[GDTEntry; 3]> = UnstableMatter::at(&GDT.entries as *const _ as usize);
-        let gdt_ptr = GDTPointer {
-            limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
-            base: gdt.addr() as u32,
-        };
-        core::arch::asm!("lgdt ({0})", in(reg) &gdt_ptr);
-    }
-
-    unsafe fn enable_paging() {
-        let pml4 = UnstableMatter::at(&raw const PAGE_TABLES.pml4 as *const _ as usize);
-
-        core::arch::asm!(
-            "mov %cr4, %eax",
-            "bts $5, %eax",
-            "mov %eax, %cr4",
-
-            // Fixed register formatting for 32-bit operand
-            "mov {0:e}, %eax",
-            "mov %eax, %cr3",
-
-            "mov $0xC0000080, %ecx",
-            "rdmsr",
-            "bts $8, %eax",
-            "wrmsr",
-
-            "mov %cr0, %eax",
-            "bts $31, %eax",
-            "bts $0, %eax",
-            "mov %eax, %cr0",
-            in(reg) pml4.addr(),
-        );
-    }
-
-    {
-        let mut serial = SerialPort::new(0x3F8);
-        for &b in b"Jumping to long mode...\r\n" {
-            serial.write_byte(b);
-        }
-    }
-
-    jump_to_long_mode()
-}
-
 unsafe fn disable_interrupts() {
     core::arch::asm!("cli");
 }
@@ -173,8 +111,8 @@ unsafe fn setup_page_tables() {
     let mut pdpt_entries = UnstableMatter::at(&mut PAGE_TABLES.pdpt.entries[0] as *mut _ as usize);
     let mut pd_entries = UnstableMatter::at(&mut PAGE_TABLES.pd.entries[0] as *mut _ as usize);
 
-    let pdpt_addr = &PAGE_TABLES.pdpt as *const PageTable as u64;
-    let pd_addr = &PAGE_TABLES.pd as *const PageTable as u64;
+    let pdpt_addr = &raw const PAGE_TABLES.pdpt as *const PageTable as u64;
+    let pd_addr = &raw const PAGE_TABLES.pd as *const PageTable as u64;
 
     pml4_entries.write(pdpt_addr | 0x3);
     pdpt_entries.write(pd_addr | 0x3);
@@ -182,42 +120,44 @@ unsafe fn setup_page_tables() {
 }
 
 unsafe fn setup_gdt() {
-    let gdt = UnstableMatter::at(&GDT.entries as *const _ as usize);
+    let gdt: UnstableMatter<[GDTEntry; 3]> = UnstableMatter::at(&raw const GDT.entries as *const _ as usize);
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
         base: gdt.addr() as u32,
     };
-    core::arch::asm!("lgdt ({0})", in(reg) &gdt_ptr);
+    core::arch::asm!("lgdt [{0}]", in(reg) &gdt_ptr, options(att_syntax));
 }
 
 unsafe fn enable_paging() {
-    let pml4_addr = &PAGE_TABLES.pml4 as *const PageTable as u32;
+    let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u32;
 
     core::arch::asm!(
+        ".code32",  // Explicitly set 32-bit mode
         "mov %cr4, %eax",
-        "bts $5, %eax",
-        "mov %eax, %cr4",
+        "or $0x20, %eax",  // Set PAE flag (bit 5)
+    "mov %eax, %cr4",
 
-        "mov {0}, %eax",
-        "mov %eax, %cr3",
+    "mov {0:e}, %eax",
+    "mov %eax, %cr3",
 
-        "mov $0xC0000080, %ecx",
-        "rdmsr",
-        "bts $8, %eax",
-        "wrmsr",
+    "mov $0xC0000080, %ecx",
+    "rdmsr",
+    "or $0x100, %eax",  // Set LME flag (bit 8)
+    "wrmsr",
 
-        "mov %cr0, %eax",
-        "bts $31, %eax",
-        "bts $0, %eax",
-        "mov %eax, %cr0",
-        in(reg) pml4_addr,
+    "mov %cr0, %eax",
+    "or $0x80000001, %eax",  // Set PG and PE flags
+    "mov %eax, %cr0",
+    in(reg) pml4_addr,
+                     options(att_syntax)
     );
 }
 
 unsafe fn jump_to_long_mode() -> ! {
-    let stack_top = &STACK.data as *const u8 as u64 + 4096;
+    let stack_top = &raw const STACK.data as *const u8 as u64 + 4096;
 
     core::arch::asm!(
+        ".code32",
         "pushl $0x08",
         "pushl $2f",
         "lretl",
@@ -235,14 +175,56 @@ unsafe fn jump_to_long_mode() -> ! {
 
         "movq {}, %rsp",
 
-        // Jump to rust_main
         "call {1}",
 
         "hlt",
         in(reg) stack_top,
                      sym rust_main,
-                     options(noreturn),
+                     options(noreturn, att_syntax),
     );
+}
+
+unsafe fn enter_long_mode() -> ! {
+    disable_interrupts();
+    {
+        let mut serial = SerialPort::new(0x3F8);
+        for &b in b"Disabled interrupts\r\n" {
+            serial.write_byte(b);
+        }
+    }
+
+    setup_page_tables();
+    {
+        let mut serial = SerialPort::new(0x3F8);
+        for &b in b"Page tables setup\r\n" {
+            serial.write_byte(b);
+        }
+    }
+
+    setup_gdt();
+    {
+        let mut serial = SerialPort::new(0x3F8);
+        for &b in b"GDT setup\r\n" {
+            serial.write_byte(b);
+        }
+    }
+
+    enable_paging();
+    {
+        let mut serial = SerialPort::new(0x3F8);
+        for &b in b"Paging enabled\r\n" {
+            serial.write_byte(b);
+        }
+    }
+
+    {
+        let mut serial = SerialPort::new(0x3F8);
+        for &b in b"Jumping to long mode...\r\n" {
+            serial.write_byte(b);
+        }
+    }
+
+    jump_to_long_mode()
 }
 
 #[no_mangle]
