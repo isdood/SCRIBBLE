@@ -1,23 +1,21 @@
 ENTRY(_start)
-OUTPUT_FORMAT(elf32-i386)
 
 SECTIONS {
-    . = 0x7e00;    /* Load address where Gear1 jumps to */
+    . = 0x7e00;
 
     .text : {
-        *(.text*)  /* Code section */
+        *(.text*)
     }
 
     .rodata : {
-        *(.rodata*)  /* Read-only data */
+        *(.rodata*)
     }
 
     .data : {
-        *(.data*)  /* Initialized data */
+        *(.data*)
     }
 
     .bss : {
-        *(.bss*)   /* Uninitialized data */
-        *(COMMON)
+        *(.bss*)
     }
 }

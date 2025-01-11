@@ -3,11 +3,7 @@ name = "spinUP"
 version = "0.1.0"
 edition = "2021"
 
-[profile.dev]
-panic = "abort"
-
 [profile.release]
+opt-level = "z"
 panic = "abort"
-
-[build]
-target = "i686-unknown-none"  # Start in 32-bit mode
+lto = true
