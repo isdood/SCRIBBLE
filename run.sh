@@ -75,8 +75,8 @@ status "Creating disk image..."
 cd ../..
 
 # Combine Gear1 and Gear2 into one disk image
-dd if=gear1.bin of=disk.img bs=512 count=1
-dd if=gear2.bin of=disk.img bs=512 seek=1
+dd if=spinUP/gear1/gear1.bin of=combined.img bs=512 count=1
+dd if=spinUP/gear2/gear2.bin of=combined.img bs=512 seek=1
 
 success "Created disk image"
 
