@@ -284,14 +284,19 @@ unsafe fn enable_paging() {
 #[allow(dead_code)]
 unsafe fn setup_long_mode() {
     // Disable interrupts
-    core::arch::asm!("cli");
+    core::arch::asm!(
+        ".code32",
+        "cli",
+        options(nomem, nostack)
+    );
 
     // Load PML4 table
     core::arch::asm!(
         ".code32",
-        "mov eax, {pml4}",
-        "mov cr3, eax",
-        pml4 = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+        "mov {tmp:e}, {pml4:e}",
+        "mov cr3, {tmp:e}",
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+                     tmp = out(reg) _,
                      options(nomem, nostack)
     );
 
@@ -309,7 +314,11 @@ unsafe fn setup_long_mode() {
 #[allow(dead_code)]
 unsafe fn enter_long_mode() -> ! {
     // Disable interrupts first
-    core::arch::asm!("cli");
+    core::arch::asm!(
+        ".code32",
+        "cli",
+        options(nomem, nostack)
+    );
     write_serial(b"Disabled interrupts\r\n");
 
     // Setup page tables
@@ -346,9 +355,9 @@ unsafe fn enter_long_mode() -> ! {
     // Load CR3 with PML4
     core::arch::asm!(
         ".code32",
-        "mov {tmp:e}, {pml4:e}",
+        "mov {tmp:e}, {addr:e}",
         "mov cr3, {tmp:e}",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
                      tmp = out(reg) _,
                      options(nomem, nostack)
     );
@@ -410,7 +419,7 @@ unsafe fn enter_long_mode() -> ! {
         // Set up final stack and jump to Rust
         "mov rsp, {stack}",
         "jmp {target}",
-        stack = in(reg) (&raw const STACK.data as *const u8 as u64 + 4096),
+        stack = in(reg) &raw const STACK.data as *const u8 as u64 + 4096,
                      target = sym rust_main,
                      options(noreturn)
     );
