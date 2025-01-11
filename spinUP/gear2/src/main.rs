@@ -9,7 +9,7 @@ use serial::SerialPort;
 use unstable_matter::UnstableMatter;
 use core::arch::asm;
 
-#[repr(C, align(16))]
+#[repr(C, packed)]
 struct InterruptStackFrame {
     instruction_pointer: u64,
     code_segment: u64,
@@ -360,33 +360,35 @@ unsafe fn setup_long_mode() {
 }
 
 unsafe fn setup_pic() {
-    // Initialize PIC1 (master)
-    asm!(
+    // Remap PIC
+    core::arch::asm!(
         ".code32",
-         "mov al, 0x11",
-         "out 0x20, al",    // ICW1: initialize
-         "mov al, 0x20",    // ICW2: IDT entry 0x20
-         "out 0x21, al",
-         "mov al, 0x04",    // ICW3: IRQ2 -> connection to slave
-         "out 0x21, al",
-         "mov al, 0x01",    // ICW4: 8086 mode
-         "out 0x21, al",
-
-         // Initialize PIC2 (slave)
-         "mov al, 0x11",
-         "out 0xA0, al",    // ICW1
-         "mov al, 0x28",    // ICW2: IDT entry 0x28
-         "out 0xA1, al",
-         "mov al, 0x02",    // ICW3: IRQ9 -> connection to master
-         "out 0xA1, al",
-         "mov al, 0x01",    // ICW4: 8086 mode
-         "out 0xA1, al",
-
-         // Mask all interrupts except timer
-         "mov al, 0xFE",    // Enable only IRQ0 (timer)
+        // Initialize master PIC
+        "mov al, 0x11",
+        "out 0x20, al",         // Start initialization (ICW1)
+    "mov al, 0x20",         // Vector offset (ICW2) - IRQ0 will be interrupt 32
+                     "out 0x21, al",
+                     "mov al, 0x04",         // Tell Master PIC that there is a slave PIC at IRQ2 (ICW3)
     "out 0x21, al",
-    "mov al, 0xFF",    // Disable all slave interrupts
+    "mov al, 0x01",         // ICW4 - x86 mode
+    "out 0x21, al",
+
+    // Initialize slave PIC
+    "mov al, 0x11",
+    "out 0xA0, al",         // Start initialization (ICW1)
+    "mov al, 0x28",         // Vector offset (ICW2) - IRQ8 will be interrupt 40
+                     "out 0xA1, al",
+                     "mov al, 0x02",         // Tell Slave PIC its cascade identity (ICW3)
     "out 0xA1, al",
+    "mov al, 0x01",         // ICW4 - x86 mode
+    "out 0xA1, al",
+
+    // Mask all interrupts except timer (IRQ0)
+    "mov al, 0xFE",         // Enable only IRQ0 (timer)
+    "out 0x21, al",
+    "mov al, 0xFF",         // Mask all interrupts on slave PIC
+    "out 0xA1, al",
+
     options(nomem, nostack)
     );
 }
@@ -511,22 +513,44 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(
 ) {
     core::arch::naked_asm!(
         ".code64",
+        // Save all registers
         "push rax",
         "push rcx",
         "push rdx",
+        "push rbx",
+        "push rbp",
         "push rsi",
         "push rdi",
+        "push r8",
+        "push r9",
+        "push r10",
+        "push r11",
+        "push r12",
+        "push r13",
+        "push r14",
+        "push r15",
 
         // Send EOI to PIC
         "mov al, 0x20",
         "out 0x20, al",
 
-        // Restore registers
+        // Restore all registers
+        "pop r15",
+        "pop r14",
+        "pop r13",
+        "pop r12",
+        "pop r11",
+        "pop r10",
+        "pop r9",
+        "pop r8",
         "pop rdi",
         "pop rsi",
+        "pop rbp",
+        "pop rbx",
         "pop rdx",
         "pop rcx",
         "pop rax",
+
         "iretq",
     );
 }
@@ -538,6 +562,29 @@ unsafe extern "x86-interrupt" fn page_fault_handler(
 ) {
     core::arch::naked_asm!(
         ".code64",
+        // Save all registers
+        "push rax",
+        "push rcx",
+        "push rdx",
+        "push rbx",
+        "push rbp",
+        "push rsi",
+        "push rdi",
+        "push r8",
+        "push r9",
+        "push r10",
+        "push r11",
+        "push r12",
+        "push r13",
+        "push r14",
+        "push r15",
+
+        // Get error code and CR2 (contains faulting address)
+        "mov rdi, cr2",  // Get the faulting address
+        "mov rsi, [rsp + 120]",  // Get error code from stack
+
+        // Handle the page fault here
+        // For now, just print a message and halt
         "cli",
         "hlt",
     );
