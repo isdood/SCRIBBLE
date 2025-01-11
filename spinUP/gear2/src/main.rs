@@ -45,13 +45,6 @@ struct GDTTable {
     entries: [GDTEntry; 3]
 }
 
-#[repr(C, packed)]
-struct GDTPointer {
-    limit: u16,
-    base: u32,
-}
-
-
 #[repr(C, align(4096))]
 struct Stack {
     data: [u8; 4096]
@@ -89,7 +82,6 @@ struct IDTEntry {
     reserved: u32,
 }
 
-// Define IDT structure
 #[repr(C, align(16))]
 struct IDT {
     entries: [IDTEntry; 256],
@@ -105,23 +97,17 @@ const DEFAULT_IDT_ENTRY: IDTEntry = IDTEntry {
     reserved: 0,
 };
 
-// Initialize IDT with const array
+// Single definition of IDT using const array
+#[no_mangle]
 static mut IDT: IDT = IDT {
     entries: [DEFAULT_IDT_ENTRY; 256],
 };
 
-// Initialize IDT using array::from_fn
-static mut IDT: IDT = IDT {
-    entries: core::array::from_fn(|_| IDTEntry {
-        offset_low: 0,
-        segment: 0,
-        flags: 0,
-        offset_middle: 0,
-        offset_high: 0,
-        reserved: 0,
-    }),
-};
-
+#[repr(C, packed)]
+struct GDTPointer {
+    limit: u16,
+    base: u32,
+}
 
 static mut PAGE_TABLES: PageTables = PageTables {
     pml4: PageTable { entries: [0; 512] },
