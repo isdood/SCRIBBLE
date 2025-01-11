@@ -172,13 +172,6 @@ fn get_cpuid() -> (u32, u32, u32, u32) {
     (eax, ebx, ecx, edx)
 }
 
-unsafe fn setup_page_tables() {
-    // Identity map first 2MB of memory
-    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3; // Present + R/W
-    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3;   // Present + R/W
-    PAGE_TABLES.pd.entries[0] = 0x83;  // Present + R/W + PS (2MB page)
-}
-
 unsafe fn setup_gdt() {
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
@@ -217,13 +210,11 @@ unsafe fn check_long_mode() -> bool {
 
     // Check for extended processor info
     let max_cpuid: u32;
-    let mut scratch: u32;
     core::arch::asm!(
         "cpuid",
         inlateout("eax") 0x80000000 => max_cpuid,
-                     out("ecx") _,
-                     out("edx") _,
-                     out("eax") scratch,
+                     lateout("ecx") _,
+                     lateout("edx") _,
     );
 
     if max_cpuid < 0x80000001 {
@@ -234,13 +225,19 @@ unsafe fn check_long_mode() -> bool {
     let edx: u32;
     core::arch::asm!(
         "cpuid",
-        in("eax") 0x80000001,
-                     out("ecx") _,
-                     out("edx") edx,
-                     out("eax") scratch,
+        inlateout("eax") 0x80000001 => _,
+                     lateout("ecx") _,
+                     lateout("edx") edx,
     );
 
     (edx & (1 << 29)) != 0 // LM bit
+}
+
+unsafe fn setup_page_tables() {
+    // Identity map first 2MB of memory
+    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3; // Present + R/W
+    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3;   // Present + R/W
+    PAGE_TABLES.pd.entries[0] = 0x83;  // Present + R/W + PS (2MB page)
 }
 
 unsafe fn setup_long_mode() {
