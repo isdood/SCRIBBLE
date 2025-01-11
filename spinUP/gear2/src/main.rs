@@ -164,14 +164,14 @@ unsafe fn setup_gdt() {
 
     core::arch::asm!(
         ".code32",
-        "sub esp, 6",           // Make space for GDTR
-        "mov [{0}], {1:x}",    // Store limit
-        "mov [{0} + 2], {2:e}", // Store base
-        "lgdt [esp]",          // Load GDT
-        "add esp, 6",          // Restore stack
-        in(reg) "esp" => _,
-                     in(reg) gdt_ptr.limit,
-                     in(reg) gdt_ptr.base,
+        "sub $6, %esp",           // Make space for GDTR
+        "movw {1:x}, (%esp)",     // Store limit
+                     "movl {2:e}, 2(%esp)",    // Store base
+                     "lgdt (%esp)",           // Load GDT
+                     "add $6, %esp",          // Restore stack
+                     in("esp") _,
+                     in("eax") gdt_ptr.limit,
+                     in("ebx") gdt_ptr.base,
                      options(att_syntax)
     );
 }
