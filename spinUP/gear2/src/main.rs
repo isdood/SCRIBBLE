@@ -48,7 +48,7 @@ struct GDTTable {
 #[repr(C, packed)]
 struct GDTPointer {
     limit: u16,
-    base: u32,  // Changed from u64 to u32 for 32-bit mode
+    base: u32,
 }
 
 
@@ -79,7 +79,7 @@ static mut STAGE_INFO: StageInfo = StageInfo {
 
 // Define IDT entry structure
 #[repr(C, packed)]
-#[derive(Copy, Clone)]  // Add Copy and Clone traits
+#[derive(Copy, Clone)]
 struct IDTEntry {
     offset_low: u16,
     segment: u16,
@@ -94,6 +94,21 @@ struct IDTEntry {
 struct IDT {
     entries: [IDTEntry; 256],
 }
+
+// Create a const default entry
+const DEFAULT_IDT_ENTRY: IDTEntry = IDTEntry {
+    offset_low: 0,
+    segment: 0,
+    flags: 0,
+    offset_middle: 0,
+    offset_high: 0,
+    reserved: 0,
+};
+
+// Initialize IDT with const array
+static mut IDT: IDT = IDT {
+    entries: [DEFAULT_IDT_ENTRY; 256],
+};
 
 // Initialize IDT using array::from_fn
 static mut IDT: IDT = IDT {
@@ -621,7 +636,7 @@ unsafe fn setup_idt() {
     // Load IDT with 32-bit pointer
     let idtr = GDTPointer {
         limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &IDT as *const _ as u32,  // Cast to u32 instead of u64
+        base: &IDT as *const _ as u32,
     };
 
     core::arch::asm!(
