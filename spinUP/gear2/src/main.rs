@@ -86,7 +86,54 @@ static mut STACK: Stack = Stack {
     data: [0; 4096]
 };
 
-static mut SERIAL: SerialPort = unsafe { SerialPort::new(0x3F8) };
+static mut SERIAL_PORT: Option<SerialPort> = None;
+
+// Helper function to safely initialize and use the serial port
+unsafe fn init_serial() {
+    SERIAL_PORT = Some(SerialPort::new(0x3F8));
+    if let Some(serial) = &mut SERIAL_PORT {
+        serial.init();
+    }
+}
+
+unsafe fn write_serial(msg: &[u8]) {
+    if let Some(serial) = &mut SERIAL_PORT {
+        for &b in msg {
+            serial.write_byte(b);
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rust_main() -> ! {
+    unsafe {
+        let mut vga = UnstableMatter::<u16>::at(0xB8000);
+        let msg = b"Long Mode OK!";
+
+        // Clear screen
+        for _ in 0..80*25 {
+            vga.write(0x0F00);
+        }
+
+        // Write message
+        for (_, &byte) in msg.iter().enumerate() {
+            vga.write(0x0F00 | byte as u16);
+        }
+
+        loop {
+            core::arch::asm!("hlt", options(nomem, nostack));
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn _start() -> ! {
+    unsafe {
+        init_serial();
+        write_serial(b"Gear2 starting...\r\n");
+        enter_long_mode();
+    }
+}
 
 unsafe fn disable_interrupts() {
     core::arch::asm!("cli");
@@ -111,9 +158,10 @@ unsafe fn setup_gdt() {
         limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
         base: gdt.addr() as u32,
     };
+
     core::arch::asm!(
         ".code32",
-        "lgdt [{0:e}]",  // Use 32-bit addressing
+        "lgdtw [{0:e}]",  // Use 16-bit operand size for LGDT in protected mode
         in(reg) &gdt_ptr,
                      options(att_syntax)
     );
@@ -142,28 +190,6 @@ unsafe fn enable_paging() {
     in(reg) pml4_addr,
                      options(att_syntax)
     );
-}
-
-#[no_mangle]
-pub extern "C" fn rust_main() -> ! {
-    unsafe {
-        let mut vga = UnstableMatter::<u16>::at(0xB8000);
-        let msg = b"Long Mode OK!";
-
-        // Clear screen
-        for _ in 0..80*25 {
-            vga.write(0x0F00);
-        }
-
-        // Write message
-        for (_, &byte) in msg.iter().enumerate() {
-            vga.write(0x0F00 | byte as u16);
-        }
-
-        loop {
-            core::arch::asm!("hlt", options(nomem, nostack));
-        }
-    }
 }
 
 unsafe fn jump_to_long_mode() -> ! {
@@ -197,61 +223,27 @@ unsafe fn jump_to_long_mode() -> ! {
     );
 }
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
-    unsafe {
-        SERIAL.init();
-        for &b in b"Gear2 starting...\r\n" {
-            SERIAL.write_byte(b);
-        }
-        enter_long_mode();
-    }
-}
-
 unsafe fn enter_long_mode() -> ! {
     disable_interrupts();
-    {
-        for &b in b"Disabled interrupts\r\n" {
-            SERIAL.write_byte(b);
-        }
-    }
+    write_serial(b"Disabled interrupts\r\n");
 
     setup_page_tables();
-    {
-        for &b in b"Page tables setup\r\n" {
-            SERIAL.write_byte(b);
-        }
-    }
+    write_serial(b"Page tables setup\r\n");
 
     setup_gdt();
-    {
-        for &b in b"GDT setup\r\n" {
-            SERIAL.write_byte(b);
-        }
-    }
+    write_serial(b"GDT setup\r\n");
 
     enable_paging();
-    {
-        for &b in b"Paging enabled\r\n" {
-            SERIAL.write_byte(b);
-        }
-    }
+    write_serial(b"Paging enabled\r\n");
 
-    {
-        for &b in b"Jumping to long mode...\r\n" {
-            SERIAL.write_byte(b);
-        }
-    }
-
+    write_serial(b"Jumping to long mode...\r\n");
     jump_to_long_mode()
 }
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     unsafe {
-        for &b in b"PANIC in gear2!\r\n" {
-            SERIAL.write_byte(b);
-        }
+        write_serial(b"PANIC in gear2!\r\n");
     }
     loop {}
 }
