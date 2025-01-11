@@ -1,28 +1,16 @@
-OUTPUT_FORMAT(binary)
-OUTPUT_ARCH(i386)
-
+ENTRY(_start)
 SECTIONS {
-    /* Bootloader starts at 0x7C00 */
-    . = 0x7C00;
-
-    .boot : {
-        /* Place all sections marked as .boot.text here */
-        *(.boot.text .boot.text.*);
-        /* Pad to 510 bytes and add boot signature */
-        . = 0x7C00 + 510;
-        SHORT(0xAA55)
-    }
-
-    /* Discard everything else */
-    /DISCARD/ : {
+    . = 0x7E00;
+    .text : {
         *(.text*)
-        *(.data*)
-        *(.bss*)
+    }
+    .rodata : {
         *(.rodata*)
-        *(.comment*)
-        *(.eh_frame*)
-        *(.note*)
-        *(.riscv.attributes*)
-        *(.debug*)
+    }
+    .data : {
+        *(.data*)
+    }
+    .bss : {
+        *(.bss*)
     }
 }

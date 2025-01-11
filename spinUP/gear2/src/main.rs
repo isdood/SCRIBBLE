@@ -149,15 +149,6 @@ pub extern "C" fn rust_main() -> ! {
     }
 }
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
-    unsafe {
-        init_serial();
-        write_serial(b"Gear2 starting...\r\n");
-        enter_long_mode();
-    }
-}
-
 unsafe fn disable_interrupts() {
     core::arch::asm!("cli");
 }
@@ -195,26 +186,61 @@ unsafe fn setup_gdt() {
     );
 }
 
-unsafe fn enable_paging() {
-    let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
+unsafe fn setup_page_tables() {
+    // Identity map first 2MB of memory
+    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3; // Present + R/W
+    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3;   // Present + R/W
+    PAGE_TABLES.pd.entries[0] = 0x83;  // Present + R/W + PS (2MB page)
+}
 
+unsafe fn check_long_mode() -> bool {
+    // Check CPUID presence
+    let has_cpuid: bool;
     core::arch::asm!(
-        ".code32",
-        "movl %cr4, %eax",
-        "orl $0x20, %eax",
-        "movl %eax, %cr4",
-        "movl {addr:e}, %eax",
-        "movl %eax, %cr3",
-        "movl $0xC0000080, %ecx",
-        "rdmsr",
-        "orl $0x100, %eax",
-        "wrmsr",
-        "movl %cr0, %eax",
-        "orl $0x80000001, %eax",
-        "movl %eax, %cr0",
-        addr = in(reg) pml4_addr as u32,
-                     options(att_syntax, nomem, nostack)
+        "pushfd",
+        "pop eax",
+        "mov ecx, eax",
+        "xor eax, 1 << 21",
+        "push eax",
+        "popfd",
+        "pushfd",
+        "pop eax",
+        "xor eax, ecx",
+        "shr eax, 21",
+        "and eax, 1",
+        out("eax") has_cpuid,
+                     out("ecx") _,
     );
+
+    if !has_cpuid {
+        return false;
+    }
+
+    // Check for extended processor info
+    let mut max_cpuid: u32;
+    core::arch::asm!(
+        "cpuid",
+        inout("eax") 0x80000000 => max_cpuid,
+                     out("ebx") _,
+                     out("ecx") _,
+                     out("edx") _,
+    );
+
+    if max_cpuid < 0x80000001 {
+        return false;
+    }
+
+    // Check for long mode support
+    let mut edx: u32;
+    core::arch::asm!(
+        "cpuid",
+        inout("eax") 0x80000001 => _,
+                     out("ebx") _,
+                     out("ecx") _,
+                     out("edx") edx,
+    );
+
+    (edx & (1 << 29)) != 0 // LM bit
 }
 
 unsafe fn setup_long_mode() {
@@ -223,38 +249,33 @@ unsafe fn setup_long_mode() {
 
     // Enable PAE
     core::arch::asm!(
-        ".code32",            // Explicitly set 32-bit mode
         "mov eax, cr4",
-        "or eax, 1 << 5",     // Set PAE bit
-        "mov cr4, eax",
-        options(nomem, nostack)
+        "or eax, 0x20",       // Set PAE bit (1 << 5)
+    "mov cr4, eax",
+    options(nomem, nostack)
     );
 
     // Load PML4 table
-    let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
     core::arch::asm!(
-        ".code32",
-        "mov eax, {0:e}",
+        "mov eax, {pml4}",
         "mov cr3, eax",
-        in(reg) pml4_addr as u32,
+        pml4 = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
                      options(nomem, nostack)
     );
 
     // Enable long mode in EFER MSR
     core::arch::asm!(
-        ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or eax, 1 << 8",      // Set LME bit
-        "wrmsr",
-        options(nomem, nostack)
+        "or eax, 0x100",       // Set LME bit (1 << 8)
+    "wrmsr",
+    options(nomem, nostack)
     );
 
     // Enable paging and protection
     core::arch::asm!(
-        ".code32",
         "mov eax, cr0",
-        "or eax, 1 << 31 | 1", // Set PG and PE bits
+        "or eax, 0x80000001",  // Set PG and PE bits
         "mov cr0, eax",
         options(nomem, nostack)
     );
@@ -269,45 +290,26 @@ fn get_cpuid() -> (u32, u32, u32, u32) {
     unsafe {
         core::arch::asm!(
             "cpuid",
-            inout("eax") 0 => eax,    // Input function 0, output to eax
-                         out("ebx") ebx,           // Output to ebx
-                         out("ecx") ecx,           // Output to ecx
-                         out("edx") edx,           // Output to edx
+            inout("eax") 0 => eax,
+                         out("ebx") ebx,
+                         out("ecx") ecx,
+                         out("edx") edx,
         );
     }
 
     (eax, ebx, ecx, edx)
 }
 
-unsafe fn jump_to_long_mode() -> ! {
-    // Load GDT before jumping
-    setup_gdt();
+unsafe fn setup_gdt() {
+    let gdt_ptr = GDTPointer {
+        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
+        base: &GDT as *const _ as u32,
+    };
 
     core::arch::asm!(
-        ".code32",
-        // Ensure stack alignment
-        "and esp, -16",
-        // Far jump to 64-bit code
-        "push dword ptr 0x08", // Code segment selector
-        "lea eax, [2f]",       // Get address of label
-        "push eax",            // Push target address
-        "retf",                // Far return to 64-bit code
-        ".align 8",
-        "2:",
-        ".code64",
-        // Load data segment registers
-        "mov ax, 0x10",        // Data segment selector
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-        // Set up stack and jump to Rust
-        "mov rsp, {stack}",    // Load stack pointer
-        "jmp {target}",        // Jump to rust_main
-        stack = in(reg) (&raw const STACK.data as *const u8 as u64 + 4096),
-                     target = sym rust_main,
-                     options(noreturn)
+        "lgdt [{0}]",
+        in(reg) &gdt_ptr,
+                     options(readonly)
     );
 }
 
@@ -421,10 +423,90 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn _start() -> ! {
+    // Initialize serial port for debugging
+    init_serial();
+    write_serial(b"Serial initialized\r\n");
+
+    // Check if long mode is available
+    if !check_long_mode() {
+        write_serial(b"Long mode not supported\r\n");
+        loop { core::arch::asm!("hlt"); }
+    }
+    write_serial(b"Long mode supported\r\n");
+
+    // Set up paging structures
+    setup_page_tables();
+    write_serial(b"Page tables set up\r\n");
+
+    // Enable PAE
+    core::arch::asm!(
+        "mov eax, cr4",
+        "or eax, 1 << 5",     // Set PAE bit
+        "mov cr4, eax",
+        options(nomem, nostack)
+    );
+    write_serial(b"PAE enabled\r\n");
+
+    // Load CR3 with PML4
+    core::arch::asm!(
+        "mov cr3, {0}",
+        in(reg) &PAGE_TABLES.pml4 as *const _ as u64,
+                     options(nomem, nostack)
+    );
+    write_serial(b"CR3 loaded\r\n");
+
+    // Enable long mode
+    core::arch::asm!(
+        "mov ecx, 0xC0000080", // EFER MSR
+        "rdmsr",
+        "or eax, 1 << 8",      // Set LME bit
+        "wrmsr",
+        options(nomem, nostack)
+    );
+    write_serial(b"Long mode enabled in EFER\r\n");
+
+    // Setup GDT for long mode
+    setup_gdt();
+    write_serial(b"GDT loaded\r\n");
+
+    // Enable paging
+    core::arch::asm!(
+        "mov eax, cr0",
+        "or eax, 1 << 31 | 1", // Set PG and PE bits
+        "mov cr0, eax",
+        options(nomem, nostack)
+    );
+    write_serial(b"Paging enabled\r\n");
+
+    // Jump to long mode
+    core::arch::asm!(
+        "push 0x08",          // Code segment
+        "lea {tmp}, [1f]",    // Get address of label
+        "push {tmp}",         // Push address
+        "retf",              // Far return to 64-bit mode
+        "1:",
+        ".code64",
+        "mov ax, 0x10",      // Data segment
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+        // Set up stack and jump to Rust
+        "mov rsp, {stack}",
+        "jmp {target}",
+        tmp = out(reg) _,
+                     stack = in(reg) (&STACK.data as *const _ as u64 + 4096),
+                     target = sym rust_main,
+                     options(noreturn)
+    );
+}
+
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    unsafe {
-        write_serial(b"PANIC in gear2!\r\n");
+    loop {
+        unsafe { core::arch::asm!("hlt"); }
     }
-    loop {}
 }
