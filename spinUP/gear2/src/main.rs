@@ -159,11 +159,11 @@ unsafe fn disable_interrupts() {
 }
 
 unsafe fn setup_page_tables() {
+    // Need to ensure CR3 is loaded after tables are set up
     PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
     PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
     PAGE_TABLES.pd.entries[0] = 0x83;
 
-    // Load CR3
     core::arch::asm!(
         ".code32",
         "mov {tmp:e}, {addr:e}",
@@ -430,26 +430,35 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
+unsafe fn check_paging_enabled() -> bool {
+    let cr0: u32;
+    core::arch::asm!(
+        ".code32",
+        "mov {0:e}, cr0",
+        out(reg) cr0,
+                     options(nomem, nostack)
+    );
+    (cr0 & (1 << 31)) != 0
+}
+
 #[no_mangle]
-pub unsafe extern "C" fn _start() -> ! {
+unsafe fn _start() -> ! {
     init_serial();
     write_serial(b"Serial initialized\r\n");
 
     disable_interrupts();
     write_serial(b"Interrupts disabled\r\n");
 
-    // Check if long mode is available
     if !check_long_mode() {
         write_serial(b"Long mode not supported\r\n");
         loop { core::arch::asm!("hlt"); }
     }
-    write_serial(b"Long mode supported\r\n");
 
-    // Set up paging structures
+    // Set up paging structures BEFORE enabling PAE
     setup_page_tables();
     write_serial(b"Page tables set up\r\n");
 
-    // Enable PAE
+    // Enable PAE before loading CR3
     core::arch::asm!(
         ".code32",
         "mov eax, cr4",
@@ -459,18 +468,7 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"PAE enabled\r\n");
 
-    // Load CR3 with PML4
-    core::arch::asm!(
-        ".code32",
-        "mov {tmp:e}, {addr:e}",
-        "mov cr3, {tmp:e}",
-        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     tmp = out(reg) _,
-                     options(nomem, nostack)
-    );
-    write_serial(b"CR3 loaded\r\n");
-
-    // Enable long mode
+    // Enable long mode in EFER MSR
     core::arch::asm!(
         ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
@@ -481,7 +479,11 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"Long mode enabled in EFER\r\n");
 
-    // Enable paging
+    // Setup GDT before enabling paging
+    setup_gdt();
+    write_serial(b"GDT loaded\r\n");
+
+    // Enable paging last
     core::arch::asm!(
         ".code32",
         "mov eax, cr0",
@@ -490,29 +492,6 @@ pub unsafe extern "C" fn _start() -> ! {
         options(nomem, nostack)
     );
     write_serial(b"Paging enabled\r\n");
-
-    // Jump to long mode
-    core::arch::asm!(
-        ".code32",
-        "push 0x08",          // Code segment
-        "lea eax, [2f]",      // Get address of label
-        "push eax",           // Push address
-        "retf",               // Far return to 64-bit mode
-        ".align 8",
-        "2:",
-        ".code64",
-        "mov ax, 0x10",       // Data segment
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-        "mov rsp, {0}",
-        "jmp {1}",
-        in(reg) &raw const STACK.data as *const _ as u64 + 4096,
-                     sym rust_main,
-                     options(noreturn)
-    );
 }
 
 #[panic_handler]
