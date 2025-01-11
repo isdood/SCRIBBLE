@@ -456,6 +456,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Enable PAE
     core::arch::asm!(
+        ".code32",
         "mov eax, cr4",
         "or eax, 1 << 5",     // Set PAE bit
         "mov cr4, eax",
@@ -464,15 +465,16 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Load CR3
     core::arch::asm!(
-        "mov {tmp:e}, {pml4:e}",  // Fixed register formatting
-        "mov cr3, {tmp:e}",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,  // Fixed static ref
-                     tmp = out(reg) _,
+        ".code32",
+        "mov ecx, {pml4:e}",
+        "mov cr3, ecx",
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
                      options(nomem, nostack)
     );
 
     // Enable long mode
     core::arch::asm!(
+        ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
         "or eax, 1 << 8",      // Set LME
@@ -482,6 +484,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Enable paging and protection
     core::arch::asm!(
+        ".code32",
         "mov eax, cr0",
         "or eax, 0x80000001",  // Set PG and PE
         "mov cr0, eax",
@@ -493,26 +496,27 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Switch to long mode
     core::arch::asm!(
+        ".code32",
         // Build far return stack frame
-        "push word 0x8",      // Code segment
-        "push word 2f",       // Return address (using 2 instead of 1)
-    // Switch mode
-    "retf",
-    // Long mode entry point
-    "2:",                 // Changed label from 1 to 2
-    ".code64",            // Switch assembler to 64-bit mode
-    "mov rsp, 0x7c00",    // Reset stack pointer
-    // Clear segment registers
-    "xor ax, ax",
-    "mov ds, ax",
-    "mov es, ax",
-    "mov fs, ax",
-    "mov gs, ax",
-    "mov ss, ax",
-    // Jump to Rust main
-    "jmp {target}",
-    target = sym rust_main,
-    options(noreturn)
+        "push word ptr 0x8",   // Code segment
+        "push word ptr 2f",    // Return address
+        // Switch mode
+        "retf",
+        // Long mode entry point
+        "2:",
+        ".code64",            // Switch assembler to 64-bit mode
+        "mov rsp, 0x7c00",    // Reset stack pointer
+        // Clear segment registers
+        "xor ax, ax",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+        // Jump to Rust main
+        "jmp {target}",
+        target = sym rust_main,
+        options(noreturn)
     );
 }
 
