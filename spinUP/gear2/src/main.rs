@@ -263,13 +263,9 @@ unsafe fn setup_long_mode() {
 unsafe fn validate_cpu_features() -> bool {
     let mut cpuid_result: u32;
     core::arch::asm!(
-        "mov eax, 0x80000001",
-        "cpuid",
-        "and edx, 1 << 29",  // Test LM bit
-        "mov {0:e}, edx",
+        "mov edx, eax",  // Use direct register names instead of template arguments
         out("eax") cpuid_result,
     );
-    cpuid_result != 0
 }
 
 unsafe fn jump_to_long_mode() -> ! {
