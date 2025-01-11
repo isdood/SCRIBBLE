@@ -1,16 +1,18 @@
-ENTRY(_start)
 SECTIONS {
-    . = 0x7E00;
+    . = 0x7c00;
     .text : {
-        *(.text*)
+        *(.text .text.*)
     }
     .rodata : {
-        *(.rodata*)
+        *(.rodata .rodata.*)
     }
     .data : {
-        *(.data*)
+        *(.data .data.*)
     }
     .bss : {
-        *(.bss*)
+        *(.bss .bss.*)
+    }
+    .boot_signature : AT(0x7dfe) {
+        *(.boot_signature)
     }
 }

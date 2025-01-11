@@ -1,3 +1,14 @@
+#![no_std]  // Don't link the Rust standard library
+#![no_main] // Disable all Rust-level entry points
+
+use core::panic::PanicInfo;
+
+// The panic handler
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
     // Setup stack
@@ -58,3 +69,9 @@ pub unsafe extern "C" fn _start() -> ! {
 
     loop {}
 }
+
+// Ensure the binary has a 512-byte size and ends with the boot signature
+#[used]
+#[no_mangle]
+#[link_section = ".boot_signature"]
+static BOOT_SIGNATURE: [u8; 2] = [0x55, 0xaa];
