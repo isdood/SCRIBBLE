@@ -162,7 +162,7 @@ unsafe fn setup_gdt() {
     let gdt: UnstableMatter<[GDTEntry; 3]> = UnstableMatter::at(&raw const GDT.entries as *const _ as usize);
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
-        base: gdt_addr() as u32,
+        base: gdt.addr() as u32,  // Fixed: Use gdt.addr() instead of non-existent gdt_addr()
     };
 
     let limit = gdt_ptr.limit;
