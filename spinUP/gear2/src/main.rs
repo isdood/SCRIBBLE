@@ -408,7 +408,7 @@ pub unsafe extern "C" fn _start() -> ! {
     // Set up page tables
     setup_page_tables();
 
-    // Load GDT before enabling long mode
+    // Initialize GDT before enabling long mode
     setup_gdt();
 
     // Enable PAE
@@ -457,7 +457,6 @@ pub unsafe extern "C" fn _start() -> ! {
         "2:",
         ".code64",
         // Set up 64-bit environment
-        "lgdt [{gdt}]",         // Reload GDT
         "mov rsp, 0x7c00",      // Reset stack
         // Clear segment registers
         "xor ax, ax",
@@ -466,12 +465,8 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
-        // Set up IDT to handle interrupts
-        "lidt [{idt}]",
         // Jump to Rust main
         "jmp {target}",
-        gdt = sym GDT_DESC,
-        idt = sym IDT_DESC,
         target = sym rust_main,
         options(noreturn)
     );
@@ -480,34 +475,40 @@ pub unsafe extern "C" fn _start() -> ! {
 #[repr(C, packed(2))]
 struct DescriptorTablePointer {
     limit: u16,
-    base: u64,
+    base: u32,
+}
+
+#[repr(C, align(8))]
+struct GDTEntry {
+    limit_low: u16,
+    base_low: u16,
+    base_middle: u8,
+    access: u8,
+    granularity: u8,
+    base_high: u8,
 }
 
 static mut GDT: [u64; 3] = [
-    0,                                                  // Null descriptor
-0x00AF9A000000FFFF,                                // Code segment
-0x00CF92000000FFFF,                                // Data segment
+    0,                      // Null descriptor
+0x00AF9A000000FFFF,    // Code segment (64-bit)
+0x00CF92000000FFFF,    // Data segment
 ];
 
-static GDT_DESC: DescriptorTablePointer = DescriptorTablePointer {
+static mut GDT_PTR: DescriptorTablePointer = DescriptorTablePointer {
     limit: (3 * 8 - 1) as u16,
-    base: unsafe { &GDT as *const _ as u64 },
-};
-
-static mut IDT: [u64; 256] = [0; 256];
-
-static IDT_DESC: DescriptorTablePointer = DescriptorTablePointer {
-    limit: (256 * 8 - 1) as u16,
-    base: unsafe { &IDT as *const _ as u64 },
+    base: 0,  // Will be set at runtime
 };
 
 unsafe fn setup_gdt() {
-    // GDT is already set up statically
-    lgdt(&GDT_DESC);
-}
+    // Set up GDT pointer
+    GDT_PTR.base = &GDT as *const _ as u32;
 
-unsafe fn lgdt(gdt: &DescriptorTablePointer) {
-    core::arch::asm!("lgdt [{0}]", in(reg) gdt, options(readonly, nostack));
+    // Load GDT
+    core::arch::asm!(
+        "lgdt [{0}]",
+        in(reg) &GDT_PTR,
+                     options(readonly, nostack)
+    );
 }
 
 // Required panic handler
