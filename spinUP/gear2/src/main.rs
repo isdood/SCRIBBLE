@@ -391,187 +391,27 @@ unsafe fn check_paging_enabled() -> bool {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    // Set up initial stack
+    // Minimal setup - just get control and print something to show we're alive
     core::arch::asm!(
-        "mov esp, 0x7c00",
+        "mov esp, 0x7c00",  // Set up a stack
+        "cli",              // Disable interrupts
         options(nomem, nostack)
     );
 
-    // Disable interrupts
-    core::arch::asm!("cli");
+    // Simple way to show we're running - write to video memory
+    let vga = 0xb8000 as *mut u16;
+    *vga = 0x0741; // White 'A' on black background
 
-    // Check for long mode support
-    if !check_long_mode() {
-        loop { core::arch::asm!("hlt"); }
+    loop {
+        core::arch::asm!("hlt");
     }
-
-    // Set up page tables with proper identity mapping
-    setup_page_tables();
-
-    // Initialize GDT before enabling long mode
-    setup_gdt();
-
-    // Enable PAE
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr4",
-        "or eax, 1 << 5",     // Set PAE bit
-        "mov cr4, eax",
-        options(nomem, nostack)
-    );
-
-    // Load CR3 with PML4 address
-    core::arch::asm!(
-        ".code32",
-        "mov eax, {pml4:e}",
-        "mov cr3, eax",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     options(nomem, nostack)
-    );
-
-    // Enable long mode
-    core::arch::asm!(
-        ".code32",
-        "mov ecx, 0xC0000080", // EFER MSR
-        "rdmsr",
-        "or eax, 1 << 8",      // Set LME
-        "wrmsr",
-        options(nomem, nostack)
-    );
-
-    // Enable paging and protection
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr0",
-        "or eax, 0x80000001",  // Set PG and PE
-        "mov cr0, eax",
-        options(nomem, nostack)
-    );
-
-    // Set up IDT for interrupt handling
-    setup_idt();
-
-    // Jump to long mode
-    core::arch::asm!(
-        ".code32",
-        // Load GDT
-        "lgdt [{gdt_ptr:e}]",
-        // Far jump to 64-bit code
-        "jmp 0x08:2f",        // 0x08 is the code segment selector
-        ".align 8",
-        "2:",
-        ".code64",
-        // Set up 64-bit environment
-        "mov rsp, 0x7c00",    // Reset stack
-        // Clear segment registers
-        "mov ax, 0x10",       // Data segment selector
-        "mov ss, ax",
-        "xor ax, ax",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        // Enable interrupts
-        "sti",
-        // Jump to Rust main
-        "jmp {target}",
-        gdt_ptr = in(reg) &raw const GDT_PTR,
-                     target = sym rust_main,
-                     options(noreturn)
-    );
 }
 
-#[repr(C, packed(2))]
-struct DescriptorTablePointer {
-    limit: u16,
-    base: u32,
-}
-
-// GDT entries for 64-bit mode
-static mut GDT: [u64; 4] = [
-    0,                      // Null descriptor
-0x00AF9A000000FFFF,    // Code segment (64-bit)
-0x00CF92000000FFFF,    // Data segment
-0,                      // Task State Segment (reserved)
-];
-
-static mut GDT_PTR: DescriptorTablePointer = DescriptorTablePointer {
-    limit: (4 * 8 - 1) as u16,
-    base: 0,  // Will be set at runtime
-};
-
-// IDT setup for basic interrupt handling
-#[repr(C, packed)]
-struct IDTEntry {
-    offset_low: u16,
-    segment: u16,
-    flags: u16,
-    offset_mid: u16,
-    offset_high: u32,
-    reserved: u32,
-}
-
-static mut IDT: [IDTEntry; 256] = [IDTEntry {
-    offset_low: 0,
-    segment: 0,
-    flags: 0,
-    offset_mid: 0,
-    offset_high: 0,
-    reserved: 0,
-}; 256];
-
-static mut IDT_PTR: DescriptorTablePointer = DescriptorTablePointer {
-    limit: (256 * 16 - 1) as u16,
-    base: 0,
-};
-
-unsafe fn setup_gdt() {
-    GDT_PTR.base = &raw const GDT as *const _ as u32;
-}
-
-unsafe fn setup_idt() {
-    // Set up basic interrupt handlers
-    for i in 0..256 {
-        IDT[i] = IDTEntry {
-            offset_low: (interrupt_handler as u64 & 0xFFFF) as u16,
-            segment: 0x08,  // Code segment
-            flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
-            offset_mid: ((interrupt_handler as u64 >> 16) & 0xFFFF) as u16,
-            offset_high: (interrupt_handler as u64 >> 32) as u32,
-            reserved: 0,
-        };
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {
+        unsafe {
+            core::arch::asm!("hlt");
+        }
     }
-
-    IDT_PTR.base = &raw const IDT as *const _ as u32;
-
-    // Load IDT
-    core::arch::asm!(
-        "lidt [{0:e}]",
-        in(reg) &IDT_PTR,
-                     options(readonly, nostack)
-    );
-}
-
-#[naked]
-unsafe extern "C" fn interrupt_handler() {
-    core::arch::asm!(
-        "push rax",
-        "push rcx",
-        "push rdx",
-        "push r8",
-        "push r9",
-        "push r10",
-        "push r11",
-        "mov al, 0x20",
-        "out 0x20, al",      // Send EOI to PIC
-        "pop r11",
-        "pop r10",
-        "pop r9",
-        "pop r8",
-        "pop rdx",
-        "pop rcx",
-        "pop rax",
-        "iretq",
-        options(noreturn)
-    );
 }
