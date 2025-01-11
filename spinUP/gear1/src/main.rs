@@ -1,9 +1,10 @@
 #![no_std]
 #![no_main]
 
-use core::panic::PanicInfo;
+#[panic_handler]
+fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
 
-#[repr(C, align(4))]
+#[repr(C, packed)]
 struct Dap {
     sz: u8,
     _pad: u8,
@@ -14,13 +15,10 @@ struct Dap {
     _pad2: u32,
 }
 
-#[link_section = ".boot.text"]
 #[no_mangle]
+#[link_section = ".boot.text"]
 pub extern "C" fn _start() -> ! {
-    #[repr(C, align(4))]
-    struct DapWrapper(Dap);
-
-    let dap = DapWrapper(Dap {
+    let dap = Dap {
         sz: 16,
         _pad: 0,
         cnt: 32,
@@ -28,16 +26,9 @@ pub extern "C" fn _start() -> ! {
         seg: 0x07E0,
         lba: 1,
         _pad2: 0,
-    });
+    };
 
     unsafe {
-        // First asm block for DAP setup
-        core::arch::asm!(
-            "mov si, {0:x}",
-            in(reg) &dap.0,
-        );
-
-        // Second asm block with noreturn
         core::arch::asm!(
             // Initialize segments
             "xor ax, ax",
@@ -55,6 +46,7 @@ pub extern "C" fn _start() -> ! {
             "out 0x92, al",
 
             // Load sectors
+            "mov si, {0:x}",
             "mov ah, 0x42",
             "int 0x13",
             "jc 2f",
@@ -70,14 +62,8 @@ pub extern "C" fn _start() -> ! {
             "int 0x10",
             "cli",
             "hlt",
-            options(noreturn)
+            in(reg) &dap,
+                         options(noreturn)
         );
     }
-}
-
-#[panic_handler]
-#[no_mangle]
-#[link_section = ".boot.text"]
-fn panic(_info: &PanicInfo) -> ! {
-    loop {}
 }

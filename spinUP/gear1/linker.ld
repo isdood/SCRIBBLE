@@ -1,40 +1,28 @@
-ENTRY(_start)
-OUTPUT_FORMAT("elf32-i386")
+OUTPUT_FORMAT(binary)
 OUTPUT_ARCH(i386)
 
 SECTIONS {
+    /* Bootloader starts at 0x7C00 */
     . = 0x7C00;
 
     .boot : {
+        /* Place all sections marked as .boot.text here */
         *(.boot.text .boot.text.*);
-        . = 510;
-        SHORT(0xAA55);
+        /* Pad to 510 bytes and add boot signature */
+        . = 0x7C00 + 510;
+        SHORT(0xAA55)
     }
 
-    .text : {
-        *(.text .text.*);
-    }
-
-    .rodata : {
-        *(.rodata .rodata.*);
-    }
-
-    .data : {
-        *(.data .data.*);
-    }
-
-    .bss : {
-        *(.bss .bss.*);
-    }
-
-    .shstrtab : {
-        *(.shstrtab);
-    }
-
+    /* Discard everything else */
     /DISCARD/ : {
-        *(.eh_frame*);
-        *(.comment);
-        *(.note*);
-        *(.debug*);
+        *(.text*)
+        *(.data*)
+        *(.bss*)
+        *(.rodata*)
+        *(.comment*)
+        *(.eh_frame*)
+        *(.note*)
+        *(.riscv.attributes*)
+        *(.debug*)
     }
 }
