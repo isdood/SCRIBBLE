@@ -15,6 +15,32 @@ struct Dap {
     _pad2: u32,
 }
 
+#[inline(always)]
+fn init_segments() {
+    unsafe {
+        core::arch::asm!(
+            "xor ax, ax",
+            "mov ds, ax",
+            "mov es, ax",
+            "mov ss, ax",
+            options(nomem, nostack)
+        );
+    }
+}
+
+#[inline(never)]
+fn load_sectors(dap: &Dap) {
+    unsafe {
+        core::arch::asm!(
+            "mov si, {0:x}",
+            "mov ah, 0x42",
+            "int 0x13",
+            in(reg) dap,
+                         options(noreturn)
+        );
+    }
+}
+
 #[no_mangle]
 #[link_section = ".boot.text"]
 pub extern "C" fn _start() -> ! {
