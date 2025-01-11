@@ -533,7 +533,6 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, cr4",
         "or eax, 1 << 5",  // PAE
         "mov cr4, eax",
-        options(nomem, nostack)
     );
 
     // 6. Load CR3 with page table
@@ -541,7 +540,6 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, {pml4:e}",
         "mov cr3, eax",
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     options(nomem, nostack)
     );
 
     // 7. Enable long mode in EFER
@@ -550,7 +548,6 @@ pub unsafe extern "C" fn _start() -> ! {
         "rdmsr",
         "or eax, 1 << 8",      // LME
         "wrmsr",
-        options(nomem, nostack)
     );
 
     // 8. Enable paging and protection
@@ -558,7 +555,6 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, cr0",
         "or eax, 1 << 31 | 1", // PG | PE
         "mov cr0, eax",
-        options(nomem, nostack)
     );
 
     // 9. Long mode jump and final setup
@@ -644,41 +640,9 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
         "popfq",
 
         "iretq",
-        options(nostack)  // Changed from noreturn
     );
 }
 
-
-#[naked]
-unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
-    core::arch::naked_asm!(
-        // Save state
-        "pushfq",
-        "push rax",
-        "push rcx",
-        "push rdx",
-        "push r8",
-        "push r9",
-        "push r10",
-        "push r11",
-
-        // Send EOI
-        "mov al, 0x20",
-        "out 0x20, al",
-
-        // Restore state
-        "pop r11",
-        "pop r10",
-        "pop r9",
-        "pop r8",
-        "pop rdx",
-        "pop rcx",
-        "pop rax",
-        "popfq",
-
-        "iretq",
-    );
-}
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
