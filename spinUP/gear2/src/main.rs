@@ -430,6 +430,7 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
+#[allow(dead_code)]
 unsafe fn check_paging_enabled() -> bool {
     let cr0: u32;
     core::arch::asm!(
@@ -449,24 +450,36 @@ pub unsafe extern "C" fn _start() -> ! {
     disable_interrupts();
     write_serial(b"Interrupts disabled\r\n");
 
+    // Check for long mode support first
     if !check_long_mode() {
         write_serial(b"Long mode not supported\r\n");
-        loop { core::arch::asm!("hlt"); }
+        loop { core::arch::asm!("hlt", options(nomem, nostack)); }
     }
+    write_serial(b"Long mode supported\r\n");
 
-    // Set up paging structures BEFORE enabling PAE
+    // Setup page tables before enabling any CPU features
     setup_page_tables();
     write_serial(b"Page tables set up\r\n");
 
-    // Enable PAE before loading CR3
+    // Enable PAE (Physical Address Extension)
     core::arch::asm!(
         ".code32",
         "mov eax, cr4",
-        "or eax, 1 << 5",     // Set PAE bit
+        "or eax, 1 << 5",      // Set PAE bit
         "mov cr4, eax",
+        // Verify PAE was set
+        "mov eax, cr4",
+        "test eax, 1 << 5",
+        "jnz 1f",
+        "hlt",                 // Halt if PAE not set
+        "1:",
         options(nomem, nostack)
     );
     write_serial(b"PAE enabled\r\n");
+
+    // Setup GDT for long mode
+    setup_gdt();
+    write_serial(b"GDT loaded\r\n");
 
     // Enable long mode in EFER MSR
     core::arch::asm!(
@@ -475,57 +488,61 @@ pub unsafe extern "C" fn _start() -> ! {
         "rdmsr",
         "or eax, 1 << 8",      // Set LME bit
         "wrmsr",
+        // Verify LME was set
+        "rdmsr",
+        "test eax, 1 << 8",
+        "jnz 1f",
+        "hlt",                 // Halt if LME not set
+        "1:",
         options(nomem, nostack)
     );
     write_serial(b"Long mode enabled in EFER\r\n");
 
-    // Setup GDT before enabling paging
-    setup_gdt();
-    write_serial(b"GDT loaded\r\n");
-
-    // Enable paging last
+    // Enable paging and protected mode
     core::arch::asm!(
         ".code32",
         "mov eax, cr0",
         "or eax, 1 << 31 | 1", // Set PG and PE bits
         "mov cr0, eax",
+        // Verify paging was enabled
+        "mov eax, cr0",
+        "test eax, 1 << 31",
+        "jnz 1f",
+        "hlt",                 // Halt if paging not set
+        "1:",
         options(nomem, nostack)
     );
     write_serial(b"Paging enabled\r\n");
 
-    // Add the long mode jump here
+    write_serial(b"Jumping to 64-bit mode...\r\n");
+
+    // Far jump to 64-bit mode
     core::arch::asm!(
         ".code32",
         // Ensure stack alignment
         "and esp, -16",
-        // Prepare far jump
-        "push dword ptr 0x08",  // CS selector
-        "lea eax, [2f]",       // Target address
+        // Far jump preparation
+        "push dword ptr 0x08", // Long mode code segment
+        "lea eax, [1f]",      // Get address of 64-bit code
         "push eax",
-        "retf",                // Far return to 64-bit code
+        "retf",               // Far return to load CS with 64-bit segment
         ".align 8",
-        "2:",
+        "1:",                 // 64-bit code starts here
         ".code64",
-        // Zero segment registers
-        "xor ax, ax",
+        // Initialize segment registers
+        "mov ax, 0x10",       // Data segment selector
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
-        // Set up final stack and jump to Rust
+        // Set up stack and jump to Rust main
         "mov rsp, {stack}",
         "jmp {target}",
         stack = in(reg) &raw const STACK.data as *const u8 as u64 + 4096,
                      target = sym rust_main,
                      options(noreturn)
     );
-
-    // This code will never be reached due to the noreturn jump,
-    // but we add it to satisfy the type system
-    loop {
-        core::arch::asm!("hlt", options(nomem, nostack));
-    }
 }
 
 #[panic_handler]
