@@ -1,3 +1,4 @@
+// Updated gear1/src/main.rs
 #![no_std]
 #![no_main]
 
@@ -14,7 +15,6 @@ struct Dap {
     _pad2: u32,
 }
 
-// In both stages
 #[repr(C, packed)]
 pub struct StageInfo {
     boot_drive: u8,
@@ -24,7 +24,7 @@ pub struct StageInfo {
     flags: u32,
 }
 
-// Use this to pass information between stages
+#[no_mangle]
 static mut STAGE_INFO: StageInfo = StageInfo {
     boot_drive: 0,
     memory_map_addr: 0,
@@ -32,6 +32,9 @@ static mut STAGE_INFO: StageInfo = StageInfo {
     stage2_load_addr: 0x7E00,
     flags: 0,
 };
+
+// Buffer for memory map (placed at a known location)
+static mut MEMORY_MAP_BUFFER: [u8; 2048] = [0; 2048];
 
 #[no_mangle]
 #[link_section = ".boot.text"]
@@ -45,9 +48,15 @@ pub extern "C" fn _start() -> ! {
             "mov sp, 0x7C00",
         );
 
-        // Store boot drive
-        let drive: u8;
-        core::arch::asm!("mov {}, dl", out(reg_byte) drive);
+        // Store boot drive in STAGE_INFO
+        core::arch::asm!("mov {}, dl", out(reg_byte) STAGE_INFO.boot_drive);
+
+        // Enable A20 line
+        enable_a20();
+
+        // Detect memory and store info
+        STAGE_INFO.memory_map_addr = MEMORY_MAP_BUFFER.as_ptr() as u32;
+        STAGE_INFO.memory_entries = detect_memory(&mut MEMORY_MAP_BUFFER) as u16;
 
         // Load gear2
         let dap = Dap {
@@ -64,60 +73,57 @@ pub extern "C" fn _start() -> ! {
             "mov ah, 0x42",
             "mov si, {0:x}",
             "int 0x13",
-            "jc 2f",         // Jump to error handler if carry set
-            "cmp ah, 0",     // Check status
-            "jne 2f",        // Jump if not zero (error)
-        "push word ptr 0x07E0",
-        "push word ptr 0",
-        "mov dl, {1}",
-        "retf",
-        "2:",           // Error handler (using numeric label)
-        "mov ax, 0x0E45",  // Print 'E' on error
-        "int 0x10",
-        "hlt",
-        in(reg) &dap,
-                         in(reg_byte) drive,
+            "jc error",     // Changed label name
+            "cmp ah, 0",
+            "jne error",    // Changed label name
+            "push word ptr 0x07E0",
+            "push word ptr 0",
+            "mov dl, {1}",
+            "retf",
+            "error:",       // Changed label name
+            "mov ax, 0x0E45",
+            "int 0x10",
+            "hlt",
+            in(reg) &dap,
+                         in(reg_byte) STAGE_INFO.boot_drive,
                          options(noreturn),
         );
     }
 }
 
-// Enable A20 line
 unsafe fn enable_a20() {
-    // BIOS method
     core::arch::asm!(
         "mov ax, 0x2401",
         "int 0x15",
-        "jc 1f",          // If failed, try alternate method
+        "jc fallback",      // Changed label name
         "ret",
-        "1:",
-        // Keyboard controller method as fallback
+        "fallback:",        // Changed label name
         "in al, 0x92",
         "or al, 2",
         "out 0x92, al",
+        options(nomem, nostack)
     );
 }
 
-// Proper memory detection
 unsafe fn detect_memory(buffer: &mut [u8]) -> u32 {
     let mut entries = 0;
-    let continuation_id = 0; // Removed mut as it wasn't needed
+    let continuation_id = 0;
 
     loop {
         let mut result: u32;
         core::arch::asm!(
             "int 0x15",
-            "jc 1f",
-            "mov eax, 1",  // Direct register reference instead of template
-            "jmp 2f",
-            "1:",
-            "mov eax, 0",  // Direct register reference instead of template
-            "2:",
+            "jc done",        // Changed label name
+            "mov eax, 1",
+            "jmp next",       // Changed label name
+            "done:",          // Changed label name
+            "mov eax, 0",
+            "next:",          // Changed label name
             inout("eax") 0xE820 => result,
                          in("ebx") continuation_id,
                          in("ecx") 24,
-                         in("edx") 0x534D4150,  // 'SMAP'
-        in("di") buffer.as_mut_ptr(),
+                         in("edx") 0x534D4150,
+                         in("di") buffer.as_mut_ptr(),
                          options(nostack)
         );
 
