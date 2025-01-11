@@ -99,6 +99,7 @@ const DEFAULT_IDT_ENTRY: IDTEntry = IDTEntry {
 
 // Single definition of IDT using const array
 #[no_mangle]
+#[link_section = ".data"]
 static mut IDT: IDT = IDT {
     entries: [DEFAULT_IDT_ENTRY; 256],
 };
@@ -362,35 +363,39 @@ unsafe fn setup_long_mode() {
 }
 
 unsafe fn setup_pic() {
-    // Remap PIC
+    // Initialize PIC
     core::arch::asm!(
-        ".code32",
-        // Initialize master PIC
+        // ICW1: start initialization
         "mov al, 0x11",
-        "out 0x20, al",         // Start initialization (ICW1)
-    "mov al, 0x20",         // Vector offset (ICW2) - IRQ0 will be interrupt 32
-                     "out 0x21, al",
-                     "mov al, 0x04",         // Tell Master PIC that there is a slave PIC at IRQ2 (ICW3)
-    "out 0x21, al",
-    "mov al, 0x01",         // ICW4 - x86 mode
-    "out 0x21, al",
+        "out 0x20, al",  // Master PIC
+        "out 0xA0, al",  // Slave PIC
+        "nop", "nop",
 
-    // Initialize slave PIC
-    "mov al, 0x11",
-    "out 0xA0, al",         // Start initialization (ICW1)
-    "mov al, 0x28",         // Vector offset (ICW2) - IRQ8 will be interrupt 40
-                     "out 0xA1, al",
-                     "mov al, 0x02",         // Tell Slave PIC its cascade identity (ICW3)
-    "out 0xA1, al",
-    "mov al, 0x01",         // ICW4 - x86 mode
-    "out 0xA1, al",
+        // ICW2: interrupt vector offsets
+        "mov al, 0x20",  // Master: IRQ0 -> INT 0x20
+        "out 0x21, al",
+        "mov al, 0x28",  // Slave: IRQ8 -> INT 0x28
+        "out 0xA1, al",
+        "nop", "nop",
 
-    // Mask all interrupts except timer (IRQ0)
-    "mov al, 0xFE",         // Enable only IRQ0 (timer)
+        // ICW3: cascading
+        "mov al, 0x04",  // Master: IRQ2 has slave
+        "out 0x21, al",
+        "mov al, 0x02",  // Slave: cascade on IRQ2
+        "out 0xA1, al",
+        "nop", "nop",
+
+        // ICW4: 8086 mode
+        "mov al, 0x01",
+        "out 0x21, al",
+        "out 0xA1, al",
+        "nop", "nop",
+
+        // OCW1: mask all interrupts except timer
+        "mov al, 0xFE",  // Enable only IRQ0 (timer)
     "out 0x21, al",
-    "mov al, 0xFF",         // Mask all interrupts on slave PIC
+    "mov al, 0xFF",  // Disable all slave interrupts
     "out 0xA1, al",
-
     options(nomem, nostack)
     );
 }
@@ -511,81 +516,53 @@ unsafe fn enter_long_mode() -> ! {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    // Disable interrupts until we're ready
+    // Disable interrupts
     core::arch::asm!("cli");
 
-    // Initialize serial for debugging
-    init_serial();
-    write_serial(b"Gear2 started\r\n");
-
-    // Set up page tables first
+    // Set up paging structures
     setup_page_tables();
-    write_serial(b"Page tables set up\r\n");
 
     // Enable PAE
     core::arch::asm!(
-        ".code32",
         "mov eax, cr4",
-        "or eax, 1 << 5",  // PAE bit
+        "or eax, 1 << 5",  // PAE
         "mov cr4, eax",
-        options(nomem, nostack)
     );
-    write_serial(b"PAE enabled\r\n");
 
-    // Load CR3
+    // Set up long mode
     core::arch::asm!(
-        ".code32",
+        "mov ecx, 0xC0000080", // EFER MSR
+        "rdmsr",
+        "or eax, 1 << 8",      // LME
+        "wrmsr",
+    );
+
+    // Load CR3 with page table
+    core::arch::asm!(
         "mov eax, {pml4:e}",
         "mov cr3, eax",
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     options(nomem, nostack)
     );
-    write_serial(b"CR3 loaded\r\n");
 
-    // Enable long mode
-    core::arch::asm!(
-        ".code32",
-        "mov ecx, 0xC0000080", // EFER MSR
-        "rdmsr",
-        "or eax, 1 << 8",      // LME bit
-        "wrmsr",
-        options(nomem, nostack)
-    );
-    write_serial(b"Long mode enabled in EFER\r\n");
-
-    // Set up IDT before enabling paging
+    // Set up IDT
     setup_idt();
-    write_serial(b"IDT set up\r\n");
 
-    // Set up and remap PIC
+    // Set up PIC
     setup_pic();
-    write_serial(b"PIC configured\r\n");
 
-    // Enable paging and protected mode
+    // Enable paging and protection
     core::arch::asm!(
-        ".code32",
         "mov eax, cr0",
         "or eax, 1 << 31 | 1", // PG | PE
         "mov cr0, eax",
-        options(nomem, nostack)
     );
-    write_serial(b"Paging enabled\r\n");
 
     // Long mode jump
     core::arch::asm!(
-        ".code32",
-        // Set up stack
-        "mov esp, {stack:e}",
-
-        // Far jump to 64-bit code
-        "push 0x08",     // Code segment
-        "lea eax, [2f]", // Get address of forward label
-        "push eax",
-        "retf",          // Far return
-
-        // 64-bit code
-        "2:",
+        "ljmp $0x08, $1f",
+        "1:",
         ".code64",
+
         // Set up segment registers
         "mov ax, 0x10",
         "mov ds, ax",
@@ -594,37 +571,39 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov gs, ax",
         "mov ss, ax",
 
+        // Set up stack
+        "mov rsp, {stack:e}",
+
         // Enable interrupts
         "sti",
 
         // Jump to Rust main
-        "jmp {target}",
+        "jmp {main}",
 
         stack = in(reg) &raw const STACK.data as *const _ as u32 + 4096,
-                     target = sym rust_main,
+                     main = sym rust_main,
                      options(noreturn)
     );
 }
 
 unsafe fn setup_idt() {
-    let code_segment = 0x08;
-
     // Set up timer interrupt handler (IRQ0 -> INT 0x20)
     IDT.entries[0x20] = IDTEntry {
         offset_low: (timer_interrupt_handler as usize & 0xFFFF) as u16,
-        segment: code_segment,
+        segment: 0x08,  // Code segment
         flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
         offset_middle: ((timer_interrupt_handler as usize >> 16) & 0xFFFF) as u16,
         offset_high: (timer_interrupt_handler as usize >> 32) as u32,
         reserved: 0
     };
 
-    // Load IDT with 32-bit pointer
+    // Set up IDT pointer
     let idtr = GDTPointer {
         limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &IDT as *const _ as u32,
+        base: &raw const IDT as *const _ as u32,
     };
 
+    // Load IDT
     core::arch::asm!(
         "lidt [{0}]",
         in(reg) &idtr,
@@ -633,10 +612,10 @@ unsafe fn setup_idt() {
 }
 
 #[naked]
-unsafe extern "x86-interrupt" fn timer_interrupt_handler(
-    _stack_frame: InterruptStackFrame
-) {
+unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
     core::arch::naked_asm!(
+        // Save state
+        "pushfq",
         "push rax",
         "push rcx",
         "push rdx",
@@ -645,10 +624,11 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(
         "push r10",
         "push r11",
 
-        // Send EOI to PIC
+        // Send EOI
         "mov al, 0x20",
         "out 0x20, al",
 
+        // Restore state
         "pop r11",
         "pop r10",
         "pop r9",
@@ -656,10 +636,13 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(
         "pop rdx",
         "pop rcx",
         "pop rax",
+        "popfq",
 
         "iretq",
+        options(noreturn)
     );
 }
+
 
 #[naked]
 unsafe extern "x86-interrupt" fn page_fault_handler(
