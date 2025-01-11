@@ -16,54 +16,51 @@ struct Dap {
 }
 
 #[no_mangle]
-#[link_section = ".boot.text"]
-pub extern "C" fn _start() -> ! {
-    let dap = Dap {
-        sz: 16,
-        _pad: 0,
-        cnt: 32,
-        off: 0,
-        seg: 0x07E0,
-        lba: 1,
-        _pad2: 0,
-    };
+pub unsafe extern "C" fn _start() -> ! {
+    // Setup stack
+    core::arch::asm!(
+        "mov sp, 0x7c00",
+        options(nomem, nostack)
+    );
 
-    unsafe {
-        core::arch::asm!(
-            // Initialize segments
-            "xor ax, ax",
-            "mov ds, ax",
-            "mov es, ax",
-            "mov ss, ax",
-            "mov sp, 0x7C00",
+    // Reset segments
+    core::arch::asm!(
+        "xor ax, ax",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov ss, ax",
+        options(nomem, nostack)
+    );
 
-            // Store boot drive
-            "mov byte ptr [0x7E00], dl",
+    // Load Gear2
+    let drive = 0x80;  // Boot drive
+    let sectors = 64;  // Number of sectors to load
+    let buffer = 0x7e00 as *mut u8;  // Load address
 
-            // Enable A20
-            "in al, 0x92",
-            "or al, 2",
-            "out 0x92, al",
+    core::arch::asm!(
+        "mov ah, 0x42",      // Extended read
+        "int 0x13",
+        "jc 1f",             // If error, fail
+        "cmp ah, 0",         // Check status
+        "jne 1f",            // If not success, fail
+        "jmp 2f",            // Success, continue
+        "1: mov al, 0x45",   // Error code
+        "mov ah, 0x0e",      // Print char
+        "int 0x10",
+        "cli",               // Halt on error
+        "hlt",
+        "2:",               // Success
+        in("dl") drive,
+                     options(nomem, nostack)
+    );
 
-            // Load sectors
-            "mov si, {0:x}",
-            "mov ah, 0x42",
-            "int 0x13",
-            "jc 2f",
+    // Jump to Gear2
+    core::arch::asm!(
+        "push word ptr 0x0000",  // CS
+        "push word ptr 0x7e00",  // IP
+        "retf",                  // Far return to Gear2
+        options(nomem, nostack)
+    );
 
-            // Jump to gear2
-            "push word ptr 0x07E0",
-            "push word ptr 0",
-            "retf",
-
-            "2:",
-            "mov al, 'E'",
-            "mov ah, 0x0E",
-            "int 0x10",
-            "cli",
-            "hlt",
-            in(reg) &dap,
-                         options(noreturn)
-        );
-    }
+    loop {}
 }

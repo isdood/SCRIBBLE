@@ -13,9 +13,9 @@ struct PageTable {
 
 #[repr(C, align(4096))]
 struct PageTables {
-    pml4: PageTable,
-    pdpt: PageTable,
-    pd: PageTable,
+    pml4: [u64; 512],
+    pdpt: [u64; 512],
+    pd: [u64; 512],
 }
 
 #[repr(C, packed)]
@@ -65,9 +65,9 @@ static mut STAGE_INFO: StageInfo = StageInfo {
 };
 
 static mut PAGE_TABLES: PageTables = PageTables {
-    pml4: PageTable { entries: [0; 512] },
-    pdpt: PageTable { entries: [0; 512] },
-    pd: PageTable { entries: [0; 512] },
+    pml4: [0; 512],
+    pdpt: [0; 512],
+    pd: [0; 512],
 };
 
 static mut GDT: GDTTable = GDTTable {
@@ -159,19 +159,12 @@ unsafe fn disable_interrupts() {
 }
 
 unsafe fn setup_page_tables() {
-    // Need to ensure CR3 is loaded after tables are set up
-    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
-    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
-    PAGE_TABLES.pd.entries[0] = 0x83;
+    // Identity map first 2MB
+    PAGE_TABLES.pml4[0] = &PAGE_TABLES.pdpt as *const _ as u64 | 0x3;
+    PAGE_TABLES.pdpt[0] = &PAGE_TABLES.pd as *const _ as u64 | 0x3;
+    PAGE_TABLES.pd[0] = 0x83;  // Present + Write + Huge (2MB)
 
-    core::arch::asm!(
-        ".code32",
-        "mov {tmp:e}, {addr:e}",
-        "mov cr3, {tmp:e}",
-        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     tmp = out(reg) _,
-                     options(nomem, nostack)
-    );
+    core::arch::asm!("mfence");
 }
 
 unsafe fn setup_gdt() {
@@ -444,104 +437,76 @@ unsafe fn check_paging_enabled() -> bool {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    init_serial();
-    write_serial(b"Serial initialized\r\n");
+    // Set up initial stack
+    core::arch::asm!(
+        "mov esp, 0x7c00",
+        options(nomem, nostack)
+    );
 
-    disable_interrupts();
-    write_serial(b"Interrupts disabled\r\n");
+    // Disable interrupts
+    core::arch::asm!("cli");
 
-    // Check for long mode support first
+    // Check for long mode support
     if !check_long_mode() {
-        write_serial(b"Long mode not supported\r\n");
-        loop { core::arch::asm!("hlt", options(nomem, nostack)); }
+        loop { core::arch::asm!("hlt"); }
     }
-    write_serial(b"Long mode supported\r\n");
 
-    // Setup page tables before enabling any CPU features
+    // Set up page tables
     setup_page_tables();
-    write_serial(b"Page tables set up\r\n");
 
-    // Enable PAE (Physical Address Extension)
+    // Enable PAE
     core::arch::asm!(
         ".code32",
         "mov eax, cr4",
-        "or eax, 1 << 5",      // Set PAE bit
+        "or eax, 1 << 5",     // Set PAE bit
         "mov cr4, eax",
-        // Verify PAE was set
-        "mov eax, cr4",
-        "test eax, 1 << 5",
-        "jnz 2f",
-        "hlt",                 // Halt if PAE not set
-        "2:",
         options(nomem, nostack)
     );
-    write_serial(b"PAE enabled\r\n");
 
-    // Setup GDT for long mode
-    setup_gdt();
-    write_serial(b"GDT loaded\r\n");
+    // Load CR3
+    core::arch::asm!(
+        ".code32",
+        "mov {tmp:e}, {addr:e}",
+        "mov cr3, {tmp:e}",
+        addr = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+                     tmp = out(reg) _,
+                     options(nomem, nostack)
+    );
 
-    // Enable long mode in EFER MSR
+    // Enable long mode
     core::arch::asm!(
         ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or eax, 1 << 8",      // Set LME bit
+        "or eax, 1 << 8",      // Set LME
         "wrmsr",
-        // Verify LME was set
-        "rdmsr",
-        "test eax, 1 << 8",
-        "jnz 3f",
-        "hlt",                 // Halt if LME not set
-        "3:",
         options(nomem, nostack)
     );
-    write_serial(b"Long mode enabled in EFER\r\n");
 
-    // Enable paging and protected mode
+    // Enable paging
     core::arch::asm!(
         ".code32",
         "mov eax, cr0",
-        "or eax, 1 << 31 | 1", // Set PG and PE bits
+        "or eax, 0x80000001",  // Set PG and PE
         "mov cr0, eax",
-        // Verify paging was enabled
-        "mov eax, cr0",
-        "test eax, 1 << 31",
-        "jnz 4f",
-        "hlt",                 // Halt if paging not set
-        "4:",
         options(nomem, nostack)
     );
-    write_serial(b"Paging enabled\r\n");
 
-    write_serial(b"Jumping to 64-bit mode...\r\n");
+    // Load 64-bit GDT
+    setup_gdt();
 
-    // Far jump to 64-bit mode
+    // Far jump to 64-bit code
     core::arch::asm!(
         ".code32",
-        // Ensure stack alignment
-        "and esp, -16",
-        // Far jump preparation
-        "push dword ptr 0x08", // Long mode code segment
-        "lea eax, [5f]",      // Get address of 64-bit code
-        "push eax",
-        "retf",               // Far return to load CS with 64-bit segment
-        ".align 8",
-        "5:",                 // 64-bit code starts here
-        ".code64",
-        // Initialize segment registers
-        "mov ax, 0x10",       // Data segment selector
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-        // Set up stack and jump to Rust main
-        "mov rsp, {stack}",
-        "jmp {target}",
-        stack = in(reg) &raw const STACK.data as *const u8 as u64 + 4096,
-                     target = sym rust_main,
-                     options(noreturn)
+        "jmp 8:2f",           // CS selector 8 (code)
+    ".align 8",
+    "2:",
+    ".code64",
+    "mov rsp, {stack}",
+    "jmp {target}",
+    stack = const 0x7c00,
+    target = sym rust_main,
+    options(noreturn)
     );
 }
 
