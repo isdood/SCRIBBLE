@@ -51,14 +51,14 @@ pub extern "C" fn _start() -> ! {
             "mov ah, 0x42",
             "mov si, {dap}",
             "int 0x13",
-            "jc error",
+            "jc 2f",           // Changed to numeric label
 
             // Jump to gear2
             "push word ptr 0x07E0",
             "push word ptr 0",
             "retf",
 
-            "error:",
+            "2:",             // Changed to numeric label
             "mov al, 'E'",
             "mov ah, 0x0E",
             "int 0x10",
