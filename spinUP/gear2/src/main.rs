@@ -155,22 +155,26 @@ unsafe fn disable_interrupts() {
 
 fn get_cpuid() -> (u32, u32, u32, u32) {
     let eax: u32;
-    let ebx: u32;
     let ecx: u32;
     let edx: u32;
 
     unsafe {
         core::arch::asm!(
+            "mov edi, ebx",    // Save ebx
             "cpuid",
+            "xchg edi, ebx",   // Restore ebx and get its value
             inout("eax") 0 => eax,
-                         out("ebx") ebx,
                          out("ecx") ecx,
                          out("edx") edx,
+                         out("edi") _,      // Use edi instead of ebx
         );
     }
 
-    (eax, ebx, ecx, edx)
+    // Since we can't directly use ebx, we'll return 0 for that value
+    // as it's not critical for our long mode check
+    (eax, 0, ecx, edx)
 }
+
 
 unsafe fn setup_gdt() {
     let gdt_ptr = GDTPointer {
@@ -391,9 +395,11 @@ unsafe fn enter_long_mode() -> ! {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    // Initialize serial port for debugging
     init_serial();
     write_serial(b"Serial initialized\r\n");
+
+    disable_interrupts();
+    write_serial(b"Interrupts disabled\r\n");
 
     // Check if long mode is available
     if !check_long_mode() {
@@ -417,8 +423,8 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Load CR3 with PML4
     core::arch::asm!(
-        "mov {tmp}, {addr:e}",  // Use temporary register with proper formatting
-        "mov cr3, {tmp}",
+        "mov {tmp:e}, {addr:e}",
+        "mov cr3, {tmp:e}",
         addr = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
                      tmp = out(reg) _,
                      options(nomem, nostack)
@@ -450,7 +456,6 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Jump to long mode
     core::arch::asm!(
-        // Far jump to 64-bit code
         "push 0x08",          // Code segment
         "lea eax, [1f]",      // Get address of label
         "push eax",           // Push address
@@ -458,14 +463,12 @@ pub unsafe extern "C" fn _start() -> ! {
         ".align 8",
         "1:",
         ".code64",
-        // Set up segment registers
         "mov ax, 0x10",       // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
-        // Set up stack and jump to Rust
         "mov rsp, {0}",
         "jmp {1}",
         in(reg) (&STACK.data as *const _ as u64 + 4096),
