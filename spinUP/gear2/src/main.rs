@@ -13,17 +13,13 @@ pub extern "C" fn _start() -> ! {
     }
 
     loop {
-        unsafe {
-            core::arch::asm!("hlt");
-        }
+        core::arch::asm!("hlt");
     }
 }
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {
-        unsafe {
-            core::arch::asm!("hlt");
-        }
+        core::arch::asm!("hlt");
     }
 }

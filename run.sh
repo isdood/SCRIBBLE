@@ -74,14 +74,9 @@ cd ../gear2
 status "Creating disk image..."
 cd ../..
 
-# Create empty disk image (1.44MB)
-dd if=/dev/zero of=combined.img bs=512 count=2880 2>/dev/null
-
-# Write Gear1 to first sector
-dd if=spinUP/gear1/gear1.bin of=combined.img conv=notrunc bs=512 count=1 2>/dev/null
-
-# Write Gear2 starting at second sector
-dd if=spinUP/gear2/disk.img of=combined.img conv=notrunc bs=512 seek=1 2>/dev/null
+# Combine Gear1 and Gear2 into one disk image
+dd if=gear1.bin of=disk.img bs=512 count=1
+dd if=gear2.bin of=disk.img bs=512 seek=1
 
 success "Created disk image"
 
