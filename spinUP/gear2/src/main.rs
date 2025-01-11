@@ -513,44 +513,29 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(
 ) {
     core::arch::naked_asm!(
         ".code64",
-        // Save all registers
+        // Save scratch registers
         "push rax",
         "push rcx",
         "push rdx",
-        "push rbx",
-        "push rbp",
-        "push rsi",
-        "push rdi",
         "push r8",
         "push r9",
         "push r10",
         "push r11",
-        "push r12",
-        "push r13",
-        "push r14",
-        "push r15",
 
         // Send EOI to PIC
         "mov al, 0x20",
         "out 0x20, al",
 
-        // Restore all registers
-        "pop r15",
-        "pop r14",
-        "pop r13",
-        "pop r12",
+        // Restore scratch registers
         "pop r11",
         "pop r10",
         "pop r9",
         "pop r8",
-        "pop rdi",
-        "pop rsi",
-        "pop rbp",
-        "pop rbx",
         "pop rdx",
         "pop rcx",
         "pop rax",
 
+        // Return from interrupt
         "iretq",
     );
 }
@@ -562,33 +547,24 @@ unsafe extern "x86-interrupt" fn page_fault_handler(
 ) {
     core::arch::naked_asm!(
         ".code64",
-        // Save all registers
+        // Save scratch registers
         "push rax",
         "push rcx",
         "push rdx",
-        "push rbx",
-        "push rbp",
-        "push rsi",
-        "push rdi",
         "push r8",
         "push r9",
         "push r10",
         "push r11",
-        "push r12",
-        "push r13",
-        "push r14",
-        "push r15",
 
-        // Get error code and CR2 (contains faulting address)
-        "mov rdi, cr2",  // Get the faulting address
-        "mov rsi, [rsp + 120]",  // Get error code from stack
+        // Get fault address and error code
+        "mov rsi, cr2",  // Faulting address
 
-        // Handle the page fault here
-        // For now, just print a message and halt
+        // Halt for now
         "cli",
         "hlt",
     );
 }
+
 
 unsafe fn setup_idt() {
     let code_segment = 0x08;
@@ -628,50 +604,14 @@ unsafe fn setup_idt() {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    // Write to VGA to confirm we're running
-    let vga = 0xB8000 as *mut u16;
-    let msg = b"G2 Start";
-    for (i, &byte) in msg.iter().enumerate() {
-        *vga.offset(i as isize) = 0x0F00 | byte as u16;
-    }
+    // Disable interrupts until we're ready
+    core::arch::asm!("cli");
 
-    // Initialize serial port
+    // Initialize serial for debugging
     init_serial();
     write_serial(b"Gear2 started\r\n");
 
-    // Check if we're in protected mode
-    let cr0_value: u32;
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr0",
-        out("eax") cr0_value,
-                     options(nomem, nostack)
-    );
-
-    if cr0_value & 1 == 0 {
-        write_serial(b"Error: Not in protected mode\r\n");
-        loop { core::arch::asm!("hlt"); }
-    }
-
-    disable_interrupts();
-    write_serial(b"Interrupts disabled\r\n");
-
-    // Setup IDT before PIC
-    setup_idt();
-    write_serial(b"IDT set up\r\n");
-
-    // Setup and remap PIC
-    setup_pic();
-    write_serial(b"PIC configured\r\n");
-
-    // Check if long mode is available
-    if !check_long_mode() {
-        write_serial(b"Long mode not supported\r\n");
-        loop { core::arch::asm!("hlt"); }
-    }
-    write_serial(b"Long mode supported\r\n");
-
-    // Set up paging structures
+    // Set up paging first
     setup_page_tables();
     write_serial(b"Page tables set up\r\n");
 
@@ -679,19 +619,18 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         ".code32",
         "mov eax, cr4",
-        "or eax, 1 << 5",     // Set PAE bit
+        "or eax, 1 << 5",  // PAE bit
         "mov cr4, eax",
         options(nomem, nostack)
     );
     write_serial(b"PAE enabled\r\n");
 
-    // Load CR3 with PML4
+    // Load CR3
     core::arch::asm!(
         ".code32",
-        "mov {tmp:e}, {addr:e}",
-        "mov cr3, {tmp:e}",
-        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     tmp = out(reg) _,
+        "mov eax, {pml4}",
+        "mov cr3, eax",
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
                      options(nomem, nostack)
     );
     write_serial(b"CR3 loaded\r\n");
@@ -701,42 +640,46 @@ pub unsafe extern "C" fn _start() -> ! {
         ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or eax, 1 << 8",      // Set LME bit
+        "or eax, 1 << 8",      // LME bit
         "wrmsr",
         options(nomem, nostack)
     );
     write_serial(b"Long mode enabled in EFER\r\n");
 
-    // Setup GDT for long mode
-    setup_gdt();
-    write_serial(b"GDT loaded\r\n");
+    // Set up IDT
+    setup_idt();
+    write_serial(b"IDT set up\r\n");
 
-    // Enable paging
+    // Set up and remap PIC
+    setup_pic();
+    write_serial(b"PIC configured\r\n");
+
+    // Enable paging and protected mode
     core::arch::asm!(
         ".code32",
         "mov eax, cr0",
-        "or eax, 1 << 31 | 1", // Set PG and PE bits
+        "or eax, 1 << 31 | 1", // PG | PE
         "mov cr0, eax",
         options(nomem, nostack)
     );
     write_serial(b"Paging enabled\r\n");
 
-    // Make sure interrupts are disabled before transition
+    // Long mode jump
     core::arch::asm!(
         ".code32",
-        "cli",
-        options(nomem, nostack)
-    );
+        // Set up stack
+        "mov esp, {stack}",
 
-    write_serial(b"Jumping to 64-bit mode...\r\n");
+        // Far jump to 64-bit code
+        "push 0x08",       // Code segment
+        "lea eax, [1f]",   // Get address of label
+        "push eax",
+        "retf",            // Far return
 
-    // Jump to long mode
-    core::arch::asm!(
-        ".code32",
-        // Ensure stack alignment
-        "and esp, -16",
-
-        // Setup segment registers
+        // 64-bit code
+        "long_mode_entry:",
+        ".code64",
+        // Set up segment registers
         "mov ax, 0x10",
         "mov ds, ax",
         "mov es, ax",
@@ -744,34 +687,13 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov gs, ax",
         "mov ss, ax",
 
-        // Push code segment and return address
-        "push 0x08",          // Code segment
-        "lea eax, [2f]",      // Get address of label
-        "push eax",           // Push address
-        "retf",               // Far return to 64-bit mode
-
-        ".align 8",
-        "2:",
-        ".code64",
-
-        // Now in 64-bit mode
-        "xor rax, rax",       // Clear RAX
-        "mov ds, ax",         // Clear segment registers
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-
-        // Set up final stack
-        "mov rsp, {stack}",
-
         // Enable interrupts
         "sti",
 
         // Jump to Rust main
         "jmp {target}",
 
-        stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
+        stack = in(reg) &raw const STACK.data as *const _ as u32 + 4096,
                      target = sym rust_main,
                      options(noreturn)
     );
