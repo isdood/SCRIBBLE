@@ -456,7 +456,6 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Enable PAE
     core::arch::asm!(
-        ".code32",
         "mov eax, cr4",
         "or eax, 1 << 5",     // Set PAE bit
         "mov cr4, eax",
@@ -465,17 +464,14 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Load CR3
     core::arch::asm!(
-        ".code32",
-        "mov {tmp:e}, {addr:e}",
-        "mov cr3, {tmp:e}",
-        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     tmp = out(reg) _,
+        "mov eax, {pml4}",
+        "mov cr3, eax",
+        pml4 = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
                      options(nomem, nostack)
     );
 
     // Enable long mode
     core::arch::asm!(
-        ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
         "or eax, 1 << 8",      // Set LME
@@ -483,9 +479,8 @@ pub unsafe extern "C" fn _start() -> ! {
         options(nomem, nostack)
     );
 
-    // Enable paging
+    // Enable paging and protection
     core::arch::asm!(
-        ".code32",
         "mov eax, cr0",
         "or eax, 0x80000001",  // Set PG and PE
         "mov cr0, eax",
@@ -495,22 +490,39 @@ pub unsafe extern "C" fn _start() -> ! {
     // Load 64-bit GDT
     setup_gdt();
 
-    // Far jump to 64-bit code
+    // Switch to long mode
     core::arch::asm!(
-        ".code32",
-        "push $8",              // Push code segment selector
-        "lea eax, [2f]",        // Get address of label
-        "push eax",             // Push target address
-        "retf",                 // Far return to switch to 64-bit mode
-        ".align 8",
-        "2:",
-        ".code64",
-        "mov rsp, {stack}",     // Set up 64-bit stack
-        "jmp {target}",         // Jump to rust_main
-        stack = const 0x7c00,
+        // Build far return stack frame
+        "push word 0x8",      // Code segment
+        "push word 1f",       // Return address
+        // Switch mode
+        "retf",
+        // Long mode entry point
+        "1:",
+        ".code64",            // Switch assembler to 64-bit mode
+        "mov rsp, 0x7c00",    // Reset stack pointer
+        // Clear segment registers
+        "xor ax, ax",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+        // Jump to Rust main
+        "jmp {target}",
         target = sym rust_main,
         options(noreturn)
     );
+}
+
+// Required panic handler
+#[panic_handler]
+fn panic(_: &core::panic::PanicInfo) -> ! {
+    loop {
+        unsafe {
+            core::arch::asm!("hlt", options(nomem, nostack));
+        }
+    }
 }
 
 /// Required panic handler for no_std
