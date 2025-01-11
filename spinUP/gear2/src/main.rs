@@ -88,20 +88,6 @@ static mut STACK: Stack = Stack {
 
 static mut SERIAL: SerialPort = unsafe { SerialPort::new(0x3F8) };
 
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
-    unsafe {
-        let mut serial = SerialPort::new(0x3F8);
-        serial.init();
-
-        for &b in b"Gear2 starting...\r\n" {
-            serial.write_byte(b);
-        }
-
-        enter_long_mode();
-    }
-}
-
 unsafe fn disable_interrupts() {
     core::arch::asm!("cli");
 }
