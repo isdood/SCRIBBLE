@@ -10,7 +10,8 @@ rustflags = [
     "-C", "link-arg=-Tlinker.ld",
     "-C", "link-arg=-nostartfiles",
     "-C", "link-arg=-static",
-    "-C", "link-arg=--oformat=binary",
-    "-C", "link-arg=--strip-all"
+    "-C", "link-arg=--gc-sections",
+    "-C", "link-arg=--strip-all",
+    "-C", "link-arg=-n"
 ]
 linker = "ld.lld"
