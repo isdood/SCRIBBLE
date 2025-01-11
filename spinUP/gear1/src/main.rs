@@ -4,31 +4,12 @@
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
 
-#[repr(C, packed)]
-struct Dap {
-    sz: u8,
-    _pad: u8,
-    cnt: u16,
-    off: u16,
-    seg: u16,
-    lba: u32,
-}
-
 #[no_mangle]
 #[link_section = ".boot.text"]
 pub extern "C" fn _start() -> ! {
-    let dap = Dap {
-        sz: 16,
-        _pad: 0,
-        cnt: 16,    // Load 16 sectors (8KB)
-        off: 0,     // Offset 0
-        seg: 0x07E0,// Segment 0x07E0 (physical addr: 0x7E00)
-        lba: 1,     // Start from sector 1
-    };
-
     unsafe {
         core::arch::asm!(
-            // Quick segment init
+            // Initialize segments and stack
             "xor ax, ax",
             "mov ds, ax",
             "mov es, ax",
@@ -38,30 +19,43 @@ pub extern "C" fn _start() -> ! {
             // Save boot drive
             "mov [0x7E00], dl",
 
-            // Enable A20 (fast method)
+            // Enable A20
             "in al, 0x92",
             "or al, 2",
             "out 0x92, al",
 
-            // Load sectors
-            "mov si, {0:x}",
+            // Set up disk read
+            "push ax",         // Reserve space for DAP
+            "push ax",
+            "push ax",
+            "push ax",
+            "mov si, sp",      // SI points to DAP
+            "mov byte ptr [si], 16",     // DAP size
+            "mov byte ptr [si + 1], 0",  // Padding
+            "mov word ptr [si + 2], 16", // Sector count
+            "mov word ptr [si + 4], 0",  // Offset
+            "mov word ptr [si + 6], 0x07E0", // Segment
+            "mov dword ptr [si + 8], 1",  // LBA
+
+            // Read sectors
             "mov ah, 0x42",
             "int 0x13",
-            "jc 2f",
+            "add sp, 8",       // Clean up DAP
+            "jc 2f",          // Jump if error
 
             // Jump to gear2
             "push word ptr 0x07E0",
             "push word ptr 0",
-            "retf",
+            "retf",           // Far return to gear2
 
-            // Error: Print 'E' and halt
-            "2: mov ax, 0x0E45",
-            "int 0x10",
-            "cli",
-            "hlt",
+            // Error handler
+            "2:",
+            "mov ax, 0x0E45", // Print 'E'
+        "int 0x10",
+        "cli",
+        "hlt",
 
-            in(reg) &dap,
-                         options(noreturn)
+        options(noreturn)
         );
     }
 }

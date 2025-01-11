@@ -1,16 +1,15 @@
 ENTRY(_start)
 SECTIONS {
-    . = 0x7E00;
-    .text : {
-        *(.text*)
+    . = 0x7C00;
+    .boot.text : {
+        *(.boot.text)
+        . = 510;
+        SHORT(0xaa55)
     }
-    .rodata : {
-        *(.rodata*)
-    }
-    .data : {
-        *(.data*)
-    }
-    .bss : {
-        *(.bss*)
+    /DISCARD/ : {
+        *(.comment)
+        *(.eh_frame)
+        *(.note.*)
+        *(.debug_*)
     }
 }

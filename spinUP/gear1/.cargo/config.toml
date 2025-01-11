@@ -1,11 +1,12 @@
 [build]
 rustflags = [
-    "-C", "link-args=-nostartfiles -static",
+    "-C", "link-args=-nostartfiles -Wl,--gc-sections -Wl,-T../linker.ld",
     "-C", "link-args=--no-eh-frame-hdr",
     "-C", "link-args=--build-id=none",
-    "-C", "target-feature=-mmx,-sse,+soft-float",
-    "-C", "relocation-model=static"
+    "-C", "relocation-model=static",
+    "-C", "opt-level=z"
 ]
 
-[target.i686-unknown-linux-gnu]
-linker = "ld.lld"
+[unstable]
+build-std = ["core"]
+build-std-features = ["compiler-builtins-mem"]

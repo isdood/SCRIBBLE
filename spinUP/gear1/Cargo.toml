@@ -4,19 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [profile.release]
-opt-level = 'z'     # Optimize for size
-lto = true          # Enable Link Time Optimization
-panic = 'abort'     # Remove panic unwinding code
-strip = true        # Strip symbols
-codegen-units = 1   # Optimize across entire program
+opt-level = "z"
+lto = true
+panic = "abort"
+strip = true
+codegen-units = 1
 
-[build]
-target = "i686-unknown-linux-gnu"
-
-[[bin]]
-name = "spinUP-gear1"
-path = "src/main.rs"
-
-# Minimize dependencies
 [dependencies]
-# (remove any unnecessary dependencies)
