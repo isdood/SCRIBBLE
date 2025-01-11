@@ -14,6 +14,25 @@ struct Dap {
     _pad2: u32,
 }
 
+// In both stages
+#[repr(C, packed)]
+pub struct StageInfo {
+    boot_drive: u8,
+    memory_map_addr: u32,
+    memory_entries: u16,
+    stage2_load_addr: u32,
+    flags: u32,
+}
+
+// Use this to pass information between stages
+static mut STAGE_INFO: StageInfo = StageInfo {
+    boot_drive: 0,
+    memory_map_addr: 0,
+    memory_entries: 0,
+    stage2_load_addr: 0x7E00,
+    flags: 0,
+};
+
 #[no_mangle]
 #[link_section = ".boot.text"]
 pub extern "C" fn _start() -> ! {
@@ -61,6 +80,50 @@ pub extern "C" fn _start() -> ! {
                          options(noreturn),
         );
     }
+}
+
+// Enable A20 line
+unsafe fn enable_a20() {
+    // BIOS method
+    core::arch::asm!(
+        "mov ax, 0x2401",
+        "int 0x15",
+        "jc 1f",          // If failed, try alternate method
+        "ret",
+        "1:",
+        // Keyboard controller method as fallback
+        "in al, 0x92",
+        "or al, 2",
+        "out 0x92, al",
+    );
+}
+
+// Proper memory detection
+unsafe fn detect_memory(buffer: &mut [u8]) -> u32 {
+    let mut entries = 0;
+    let mut continuation_id = 0;
+
+    loop {
+        let mut result: u32;
+        core::arch::asm!(
+            "int 0x15",
+            "jc 1f",
+            "mov {0:e}, 1",
+            "jmp 2f",
+            "1: mov {0:e}, 0",
+            "2:",
+            inout("eax") 0xE820 => result,
+                         in("ebx") continuation_id,
+                         in("ecx") 24,
+                         in("edx") 0x534D4150,
+                         in("di") buffer.as_mut_ptr(),
+        );
+
+        if result == 0 { break; }
+        entries += 1;
+        if continuation_id == 0 { break; }
+    }
+    entries
 }
 
 #[panic_handler]

@@ -44,6 +44,25 @@ struct Stack {
     data: [u8; 4096]
 }
 
+// In both stages
+#[repr(C, packed)]
+pub struct StageInfo {
+    boot_drive: u8,
+    memory_map_addr: u32,
+    memory_entries: u16,
+    stage2_load_addr: u32,
+    flags: u32,
+}
+
+// Use this to pass information between stages
+static mut STAGE_INFO: StageInfo = StageInfo {
+    boot_drive: 0,
+    memory_map_addr: 0,
+    memory_entries: 0,
+    stage2_load_addr: 0x7E00,
+    flags: 0,
+};
+
 static mut PAGE_TABLES: PageTables = PageTables {
     pml4: PageTable { entries: [0; 512] },
     pdpt: PageTable { entries: [0; 512] },
@@ -142,19 +161,18 @@ pub extern "C" fn _start() -> ! {
 unsafe fn disable_interrupts() {
     core::arch::asm!("cli");
 }
-
 unsafe fn setup_page_tables() {
-    let tables_ptr = &raw mut PAGE_TABLES as *mut PageTables;
+    // Clear tables first
+    for table in &mut PAGE_TABLES.pdpt.entries {
+        *table = 0;
+    }
 
-    // Clear all tables
-    (*tables_ptr).pml4.entries.fill(0);
-    (*tables_ptr).pdpt.entries.fill(0);
-    (*tables_ptr).pd.entries.fill(0);
-
-    // Set up identity mapping
-    (*tables_ptr).pml4.entries[0] = (&(*tables_ptr).pdpt as *const PageTable as u64) | 0x3;
-    (*tables_ptr).pdpt.entries[0] = (&(*tables_ptr).pd as *const PageTable as u64) | 0x3;
-    (*tables_ptr).pd.entries[0] = 0x83; // Present + Write + Huge (2MB)
+    // Identity map first 2MB
+    PAGE_TABLES.pml4.entries[0] =
+    (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
+    PAGE_TABLES.pdpt.entries[0] =
+    (&PAGE_TABLES.pd as *const _ as u64) | 0x3;
+    PAGE_TABLES.pd.entries[0] = 0x83; // PS=1, RW=1, P=1
 }
 
 unsafe fn setup_gdt() {
@@ -240,6 +258,18 @@ unsafe fn setup_long_mode() {
         "mov cr0, eax",
         options(nomem, nostack)
     );
+}
+
+unsafe fn validate_cpu_features() -> bool {
+    let mut cpuid_result: u32;
+    core::arch::asm!(
+        "mov eax, 0x80000001",
+        "cpuid",
+        "and edx, 1 << 29",  // Test LM bit
+        "mov {0:e}, edx",
+        out("eax") cpuid_result,
+    );
+    cpuid_result != 0
 }
 
 unsafe fn jump_to_long_mode() -> ! {
