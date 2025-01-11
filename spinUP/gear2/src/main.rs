@@ -125,7 +125,13 @@ unsafe fn setup_gdt() {
         limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
         base: gdt.addr() as u32,
     };
-    core::arch::asm!("lgdt [{0}]", in(reg) &gdt_ptr, options(att_syntax));
+    // Use the 32-bit lgdt instruction with correct size suffix
+    core::arch::asm!(
+        ".code32",
+        "lgdtl [{0}]",  // Added 'l' suffix for 32-bit operation
+        in(reg) &gdt_ptr,
+                     options(att_syntax)
+    );
 }
 
 unsafe fn enable_paging() {
