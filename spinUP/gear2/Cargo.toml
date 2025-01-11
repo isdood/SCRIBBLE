@@ -3,15 +3,11 @@ name = "spinUP"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-unstable_matter = { path = "../../lib/unstable_matter" }
-
 [profile.dev]
 panic = "abort"
 
 [profile.release]
-opt-level = 3
-debug = false
-lto = true
-codegen-units = 1
 panic = "abort"
+
+[build]
+target = "i686-unknown-none"  # Start in 32-bit mode
