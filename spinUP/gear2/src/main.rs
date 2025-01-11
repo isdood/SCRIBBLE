@@ -6,6 +6,16 @@ use core::panic::PanicInfo;
 mod serial;
 use serial::SerialPort;
 use unstable_matter::UnstableMatter;
+use core::arch::asm;
+
+#[repr(C, align(16))]
+struct InterruptStackFrame {
+    instruction_pointer: u64,
+    code_segment: u64,
+    cpu_flags: u64,
+    stack_pointer: u64,
+    stack_segment: u64
+}
 
 #[repr(C)]
 struct PageTable {
@@ -348,6 +358,38 @@ unsafe fn setup_long_mode() {
     );
 }
 
+unsafe fn setup_pic() {
+    // Initialize PIC1 (master)
+    asm!(
+        ".code32",
+         "mov al, 0x11",
+         "out 0x20, al",    // ICW1: initialize
+         "mov al, 0x20",    // ICW2: IDT entry 0x20
+         "out 0x21, al",
+         "mov al, 0x04",    // ICW3: IRQ2 -> connection to slave
+         "out 0x21, al",
+         "mov al, 0x01",    // ICW4: 8086 mode
+         "out 0x21, al",
+
+         // Initialize PIC2 (slave)
+         "mov al, 0x11",
+         "out 0xA0, al",    // ICW1
+         "mov al, 0x28",    // ICW2: IDT entry 0x28
+         "out 0xA1, al",
+         "mov al, 0x02",    // ICW3: IRQ9 -> connection to master
+         "out 0xA1, al",
+         "mov al, 0x01",    // ICW4: 8086 mode
+         "out 0xA1, al",
+
+         // Mask all interrupts except timer
+         "mov al, 0xFE",    // Enable only IRQ0 (timer)
+    "out 0x21, al",
+    "mov al, 0xFF",    // Disable all slave interrupts
+    "out 0xA1, al",
+    options(nomem, nostack)
+    );
+}
+
 #[allow(dead_code)]
 unsafe fn enter_long_mode() -> ! {
     // Disable interrupts first
@@ -462,27 +504,57 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
-#[no_mangle]
-unsafe extern "x86-interrupt" fn timer_handler() {
-    write_serial(b"Timer tick\r\n");
+#[naked]
+unsafe extern "x86-interrupt" fn timer_interrupt_handler(
+    _stack_frame: InterruptStackFrame
+) {
+    asm!(
+        ".code64",
+         // Save registers
+         "push rax",
+         "push rcx",
+         "push rdx",
+         "push rsi",
+         "push rdi",
+
+         // Send EOI to PIC
+         "mov al, 0x20",
+         "out 0x20, al",
+
+         // Restore registers
+         "pop rdi",
+         "pop rsi",
+         "pop rdx",
+         "pop rcx",
+         "pop rax",
+         "iretq",
+         options(noreturn)
+    );
 }
 
-#[no_mangle]
-unsafe extern "x86-interrupt" fn page_fault_handler() {
-    write_serial(b"Page fault\r\n");
-    loop { core::arch::asm!("hlt"); }
+#[naked]
+unsafe extern "x86-interrupt" fn page_fault_handler(
+    _stack_frame: InterruptStackFrame,
+    _error_code: u64
+) {
+    asm!(
+        ".code64",
+         "cli",
+         "hlt",
+         options(noreturn)
+    );
 }
 
 unsafe fn setup_idt() {
     let code_segment = 0x08;
 
     // Timer interrupt handler (IRQ0)
-    IDT.entries[0x08] = IDTEntry {
-        offset_low: (timer_handler as usize & 0xFFFF) as u16,
+    IDT.entries[0x20] = IDTEntry {  // Changed from 0x08 to 0x20
+        offset_low: (timer_interrupt_handler as usize & 0xFFFF) as u16,
         segment: code_segment,
         flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
-        offset_middle: ((timer_handler as usize >> 16) & 0xFFFF) as u16,
-        offset_high: (timer_handler as usize >> 32) as u32,
+        offset_middle: ((timer_interrupt_handler as usize >> 16) & 0xFFFF) as u16,
+        offset_high: (timer_interrupt_handler as usize >> 32) as u32,
         reserved: 0
     };
 
@@ -496,17 +568,16 @@ unsafe fn setup_idt() {
         reserved: 0
     };
 
-    // Load the IDT
     let idtr = GDTPointer {
         limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &raw const IDT as *const _ as u32,  // Fixed warning
+        base: &raw const IDT as *const _ as u32,
     };
 
-    core::arch::asm!(
+    asm!(
         ".code32",
-        "lidt [{0:e}]",  // Use 32-bit addressing
-        in(reg) &idtr,
-                     options(readonly)
+         "lidt [{0:e}]",
+         in(reg) &idtr,
+         options(readonly)
     );
 }
 
@@ -540,9 +611,13 @@ pub unsafe extern "C" fn _start() -> ! {
     disable_interrupts();
     write_serial(b"Interrupts disabled\r\n");
 
-    // Add IDT setup before enabling paging
+    // Setup IDT before PIC
     setup_idt();
     write_serial(b"IDT set up\r\n");
+
+    // Setup and remap PIC
+    setup_pic();
+    write_serial(b"PIC configured\r\n");
 
     // Check if long mode is available
     if !check_long_mode() {
@@ -587,6 +662,10 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"Long mode enabled in EFER\r\n");
 
+    // Setup GDT for long mode
+    setup_gdt();
+    write_serial(b"GDT loaded\r\n");
+
     // Enable paging
     core::arch::asm!(
         ".code32",
@@ -597,16 +676,21 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"Paging enabled\r\n");
 
-    // Setup GDT for long mode
-    setup_gdt();
-    write_serial(b"GDT loaded\r\n");
+    // Make sure interrupts are disabled before transition
+    core::arch::asm!(
+        ".code32",
+        "cli",
+        options(nomem, nostack)
+    );
+
+    write_serial(b"Jumping to 64-bit mode...\r\n");
 
     // Jump to long mode
-    write_serial(b"Jumping to 64-bit mode...\r\n");
     core::arch::asm!(
         ".code32",
         // Ensure stack alignment
         "and esp, -16",
+
         // Setup segment registers
         "mov ax, 0x10",
         "mov ds, ax",
@@ -614,14 +698,17 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
+
         // Push code segment and return address
         "push 0x08",          // Code segment
         "lea eax, [2f]",      // Get address of label
         "push eax",           // Push address
         "retf",               // Far return to 64-bit mode
+
         ".align 8",
         "2:",
         ".code64",
+
         // Now in 64-bit mode
         "xor rax, rax",       // Clear RAX
         "mov ds, ax",         // Clear segment registers
@@ -629,10 +716,16 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
+
         // Set up final stack
         "mov rsp, {stack}",
+
+        // Enable interrupts
+        "sti",
+
         // Jump to Rust main
         "jmp {target}",
+
         stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
                      target = sym rust_main,
                      options(noreturn)
