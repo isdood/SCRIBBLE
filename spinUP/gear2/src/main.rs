@@ -33,12 +33,6 @@ struct GDTTable {
     entries: [GDTEntry; 3]
 }
 
-#[repr(C, packed)]
-struct GDTPointer {
-    limit: u16,
-    base: u32,
-}
-
 #[repr(C, align(4096))]
 struct Stack {
     data: [u8; 4096]
@@ -61,23 +55,23 @@ static mut GDT: GDTTable = GDTTable {
             granularity: 0,
             base_high: 0,
         },
-        // Code segment
+        // 64-bit code segment
         GDTEntry {
-            limit_low: 0xFFFF,
-            base_low: 0,
-            base_middle: 0,
-            access: 0x9A,
-            granularity: 0xAF,
-            base_high: 0,
+            limit_low: 0,      // Limit ignored in 64-bit mode
+            base_low: 0,       // Base ignored in 64-bit mode
+            base_middle: 0,    // Base ignored in 64-bit mode
+            access: 0x9A,      // Present(1) | DPL(00) | S(1) | Type(1010)
+            granularity: 0x20, // Long mode (1) | Default Op Size (0) | Granularity (0)
+            base_high: 0,      // Base ignored in 64-bit mode
         },
         // Data segment
         GDTEntry {
-            limit_low: 0xFFFF,
-            base_low: 0,
-            base_middle: 0,
-            access: 0x92,
-            granularity: 0xCF,
-            base_high: 0,
+            limit_low: 0,      // Limit ignored in 64-bit mode
+            base_low: 0,       // Base ignored in 64-bit mode
+            base_middle: 0,    // Base ignored in 64-bit mode
+            access: 0x92,      // Present(1) | DPL(00) | S(1) | Type(0010)
+            granularity: 0,    // Long mode (0) | Default Op Size (0) | Granularity (0)
+            base_high: 0,      // Base ignored in 64-bit mode
         },
     ]
 };
@@ -159,35 +153,27 @@ unsafe fn setup_page_tables() {
 }
 
 unsafe fn setup_gdt() {
-    let gdt: UnstableMatter<[GDTEntry; 3]> = UnstableMatter::at(&raw const GDT.entries as *const _ as usize);
     let gdt_ptr = GDTPointer {
-        limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
-        base: gdt.addr() as u32,  // Fixed: Use gdt.addr() instead of non-existent gdt_addr()
+        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
+        base: (&GDT as *const GDTTable) as u32,
     };
-
-    let limit = gdt_ptr.limit;
-    let base = gdt_ptr.base;
 
     core::arch::asm!(
         ".code32",
         // Create space on stack and ensure alignment
-        "subl $8, %esp",          // Allocate 8 bytes (6 needed, but keep aligned)
-    "andl $-8, %esp",         // Ensure 8-byte alignment
+        "subl $8, %esp",
+        "andl $-8, %esp",
 
-    // Move values into registers
-    "mov {limit:e}, %eax",    // Use :e for 32-bit registers
-    "mov {base:e}, %ecx",     // Use :e for 32-bit registers
-
-    // Store GDTR data
-    "movw %ax, (%esp)",       // Store limit (16-bit)
-    "movl %ecx, 2(%esp)",     // Store base (32-bit)
-    "lgdt (%esp)",            // Load GDT
+        // Store GDTR data
+        "movw {limit:x}, (%esp)",     // Store limit
+                     "movl {base:e}, 2(%esp)",     // Store base
+                     "lgdt (%esp)",                // Load GDT
 
                      // Restore stack
                      "addl $8, %esp",
 
-                     limit = in(reg) limit,
-                     base = in(reg) base,
+                     limit = in(reg) gdt_ptr.limit,
+                     base = in(reg) gdt_ptr.base,
                      options(att_syntax)
     );
 }
