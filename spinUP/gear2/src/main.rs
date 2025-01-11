@@ -76,9 +76,8 @@ static mut STAGE_INFO: StageInfo = StageInfo {
     flags: 0,
 };
 
-// Add this struct for IDT entries
+// Define IDT entry structure
 #[repr(C, packed)]
-#[derive(Copy, Clone)]  // Add these derives
 struct IDTEntry {
     offset_low: u16,
     segment: u16,
@@ -88,23 +87,21 @@ struct IDTEntry {
     reserved: u32,
 }
 
+// Define IDT structure
 #[repr(C, align(16))]
 struct IDT {
-    entries: [IDTEntry; 256]
+    entries: [IDTEntry; 256],
 }
 
-// Initialize IDT with a const default entry
-const DEFAULT_IDT_ENTRY: IDTEntry = IDTEntry {
-    offset_low: 0,
-    segment: 0,
-    flags: 0,
-    offset_middle: 0,
-    offset_high: 0,
-    reserved: 0
-};
-
 static mut IDT: IDT = IDT {
-    entries: [DEFAULT_IDT_ENTRY; 256]
+    entries: [IDTEntry {
+        offset_low: 0,
+        segment: 0,
+        flags: 0,
+        offset_middle: 0,
+        offset_high: 0,
+        reserved: 0,
+    }; 256],
 };
 
 static mut PAGE_TABLES: PageTables = PageTables {
@@ -507,13 +504,134 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn _start() -> ! {
+    // Disable interrupts until we're ready
+    core::arch::asm!("cli");
+
+    // Initialize serial for debugging
+    init_serial();
+    write_serial(b"Gear2 started\r\n");
+
+    // Set up page tables first
+    setup_page_tables();
+    write_serial(b"Page tables set up\r\n");
+
+    // Enable PAE
+    core::arch::asm!(
+        ".code32",
+        "mov eax, cr4",
+        "or eax, 1 << 5",  // PAE bit
+        "mov cr4, eax",
+        options(nomem, nostack)
+    );
+    write_serial(b"PAE enabled\r\n");
+
+    // Load CR3
+    core::arch::asm!(
+        ".code32",
+        "mov eax, {pml4:e}",
+        "mov cr3, eax",
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+                     options(nomem, nostack)
+    );
+    write_serial(b"CR3 loaded\r\n");
+
+    // Enable long mode
+    core::arch::asm!(
+        ".code32",
+        "mov ecx, 0xC0000080", // EFER MSR
+        "rdmsr",
+        "or eax, 1 << 8",      // LME bit
+        "wrmsr",
+        options(nomem, nostack)
+    );
+    write_serial(b"Long mode enabled in EFER\r\n");
+
+    // Set up IDT before enabling paging
+    setup_idt();
+    write_serial(b"IDT set up\r\n");
+
+    // Set up and remap PIC
+    setup_pic();
+    write_serial(b"PIC configured\r\n");
+
+    // Enable paging and protected mode
+    core::arch::asm!(
+        ".code32",
+        "mov eax, cr0",
+        "or eax, 1 << 31 | 1", // PG | PE
+        "mov cr0, eax",
+        options(nomem, nostack)
+    );
+    write_serial(b"Paging enabled\r\n");
+
+    // Long mode jump
+    core::arch::asm!(
+        ".code32",
+        // Set up stack
+        "mov esp, {stack:e}",
+
+        // Far jump to 64-bit code
+        "push 0x08",     // Code segment
+        "lea eax, [2f]", // Get address of forward label
+        "push eax",
+        "retf",          // Far return
+
+        // 64-bit code
+        "2:",
+        ".code64",
+        // Set up segment registers
+        "mov ax, 0x10",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+
+        // Enable interrupts
+        "sti",
+
+        // Jump to Rust main
+        "jmp {target}",
+
+        stack = in(reg) &raw const STACK.data as *const _ as u32 + 4096,
+                     target = sym rust_main,
+                     options(noreturn)
+    );
+}
+
+unsafe fn setup_idt() {
+    let code_segment = 0x08;
+
+    // Set up timer interrupt handler (IRQ0 -> INT 0x20)
+    IDT.entries[0x20] = IDTEntry {
+        offset_low: (timer_interrupt_handler as usize & 0xFFFF) as u16,
+        segment: code_segment,
+        flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
+        offset_middle: ((timer_interrupt_handler as usize >> 16) & 0xFFFF) as u16,
+        offset_high: (timer_interrupt_handler as usize >> 32) as u32,
+        reserved: 0
+    };
+
+    // Load IDT
+    let idtr = GDTPointer {
+        limit: (core::mem::size_of::<IDT>() - 1) as u16,
+        base: &IDT as *const _ as u64,
+    };
+
+    core::arch::asm!(
+        "lidt [{0}]",
+        in(reg) &idtr,
+                     options(readonly, nostack)
+    );
+}
+
 #[naked]
 unsafe extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: InterruptStackFrame
 ) {
     core::arch::naked_asm!(
-        ".code64",
-        // Save scratch registers
         "push rax",
         "push rcx",
         "push rdx",
@@ -526,7 +644,6 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(
         "mov al, 0x20",
         "out 0x20, al",
 
-        // Restore scratch registers
         "pop r11",
         "pop r10",
         "pop r9",
@@ -535,7 +652,6 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(
         "pop rcx",
         "pop rax",
 
-        // Return from interrupt
         "iretq",
     );
 }
@@ -562,140 +678,6 @@ unsafe extern "x86-interrupt" fn page_fault_handler(
         // Halt for now
         "cli",
         "hlt",
-    );
-}
-
-
-unsafe fn setup_idt() {
-    let code_segment = 0x08;
-
-    // Timer interrupt handler (IRQ0)
-    IDT.entries[0x20] = IDTEntry {  // Changed from 0x08 to 0x20
-        offset_low: (timer_interrupt_handler as usize & 0xFFFF) as u16,
-        segment: code_segment,
-        flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
-        offset_middle: ((timer_interrupt_handler as usize >> 16) & 0xFFFF) as u16,
-        offset_high: (timer_interrupt_handler as usize >> 32) as u32,
-        reserved: 0
-    };
-
-    // Page fault handler
-    IDT.entries[0x0E] = IDTEntry {
-        offset_low: (page_fault_handler as usize & 0xFFFF) as u16,
-        segment: code_segment,
-        flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
-        offset_middle: ((page_fault_handler as usize >> 16) & 0xFFFF) as u16,
-        offset_high: (page_fault_handler as usize >> 32) as u32,
-        reserved: 0
-    };
-
-    let idtr = GDTPointer {
-        limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &raw const IDT as *const _ as u32,
-    };
-
-    asm!(
-        ".code32",
-         "lidt [{0:e}]",
-         in(reg) &idtr,
-         options(readonly)
-    );
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _start() -> ! {
-    // Disable interrupts until we're ready
-    core::arch::asm!("cli");
-
-    // Initialize serial for debugging
-    init_serial();
-    write_serial(b"Gear2 started\r\n");
-
-    // Set up paging first
-    setup_page_tables();
-    write_serial(b"Page tables set up\r\n");
-
-    // Enable PAE
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr4",
-        "or eax, 1 << 5",  // PAE bit
-        "mov cr4, eax",
-        options(nomem, nostack)
-    );
-    write_serial(b"PAE enabled\r\n");
-
-    // Load CR3
-    core::arch::asm!(
-        ".code32",
-        "mov eax, {pml4:e}",  // Use :e for 32-bit register formatting
-        "mov cr3, eax",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     options(nomem, nostack)
-    );
-    write_serial(b"CR3 loaded\r\n");
-
-    // Enable long mode
-    core::arch::asm!(
-        ".code32",
-        "mov ecx, 0xC0000080", // EFER MSR
-        "rdmsr",
-        "or eax, 1 << 8",      // LME bit
-        "wrmsr",
-        options(nomem, nostack)
-    );
-    write_serial(b"Long mode enabled in EFER\r\n");
-
-    // Set up IDT
-    setup_idt();
-    write_serial(b"IDT set up\r\n");
-
-    // Set up and remap PIC
-    setup_pic();
-    write_serial(b"PIC configured\r\n");
-
-    // Enable paging and protected mode
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr0",
-        "or eax, 1 << 31 | 1", // PG | PE
-        "mov cr0, eax",
-        options(nomem, nostack)
-    );
-    write_serial(b"Paging enabled\r\n");
-
-    // Long mode jump
-    core::arch::asm!(
-        ".code32",
-        // Set up stack
-        "mov esp, {stack:e}",  // Use :e for 32-bit register formatting
-
-        // Far jump to 64-bit code
-        "push 0x08",        // Code segment
-        "lea eax, [2f]",    // Get address of label using numeric label
-        "push eax",
-        "retf",             // Far return
-
-        // 64-bit code
-        "2:",               // Numeric label instead of named label
-        ".code64",
-        // Set up segment registers
-        "mov ax, 0x10",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-
-        // Enable interrupts
-        "sti",
-
-        // Jump to Rust main
-        "jmp {target}",
-
-        stack = in(reg) &raw const STACK.data as *const _ as u32 + 4096,
-                     target = sym rust_main,
-                     options(noreturn)
     );
 }
 
