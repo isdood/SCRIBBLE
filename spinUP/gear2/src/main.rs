@@ -512,3 +512,13 @@ pub unsafe extern "C" fn _start() -> ! {
         options(noreturn)
     );
 }
+
+/// Required panic handler for no_std
+#[panic_handler]
+fn panic(_: &core::panic::PanicInfo) -> ! {
+    loop {
+        unsafe {
+            core::arch::asm!("hlt", options(nomem, nostack));
+        }
+    }
+}
