@@ -568,10 +568,10 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         ".code32",
         "push 0x08",              // Code segment
-        "lea eax, [rel 2f]",      // Get address of label
+        "lea eax, [long_mode]",   // Get address of label
         "push eax",               // Push target address
         "retf",                   // Far return to long mode
-        "2:",
+        "long_mode:",             // Changed to named label
         ".code64",                // Switch to 64-bit mode
         "mov ax, 0x10",          // Data segment
         "mov ds, ax",
