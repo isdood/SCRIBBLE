@@ -160,8 +160,8 @@ unsafe fn disable_interrupts() {
 
 unsafe fn setup_page_tables() {
     // Identity map first 2MB
-    PAGE_TABLES.pml4[0] = &PAGE_TABLES.pdpt as *const _ as u64 | 0x3;
-    PAGE_TABLES.pdpt[0] = &PAGE_TABLES.pd as *const _ as u64 | 0x3;
+    PAGE_TABLES.pml4[0] = &raw const PAGE_TABLES.pdpt as *const _ as u64 | 0x3;
+    PAGE_TABLES.pdpt[0] = &raw const PAGE_TABLES.pd as *const _ as u64 | 0x3;
     PAGE_TABLES.pd[0] = 0x83;  // Present + Write + Huge (2MB)
 
     core::arch::asm!("mfence");
@@ -468,7 +468,7 @@ pub unsafe extern "C" fn _start() -> ! {
         ".code32",
         "mov {tmp:e}, {addr:e}",
         "mov cr3, {tmp:e}",
-        addr = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
                      tmp = out(reg) _,
                      options(nomem, nostack)
     );
