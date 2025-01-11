@@ -1,11 +1,12 @@
 #![no_std]
 
+// In lib/unstable_matter/src/lib.rs or similar:
 pub struct UnstableMatter<T> {
     addr: *mut T,
 }
 
 impl<T> UnstableMatter<T> {
-    pub fn at(addr: usize) -> Self {
+    pub unsafe fn at(addr: usize) -> Self {
         Self {
             addr: addr as *mut T,
         }
@@ -17,9 +18,5 @@ impl<T> UnstableMatter<T> {
 
     pub fn write(&mut self, value: T) {
         unsafe { core::ptr::write_volatile(self.addr, value) }
-    }
-
-    pub fn as_ptr(&self) -> *mut T {
-        self.addr
     }
 }

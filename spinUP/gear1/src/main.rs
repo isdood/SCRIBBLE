@@ -1,43 +1,69 @@
 #![no_std]
 #![no_main]
 
-use core::arch::global_asm;
 use core::panic::PanicInfo;
 
-#[panic_handler]
-fn panic(_: &PanicInfo) -> ! {
-    loop {}
+#[repr(C, packed)]
+struct Dap {
+    sz: u8,
+    _pad: u8,
+    cnt: u16,
+    off: u16,
+    seg: u16,
+    lba: u32,
+    _pad2: u32,
 }
 
-global_asm!(r#"
-.section .boot, "ax"
-.code16
-.globl _start
-_start:
-# Jump over BPB
-jmp short start
-nop
+#[no_mangle]
+#[link_section = ".boot.text"]
+pub extern "C" fn _start() -> ! {
+    unsafe {
+        // Setup segments
+        core::arch::asm!(
+            "xor ax, ax",
+            "mov ds, ax",
+            "mov ss, ax",
+            "mov sp, 0x7C00",
+        );
 
-# BPB (BIOS Parameter Block)
-.space 59, 0
+        // Store boot drive
+        let drive: u8;
+        core::arch::asm!("mov {}, dl", out(reg_byte) drive);
 
-start:
-# Set up segments
-xor ax, ax
-mov ds, ax
-mov es, ax
-mov ss, ax
-mov sp, 0x7c00
+        // Load gear2
+        let dap = Dap {
+            sz: 16,
+            _pad: 0,
+            cnt: 32,
+            off: 0,
+            seg: 0x07E0,
+            lba: 1,
+            _pad2: 0,
+        };
 
-# Load sector 2 to 0x7E00
-mov ax, 0x0201     # AH=read(2), AL=1 sector
-mov cx, 0x0002     # CH=track 0, CL=sector 2
-xor dh, dh         # DH=head 0
-mov bx, 0x7e00     # ES:BX = 0:0x7E00
-int 0x13
+        core::arch::asm!(
+            "mov ah, 0x42",
+            "mov si, {0:x}",
+            "int 0x13",
+            "jc 2f",         // Jump to error handler if carry set
+            "cmp ah, 0",     // Check status
+            "jne 2f",        // Jump if not zero (error)
+        "push word ptr 0x07E0",
+        "push word ptr 0",
+        "mov dl, {1}",
+        "retf",
+        "2:",           // Error handler (using numeric label)
+        "mov ax, 0x0E45",  // Print 'E' on error
+        "int 0x10",
+        "hlt",
+        in(reg) &dap,
+                         in(reg_byte) drive,
+                         options(noreturn),
+        );
+    }
+}
 
-# Jump to loaded sector
-.byte 0xea         # Far jump opcode
-.word 0x0000       # Offset
-.word 0x07e0       # Segment
-"#);
+#[panic_handler]
+#[no_mangle]
+#[link_section = ".boot.text.panic"]
+fn panic(_: &PanicInfo) -> ! { loop {} }

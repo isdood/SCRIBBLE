@@ -4,11 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [profile.release]
-opt-level = "z"
+opt-level = "z"  # Optimize for size
+debug = false
 lto = true
 codegen-units = 1
 panic = "abort"
-strip = true
-
-[build-dependencies]
-cc = "1.0"
