@@ -1,20 +1,3 @@
-#![no_std]
-#![no_main]
-
-#[panic_handler]
-fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
-
-#[repr(C, packed)]
-struct Dap {
-    sz: u8,
-    _pad: u8,
-    cnt: u16,
-    off: u16,
-    seg: u16,
-    lba: u32,
-    _pad2: u32,
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
     // Setup stack
@@ -33,33 +16,44 @@ pub unsafe extern "C" fn _start() -> ! {
     );
 
     // Load Gear2
-    let drive = 0x80;  // Boot drive
-    let sectors = 64;  // Number of sectors to load
-    let buffer = 0x7e00 as *mut u8;  // Load address
+    let drive: u8 = 0x80;  // Boot drive
 
+    // Set up disk address packet on stack
     core::arch::asm!(
-        "mov ah, 0x42",      // Extended read
-        "int 0x13",
-        "jc 1f",             // If error, fail
-        "cmp ah, 0",         // Check status
-        "jne 1f",            // If not success, fail
-        "jmp 2f",            // Success, continue
-        "1: mov al, 0x45",   // Error code
-        "mov ah, 0x0e",      // Print char
-        "int 0x10",
-        "cli",               // Halt on error
-        "hlt",
-        "2:",               // Success
-        in("dl") drive,
-                     options(nomem, nostack)
-    );
+        // Create disk address packet
+        "push word ptr 0",     // Upper 16 bits of LBA (48-bit)
+    "push word ptr 0",     // Upper 32 bits of LBA (48-bit)
+    "push word ptr 0",     // Lower 32 bits of LBA - high word
+    "push word ptr 1",     // Lower 32 bits of LBA - low word (sector 1)
+    "push word ptr 0x07e0", // Segment of buffer
+    "push word ptr 0",     // Offset of buffer
+    "push word ptr 63",    // Number of sectors (63 more sectors)
+    "push word ptr 16",    // Size of packet (16 bytes)
+    "mov si, sp",         // SI points to packet
+
+    // Call INT 13h
+    "mov ah, 0x42",      // Extended read
+    "mov dl, {drive}",   // Drive number
+    "int 0x13",          // Call BIOS
+    "jc 2f",            // If error, jump to error handler
+
+    // Clean up stack
+    "add sp, 16",       // Remove packet from stack
 
     // Jump to Gear2
-    core::arch::asm!(
-        "push word ptr 0x0000",  // CS
-        "push word ptr 0x7e00",  // IP
-        "retf",                  // Far return to Gear2
-        options(nomem, nostack)
+    "push word ptr 0",   // CS = 0
+    "push word ptr 0x7e00", // IP = 0x7e00
+    "retf",              // Far return to Gear2
+
+    // Error handler
+    "2:",
+    "mov al, 'E'",      // Error character
+    "mov ah, 0x0e",     // TTY output
+    "int 0x10",         // Print it
+    "cli",              // Disable interrupts
+    "hlt",              // Halt
+    drive = in(reg_byte) drive,
+                     options(nomem)
     );
 
     loop {}
