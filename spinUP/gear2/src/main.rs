@@ -509,9 +509,8 @@ unsafe fn enter_long_mode() -> ! {
 unsafe extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: InterruptStackFrame
 ) {
-    core::arch::naked_asm!(
+    core::arch::asm!(
         ".code64",
-        // Save registers
         "push rax",
         "push rcx",
         "push rdx",
