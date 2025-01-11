@@ -1,32 +1,40 @@
 ENTRY(_start)
-OUTPUT_FORMAT(elf32-i386)
 
-SECTIONS {
+SECTIONS
+{
     . = 0x7C00;
 
-    /* Combine everything into a single bootable section */
-    .boot : {
-        KEEP(*(.boot.text))  /* Our entry point */
-        *(.text*)            /* Other code */
-        *(.rodata*)          /* Read-only data */
-        *(.data*)            /* Data */
-        . = 510 - (. - 0x7C00);  /* Pad to boot signature */
-        SHORT(0xaa55)            /* Boot signature */
-    } =0
+    .start : {
+        *(.boot.text)    /* Entry point */
+    }
 
-    /* These sections must exist for the linker but won't be in final binary */
-    .shstrtab 0 : { *(.shstrtab) }
-    .symtab 0 : { *(.symtab) }
-    .strtab 0 : { *(.strtab) }
+    .text : {
+        *(.text*)        /* Code */
+    }
 
-    /DISCARD/ : {
-        *(.eh_frame*)
-        *(.note*)
-        *(.comment*)
-        *(.rel*)
-        *(.rela*)
-        *(.bss*)
+    .rodata : {
+        *(.rodata*)      /* Constants */
+    }
+
+    .data : {
+        *(.data*)        /* Data */
+    }
+
+    /* Ensure we don't exceed available space */
+    . = 0x7C00 + 510;
+
+    /* Add boot signature */
+    .signature : {
+        SHORT(0xaa55)
+    }
+
+    /* These are required by the toolchain */
+    .metadata : {
+        *(.shstrtab)
+        *(.strtab)
+        *(.symtab)
     }
 }
 
-ASSERT(SIZEOF(.boot) <= 512, "Error: Boot sector exceeds 512 bytes")
+/* Sanity check */
+ASSERT(SIZEOF(.start) + SIZEOF(.text) + SIZEOF(.rodata) + SIZEOF(.data) + 2 <= 512, "Boot sector exceeds 512 bytes")

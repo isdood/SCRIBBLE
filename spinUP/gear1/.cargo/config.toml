@@ -7,11 +7,12 @@ build-std-features = ["compiler-builtins-mem"]
 
 [target.i686-spinup]
 rustflags = [
-    "-C", "opt-level=z",
+    "-C", "opt-level=s",
     "-C", "no-redzone",
-    "-C", "link-args=-Tlinker.ld",
-    "-C", "link-args=--oformat=binary",
-    "-C", "link-args=-static",
-    "-C", "link-args=--nmagic"
+    "-C", "relocation-model=static",
+    "-C", "code-model=small",
+    "-C", "link-arg=-N",
+    "-C", "link-arg=-Tlinker.ld",
+    "-C", "link-arg=--oformat=binary",
+    "-C", "link-arg=-nostartfiles"
 ]
-linker = "ld.lld"
