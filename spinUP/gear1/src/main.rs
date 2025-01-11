@@ -4,8 +4,8 @@
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
 
-#[no_mangle]
 #[link_section = ".boot.text"]
+#[no_mangle]
 pub extern "C" fn _start() -> ! {
     unsafe {
         core::arch::asm!(
@@ -23,27 +23,27 @@ pub extern "C" fn _start() -> ! {
             "or al, 2",
             "out 0x92, al",
 
-            // Build DAP on stack
-            "push word ptr 0",         // Upper _pad2
-            "push word ptr 0",         // Lower _pad2
-            "push word ptr 0",         // Upper LBA
-            "push word ptr 1",         // Lower LBA = 1
-            "push word ptr 0x07E0",    // segment
-            "push word ptr 0",         // offset
-            "push word ptr 16",        // count
-            "push word ptr 0x10",      // size=16
-            "mov si, sp",              // SI points to DAP
+            // Build DAP
+            "sub sp, 16",         // Reserve space for DAP
+            "mov si, sp",         // SI points to DAP
+            "mov byte ptr [si], 16", // size=16
+            "mov byte ptr [si + 1], 0", // pad=0
+            "mov word ptr [si + 2], 16", // count=16
+            "mov word ptr [si + 4], 0", // offset=0
+            "mov word ptr [si + 6], 0x07E0", // segment
+            "mov dword ptr [si + 8], 1", // LBA=1
+            "mov dword ptr [si + 12], 0", // pad2=0
 
             // Load sectors
             "mov ah, 0x42",
             "int 0x13",
-            "add sp, 16",              // Clean stack
-            "jc 2f",                   // Jump if error
+            "add sp, 16",         // Clean stack
+            "jc 2f",             // Jump if error
 
             // Jump to gear2
-            "push word ptr 0x07E0",    // segment
-            "push word ptr 0",         // offset
-            "retf",                    // Far return
+            "push word ptr 0x07E0", // segment
+            "push word ptr 0",    // offset
+            "retf",              // Far return
 
             // Error: print 'E' and halt
             "2:",

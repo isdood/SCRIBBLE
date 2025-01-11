@@ -8,6 +8,7 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 panic = "abort"
+debug = false
 strip = true
 
 [dependencies]
