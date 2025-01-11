@@ -151,7 +151,11 @@ pub extern "C" fn rust_main() -> ! {
 }
 
 unsafe fn disable_interrupts() {
-    core::arch::asm!("cli");
+    core::arch::asm!(
+        ".code32",
+        "cli",
+        options(nomem, nostack)
+    );
 }
 
 unsafe fn setup_page_tables() {
@@ -177,6 +181,7 @@ unsafe fn setup_gdt() {
     };
 
     core::arch::asm!(
+        ".code32",
         "lgdt [{0}]",
         in(reg) &gdt_ptr,
                      options(readonly)
@@ -446,6 +451,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Enable PAE
     core::arch::asm!(
+        ".code32",
         "mov eax, cr4",
         "or eax, 1 << 5",     // Set PAE bit
         "mov cr4, eax",
@@ -455,9 +461,10 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Load CR3 with PML4
     core::arch::asm!(
+        ".code32",
         "mov {tmp:e}, {addr:e}",
         "mov cr3, {tmp:e}",
-        addr = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
                      tmp = out(reg) _,
                      options(nomem, nostack)
     );
@@ -465,6 +472,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Enable long mode
     core::arch::asm!(
+        ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
         "or eax, 1 << 8",      // Set LME bit
@@ -473,12 +481,9 @@ pub unsafe extern "C" fn _start() -> ! {
     );
     write_serial(b"Long mode enabled in EFER\r\n");
 
-    // Setup GDT for long mode
-    setup_gdt();
-    write_serial(b"GDT loaded\r\n");
-
     // Enable paging
     core::arch::asm!(
+        ".code32",
         "mov eax, cr0",
         "or eax, 1 << 31 | 1", // Set PG and PE bits
         "mov cr0, eax",
@@ -488,22 +493,23 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Jump to long mode
     core::arch::asm!(
+        ".code32",
         "push 0x08",          // Code segment
-        "lea eax, [2f]",      // Get address of label (using 2 instead of 1)
-    "push eax",           // Push address
-    "retf",               // Far return to 64-bit mode
-    ".align 8",
-    "2:",                 // Changed from 2: to 2:
-    ".code64",
-    "mov ax, 0x10",       // Data segment
-    "mov ds, ax",
-    "mov es, ax",
-    "mov fs, ax",
-    "mov gs, ax",
-    "mov ss, ax",
-    "mov rsp, {0}",
-    "jmp {1}",
-    in(reg) (&raw const STACK.data as *const _ as u64 + 4096),
+        "lea eax, [2f]",      // Get address of label
+        "push eax",           // Push address
+        "retf",               // Far return to 64-bit mode
+        ".align 8",
+        "2:",
+        ".code64",
+        "mov ax, 0x10",       // Data segment
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+        "mov rsp, {0}",
+        "jmp {1}",
+        in(reg) &raw const STACK.data as *const _ as u64 + 4096,
                      sym rust_main,
                      options(noreturn)
     );
@@ -512,6 +518,12 @@ pub unsafe extern "C" fn _start() -> ! {
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {
-        unsafe { core::arch::asm!("hlt"); }
+        unsafe {
+            core::arch::asm!(
+                ".code32",
+                "hlt",
+                options(nomem, nostack)
+            );
+        }
     }
 }
