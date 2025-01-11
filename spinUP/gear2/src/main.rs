@@ -498,7 +498,7 @@ pub unsafe extern "C" fn _start() -> ! {
     // Far jump to 64-bit code
     core::arch::asm!(
         ".code32",
-        "jmp 8:2f",           // CS selector 8 (code)
+        "jmp far 8:2f",           // CS selector 8 (code)
     ".align 8",
     "2:",
     ".code64",
