@@ -55,6 +55,7 @@ pub struct StageInfo {
 }
 
 // Use this to pass information between stages
+#[allow(dead_code)]
 static mut STAGE_INFO: StageInfo = StageInfo {
     boot_drive: 0,
     memory_map_addr: 0,
@@ -172,6 +173,7 @@ unsafe fn setup_gdt() {
     );
 }
 
+#[allow(dead_code)]
 fn get_cpuid() -> (u32, u32, u32, u32) {
     let eax: u32;
     let ecx: u32;
@@ -242,6 +244,7 @@ unsafe fn check_long_mode() -> bool {
     (edx & (1 << 29)) != 0 // LM bit
 }
 
+#[allow(dead_code)]
 unsafe fn setup_long_mode() {
     // Disable interrupts
     core::arch::asm!("cli");
@@ -280,6 +283,7 @@ unsafe fn setup_long_mode() {
     );
 }
 
+#[allow(dead_code)]
 unsafe fn enter_long_mode() -> ! {
     // Disable interrupts first
     core::arch::asm!("cli");
@@ -308,23 +312,22 @@ unsafe fn enter_long_mode() -> ! {
         "mov cr4, eax",
         "mov eax, cr4",        // Verify PAE was set
         "test eax, 1 << 5",
-        "jz 1f",               // If PAE not set, halt
-        "jmp 2f",
-        "1: hlt",
-        "2:",
+        "jz 3f",               // If PAE not set, halt
+        "jmp 4f",
+        "3: hlt",
+        "4:",
         options(nomem, nostack)
     );
     write_serial(b"Enabled PAE\r\n");
 
     // Load CR3 with PML4
     core::arch::asm!(
-        "mov {tmp:e}, {addr:e}",
+        "mov {tmp:e}, {pml4:e}",
         "mov cr3, {tmp:e}",
-        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
                      tmp = out(reg) _,
                      options(nomem, nostack)
     );
-    write_serial(b"Loaded CR3\r\n");
 
     // Enable long mode in EFER MSR
     core::arch::asm!(
@@ -336,10 +339,10 @@ unsafe fn enter_long_mode() -> ! {
         // Verify EFER.LME was set
         "rdmsr",
         "test eax, 1 << 8",
-        "jz 1f",               // If LME not set, halt
-        "jmp 2f",
-        "1: hlt",
-        "2:",
+        "jz 5f",               // If LME not set, halt
+        "jmp 6f",
+        "5: hlt",
+        "6:",
         options(nomem, nostack)
     );
     write_serial(b"Enabled long mode in EFER\r\n");
@@ -367,11 +370,11 @@ unsafe fn enter_long_mode() -> ! {
         "and esp, -16",
         // Prepare far jump
         "push dword ptr 0x08",  // CS selector
-        "lea eax, [2f]",       // Target address
+        "lea eax, [4f]",       // Target address
         "push eax",
         "retf",                // Far return to 64-bit code
         ".align 8",
-        "2:",
+        "4:",
         ".code64",
         // Zero segment registers
         "xor ax, ax",
@@ -457,7 +460,7 @@ pub unsafe extern "C" fn _start() -> ! {
     "push eax",           // Push address
     "retf",               // Far return to 64-bit mode
     ".align 8",
-    "2:",                 // Changed from 1: to 2:
+    "2:",                 // Changed from 2: to 2:
     ".code64",
     "mov ax, 0x10",       // Data segment
     "mov ds, ax",
