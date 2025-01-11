@@ -162,7 +162,7 @@ unsafe fn setup_gdt() {
     let gdt: UnstableMatter<[GDTEntry; 3]> = UnstableMatter::at(&raw const GDT.entries as *const _ as usize);
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<[GDTEntry; 3]>() - 1) as u16,
-        base: gdt.addr() as u32,
+        base: gdt_addr() as u32,
     };
 
     let limit = gdt_ptr.limit;
@@ -175,13 +175,13 @@ unsafe fn setup_gdt() {
     "andl $-8, %esp",         // Ensure 8-byte alignment
 
     // Move values into registers
-    "mov {limit}, %eax",
-    "mov {base}, %ecx",
+    "mov {limit:e}, %eax",    // Use :e for 32-bit registers
+    "mov {base:e}, %ecx",     // Use :e for 32-bit registers
 
     // Store GDTR data
-    "movw %ax, (%esp)",      // Store limit
-                     "movl %ecx, 2(%esp)",    // Store base
-                     "lgdt (%esp)",           // Load GDT
+    "movw %ax, (%esp)",       // Store limit (16-bit)
+    "movl %ecx, 2(%esp)",     // Store base (32-bit)
+    "lgdt (%esp)",            // Load GDT
 
                      // Restore stack
                      "addl $8, %esp",
