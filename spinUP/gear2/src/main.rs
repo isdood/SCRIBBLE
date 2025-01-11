@@ -63,20 +63,20 @@ static mut GDT: GDTTable = GDTTable {
         },
         // 64-bit code segment
         GDTEntry {
-            limit_low: 0,
+            limit_low: 0xFFFF,
             base_low: 0,
             base_middle: 0,
-            access: 0x9A,       // Present | Ring 0 | Code | Read/Execute
-            granularity: 0x20,  // Long mode (no size bit)
+            access: 0x9A,      // Present | Ring 0 | Code | Readable
+            granularity: 0x20, // Long mode bit
             base_high: 0,
         },
         // Data segment
         GDTEntry {
-            limit_low: 0,
+            limit_low: 0xFFFF,
             base_low: 0,
             base_middle: 0,
-            access: 0x92,      // Present | Ring 0 | Data | Read/Write
-            granularity: 0,    // No long mode bit for data
+            access: 0x92,      // Present | Ring 0 | Data | Writable
+            granularity: 0x00, // No long mode bit needed
             base_high: 0,
         },
     ]
@@ -199,45 +199,75 @@ unsafe fn enable_paging() {
     );
 }
 
-unsafe fn jump_to_long_mode() -> ! {
+unsafe fn setup_long_mode() {
+    // Disable interrupts
+    core::arch::asm!("cli");
+
+    // Enable PAE
     core::arch::asm!(
-        ".code32",
-        "and esp, -16",              // Stack alignment
-        "push 0x08",                 // Code segment
-        "push 2f",                   // Target address
-        "retf",                      // Far return
+        "mov eax, cr4",
+        "or eax, 1 << 5",     // Set PAE bit
+        "mov cr4, eax"
+    );
+
+    // Load PML4 table
+    let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
+    core::arch::asm!(
+        "mov eax, {0:e}",
+        "mov cr3, eax",
+        in(reg) pml4_addr as u32
+    );
+
+    // Enable long mode in EFER MSR
+    core::arch::asm!(
+        "mov ecx, 0xC0000080", // EFER MSR
+        "rdmsr",
+        "or eax, 1 << 8",      // Set LME bit
+        "wrmsr"
+    );
+
+    // Enable paging and protection
+    core::arch::asm!(
+        "mov eax, cr0",
+        "or eax, 1 << 31 | 1", // Set PG and PE bits
+        "mov cr0, eax"
+    );
+}
+
+unsafe fn jump_to_long_mode() -> ! {
+    // Load GDT before jumping
+    setup_gdt();
+
+    core::arch::asm!(
+        "push 0x08",           // Code segment selector
+        "lea eax, [2f]",       // Get address of label
+        "push eax",            // Push target address
+        "retf",                // Far return to 64-bit code
         ".align 8",
         "2:",
         ".code64",
-        // Load data segments
-        "mov ax, 0x10",             // Data segment selector
+        // Load data segment registers
+        "mov ax, 0x10",        // Data segment selector
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
-        // Set up stack and jump to rust_main
-        "mov rsp, {stack}",
-        "mov rax, {target}",
-        "jmp rax",
+        // Set up stack and jump to Rust
+        "mov rsp, {stack}",    // Load stack pointer
+        "jmp {target}",        // Jump to rust_main
         stack = in(reg) (&raw const STACK.data as *const u8 as u64 + 4096),
-                     target = in(reg) rust_main as u64,
+                     target = sym rust_main,
                      options(noreturn)
     );
 }
 
 unsafe fn enter_long_mode() -> ! {
-    disable_interrupts();
-    write_serial(b"Disabled interrupts\r\n");
-
+    write_serial(b"Setting up page tables...\r\n");
     setup_page_tables();
-    write_serial(b"Page tables setup\r\n");
 
-    setup_gdt();
-    write_serial(b"GDT setup\r\n");
-
-    enable_paging();
-    write_serial(b"Paging enabled\r\n");
+    write_serial(b"Enabling long mode...\r\n");
+    setup_long_mode();
 
     write_serial(b"Jumping to long mode...\r\n");
     jump_to_long_mode()
