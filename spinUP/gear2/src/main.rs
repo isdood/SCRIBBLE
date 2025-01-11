@@ -64,6 +64,34 @@ static mut STAGE_INFO: StageInfo = StageInfo {
     flags: 0,
 };
 
+// Add this struct for IDT entries
+#[repr(C, packed)]
+struct IDTEntry {
+    offset_low: u16,
+    segment: u16,
+    flags: u16,
+    offset_middle: u16,
+    offset_high: u32,
+    reserved: u32,
+}
+
+// Add this as a static
+#[repr(C, align(16))]
+struct IDT {
+    entries: [IDTEntry; 256]
+}
+
+static mut IDT: IDT = IDT {
+    entries: [IDTEntry {
+        offset_low: 0,
+        segment: 0,
+        flags: 0,
+        offset_middle: 0,
+        offset_high: 0,
+        reserved: 0
+    }; 256]
+};
+
 static mut PAGE_TABLES: PageTables = PageTables {
     pml4: PageTable { entries: [0; 512] },
     pdpt: PageTable { entries: [0; 512] },
@@ -430,6 +458,32 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
+unsafe fn setup_idt() {
+    // Set up a minimal IDT with just the critical handlers
+    let code_segment = 0x08;
+
+    // Timer interrupt handler (IRQ0)
+    IDT.entries[0x08].segment = code_segment;
+    IDT.entries[0x08].flags = 0x8E00;  // Present, Ring 0, Interrupt Gate
+
+    // Page fault handler
+    IDT.entries[0x0E].segment = code_segment;
+    IDT.entries[0x0E].flags = 0x8E00;  // Present, Ring 0, Interrupt Gate
+
+    // Load the IDT
+    let idtr = GDTPointer {
+        limit: (core::mem::size_of::<IDT>() - 1) as u16,
+        base: &IDT as *const _ as u32,
+    };
+
+    core::arch::asm!(
+        ".code32",
+        "lidt [{0}]",
+        in(reg) &idtr,
+                     options(readonly)
+    );
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
     // Write to VGA to confirm we're running
@@ -444,12 +498,15 @@ pub unsafe extern "C" fn _start() -> ! {
     write_serial(b"Gear2 started\r\n");
 
     // Check if we're in protected mode
-    let cr0: u32;
     core::arch::asm!(
-        ".code16",
+        ".code32",        // Changed from .code16
         "mov eax, cr0",
         out("eax") cr0,
     );
+
+    // Add IDT setup before enabling paging
+    setup_idt();
+    write_serial(b"IDT set up\r\n");
 
     if cr0 & 1 == 0 {
         write_serial(b"Error: Not in protected mode\r\n");
