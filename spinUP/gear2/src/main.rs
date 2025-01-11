@@ -508,27 +508,27 @@ unsafe fn enter_long_mode() -> ! {
 unsafe extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: InterruptStackFrame
 ) {
-    asm!(
+    core::arch::naked_asm!(
         ".code64",
-         // Save registers
-         "push rax",
-         "push rcx",
-         "push rdx",
-         "push rsi",
-         "push rdi",
+        // Save registers
+        "push rax",
+        "push rcx",
+        "push rdx",
+        "push rsi",
+        "push rdi",
 
-         // Send EOI to PIC
-         "mov al, 0x20",
-         "out 0x20, al",
+        // Send EOI to PIC
+        "mov al, 0x20",
+        "out 0x20, al",
 
-         // Restore registers
-         "pop rdi",
-         "pop rsi",
-         "pop rdx",
-         "pop rcx",
-         "pop rax",
-         "iretq",
-         options(noreturn)
+        // Restore registers
+        "pop rdi",
+        "pop rsi",
+        "pop rdx",
+        "pop rcx",
+        "pop rax",
+        "iretq",
+        options(noreturn)
     );
 }
 
@@ -537,11 +537,11 @@ unsafe extern "x86-interrupt" fn page_fault_handler(
     _stack_frame: InterruptStackFrame,
     _error_code: u64
 ) {
-    asm!(
+    core::arch::naked_asm!(
         ".code64",
-         "cli",
-         "hlt",
-         options(noreturn)
+        "cli",
+        "hlt",
+        options(noreturn)
     );
 }
 
