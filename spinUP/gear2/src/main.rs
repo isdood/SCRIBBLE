@@ -405,7 +405,7 @@ pub unsafe extern "C" fn _start() -> ! {
         loop { core::arch::asm!("hlt"); }
     }
 
-    // Set up page tables
+    // Set up page tables with proper identity mapping
     setup_page_tables();
 
     // Initialize GDT before enabling long mode
@@ -420,7 +420,7 @@ pub unsafe extern "C" fn _start() -> ! {
         options(nomem, nostack)
     );
 
-    // Load CR3
+    // Load CR3 with PML4 address
     core::arch::asm!(
         ".code32",
         "mov eax, {pml4:e}",
@@ -448,28 +448,31 @@ pub unsafe extern "C" fn _start() -> ! {
         options(nomem, nostack)
     );
 
+    // Set up IDT for interrupt handling
+    setup_idt();
+
     // Jump to long mode
     core::arch::asm!(
         ".code32",
         // Load GDT
         "lgdt [{gdt_ptr:e}]",
         // Far jump to 64-bit code
-        "push $0x08",           // Code segment
-        "lea eax, [2f]",        // Get address of label
-        "push eax",             // Push target address
-        "retf",                 // Far return to switch modes
+        "jmp 0x08:2f",        // 0x08 is the code segment selector
         ".align 8",
         "2:",
         ".code64",
         // Set up 64-bit environment
-        "mov rsp, 0x7c00",      // Reset stack
+        "mov rsp, 0x7c00",    // Reset stack
         // Clear segment registers
-        "xor ax, ax",
+        "mov ax, 0x10",       // Data segment selector
         "mov ss, ax",
+        "xor ax, ax",
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
+        // Enable interrupts
+        "sti",
         // Jump to Rust main
         "jmp {target}",
         gdt_ptr = in(reg) &raw const GDT_PTR,
@@ -484,27 +487,91 @@ struct DescriptorTablePointer {
     base: u32,
 }
 
-static mut GDT: [u64; 3] = [
+// GDT entries for 64-bit mode
+static mut GDT: [u64; 4] = [
     0,                      // Null descriptor
 0x00AF9A000000FFFF,    // Code segment (64-bit)
 0x00CF92000000FFFF,    // Data segment
+0,                      // Task State Segment (reserved)
 ];
 
 static mut GDT_PTR: DescriptorTablePointer = DescriptorTablePointer {
-    limit: (3 * 8 - 1) as u16,
+    limit: (4 * 8 - 1) as u16,
     base: 0,  // Will be set at runtime
+};
+
+// IDT setup for basic interrupt handling
+#[repr(C, packed)]
+struct IDTEntry {
+    offset_low: u16,
+    segment: u16,
+    flags: u16,
+    offset_mid: u16,
+    offset_high: u32,
+    reserved: u32,
+}
+
+static mut IDT: [IDTEntry; 256] = [IDTEntry {
+    offset_low: 0,
+    segment: 0,
+    flags: 0,
+    offset_mid: 0,
+    offset_high: 0,
+    reserved: 0,
+}; 256];
+
+static mut IDT_PTR: DescriptorTablePointer = DescriptorTablePointer {
+    limit: (256 * 16 - 1) as u16,
+    base: 0,
 };
 
 unsafe fn setup_gdt() {
     GDT_PTR.base = &raw const GDT as *const _ as u32;
 }
 
-// Required panic handler
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {
-        unsafe {
-            core::arch::asm!("hlt", options(nomem, nostack));
-        }
+unsafe fn setup_idt() {
+    // Set up basic interrupt handlers
+    for i in 0..256 {
+        IDT[i] = IDTEntry {
+            offset_low: (interrupt_handler as u64 & 0xFFFF) as u16,
+            segment: 0x08,  // Code segment
+            flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
+            offset_mid: ((interrupt_handler as u64 >> 16) & 0xFFFF) as u16,
+            offset_high: (interrupt_handler as u64 >> 32) as u32,
+            reserved: 0,
+        };
     }
+
+    IDT_PTR.base = &raw const IDT as *const _ as u32;
+
+    // Load IDT
+    core::arch::asm!(
+        "lidt [{0:e}]",
+        in(reg) &IDT_PTR,
+                     options(readonly, nostack)
+    );
+}
+
+#[naked]
+unsafe extern "C" fn interrupt_handler() {
+    core::arch::asm!(
+        "push rax",
+        "push rcx",
+        "push rdx",
+        "push r8",
+        "push r9",
+        "push r10",
+        "push r11",
+        "mov al, 0x20",
+        "out 0x20, al",      // Send EOI to PIC
+        "pop r11",
+        "pop r10",
+        "pop r9",
+        "pop r8",
+        "pop rdx",
+        "pop rcx",
+        "pop rax",
+        "iretq",
+        options(noreturn)
+    );
 }
