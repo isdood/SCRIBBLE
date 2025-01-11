@@ -310,7 +310,6 @@ unsafe fn setup_long_mode() {
 unsafe fn enter_long_mode() -> ! {
     // Disable interrupts first
     core::arch::asm!("cli");
-    ".code32",
     write_serial(b"Disabled interrupts\r\n");
 
     // Setup page tables
