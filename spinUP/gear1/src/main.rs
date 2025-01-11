@@ -31,6 +31,13 @@ pub extern "C" fn _start() -> ! {
     });
 
     unsafe {
+        // First asm block for DAP setup
+        core::arch::asm!(
+            "mov si, {0:x}",
+            in(reg) &dap.0,
+        );
+
+        // Second asm block with noreturn
         core::arch::asm!(
             // Initialize segments
             "xor ax, ax",
@@ -49,8 +56,6 @@ pub extern "C" fn _start() -> ! {
 
             // Load sectors
             "mov ah, 0x42",
-            "mov {tmp:x}, {dap}",  // Load DAP address into temporary register
-            "mov si, {tmp:x}",     // Move to SI for int 13h
             "int 0x13",
             "jc 2f",
 
@@ -65,9 +70,7 @@ pub extern "C" fn _start() -> ! {
             "int 0x10",
             "cli",
             "hlt",
-            dap = in(reg) &dap.0,
-                         tmp = out(reg) _,      // Temporary register for address handling
-                         options(noreturn)
+            options(noreturn)
         );
     }
 }
