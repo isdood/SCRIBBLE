@@ -165,8 +165,13 @@ unsafe fn setup_gdt() {
         base: gdt.addr() as u32,
     };
 
+    // Create a temporary value for ESP modifications
+    let mut esp: u32;
+
     core::arch::asm!(
         ".code32",
+        // Get current ESP
+        "mov %esp, {0:e}",
         // Create space on stack and ensure alignment
         "subl $8, %esp",          // Allocate 8 bytes (6 needed, but keep aligned)
     "andl $-8, %esp",         // Ensure 8-byte alignment
@@ -174,8 +179,9 @@ unsafe fn setup_gdt() {
     "movw {1:x}, (%esp)",     // Store limit
                      "movl {2:e}, 2(%esp)",    // Store base
                      "lgdt (%esp)",            // Load GDT
-                     "addl $8, %esp",          // Restore stack
-                     in("esp") _,
+                     // Restore original ESP
+                     "mov {0:e}, %esp",
+                     out(reg) esp,             // Output for saving ESP
                      in("eax") gdt_ptr.limit,
                      in("ebx") gdt_ptr.base,
                      options(att_syntax)
