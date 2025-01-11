@@ -90,18 +90,20 @@ static mut SERIAL_PORT: Option<SerialPort> = None;
 
 // Helper function to safely initialize and use the serial port
 unsafe fn init_serial() {
-    let serial_ptr = &mut SERIAL_PORT as *mut Option<SerialPort>;
-    *serial_ptr = Some(SerialPort::new(0x3F8));
-    if let Some(ref mut serial) = *serial_ptr {
-        serial.init();
+    // Directly manipulate the static to avoid any potential UB
+    SERIAL_PORT = Some(SerialPort::new(0x3F8));
+
+    // Get a raw pointer to the inner SerialPort
+    if let Some(ref mut port) = SERIAL_PORT {
+        port.init();
     }
 }
 
 unsafe fn write_serial(msg: &[u8]) {
-    let serial_ptr = &mut SERIAL_PORT as *mut Option<SerialPort>;
-    if let Some(ref mut serial) = *serial_ptr {
+    // Use a raw pointer to access the port
+    if let Some(ref mut port) = SERIAL_PORT {
         for &b in msg {
-            serial.write_byte(b);
+            port.write_byte(b);
         }
     }
 }
@@ -142,16 +144,15 @@ unsafe fn disable_interrupts() {
 }
 
 unsafe fn setup_page_tables() {
-    let mut pml4_entries = UnstableMatter::at(&mut PAGE_TABLES.pml4.entries[0] as *mut _ as usize);
-    let mut pdpt_entries = UnstableMatter::at(&mut PAGE_TABLES.pdpt.entries[0] as *mut _ as usize);
-    let mut pd_entries = UnstableMatter::at(&mut PAGE_TABLES.pd.entries[0] as *mut _ as usize);
+    // First clear all tables
+    PAGE_TABLES.pml4.entries.fill(0);
+    PAGE_TABLES.pdpt.entries.fill(0);
+    PAGE_TABLES.pd.entries.fill(0);
 
-    let pdpt_addr = &raw const PAGE_TABLES.pdpt as *const PageTable as u64;
-    let pd_addr = &raw const PAGE_TABLES.pd as *const PageTable as u64;
-
-    pml4_entries.write(pdpt_addr | 0x3);
-    pdpt_entries.write(pd_addr | 0x3);
-    pd_entries.write(0x83);  // Present + Write + Huge (2MB)
+    // Set up identity mapping for first 2MB
+    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const PageTable as u64) | 0x3;
+    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const PageTable as u64) | 0x3;
+    PAGE_TABLES.pd.entries[0] = 0x83; // Present + Write + Huge (2MB)
 }
 
 unsafe fn setup_gdt() {
@@ -163,66 +164,78 @@ unsafe fn setup_gdt() {
 
     core::arch::asm!(
         ".code32",
-        "mov {0:e}, %esi",  // Load pointer to GDTR into ESI
-        "lgdt (%esi)",      // Load GDT using indirect addressing
-                     in(reg) &gdt_ptr,
+        "sub esp, 6",           // Make space for GDTR
+        "mov [{0}], {1:x}",    // Store limit
+        "mov [{0} + 2], {2:e}", // Store base
+        "lgdt [esp]",          // Load GDT
+        "add esp, 6",          // Restore stack
+        in(reg) "esp" => _,
+                     in(reg) gdt_ptr.limit,
+                     in(reg) gdt_ptr.base,
                      options(att_syntax)
     );
 }
 
 unsafe fn enable_paging() {
-    let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u32;
+    let pml4_addr = &PAGE_TABLES.pml4 as *const PageTable as u64;
 
     core::arch::asm!(
         ".code32",
+        // Enable PAE
         "mov %cr4, %eax",
-        "or $0x20, %eax",     // Set PAE flag (bit 5)
-    "mov %eax, %cr4",
+        "or $0x20, %eax",
+        "mov %eax, %cr4",
 
-    "mov {0:e}, %eax",
-    "mov %eax, %cr3",
+        // Load CR3 with PML4 address
+        "mov {0:e}, %eax",
+        "mov %eax, %cr3",
 
-    "mov $0xC0000080, %ecx",
-    "rdmsr",
-    "or $0x100, %eax",    // Set LME flag (bit 8)
-    "wrmsr",
+        // Enable long mode in EFER
+        "mov $0xC0000080, %ecx",
+        "rdmsr",
+        "or $0x100, %eax",
+        "wrmsr",
 
-    "mov %cr0, %eax",
-    "or $0x80000001, %eax", // Set PG and PE flags
-    "mov %eax, %cr0",
-    in(reg) pml4_addr,
+        // Enable paging
+        "mov %cr0, %eax",
+        "or $0x80000001, %eax",
+        "mov %eax, %cr0",
+        in(reg) pml4_addr,
                      options(att_syntax)
     );
 }
 
 unsafe fn jump_to_long_mode() -> ! {
-    let stack_top = &raw const STACK.data as *const u8 as u64 + 4096;
+    let stack_top = &STACK.data as *const u8 as u64 + 4096;
 
     core::arch::asm!(
         ".code32",
-        "pushl $0x08",
-        "pushl $2f",
-        "lretl",
+        // Load new code segment
+        "push $0x08",         // New CS value (1st GDT entry)
+    "lea 1f(%eip), %eax", // Get address of label 1
+                     "push %eax",          // Push return address
+                     "retf",               // Far return to load CS and jump
 
-        ".align 8",
-        ".code64",
-        "2:",
+                     ".code64",
+                     "1:",                 // Long mode entry point
+                     // Load data segments
+                     "mov $0x10, %ax",
+                     "mov %ax, %ds",
+                     "mov %ax, %es",
+                     "mov %ax, %fs",
+                     "mov %ax, %gs",
+                     "mov %ax, %ss",
 
-        "movw $0x10, %ax",
-        "movw %ax, %ds",
-        "movw %ax, %es",
-        "movw %ax, %fs",
-        "movw %ax, %gs",
-        "movw %ax, %ss",
+                     // Set up new stack
+                     "mov {}, %rsp",
 
-        "movq {}, %rsp",
+                     // Jump to Rust
+                     "call {}",
 
-        "call {1}",
-
-        "hlt",
-        in(reg) stack_top,
+                     "hlt",
+                     in(reg) stack_top,
                      sym rust_main,
-                     options(noreturn, att_syntax),
+                     options(noreturn, att_syntax)
     );
 }
 
