@@ -1,0 +1,11 @@
+[package]
+name = "unstable_matter"
+version = "0.1.0"
+edition = "2021"
+authors = ["Caleb J.D. Terkovics <calebjdt@gmail.com>"]
+
+[lib]
+name = "unstable_matter"
+path = "src/lib.rs"
+
+[dependencies]
