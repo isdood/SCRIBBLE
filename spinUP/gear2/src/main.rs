@@ -533,6 +533,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, cr4",
         "or eax, 1 << 5",  // PAE
         "mov cr4, eax",
+        options(nomem, nostack)
     );
 
     // 6. Load CR3 with page table
@@ -540,6 +541,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, {pml4:e}",
         "mov cr3, eax",
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+                     options(nomem, nostack)
     );
 
     // 7. Enable long mode in EFER
@@ -548,6 +550,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "rdmsr",
         "or eax, 1 << 8",      // LME
         "wrmsr",
+        options(nomem, nostack)
     );
 
     // 8. Enable paging and protection
@@ -555,6 +558,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, cr0",
         "or eax, 1 << 31 | 1", // PG | PE
         "mov cr0, eax",
+        options(nomem, nostack)
     );
 
     // 9. Long mode jump and final setup
@@ -582,10 +586,8 @@ pub unsafe extern "C" fn _start() -> ! {
 
         stack = in(reg) &raw const STACK.data as *const _ as u32 + 4096,
                      main = sym rust_main,
-                     options(nostack)  // Changed from noreturn
     );
 
-    // We need this unreachable to satisfy the ! return type
     core::hint::unreachable_unchecked();
 }
 
@@ -648,13 +650,10 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
 
 
 #[naked]
-unsafe extern "x86-interrupt" fn page_fault_handler(
-    _stack_frame: InterruptStackFrame,
-    _error_code: u64
-) {
+unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
     core::arch::naked_asm!(
-        ".code64",
-        // Save scratch registers
+        // Save state
+        "pushfq",
         "push rax",
         "push rcx",
         "push rdx",
@@ -663,12 +662,21 @@ unsafe extern "x86-interrupt" fn page_fault_handler(
         "push r10",
         "push r11",
 
-        // Get fault address and error code
-        "mov rsi, cr2",  // Faulting address
+        // Send EOI
+        "mov al, 0x20",
+        "out 0x20, al",
 
-        // Halt for now
-        "cli",
-        "hlt",
+        // Restore state
+        "pop r11",
+        "pop r10",
+        "pop r9",
+        "pop r8",
+        "pop rdx",
+        "pop rcx",
+        "pop rax",
+        "popfq",
+
+        "iretq",
     );
 }
 
