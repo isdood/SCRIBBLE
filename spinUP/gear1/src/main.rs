@@ -47,13 +47,13 @@ pub extern "C" fn _start() -> ! {
 
             // Load sectors
             "mov ah, 0x42",
-            "mov si, {0}",
+            "mov si, {0:x}",  // Fixed: proper syntax for register
             "int 0x13",
             "jc 2f",
 
             // Jump to gear2
-            "pushw 0x07E0",
-            "pushw 0",
+            "push word ptr 0x07E0",  // Fixed: proper push syntax
+            "push word ptr 0",       // Fixed: proper push syntax
             "retf",
 
             "2:",

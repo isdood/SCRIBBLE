@@ -1,18 +1,17 @@
-ENTRY(_start)
-
-SECTIONS {
+OUTPUT_FORMAT("binary")
+SECTIONS
+{
     . = 0x7C00;
-
-    .boot : {
+    .text : {
         *(.boot.text);
         *(.boot.text.*);
+
+        /* Fill to 510 bytes, then add boot signature */
         . = 510;
-        SHORT(0xAA55);
+        SHORT(0xAA55)
     }
 
     /DISCARD/ : {
-        *(.eh_frame);
-        *(.eh_frame_hdr);
-        *(.comment);
+        *(.*);
     }
 }
