@@ -63,21 +63,21 @@ static mut GDT: GDTTable = GDTTable {
         },
         // 64-bit code segment
         GDTEntry {
-            limit_low: 0,      // Limit ignored in 64-bit mode
-            base_low: 0,       // Base ignored in 64-bit mode
-            base_middle: 0,    // Base ignored in 64-bit mode
-            access: 0x9A,      // Present(1) | DPL(00) | S(1) | Type(1010)
-            granularity: 0x20, // Long mode (1) | Default Op Size (0) | Granularity (0)
-            base_high: 0,      // Base ignored in 64-bit mode
+            limit_low: 0,
+            base_low: 0,
+            base_middle: 0,
+            access: 0x9A,       // Present | Ring 0 | Code | Read/Execute
+            granularity: 0x20,  // Long mode (no size bit)
+            base_high: 0,
         },
         // Data segment
         GDTEntry {
-            limit_low: 0,      // Limit ignored in 64-bit mode
-            base_low: 0,       // Base ignored in 64-bit mode
-            base_middle: 0,    // Base ignored in 64-bit mode
-            access: 0x92,      // Present(1) | DPL(00) | S(1) | Type(0010)
-            granularity: 0,    // Long mode (0) | Default Op Size (0) | Granularity (0)
-            base_high: 0,      // Base ignored in 64-bit mode
+            limit_low: 0,
+            base_low: 0,
+            base_middle: 0,
+            access: 0x92,      // Present | Ring 0 | Data | Read/Write
+            granularity: 0,    // No long mode bit for data
+            base_high: 0,
         },
     ]
 };
@@ -144,8 +144,8 @@ unsafe fn disable_interrupts() {
 }
 
 unsafe fn setup_page_tables() {
-    // Get pointers to the whole tables, not just first entries
-    let tables_ptr = &raw mut PAGE_TABLES as *mut PageTables;
+    // Get pointers to the whole tables
+    let tables_ptr = &mut PAGE_TABLES as *mut PageTables;
 
     // Clear all tables
     (*tables_ptr).pml4.entries.fill(0);
@@ -153,8 +153,8 @@ unsafe fn setup_page_tables() {
     (*tables_ptr).pd.entries.fill(0);
 
     // Set up identity mapping
-    (*tables_ptr).pml4.entries[0] = (&raw const (*tables_ptr).pdpt as *const PageTable as u64) | 0x3;
-    (*tables_ptr).pdpt.entries[0] = (&raw const (*tables_ptr).pd as *const PageTable as u64) | 0x3;
+    (*tables_ptr).pml4.entries[0] = (&(*tables_ptr).pdpt as *const PageTable as u64) | 0x3;
+    (*tables_ptr).pdpt.entries[0] = (&(*tables_ptr).pd as *const PageTable as u64) | 0x3;
     (*tables_ptr).pd.entries[0] = 0x83; // Present + Write + Huge (2MB)
 }
 
@@ -185,62 +185,66 @@ unsafe fn setup_gdt() {
 }
 
 unsafe fn enable_paging() {
-    let pml4_addr = &raw const PAGE_TABLES.pml4 as *const PageTable as u64;
+    let pml4_addr = &PAGE_TABLES.pml4 as *const PageTable as u64;
 
     core::arch::asm!(
         ".code32",
-        // Enable PAE
-        "mov %cr4, %eax",
-        "or $0x20, %eax",
-        "mov %eax, %cr4",
+        // Enable PAE first
+        "movl %cr4, %eax",
+        "orl $0x20, %eax",      // Set PAE bit
+        "movl %eax, %cr4",
 
-        // Load CR3 with PML4 address
-        "mov {0:e}, %eax",
-        "mov %eax, %cr3",
+        // Load PML4 address
+        "movl {addr:e}, %eax",
+        "movl %eax, %cr3",
 
-        // Enable long mode in EFER
-        "mov $0xC0000080, %ecx",
+        // Enable long mode in EFER MSR
+        "movl $0xC0000080, %ecx",
         "rdmsr",
-        "or $0x100, %eax",
+        "orl $0x100, %eax",    // Set LME bit
         "wrmsr",
 
-        // Enable paging
-        "mov %cr0, %eax",
-        "or $0x80000001, %eax",
-        "mov %eax, %cr0",
-        in(reg) pml4_addr,
-                     options(att_syntax)
+        // Enable paging and protection
+        "movl %cr0, %eax",
+        "orl $0x80000001, %eax",  // Set PG and PE bits
+        "movl %eax, %cr0",
+
+        addr = in(reg) pml4_addr as u32,
+                     options(att_syntax, nomem, nostack)
     );
 }
 
 unsafe fn jump_to_long_mode() -> ! {
-    let stack_top = &raw const STACK.data as *const u8 as u64 + 4096;
-
     core::arch::asm!(
         ".code32",
-        // Set up far jump to 64-bit code
-        "movl $0x08, -8(%esp)",   // Push CS selector
-                     "movl $1f, -4(%esp)",     // Push target address
-                     "ljmp *-8(%esp)",         // Far jump using memory operand
+        // Ensure stack is aligned
+        "andl $-16, %esp",
 
-                     ".align 8",               // Ensure 64-bit alignment
-                     "1:",                     // Long mode entry point
-                     ".code64",
-                     // Set up segment registers
-                     "movw $0x10, %ax",
-                     "movw %ax, %ds",
-                     "movw %ax, %es",
-                     "movw %ax, %fs",
-                     "movw %ax, %gs",
-                     "movw %ax, %ss",
+        // Far jump to 64-bit code
+        "pushl $0x08",          // Push code segment
+        "pushl $1f",            // Push return address
+        "lret",                 // Far return to load CS and jump
 
-                     // Set up stack and call main
-                     "movq {}, %rsp",
-                     "callq *{}",
-                     "hlt",
-                     in(reg) stack_top,
-                     sym rust_main,
-                     options(noreturn, att_syntax)
+        ".align 8",
+        "1:",
+        ".code64",
+
+        // Load data segment registers
+        "mov $0x10, %ax",
+        "mov %ax, %ds",
+        "mov %ax, %es",
+        "mov %ax, %fs",
+        "mov %ax, %gs",
+        "mov %ax, %ss",
+
+        // Set up stack and jump to Rust
+        "movabs {stack}, %rsp",
+        "movabs {target}, %rax",
+        "jmp *%rax",
+
+        stack = in(reg) (&STACK.data as *const u8 as u64 + 4096),
+                     target = in(reg) rust_main as u64,
+                     options(noreturn)
     );
 }
 
