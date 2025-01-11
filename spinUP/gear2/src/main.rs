@@ -70,38 +70,6 @@ static mut PAGE_TABLES: PageTables = PageTables {
     pd: [0; 512],
 };
 
-static mut GDT: GDTTable = GDTTable {
-    entries: [
-        // Null descriptor
-        GDTEntry {
-            limit_low: 0,
-            base_low: 0,
-            base_middle: 0,
-            access: 0,
-            granularity: 0,
-            base_high: 0,
-        },
-        // 64-bit code segment
-        GDTEntry {
-            limit_low: 0xFFFF,
-            base_low: 0,
-            base_middle: 0,
-            access: 0x9A,      // Present(1) | DPL(00) | S(1) | Type(1010)
-            granularity: 0xA0, // G(1) | L(1) | Limit(0000)
-            base_high: 0,
-        },
-        // Data segment
-        GDTEntry {
-            limit_low: 0xFFFF,
-            base_low: 0,
-            base_middle: 0,
-            access: 0x92,      // Present(1) | DPL(00) | S(1) | Type(0010)
-            granularity: 0xC0, // G(1) | D/B(1) | Limit(0000)
-            base_high: 0,
-        },
-    ]
-};
-
 static mut STACK: Stack = Stack {
     data: [0; 4096]
 };
