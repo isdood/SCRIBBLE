@@ -27,8 +27,10 @@ error() {
 
 # Cleanup function
 cleanup() {
-    status "Cleaning up..."
+    status "Cleaning up, pushing to isdood/scribble..."
+
     #Push to github
+    echo ""
     git add -A
     git commit -m "dbg."
     git push
