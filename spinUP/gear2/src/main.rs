@@ -498,15 +498,15 @@ pub unsafe extern "C" fn _start() -> ! {
     // Far jump to 64-bit code
     core::arch::asm!(
         ".code32",
-        "pushd $8",           // Push code segment selector
-        "lea eax, [2f]",      // Get address of label
-        "push eax",           // Push target address
-        "retf",               // Far return to switch to 64-bit mode
+        "push $8",              // Push code segment selector
+        "lea eax, [2f]",        // Get address of label
+        "push eax",             // Push target address
+        "retf",                 // Far return to switch to 64-bit mode
         ".align 8",
         "2:",
         ".code64",
-        "mov rsp, {stack}",   // Set up 64-bit stack
-        "jmp {target}",       // Jump to rust_main
+        "mov rsp, {stack}",     // Set up 64-bit stack
+        "jmp {target}",         // Jump to rust_main
         stack = const 0x7c00,
         target = sym rust_main,
         options(noreturn)
