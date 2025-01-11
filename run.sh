@@ -29,7 +29,7 @@ error() {
 cleanup() {
     status "Cleaning up, pushing to isdood/scribble..."
 
-    #Push to github
+    # Push to GitHub
     echo ""
     git add -A
     git commit -m "dbg."
@@ -45,6 +45,9 @@ trap cleanup EXIT
 status "Building Gear1..."
 cd spinUP/gear1
 ./build.sh || error "Failed to build Gear1"
+
+# Strip debug symbols from Gear1 binary
+strip --strip-all target/i686-spinup/release/spinUP-gear1
 
 # Verify Gear1
 GEAR1_SIZE=$(stat -c%s "target/i686-spinup/release/spinUP-gear1")
