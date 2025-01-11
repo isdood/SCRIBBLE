@@ -8,6 +8,8 @@ build-std-features = ["compiler-builtins-mem"]
 [target.i686-spinup]
 rustflags = [
     "-C", "opt-level=z",
+    "-C", "no-redzone",
+    "-C", "code-model=kernel",
     "-C", "link-arg=-Tlinker.ld",
     "-C", "link-arg=--oformat=binary",
     "-C", "link-arg=-nostartfiles"
