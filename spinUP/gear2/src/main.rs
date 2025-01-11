@@ -144,20 +144,18 @@ unsafe fn disable_interrupts() {
 }
 
 unsafe fn setup_page_tables() {
-    // Use raw pointers instead of references
-    let pml4_ptr = &raw mut PAGE_TABLES.pml4.entries[0] as *mut [u64; 512];
-    let pdpt_ptr = &raw mut PAGE_TABLES.pdpt.entries[0] as *mut [u64; 512];
-    let pd_ptr = &raw mut PAGE_TABLES.pd.entries[0] as *mut [u64; 512];
+    // Get pointers to the whole tables, not just first entries
+    let tables_ptr = &raw mut PAGE_TABLES as *mut PageTables;
 
-    // Clear tables using raw pointers
-    (*pml4_ptr).fill(0);
-    (*pdpt_ptr).fill(0);
-    (*pd_ptr).fill(0);
+    // Clear all tables
+    (*tables_ptr).pml4.entries.fill(0);
+    (*tables_ptr).pdpt.entries.fill(0);
+    (*tables_ptr).pd.entries.fill(0);
 
-    // Set up identity mapping using raw pointers
-    (*pml4_ptr)[0] = (&raw const PAGE_TABLES.pdpt as *const PageTable as u64) | 0x3;
-    (*pdpt_ptr)[0] = (&raw const PAGE_TABLES.pd as *const PageTable as u64) | 0x3;
-    (*pd_ptr)[0] = 0x83; // Present + Write + Huge (2MB)
+    // Set up identity mapping
+    (*tables_ptr).pml4.entries[0] = (&raw const (*tables_ptr).pdpt as *const PageTable as u64) | 0x3;
+    (*tables_ptr).pdpt.entries[0] = (&raw const (*tables_ptr).pd as *const PageTable as u64) | 0x3;
+    (*tables_ptr).pd.entries[0] = 0x83; // Present + Write + Huge (2MB)
 }
 
 unsafe fn setup_gdt() {
@@ -167,18 +165,19 @@ unsafe fn setup_gdt() {
         base: gdt.addr() as u32,
     };
 
-    // Allocate space on stack for GDTR
-    let mut gdtr_space: [u8; 6] = [0; 6];
-    let gdtr_ptr = &mut gdtr_space as *mut _ as u32;
-
     core::arch::asm!(
         ".code32",
-        "movw {1:x}, ({0:e})",     // Store limit
-                     "movl {2:e}, 2({0:e})",    // Store base
-                     "lgdt ({0:e})",            // Load GDT
-                     in(reg) gdtr_ptr,
-                     in(reg) gdt_ptr.limit,
-                     in(reg) gdt_ptr.base,
+        // Create space on stack and ensure alignment
+        "subl $8, %esp",          // Allocate 8 bytes (6 needed, but keep aligned)
+    "andl $-8, %esp",         // Ensure 8-byte alignment
+    // Store GDTR data
+    "movw {1:x}, (%esp)",     // Store limit
+                     "movl {2:e}, 2(%esp)",    // Store base
+                     "lgdt (%esp)",            // Load GDT
+                     "addl $8, %esp",          // Restore stack
+                     in("esp") _,
+                     in("eax") gdt_ptr.limit,
+                     in("ebx") gdt_ptr.base,
                      options(att_syntax)
     );
 }
@@ -217,28 +216,25 @@ unsafe fn jump_to_long_mode() -> ! {
 
     core::arch::asm!(
         ".code32",
-        // Far jump to 64-bit code
-        "push $0x08",              // New CS value (1st GDT entry)
-    "push $1f",               // Push address of label 1
-    "ljmp *(%esp)",          // Far jump using stack
+        // Set up far jump to 64-bit code
+        "movl $0x08, -8(%esp)",   // Push CS selector
+                     "movl $1f, -4(%esp)",     // Push target address
+                     "ljmp *-8(%esp)",         // Far jump using memory operand
 
-                     ".align 8",
-                     ".code64",
+                     ".align 8",               // Ensure 64-bit alignment
                      "1:",                     // Long mode entry point
-                     // Load data segments
-                     "mov $0x10, %ax",
-                     "mov %ax, %ds",
-                     "mov %ax, %es",
-                     "mov %ax, %fs",
-                     "mov %ax, %gs",
-                     "mov %ax, %ss",
+                     ".code64",
+                     // Set up segment registers
+                     "movw $0x10, %ax",
+                     "movw %ax, %ds",
+                     "movw %ax, %es",
+                     "movw %ax, %fs",
+                     "movw %ax, %gs",
+                     "movw %ax, %ss",
 
-                     // Set up new stack
-                     "mov {}, %rsp",
-
-                     // Jump to Rust
-                     "call {}",
-
+                     // Set up stack and call main
+                     "movq {}, %rsp",
+                     "callq *{}",
                      "hlt",
                      in(reg) stack_top,
                      sym rust_main,
