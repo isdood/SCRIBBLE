@@ -216,30 +216,6 @@ unsafe fn setup_gdt() {
     );
 }
 
-unsafe fn setup_page_tables() {
-    // Clear tables
-    let pml4_ptr = &raw mut PAGE_TABLES.pml4.entries[0] as *mut u64;
-    let pdpt_ptr = &raw mut PAGE_TABLES.pdpt.entries[0] as *mut u64;
-    let pd_ptr = &raw mut PAGE_TABLES.pd.entries[0] as *mut u64;
-    let pt_ptr = &raw mut PAGE_TABLES.pt.entries[0] as *mut u64;
-
-    core::ptr::write_bytes(pml4_ptr, 0, 512);
-    core::ptr::write_bytes(pdpt_ptr, 0, 512);
-    core::ptr::write_bytes(pd_ptr, 0, 512);
-    core::ptr::write_bytes(pt_ptr, 0, 512);
-
-    // Set up identity mapping for first 2MB
-    // Each entry contains the physical address of the next table and flags
-    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
-    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
-    PAGE_TABLES.pd.entries[0] = (&raw const PAGE_TABLES.pt as *const _ as u64) | 0x3;
-
-    // Map first 2MB with 4KB pages
-    for i in 0..512 {
-        PAGE_TABLES.pt.entries[i] = (i as u64 * 0x1000) | 0x3; // Present + writable
-    }
-}
-
 unsafe fn setup_pic() {
     // ICW1: start initialization
     core::arch::asm!(
