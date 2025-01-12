@@ -51,17 +51,20 @@ struct GDTPointer {
     base: u32,
 }
 
-#[repr(C)]
-struct PageTable {
-    entries: [u64; 512]
-}
-
 #[repr(C, align(4096))]
 struct PageTables {
     pml4: PageTable,
     pdpt: PageTable,
     pd: PageTable,
+    pt: PageTable,  // Add a page table for finer-grained mapping
 }
+
+static mut PAGE_TABLES: PageTables = PageTables {
+    pml4: PageTable { entries: [0; 512] },
+    pdpt: PageTable { entries: [0; 512] },
+    pd: PageTable { entries: [0; 512] },
+    pt: PageTable { entries: [0; 512] },
+};
 
 #[repr(C, align(4096))]
 struct Stack {
@@ -149,11 +152,22 @@ unsafe fn setup_idt() {
     // Set up timer interrupt handler
     IDT.entries[32] = IdtEntry {
         offset_low: (timer_interrupt_handler as u64 & 0xFFFF) as u16,
-        segment_selector: 0x08,
-        ist: 0,
-        flags: 0x8E,
+        segment_selector: 0x08,  // Kernel code segment
+        ist: 0,                  // No interrupt stack table
+        flags: 0x8E,            // Present, Ring 0, Interrupt Gate
         offset_middle: ((timer_interrupt_handler as u64 >> 16) & 0xFFFF) as u16,
         offset_high: (timer_interrupt_handler as u64 >> 32) as u32,
+        reserved: 0,
+    };
+
+    // Set up page fault handler
+    IDT.entries[14] = IdtEntry {
+        offset_low: (page_fault_handler as u64 & 0xFFFF) as u16,
+        segment_selector: 0x08,  // Kernel code segment
+        ist: 0,                  // No interrupt stack table
+        flags: 0x8E,            // Present, Ring 0, Interrupt Gate
+        offset_middle: ((page_fault_handler as u64 >> 16) & 0xFFFF) as u16,
+        offset_high: (page_fault_handler as u64 >> 32) as u32,
         reserved: 0,
     };
 
@@ -164,8 +178,7 @@ unsafe fn setup_idt() {
 
     core::arch::asm!(
         ".code32",
-        // Use explicit operand size prefix and 32-bit register
-        "lidt [{0:e}]",  // :e specifies 32-bit register
+        "lidt [{0:e}]",
         in(reg) &idt_ptr
     );
 }
@@ -184,21 +197,92 @@ unsafe fn setup_gdt() {
     );
 }
 
+#[naked]
+extern "x86-interrupt" fn page_fault_handler() -> ! {
+    unsafe {
+        core::arch::naked_asm!(
+            "push rax",
+            "push rcx",
+            "push rdx",
+            "push rbx",
+            "push rbp",
+            "push rsi",
+            "push rdi",
+            "push r8",
+            "push r9",
+            "push r10",
+            "push r11",
+            "push r12",
+            "push r13",
+            "push r14",
+            "push r15",
+
+            // Get error code and faulting address
+            "mov rax, cr2",     // Get the faulting address
+            "mov rbx, [rsp+120]", // Get error code from stack
+
+            // Handle the page fault by mapping the page
+            "mov rcx, rax",     // Save faulting address
+            "shr rax, 12",      // Get page number
+            "and rax, 0x1FF",   // Get index into PT
+            "shl rax, 3",       // Multiply by 8 for entry size
+            "lea rbx, [rel PAGE_TABLES]",
+            "add rbx, 24576",   // Offset to PT (4096 * 6)
+        "add rbx, rax",     // Point to PT entry
+        "mov rax, rcx",     // Get back faulting address
+        "and rax, ~0xFFF",  // Clear low 12 bits
+        "or rax, 0x3",      // Present + writable
+        "mov [rbx], rax",   // Set PT entry
+
+        // Invalidate TLB entry
+        "invlpg [rcx]",
+
+        // Restore registers and return
+        "pop r15",
+        "pop r14",
+        "pop r13",
+        "pop r12",
+        "pop r11",
+        "pop r10",
+        "pop r9",
+        "pop r8",
+        "pop rdi",
+        "pop rsi",
+        "pop rbp",
+        "pop rbx",
+        "pop rdx",
+        "pop rcx",
+        "pop rax",
+
+        "add rsp, 8",  // Remove error code
+        "iretq",
+        options(noreturn)
+        );
+    }
+}
+
 unsafe fn setup_page_tables() {
-    // Clear tables using raw pointers
+    // Clear tables
     let pml4_ptr = &raw mut PAGE_TABLES.pml4.entries[0] as *mut u64;
     let pdpt_ptr = &raw mut PAGE_TABLES.pdpt.entries[0] as *mut u64;
     let pd_ptr = &raw mut PAGE_TABLES.pd.entries[0] as *mut u64;
+    let pt_ptr = &raw mut PAGE_TABLES.pt.entries[0] as *mut u64;
 
-    // Zero out tables
     core::ptr::write_bytes(pml4_ptr, 0, 512);
     core::ptr::write_bytes(pdpt_ptr, 0, 512);
     core::ptr::write_bytes(pd_ptr, 0, 512);
+    core::ptr::write_bytes(pt_ptr, 0, 512);
 
-    // Set up mappings using raw pointers
+    // Set up identity mapping for first 2MB
+    // Each entry contains the physical address of the next table and flags
     PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
     PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
-    PAGE_TABLES.pd.entries[0] = 0x83;  // Map first 2MB with huge pages
+    PAGE_TABLES.pd.entries[0] = (&raw const PAGE_TABLES.pt as *const _ as u64) | 0x3;
+
+    // Map first 2MB with 4KB pages
+    for i in 0..512 {
+        PAGE_TABLES.pt.entries[i] = (i as u64 * 0x1000) | 0x3; // Present + writable
+    }
 }
 
 unsafe fn setup_pic() {
@@ -294,6 +378,7 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
 pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!("cli");
 
+    // Clear all segment registers
     core::arch::asm!(
         ".code32",
         "xor ax, ax",
@@ -306,6 +391,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     setup_page_tables();
 
+    // Load CR3
     core::arch::asm!(
         ".code32",
         "mov eax, {pml4:e}",
@@ -313,43 +399,47 @@ pub unsafe extern "C" fn _start() -> ! {
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
     );
 
+    // Enable PAE
     core::arch::asm!(
         ".code32",
         "mov eax, cr4",
-        "or eax, 1 << 5",
+        "or eax, 1 << 5",  // PAE
         "mov cr4, eax"
     );
 
+    // Enable Long Mode
     core::arch::asm!(
         ".code32",
-        "mov ecx, 0xC0000080",
+        "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or eax, 1 << 8",
+        "or eax, 1 << 8",      // LME
         "wrmsr"
     );
 
     setup_gdt();
     setup_idt();
 
+    // Enable paging and protection
     core::arch::asm!(
         ".code32",
         "mov eax, cr0",
-        "or eax, 1 << 31 | 1",
+        "or eax, 1 << 31 | 1", // PG | PE
         "mov cr0, eax"
     );
 
     setup_pic();
 
+    // Switch to long mode
     core::arch::asm!(
         ".code32",
-        "push 0x08",
-        "lea eax, [2f]",
+        "push 0x08",         // Code segment
+        "lea eax, [2f]",     // Target address
         "push eax",
-        "retf",
+        "retf",              // Far return to 64-bit mode
 
         "2:",
         ".code64",
-        "mov ax, 0x10",
+        "mov ax, 0x10",      // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
@@ -359,7 +449,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov rsp, {stack}",
         "mov rbp, rsp",
 
-        "sti",
+        "sti",               // Enable interrupts
 
         "jmp {target}",
 
