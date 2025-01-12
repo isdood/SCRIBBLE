@@ -2,36 +2,20 @@ use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1, DecodedKey};
 use spin::Mutex;
 use x86_64::instructions::port::Port;
 
-pub struct KeyboardController {
+pub struct KeyboardDriver {
     keyboard: Keyboard<layouts::Us104Key, ScancodeSet1>,
-    last_keycode: Option<DecodedKey>,
 }
 
-impl KeyboardController {
+impl KeyboardDriver {
     pub fn new() -> Self {
-        KeyboardController {
-            keyboard: Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore),
-            last_keycode: None,
+        KeyboardDriver {
+            keyboard: Keyboard::new(ScancodeSet1::new(), layouts::Us104Key, HandleControl::Ignore)
         }
-    }
-
-    pub fn add_byte(&mut self, scancode: u8) -> Option<DecodedKey> {
-        if let Ok(Some(key_event)) = self.keyboard.add_byte(scancode) {
-            if let Some(decoded_key) = self.keyboard.process_keyevent(key_event) {
-                self.last_keycode = Some(decoded_key);
-                return Some(decoded_key);
-            }
-        }
-        None
-    }
-
-    pub fn last_key(&self) -> Option<DecodedKey> {
-        self.last_keycode
     }
 }
 
 lazy_static::lazy_static! {
-    pub static ref KEYBOARD: Mutex<KeyboardController> = Mutex::new(KeyboardController::new());
+    pub static ref KEYBOARD: Mutex<KeyboardDriver> = Mutex::new(KeyboardDriver::new());
 }
 
 pub fn handle_keyboard_interrupt() {

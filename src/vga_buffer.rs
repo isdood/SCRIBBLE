@@ -1,33 +1,12 @@
 // src/vga_buffer.rs
 
-use crate::unstable_matter::UnstableMatter;
+use x86_64::instructions::port::Port;
 use core::fmt;
-use spin::Mutex;
 use lazy_static::lazy_static;
+use spin::Mutex;
+use unstable_matter::unstable_vectrix::UnstableVectrix;
 
-const BUFFER_HEIGHT: usize = 25;
-const BUFFER_WIDTH: usize = 80;
-
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
-}
-
-// debug macro
-#[macro_export]
-macro_rules! debug_print {
-    ($($arg:tt)*) => {{
-        use core::fmt::Write;
-        $crate::vga_buffer::WRITER.lock().debug_print(&format_args!($($arg)*).to_string());
-    }};
-}
-
-#[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
-}
-
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Color {
@@ -54,7 +33,7 @@ pub enum Color {
 struct ColorCode(u8);
 
 impl ColorCode {
-    const fn new(foreground: Color, background: Color) -> ColorCode {
+    fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
 }
@@ -66,9 +45,12 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
+const BUFFER_HEIGHT: usize = 25;
+const BUFFER_WIDTH: usize = 80;
+
 #[repr(transparent)]
 struct Buffer {
-    chars: [[UnstableMatter<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
+    chars: [[UnstableVectrix<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
 pub struct Writer {
@@ -78,31 +60,15 @@ pub struct Writer {
 }
 
 impl Writer {
+    fn verify_text_mode(&self) -> bool {
+        unsafe {
+            let mut misc_port = Port::<u8>::new(0x3CC);
+            let misc_output: u8 = misc_port.read();
+            (misc_output & 0x01) == 0x01
+        }
+    }
+
     pub fn write_byte(&mut self, byte: u8) {
-        fn verify_text_mode() -> bool {
-            unsafe {
-                use x86_64::instructions::port::Port;
-
-                let mut misc_port = Port::new(0x3CC);
-                let misc_output = misc_port.read();
-
-                // Bit 0 indicates text/graphics mode
-                (misc_output & 1) == 0
-            }
-        }
-
-        pub fn write_byte(&mut self, byte: u8) {
-            if !Self::verify_text_mode() {
-                // Try to force text mode
-                unsafe {
-                    use x86_64::instructions::port::Port;
-                    let mut mode_port = Port::new(0x3D4);
-                    mode_port.write(0x00_u8);
-                    let mut data_port = Port::new(0x3D5);
-                    data_port.write(0x03_u8); // Text mode 80x25
-                }
-            }
-        }
         match byte {
             b'\n' => self.new_line(),
             byte => {
@@ -114,7 +80,7 @@ impl Writer {
                 let col = self.column_position;
 
                 let color_code = self.color_code;
-                self.buffer.chars[row][col].write(ScreenChar {
+                self.buffer.chars[row][col].write(0, ScreenChar {  // Add index 0
                     ascii_character: byte,
                     color_code,
                 });
@@ -126,8 +92,8 @@ impl Writer {
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
-                let character = self.buffer.chars[row][col].read();
-                self.buffer.chars[row - 1][col].write(character);
+                let character = self.buffer.chars[row][col].read(0);  // Add index 0
+                self.buffer.chars[row - 1][col].write(0, character);  // Add index 0
             }
         }
         self.clear_row(BUFFER_HEIGHT - 1);
@@ -140,9 +106,10 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(blank);
+            self.buffer.chars[row][col].write(0, blank);  // Add index 0
         }
     }
+}
 
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
@@ -172,7 +139,6 @@ impl Writer {
         self.write_byte(b'\n');
         self.color_code = color_backup;
     }
-
 }
 
 impl fmt::Write for Writer {
@@ -183,25 +149,28 @@ impl fmt::Write for Writer {
 }
 
 lazy_static! {
-    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
-        color_code: ColorCode::new(Color::White, Color::Black),
-                                                      buffer: unsafe {
-                                                          let buf = &mut *(0xb8000 as *mut Buffer);
-                                                          // Validate VGA memory is accessible
-                                                          let mut test_char = ScreenChar {
-                                                              ascii_character: b'T',
-                                                              color_code: ColorCode::new(Color::White, Color::Black),
-                                                          };
-                                                          buf.chars[0][0].write(test_char);
-                                                          test_char = buf.chars[0][0].read();
-                                                          if test_char.ascii_character != b'T' {
-                                                              // If we can't read/write, panic
-                                                              panic!("VGA buffer not accessible");
-                                                          }
-                                                          buf
-                                                      },
-    });
+    pub static ref WRITER: Mutex<Writer> = {
+        let mut writer = Writer {
+            column_position: 0,
+            color_code: ColorCode::new(Color::Yellow, Color::Black),
+            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+        };
+
+        // Validate VGA memory is accessible
+        let test_char = ScreenChar {
+            ascii_character: b'T',
+            color_code: ColorCode::new(Color::White, Color::Black),
+        };
+
+        writer.buffer.chars[0][0].write(test_char);
+        let read_char = writer.buffer.chars[0][0].read();
+
+        if read_char.ascii_character != b'T' {
+            panic!("VGA buffer not accessible");
+        }
+
+        Mutex::new(writer)
+    };
 }
 
 #[doc(hidden)]

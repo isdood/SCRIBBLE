@@ -1,28 +1,21 @@
 [package]
 name = "scribble"
 version = "0.0.1"
-authors = ["Caleb J.D. Terkovics <calebjdt@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-spin = "0.9.2"
+x86_64 = "0.14.2"
+spin = "0.9.8"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-x86_64 = "0.14.9"
-pic8259 = "0.10.2"
-uart_16550 = "0.2.14"
-pc-keyboard = "0.5.0"
-linked_list_allocator = "0.9.0"
-volatile = "0.4.3"
-llvm = "0.0.1"
+uart_16550 = "0.2.19"
+pic8259 = "0.10.4"
+pc-keyboard = "0.7.0"
+linked_list_allocator = "0.10.5"
+unstable_matter = { path = "lib/unstable_matter" }
+spinUP = { path = "./spinUP/gear2", lib = true }
 
-[dev-dependencies]
-bootimage = "0.10.2"
-
-[build-dependencies]
-# No need to reference the bootloader here
-
-[package.metadata.bootloader]
-target = "bootloader/x86_64-scribble.json"  # Ensure this matches the new target file
-
-[features]
-alloc = []
+[workspace]
+members = [
+    "lib/unstable_matter",
+    "spinUP/gear2"
+]

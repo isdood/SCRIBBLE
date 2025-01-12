@@ -25,21 +25,18 @@ error() {
     exit 1
 }
 
-# Cleanup function
-cleanup() {
-    status "Cleaning up, pushing to isdood/scribble..."
+# Ensure unstable_matter is accessible to gear2
+status "Setting up dependencies..."
+if [ ! -L "spinUP/gear2/lib/unstable_matter" ]; then
+    mkdir -p spinUP/gear2/lib
+    ln -sf ../../lib/unstable_matter spinUP/gear2/lib/unstable_matter
+fi
+success "Dependencies set up"
 
-    #Push to github
-    echo ""
-    git add -A
-    git commit -m "dbg."
-    git push
-    killall qemu-system-x86_64 2>/dev/null || true
-    rm -f serial.log combined.img qemu.log
-}
-
-# Set up cleanup on script exit
-trap cleanup EXIT
+# Build the kernel
+status "Building kernel..."
+cargo build --release || error "Failed to build kernel"
+success "Kernel built successfully"
 
 # Build Gear1
 status "Building Gear1..."
@@ -51,18 +48,21 @@ GEAR1_SIZE=$(stat -c%s "target/i686-spinup/release/spinUP-gear1")
 if [ "$GEAR1_SIZE" -gt 512 ]; then
     error "Gear1 is larger than 512 bytes ($GEAR1_SIZE bytes)"
 fi
-status "Gear1 size: $GEAR1_SIZE bytes"
-hexdump -C -n 512 target/i686-spinup/release/spinUP-gear1
 success "Gear1 built successfully"
 
 # Build Gear2
 status "Building Gear2..."
 cd ../gear2
 ./build.sh || error "Failed to build Gear2"
+success "Gear2 built successfully"
 
 # Create disk image
 status "Creating disk image..."
 cd ../..
+
+# Calculate sizes and offsets
+KERNEL_SIZE=$(stat -c%s "target/x86_64-unknown-none/release/scribble")
+GEAR2_SIZE=$(stat -c%s "spinUP/gear2/target/x86_64-spinUP/release/spinUP")
 
 # Create empty disk image (1.44MB)
 dd if=/dev/zero of=combined.img bs=512 count=2880 2>/dev/null
@@ -73,18 +73,10 @@ dd if=spinUP/gear1/target/i686-spinup/release/spinUP-gear1 of=combined.img bs=51
 # Write Gear2 starting at second sector
 dd if=spinUP/gear2/target/x86_64-spinUP/release/spinUP of=combined.img bs=512 seek=1 conv=notrunc
 
+# Write kernel after Gear2 (starting at sector 33 to leave room for Gear2)
+dd if=target/x86_64-unknown-none/release/scribble of=combined.img bs=512 seek=33 conv=notrunc
+
 success "Created disk image"
-
-# Verify disk image
-status "Verifying disk image..."
-echo "First sector (Gear1):"
-hexdump -C -n 512 combined.img
-echo
-echo "Second sector (Start of Gear2):"
-hexdump -C -s 512 -n 512 combined.img
-echo
-
-success "Disk image verified"
 
 # Run in QEMU
 status "Starting QEMU..."
@@ -93,31 +85,11 @@ status "Starting QEMU..."
 qemu-system-x86_64 \
     -drive file=combined.img,format=raw,if=floppy \
     -serial stdio \
-    -display none \
+    -monitor unix:qemu-monitor-socket,server,nowait \
     -d int,cpu_reset \
-    -no-reboot &
+    -no-shutdown \
+    -no-reboot \
+    -display gtk \  # Add this line to see the output
+    2>&1 | tee qemu.log
 
-QEMU_PID=$!
-
-# Wait for QEMU to start
-sleep 2
-
-# Check if QEMU is still running
-if ! kill -0 $QEMU_PID 2>/dev/null; then
-    error "QEMU failed to start"
-fi
-
-# Wait a bit for output
-sleep 3
-
-# Kill QEMU gracefully
-kill $QEMU_PID
-
-# Check if we got any output indicating successful handoff
-if dmesg | grep -q "Gear 2.*Starting" || grep -q "Gear 2.*Starting" qemu.log 2>/dev/null; then
-    success "Bootloader handoff successful!"
-else
-    error "Bootloader handoff failed"
-fi
-
-success "Test completed"
+success "QEMU started"

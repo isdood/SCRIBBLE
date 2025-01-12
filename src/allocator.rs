@@ -1,46 +1,27 @@
 // src/allocator.rs
+use unstable_matter::unstable_vectrix::UnstableVectrix;
 
-use linked_list_allocator::LockedHeap;
-use x86_64::{
-    VirtAddr,
-    structures::paging::{
-        mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
-    },
-};
+pub struct VectorSpaceAllocator {
+    heap: UnstableVectrix<u8>,
+    vector_regions: UnstableVectrix<VectorAddressSpace>,
+}
 
-#[global_allocator]
-pub static ALLOCATOR: LockedHeap = LockedHeap::empty(); // Make this public
-
-pub fn init_heap(
-    mapper: &mut impl Mapper<Size4KiB>,
-    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
-) -> Result<(), MapToError<Size4KiB>> {
-    let page_range = {
-        let heap_start = VirtAddr::new(crate::HEAP_START as u64);
-        let heap_end = heap_start + crate::HEAP_SIZE - 1u64;
-        let heap_start_page = Page::containing_address(heap_start);
-        let heap_end_page = Page::containing_address(heap_end);
-        Page::range_inclusive(heap_start_page, heap_end_page)
-    };
-
-    for page in page_range {
-        let frame = frame_allocator
-        .allocate_frame()
-        .ok_or(MapToError::FrameAllocationFailed)?;
-        let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe {
-            mapper.map_to(page, frame, flags, frame_allocator)?.flush();
+impl VectorSpaceAllocator {
+    pub unsafe fn new(heap_start: usize, heap_size: usize) -> Self {
+        Self {
+            heap: UnstableVectrix::new(heap_start, heap_size, 0),
+            vector_regions: UnstableVectrix::new(heap_start + heap_size, 1024, 0),
         }
     }
 
-    unsafe {
-        ALLOCATOR.lock().init(crate::HEAP_START, crate::HEAP_SIZE); // Pass usize arguments
+    pub fn allocate_vector(&mut self, layout: Layout, vector_aligned: bool) -> Option<*mut u8> {
+        if vector_aligned {
+            // Ensure allocation is properly aligned for vector operations
+            // This might require different alignment than standard allocations
+            todo!("Implement vector-aligned allocation")
+        } else {
+            // Standard allocation path
+            todo!("Implement standard allocation")
+        }
     }
-
-    Ok(())
-}
-
-#[alloc_error_handler]
-fn alloc_error_handler(layout: core::alloc::Layout) -> ! {
-    panic!("allocation error: {:?}", layout)
 }

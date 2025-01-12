@@ -8,6 +8,85 @@
 #![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
+use unstable_matter::unstable_vectrix::UnstableVectrix;
+
+const KERNEL_LOAD_ADDR: u64 = 0x100000;  // Load kernel at 1MB
+const KERNEL_SECTOR_START: u16 = 33;     // Kernel starts at sector 33
+const SECTORS_TO_READ: u16 = 100;        // Adjust based on kernel size
+
+const VGA_BUFFER: *mut u8 = 0xb8000 as *mut u8;
+static mut VGA_CURSOR: usize = 0;
+
+// At the top of main.rs
+pub const BOOT_START: u64 = 0x7E00;
+pub const BOOT_STACK_START: u64 = 0x9000;
+pub const BOOT_STACK_SIZE: u64 = 0x4000;
+
+mod debug {
+    use super::UnstableChar;
+    use core::fmt;
+
+    pub struct DebugWriter;
+
+    impl DebugWriter {
+        pub fn new() -> Self {
+            DebugWriter
+        }
+    }
+
+    impl fmt::Write for DebugWriter {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            unsafe {
+                super::print(s);
+            }
+            Ok(())
+        }
+    }
+
+    #[macro_export]
+    macro_rules! debug_print {
+        ($($arg:tt)*) => ({
+            use core::fmt::Write;
+            let mut writer = $crate::debug::DebugWriter::new();
+            writer.write_fmt(format_args!($($arg)*)).unwrap();
+        });
+    }
+
+    #[macro_export]
+    macro_rules! debug_println {
+        () => ($crate::debug_print!("\n"));
+        ($($arg:tt)*) => ($crate::debug_print!("{}\n", format_args!($($arg)*)));
+    }
+}
+
+#[repr(transparent)]
+struct UnstableChar {
+    inner: UnstableVectrix<u16>,
+}
+
+impl UnstableChar {
+    fn new(value: u16) -> Self {
+        UnstableChar {
+            inner: UnstableVectrix::new(value)
+        }
+    }
+
+    fn write(&mut self, value: u16) {
+        self.inner.write(value)
+    }
+
+    fn read(&self) -> u16 {
+        self.inner.read()
+    }
+}
+
+#[repr(C)]
+pub struct BootParams {
+    pub kernel_load_addr: u32,
+    pub kernel_size: u32,
+    pub memory_map_addr: u32,
+    pub memory_map_entries: u32,
+}
 
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
@@ -203,6 +282,11 @@ unsafe fn setup_idt() {
 }
 
 unsafe fn setup_page_tables() {
+
+    if !verify_memory_access((&PAGE_TABLES as *const _) as u64, core::mem::size_of::<PageTables>()) {
+        debug_println!("ERROR: Cannot access page table memory!");
+        loop {}
+    }
     core::ptr::write_bytes(&raw mut PAGE_TABLES as *mut _, 0, 1);
 
     PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
@@ -217,6 +301,18 @@ unsafe fn setup_page_tables() {
         "mov cr3, {0:e}",
         in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
     );
+}
+
+unsafe fn verify_memory_access(addr: u64, size: usize) -> bool {
+    let test_value = UnstableVectrix::<u8>::new(0x55);
+    let ptr = addr as *mut u8;
+
+    // Try to write and read back a test value
+    test_value.write(0x55);
+    ptr.write_volatile(0x55);
+    let read_back = ptr.read_volatile();
+
+    read_back == 0x55
 }
 
 unsafe fn setup_pic() {
@@ -315,6 +411,91 @@ pub unsafe extern "C" fn _start() -> ! {
     );
 }
 
+unsafe fn read_disk_sector(sector: u16, buffer: *mut u8) {
+    let mut disk_packet = [0u8; 16];
+    // Disk Address Packet structure
+    disk_packet[0] = 16;    // Size of packet
+    disk_packet[1] = 0;     // Reserved
+    disk_packet[2] = 1;     // Number of sectors to read
+    disk_packet[3] = 0;     // Reserved
+    disk_packet[4..8].copy_from_slice(&(buffer as u32).to_le_bytes());  // Buffer address
+    disk_packet[8..12].copy_from_slice(&(sector as u32).to_le_bytes()); // LBA (low)
+    disk_packet[12..16].fill(0);  // LBA (high)
+
+    core::arch::asm!(
+        ".code32",
+        "mov ah, 0x42",
+        "mov dl, 0x00",      // Drive number (0x00 for floppy)
+    "int 0x13",
+    in("si") disk_packet.as_ptr(),
+                     options(preserves_flags)
+    );
+}
+
+// load the kernel from disk
+unsafe fn load_kernel() {
+    // Read kernel from disk using BIOS int 13h
+    let mut buffer = KERNEL_LOAD_ADDR as *mut u8;
+
+    for sector in 0..SECTORS_TO_READ {
+        let lba = KERNEL_SECTOR_START + sector;
+
+        // Use int 13h to read the sector
+        core::arch::asm!(
+            ".code32",
+            "push eax",
+            "push ebx",
+            "push ecx",
+            "push edx",
+            "push esi",
+            "push edi",
+
+            // Set up disk read
+            "mov ah, 0x42",
+            "mov dl, 0x00",  // Drive number (0x00 for floppy)
+        "mov si, sp",
+        "sub sp, 16",    // Make space for disk address packet
+
+        // Build disk address packet
+        "mov byte ptr [si-16], 16",   // Size of packet
+        "mov byte ptr [si-15], 0",    // Reserved
+        "mov word ptr [si-14], 1",    // Number of sectors
+        "mov dword ptr [si-12], {0}", // Buffer address
+        "mov dword ptr [si-8], {1}",  // LBA low
+        "mov dword ptr [si-4], 0",    // LBA high
+
+        "int 0x13",
+
+        "add sp, 16",
+        "pop edi",
+        "pop esi",
+        "pop edx",
+        "pop ecx",
+        "pop ebx",
+        "pop eax",
+        in(reg) buffer as u32,
+                         in(reg) lba as u32,
+                         options(nostack),
+        );
+
+        buffer = buffer.add(512);
+    }
+}
+
+unsafe fn print(s: &str) {
+    for byte in s.bytes() {
+        let char_ptr = (VGA_BUFFER as *mut u16).add(VGA_CURSOR);
+        let vga_char = UnstableChar::new(0);
+        vga_char.write((0x0F << 8) | byte as u16); // White on black
+        VGA_CURSOR += 1;
+    }
+}
+
+unsafe fn println(s: &str) {
+    print(s);
+    VGA_CURSOR = (VGA_CURSOR + 80 - (VGA_CURSOR % 80)); // New line
+}
+
 #[no_mangle]
 unsafe extern "C" fn long_mode_start() -> ! {
     rust_main()
@@ -322,6 +503,43 @@ unsafe extern "C" fn long_mode_start() -> ! {
 
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
+    unsafe {
+
+        debug_println!("spinUP: Gear 2 started at {:016x}", BOOT_START);
+        debug_println!("spinUP: Stack at {:016x}-{:016x}",
+                       BOOT_STACK_START,
+                       BOOT_STACK_START + BOOT_STACK_SIZE
+        );
+        // ... rest of the code
+        println("spinUP: Gear 2 started");
+        println("spinUP: Loading kernel...");
+
+        // Load kernel
+        let mut buffer = KERNEL_LOAD_ADDR as *mut u8;
+        for sector in 0..SECTORS_TO_READ {
+            read_disk_sector(KERNEL_SECTOR_START + sector, buffer);
+            buffer = buffer.add(512);
+            if sector % 10 == 0 {
+                print(".");  // Progress indicator
+            }
+        }
+        println("\nspinUP: Kernel loaded");
+
+        // Set up argument structure for kernel
+        let boot_params = BootParams {
+            kernel_load_addr: KERNEL_LOAD_ADDR as u32,
+            kernel_size: (SECTORS_TO_READ as u32) * 512,
+            memory_map_addr: &PAGE_TABLES as *const _ as u32,
+            memory_map_entries: 3, // PML4, PDPT, PD
+        };
+
+        println("spinUP: Jumping to kernel");
+
+        // Jump to kernel
+        let kernel_entry = KERNEL_LOAD_ADDR as *const fn() -> !;
+        (*kernel_entry)();
+    }
+
     loop {
         unsafe {
             core::arch::asm!("hlt");

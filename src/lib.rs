@@ -1,5 +1,3 @@
-// src/lib.rs
-
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
@@ -10,11 +8,9 @@
 
 extern crate alloc;
 
-use bootloader::{BootInfo};
+use spinUP::boot_params::BootParams;
 use x86_64::structures::paging::{OffsetPageTable, Size4KiB};
 use x86_64::VirtAddr;
-use bootloader::boot_info::Optional;
-use crate::memory::{BootInfoFrameAllocator, init}; // Import the moved functions
 
 pub mod allocator;
 pub mod freezer;
@@ -28,7 +24,10 @@ pub mod serial;
 pub mod splat;
 pub mod stat;
 pub mod vga_buffer;
-pub mod unstable_matter;
+pub mod unstable_vectrix;  // VSF testing
+
+// Remove this line since we're using it as a dependency
+// pub mod unstable_matter;
 
 pub use crate::allocator::ALLOCATOR;
 
@@ -41,27 +40,18 @@ pub enum InitError {
 pub const HEAP_START: usize = 0x_4444_4444_0000;
 pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
 
-pub fn init_memory_management(boot_info: &'static BootInfo)
+// Update the function to use BootParams from spinUP instead of bootloader
+pub fn init_memory_management(boot_params: &'static BootParams)
 -> Result<(OffsetPageTable<'static>, BootInfoFrameAllocator), InitError> {
-    // Handle the Optional<u64> type using the helper function
-    let physical_memory_offset = match optional_to_option(boot_info.physical_memory_offset) {
-        Some(offset) => VirtAddr::new(offset),
-        None => VirtAddr::new(0),
-    };
+    let physical_memory_offset = VirtAddr::new(boot_params.memory_map_addr as u64);
 
     // Initialize the page table mapper
-    let mapper = unsafe { init(physical_memory_offset) };
+    let mapper = unsafe { memory::init(physical_memory_offset) };
 
-    // Initialize the frame allocator
-    let frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_regions) };
+    // Initialize the frame allocator with the boot parameters
+    let frame_allocator = unsafe {
+        memory::BootInfoFrameAllocator::init_from_boot_params(boot_params)
+    };
 
     Ok((mapper, frame_allocator))
-}
-
-// Helper function to convert Optional<u64> to Option<u64>
-fn optional_to_option(opt: Optional<u64>) -> Option<u64> {
-    match opt {
-        Optional::Some(val) => Some(val),
-        Optional::None => None,
-    }
 }

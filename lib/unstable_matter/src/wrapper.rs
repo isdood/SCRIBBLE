@@ -1,6 +1,5 @@
 // lib/unstable_matter/src/wrapper.rs
 
-use crate::unstable_matter::UnstableMatter;
 use crate::unstable_vectrix::UnstableVectrix;
 
 pub struct Wrapper<T> {
@@ -8,9 +7,9 @@ pub struct Wrapper<T> {
 }
 
 impl<T> Wrapper<T> {
-    pub unsafe fn new(addr: usize, size: usize, offset: usize) -> Self {
+    pub unsafe fn new(addr: usize, size: usize, _offset: usize) -> Self {
         Self {
-            vectrix: UnstableVectrix::new(addr, size, offset),
+            vectrix: UnstableVectrix::new(addr, size, _offset),
         }
     }
 

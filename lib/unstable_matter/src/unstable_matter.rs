@@ -21,11 +21,14 @@
 //! - **Documentation**: Clearly document all unsafe code and the reasons for its use to help maintainers understand the context.
 //! - **Concurrency**: Carefully handle concurrent access to volatile memory to avoid data races and ensure thread safety.
 
-pub struct UnstableMatter<T> {
-    ptr: *mut T,
+// lib/unstable_matter/src/unstable_matter.rs
+use super::unstable_matter::UnstableMatter;
+
+pub struct UnstableVectrix<T> {
+    matter: UnstableMatter<T>,
 }
 
-impl<T> UnstableMatter<T> {
+unsafe impl<T> Send for UnstableVectrix<T> {}
     pub unsafe fn at(addr: usize) -> Self {
         Self { ptr: addr as *mut T }
     }
@@ -41,5 +44,13 @@ impl<T> UnstableMatter<T> {
     // Add fence operations for hardware operations
     pub fn fence(&self) {
         core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub fn ptr(&self) -> *mut T {
+        self.ptr
+    }
+
+    pub fn ptr_add(&self, offset: usize) -> *mut T {
+        unsafe { self.ptr.add(offset) }
     }
 }
