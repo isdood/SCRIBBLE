@@ -619,7 +619,7 @@ pub unsafe extern "C" fn _start() -> ! {
     // Enable PAE in CR4
     core::arch::asm!(
         "mov rax, cr4",
-        "or rax, 1 << 5",  // PAE
+        "or eax, 1 << 5",  // PAE
         "mov cr4, rax",
     );
 
@@ -637,26 +637,27 @@ pub unsafe extern "C" fn _start() -> ! {
     // Enable paging in CR0
     core::arch::asm!(
         "mov rax, cr0",
-        "or rax, 0x80000001",  // PG + PE
+        "mov rbx, 0x80000001", // PG + PE flags
+        "or rax, rbx",         // Set the flags
         "mov cr0, rax",
     );
 
     // Jump to long mode with a label > 1
     core::arch::asm!(
-        "push qword ptr 0x08",  // Code segment
-        "lea rax, [rip + 2f]",  // Get address of label 2 using RIP-relative addressing
+        "push 0x08",           // Code segment
+        "lea rax, [rip + 2f]", // Get address of label 2 using RIP-relative addressing
         "push rax",
-        "retfq",                // Far return
+        "retfq",               // Far return
         "2:",
         ".code64",
-        "mov ax, 0x10",         // Data segment
+        "mov ax, 0x10",        // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
 
-        // Set up stack using raw pointer
+        // Set up stack
         "mov rsp, {stack}",
         "mov rbp, rsp",
 
@@ -668,7 +669,6 @@ pub unsafe extern "C" fn _start() -> ! {
                      options(noreturn)
     );
 }
-
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
