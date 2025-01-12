@@ -122,34 +122,50 @@ struct IdtEntry {
     reserved: u32,
 }
 
-impl IdtEntry {
-    const fn new(handler: u64) -> Self {
-        IdtEntry {
-            offset_low: (handler & 0xFFFF) as u16,
-            segment_selector: 0x08, // Code segment
-            ist: 0,
-            flags: 0x8E, // Present, Ring 0, Interrupt Gate
-            offset_middle: ((handler >> 16) & 0xFFFF) as u16,
-            offset_high: (handler >> 32) as u32,
-            reserved: 0,
-        }
-    }
+#[repr(align(16))]  // Ensure 16-byte alignment for IDT
+static mut IDT: [IdtEntry; 256] = [{
+    let entry = IdtEntry {
+        offset_low: 0,
+        segment_selector: 0x08,  // Code segment
+        ist: 0,
+        flags: 0x8E,  // Present, Ring 0, Interrupt Gate
+        offset_middle: 0,
+        offset_high: 0,
+        reserved: 0,
+    };
+    entry
+}; 256];
 
-    const fn missing() -> Self {
-        Self::new(0)
-    }
-}
-
-// Define the IDT structure
 #[repr(C, packed)]
-struct Idt {
-    entries: [IdtEntry; 256],
+struct IdtPointer {
+    limit: u16,
+    base: u64,
 }
 
-// Static IDT instance
-static mut IDT: Idt = Idt {
-    entries: [IdtEntry::missing(); 256],
-};
+unsafe fn setup_idt() {
+    // Set up timer interrupt handler
+    let handler_addr = timer_interrupt_handler as u64;
+    IDT[32] = IdtEntry {
+        offset_low: (handler_addr & 0xFFFF) as u16,
+        segment_selector: 0x08,  // Code segment
+        ist: 0,
+        flags: 0x8E,  // Present, Ring 0, Interrupt Gate
+        offset_middle: ((handler_addr >> 16) & 0xFFFF) as u16,
+        offset_high: (handler_addr >> 32) as u32,
+        reserved: 0,
+    };
+
+    // Load IDT
+    let idt_ptr = IdtPointer {
+        limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
+        base: &IDT as *const _ as u64,
+    };
+
+    core::arch::asm!(
+        "lidt [{0}]",
+        in(reg) &idt_ptr
+    );
+}
 
 #[repr(C, packed)]
 struct GDTPointer {
@@ -396,7 +412,6 @@ unsafe fn setup_idt() {
     asm!("lidt [{}]", in(reg) &idt_descriptor);
 }
 
-
 unsafe fn setup_pic() {
     // ICW1: start initialization
     core::arch::asm!(
@@ -406,39 +421,39 @@ unsafe fn setup_pic() {
         "out 0x80, al"  // Delay
     );
 
-    // ICW2: vector offset
+    // ICW2: vector offset (32 for master, 40 for slave)
     core::arch::asm!(
-        "mov al, 0x20",
-        "out 0x21, al", // Master: IRQ 0-7 → INT 0x20-0x27
-        "mov al, 0x28",
-        "out 0xA1, al", // Slave: IRQ 8-15 → INT 0x28-0x2F
+        "mov al, 32",
+        "out 0x21, al", // Master PIC
+        "mov al, 40",
+        "out 0xA1, al", // Slave PIC
         "out 0x80, al"  // Delay
     );
 
-    // ICW3: cascading
+    // ICW3: cascade configuration
     core::arch::asm!(
-        "mov al, 0x04",
-        "out 0x21, al", // Master: Slave on IRQ2
-        "mov al, 0x02",
-        "out 0xA1, al", // Slave: Cascade identity
+        "mov al, 4",    // Tell Master PIC that there is a slave PIC at IRQ2
+        "out 0x21, al",
+        "mov al, 2",    // Tell Slave PIC its cascade identity
+        "out 0xA1, al",
         "out 0x80, al"  // Delay
     );
 
-    // ICW4: 8086 mode
+    // ICW4: set x86 mode
     core::arch::asm!(
-        "mov al, 0x01",
+        "mov al, 1",
         "out 0x21, al",
         "out 0xA1, al",
         "out 0x80, al"  // Delay
     );
 
-    // OCW1: enable only timer interrupt
+    // OCW1: mask all interrupts except timer
     core::arch::asm!(
-        "mov al, 0xFE", // Enable IRQ0 (timer), mask others
-                     "out 0x21, al",
-                     "mov al, 0xFF", // Mask all slave interrupts
-                     "out 0xA1, al",
-                     "out 0x80, al"  // Delay
+        "mov al, 0xfe", // Enable only IRQ0 (timer)
+    "out 0x21, al",
+    "mov al, 0xff", // Mask all slave interrupts
+    "out 0xA1, al",
+    "out 0x80, al"  // Delay
     );
 }
 
@@ -640,7 +655,7 @@ pub unsafe extern "C" fn _start() -> ! {
 extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
     unsafe {
         core::arch::naked_asm!(
-            // Save registers
+            // Save all registers
             "push rax",
             "push rcx",
             "push rdx",
@@ -678,7 +693,7 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
             "pop rcx",
             "pop rax",
 
-            "iretq"  // Remove options(noreturn)
+            "iretq"
         );
     }
 }
