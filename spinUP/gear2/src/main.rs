@@ -216,7 +216,7 @@ pub unsafe extern "C" fn _start() -> ! {
     // Load GDT
     core::arch::asm!(
         ".code32",
-        "lgdt [{0:e}]",
+        "lgdt [{0}]",
         in(reg) &GDT_PTR,
     );
 
@@ -226,9 +226,9 @@ pub unsafe extern "C" fn _start() -> ! {
     // Load CR3
     core::arch::asm!(
         ".code32",
-        "mov eax, {0:e}",
+        "mov eax, {0}",
         "mov cr3, eax",
-        in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+        in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
     );
 
     // Enable PAE and PSE
@@ -256,11 +256,11 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov cr0, eax",
     );
 
-    // Jump to 64-bit mode
+    // Jump to 64-bit mode - Fix the problematic jump
     core::arch::asm!(
         ".code32",
-        "jmp 0x08:2f",    // Far jump with new code segment
-        "2:",
+        "jmp {0}, {1}",
+        "1:",
         ".code64",
         "mov ax, 0x10",   // Data segment
         "mov ds, ax",
@@ -270,26 +270,34 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov ss, ax",
 
         // Set up stack
-        "mov rsp, {0}",
+        "mov rsp, {2}",
         "mov rbp, rsp",
 
         // Set up IDT
-        "call {1}",
+        "call {3}",
 
         // Remap and initialize PIC
-        "call {2}",
+        "call {4}",
 
         // Enable interrupts
         "sti",
 
         // Jump to Rust main
-        "jmp {3}",
-        in(reg) &STACK.data as *const _ as u64 + 4096,
+        "jmp {5}",
+        const 0x08,        // Code segment selector
+        sym long_mode_start,
+        in(reg) &STACK.data as *const _ as u64 + STACK_SIZE,
                      sym setup_idt,
                      sym setup_pic,
                      sym rust_main,
                      options(noreturn),
     );
+}
+
+#[no_mangle]
+unsafe extern "C" fn long_mode_start() -> ! {
+    // This function will never be called directly - it's just a target for the jump
+    rust_main()
 }
 
 #[naked]
