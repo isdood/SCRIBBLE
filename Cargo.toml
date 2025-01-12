@@ -1,8 +1,9 @@
 [workspace]
 members = [
-    "boot/spINIT",    # Note the capital 'I'
-    "boot/spinUP",    # Note the capital 'UP'
+    "boot/spINIT",
+    "boot/spinUP",
     "boot/spun",
+    "lib/scribble",
     "lib/unstable_matter"
 ]
 
@@ -12,6 +13,7 @@ edition = "2021"
 authors = ["isdood"]
 
 [workspace.metadata]
-last_updated = "2025-01-12T22:30:44Z"
+last_updated = "2025-01-12T23:03:15Z"
 maintained_by = "isdood"
+
 
