@@ -30,27 +30,6 @@ struct IdtPointer {
     base: u32,
 }
 
-#[repr(C, packed)]
-struct GDTEntry {
-    limit_low: u16,
-    base_low: u16,
-    base_middle: u8,
-    access: u8,
-    granularity: u8,
-    base_high: u8,
-}
-
-#[repr(C, packed)]
-struct GDTTable {
-    entries: [GDTEntry; 3]
-}
-
-#[repr(C, packed(4))]  // Ensure 4-byte alignment for 32-bit mode
-struct GDTPointer {
-    limit: u16,
-    base: u32,
-}
-
 #[repr(C)]
 struct PageTable {
     entries: [u64; 512]
@@ -103,38 +82,7 @@ pub struct StageInfo {
     flags: u32,
 }
 
-// Static definitions
-static mut GDT: GDTTable = GDTTable {
-    entries: [
-        // Null descriptor
-        GDTEntry {
-            limit_low: 0,
-            base_low: 0,
-            base_middle: 0,
-            access: 0,
-            granularity: 0,
-            base_high: 0,
-        },
-        // 64-bit code segment
-        GDTEntry {
-            limit_low: 0xFFFF,
-            base_low: 0,
-            base_middle: 0,
-            access: 0x9A,       // Present + Ring 0 + Code Segment + Readable
-            granularity: 0xAF,  // 4K pages + Long mode + Limit bits
-            base_high: 0,
-        },
-        // Data segment
-        GDTEntry {
-            limit_low: 0xFFFF,
-            base_low: 0,
-            base_middle: 0,
-            access: 0x92,       // Present + Ring 0 + Data Segment + Writable
-            granularity: 0xCF,  // 4K pages + 32-bit + Limit bits
-            base_high: 0,
-        },
-    ]
-};
+
 
 static mut IDT: Idt = Idt {
     entries: {
@@ -200,18 +148,78 @@ unsafe fn setup_idt() {
     );
 }
 
-unsafe fn setup_gdt() {
-    let gdt_ptr = GDTPointer {
-        limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: &raw const GDT as *const _ as u32,
-    };
+#[repr(C, packed)]
+struct GdtDescriptor {
+    limit_low: u16,
+    base_low: u16,
+    base_middle: u8,
+    access: u8,
+    granularity: u8,
+    base_high: u8,
+}
 
-    core::arch::asm!(
-        ".code32",
-        // Use explicit operand size prefix and 32-bit register
-        "lgdt [{0:e}]",  // :e specifies 32-bit register
-        in(reg) &gdt_ptr
-    );
+#[repr(C, packed)]
+struct GdtPointer {
+    limit: u16,
+    base: u64,
+}
+
+static mut GDT: [GdtDescriptor; 5] = [
+    // Null descriptor
+    GdtDescriptor {
+        limit_low: 0,
+        base_low: 0,
+        base_middle: 0,
+        access: 0,
+        granularity: 0,
+        base_high: 0,
+    },
+// Kernel code segment (64-bit)
+GdtDescriptor {
+    limit_low: 0xFFFF,
+    base_low: 0,
+    base_middle: 0,
+    access: 0x9A,      // Present, Ring 0, Code, Readable
+    granularity: 0x2F, // 4KB granularity, 64-bit code
+    base_high: 0,
+},
+// Kernel data segment
+GdtDescriptor {
+    limit_low: 0xFFFF,
+    base_low: 0,
+    base_middle: 0,
+    access: 0x92,      // Present, Ring 0, Data, Writable
+    granularity: 0xCF, // 4KB granularity, 32-bit
+    base_high: 0,
+},
+// User code segment (64-bit)
+GdtDescriptor {
+    limit_low: 0xFFFF,
+    base_low: 0,
+    base_middle: 0,
+    access: 0xFA,      // Present, Ring 3, Code, Readable
+    granularity: 0x2F, // 4KB granularity, 64-bit code
+    base_high: 0,
+},
+// User data segment
+GdtDescriptor {
+    limit_low: 0xFFFF,
+    base_low: 0,
+    base_middle: 0,
+    access: 0xF2,      // Present, Ring 3, Data, Writable
+    granularity: 0xCF, // 4KB granularity, 32-bit
+    base_high: 0,
+},
+];
+
+static mut GDT_PTR: GdtPointer = GdtPointer {
+    limit: (core::mem::size_of::<[GdtDescriptor; 5]>() - 1) as u16,
+    base: 0, // Will be initialized at runtime
+};
+
+unsafe fn setup_gdt() {
+    // Set the GDT base address
+    GDT_PTR.base = &GDT as *const _ as u64;
 }
 
 unsafe fn setup_pic() {
@@ -314,7 +322,7 @@ extern "C" fn handle_page_fault(fault_addr: u64, error_code: u64) {
         // Only handle page-not-present faults
         if error_code & 1 == 0 {
             let pd_idx = (fault_addr >> 21) & 0x1FF;
-            PAGE_TABLES.pd.entries[pd_idx as usize] = ((fault_addr & !0x1FFFFF) | 0x83);
+            PAGE_TABLES.pd.entries[pd_idx as usize] = (fault_addr & !0x1FFFFF) | 0x83;
             core::arch::asm!("invlpg [{}]", in(reg) fault_addr);
         }
     }
