@@ -54,6 +54,20 @@ struct IdtEntry {
     reserved: u32,
 }
 
+impl IdtEntry {
+    const fn new_empty() -> Self {
+        IdtEntry {
+            offset_low: 0,
+            segment: 0,
+            ist: 0,
+            flags: 0,
+            offset_mid: 0,
+            offset_high: 0,
+            reserved: 0,
+        }
+    }
+}
+
 // IDT Descriptor structure
 #[repr(C, packed)]
 struct IdtDescriptor {
@@ -126,17 +140,7 @@ static mut GDT_PTR: GdtDescriptor = GdtDescriptor {
     base: 0,
 };
 
-static mut IDT: [IdtEntry; 256] = unsafe {
-    core::array::from_fn(|_| IdtEntry {
-        offset_low: 0,
-        segment: 0,
-        ist: 0,
-        flags: 0,
-        offset_mid: 0,
-        offset_high: 0,
-        reserved: 0,
-    })
-};
+static mut IDT: [IdtEntry; 256] = [IdtEntry::new_empty(); 256];
 
 static mut IDT_PTR: IdtDescriptor = IdtDescriptor {
     limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
@@ -367,3 +371,5 @@ pub extern "C" fn rust_main() -> ! {
         }
     }
 }
+
+// Author: Caleb J.D. Terkovics
