@@ -1,5 +1,3 @@
-// src/wrapper.rs
-
 // lib/unstable_matter/src/wrapper.rs
 
 use crate::unstable_matter::UnstableMatter;
@@ -39,10 +37,10 @@ impl<T> Wrapper<T> {
         }
     }
 
-    pub fn write(&self, idx: usize, value: T) {
+    pub fn write(&mut self, idx: usize, value: T) { // Changed self to &mut self
         match self.implementation {
-            Implementation::Old => unsafe { self.old.as_ref().unwrap().write(value) },
-            Implementation::New => self.new.as_ref().unwrap().write(idx, value),
+            Implementation::Old => unsafe { self.old.as_mut().unwrap().write(value) }, // Changed as_ref() to as_mut()
+            Implementation::New => self.new.as_mut().unwrap().write(idx, value), // Changed as_ref() to as_mut()
         }
     }
 
