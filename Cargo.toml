@@ -1,27 +1,17 @@
+[workspace]
+members = [
+    "boot/spINIT",    # Note the capital 'I'
+    "boot/spinUP",    # Note the capital 'UP'
+    "boot/spun",
+    "lib/unstable_matter"
+]
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["isdood"]
-repository = "private"
-license = "MIT"
-
-[workspace]
-members = [
-    "spinit",  # Stage 1: Initial Boot
-    "spinup",  # Stage 2: Memory Setup
-    "spun"     # Stage 3: Kernel
-]
 
 [workspace.metadata]
-last_updated = "2025-01-12T22:21:28Z"
+last_updated = "2025-01-12T22:30:44Z"
 maintained_by = "isdood"
-boot_stages = ["spinit", "spinup", "spun"]
 
-[dependencies]
-spin = "0.9.8"
-lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-uart_16550 = "0.2.19"
-pic8259 = "0.10.4"
-linked_list_allocator = "0.10.5"
-unstable_matter = { path = "lib/unstable_matter" }
-spinUP = { path = "./spinUP/gear2" }
