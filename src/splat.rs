@@ -3,7 +3,7 @@ use spin::Mutex;
 use alloc::{string::String, vec::Vec};
 use core::fmt::Write;
 use lazy_static::lazy_static;
-use x86_64::registers::rflags;
+use unstable_matter::arch::x86_64::registers::rflags;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SplatLevel {

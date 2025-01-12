@@ -1,0 +1,19 @@
+# boot/spun/Cargo.toml
+
+[package]
+name = "spun"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+spinit = { path = "../spinit" }
+spinup = { path = "../spinup" }
+unstable_matter = { path = "../../lib/unstable_matter" }
+scribble = { path = "../../lib/scribble" }
+
+[package.metadata]
+boot_stage = 3
+stage_name = "Kernel"
+last_updated = "2025-01-12T22:21:28Z"
+maintainer = "isdood"

@@ -1,37 +1,42 @@
 // src/memory.rs
-use unstable_matter::unstable_vectrix::{UnstableVectrix, VirtAddr, PhysAddr};
-use crate::page_table::VectorPageTable;
+use unstable_matter::SpaceTime;
+use spinUP::boot_params::BootParams;
+use unstable_matter::VirtAddr;
 
-pub struct MemoryManager {
-    page_table: VectorPageTable,
-    heap_start: VirtAddr,
-    heap_size: usize,
+pub struct MemoryRegion {
+    pub start: usize,
+    pub size: usize,
 }
 
-impl MemoryManager {
-    pub unsafe fn new(phys_offset: u64, heap_start: u64, heap_size: usize) -> Self {
-        Self {
-            page_table: VectorPageTable::new(phys_offset),
-            heap_start: VirtAddr::new(heap_start),
-            heap_size,
+pub struct MemoryMap {
+    pub regions: &'static [MemoryRegion],
+}
+
+pub struct OffsetPageTable<'a> {
+    level_4_table: &'a mut PageTable,
+}
+
+pub struct BootInfoFrameAllocator {
+    memory_regions: SpaceTime<MemoryRegion>,
+}
+
+impl BootInfoFrameAllocator {
+    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
+        BootInfoFrameAllocator {
+            memory_regions: SpaceTime::new(
+                memory_map as *const _ as usize,
+                memory_map.len(),
+                                                 0
+            ),
         }
     }
+}
 
-    pub fn init_heap(&mut self) -> Result<(), &'static str> {
-        // Initialize heap with vector operations
-        let heap_vec = unsafe {
-            UnstableVectrix::new(
-                self.heap_start.as_u64() as usize,
-                                 self.heap_size,
-                                 0
-            )
-        };
-
-        // Zero out the heap area
-        for i in 0..self.heap_size {
-            heap_vec.write(i, 0);
-        }
-
-        Ok(())
-    }
+pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+    let level_4_table = {
+        let table_addr = physical_memory_offset.as_u64();
+        let table = SpaceTime::new(table_addr as usize, 512, 0);
+        &mut *table.as_mut_ptr()
+    };
+    OffsetPageTable::new(level_4_table, physical_memory_offset)
 }

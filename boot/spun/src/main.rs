@@ -1,9 +1,7 @@
-/// Kernel Entry Point
-/// Last Updated: 2025-01-12 21:49:22 UTC
-/// Author: Caleb J.D. Terkovics (isdood)
-///
-/// This module serves as the main entry point for the kernel,
-/// using our custom spinUP bootloader and Sun_rise initialization.
+/// SPUN: Kernel Entry Point
+/// Last Updated: 2025-01-12 22:12:07 UTC
+/// Author: isdood
+/// Stage: 3/3 (Final Kernel)
 
 #![no_std]
 #![no_main]
@@ -11,50 +9,45 @@
 use spinup::{spinup_entry, SpinInfo};
 use scribble::{freezer, stat, println};
 use unstable_matter::{
-    sun_rise::{self, Sun_rise},
-    rtc::{self, DateTime},
     vector_space::VectorSpace,
+    ufo::{UFO, Protected},
 };
 
 spinup_entry!(kernel_main);
 
-// System state management with Sun_rise
-static KERNEL_STATE: Sun_rise<KernelState> = Sun_rise::new();
+/// Kernel state management
+static KERNEL_STATE: sun_rise::Sun_rise<KernelState> = sun_rise::Sun_rise::new();
 
 #[derive(Debug)]
 struct KernelState {
-    boot_time: DateTime,
-    current_user: &'static str,
-    memory_space: VectorSpace,
-    anomaly_count: u32,
-    system_frozen: bool,
+    boot_time: usize,           // UTC timestamp
+    current_user: &'static str, // Current user
+    vector_space: VectorSpace,  // Memory management
+    anomaly_count: u32,        // System health
+    system_frozen: bool,       // System state
 }
 
 fn kernel_main(spin_info: &'static mut SpinInfo) -> ! {
-    // Initialize RTC first
-    rtc::init_rtc();
-
-    println!("SpinUP Kernel Starting at: {}", rtc::get_time_string());
-    println!("Current User: isdood");
+    println!("SPUN Kernel Starting at: {}", spin_info.boot_time);
+    println!("Current User: {}", "isdood");
 
     // Initialize kernel state with vector space
     KERNEL_STATE.init(KernelState {
-        boot_time: DateTime::now(),
-                      current_user: "isdood",
-                      memory_space: VectorSpace::new(
-                          spin_info.memory_map.kernel_start,
-                          spin_info.memory_map.kernel_size
-                      ),
-                      anomaly_count: 0,
-                      system_frozen: false,
+        boot_time: 1705097527, // 2025-01-12 22:12:07 UTC
+        current_user: "isdood",
+        vector_space: VectorSpace::new(
+            spin_info.memory_map.kernel_start,
+            spin_info.memory_map.kernel_size
+        ),
+        anomaly_count: 0,
+        system_frozen: false,
     });
 
     match init_system(spin_info) {
         Ok(_) => {
             println!("Vector Space Initialization Complete");
             let state = KERNEL_STATE.get().unwrap();
-            println!("Boot Time: {}", state.boot_time.to_string());
-            println!("Memory Space: {:?}", state.memory_space);
+            println!("Boot Time: {}", state.boot_time);
         }
         Err(e) => {
             println!("Kernel Vector Space Initialization Failed: {}", e);
@@ -68,7 +61,7 @@ fn kernel_main(spin_info: &'static mut SpinInfo) -> ! {
     });
 
     if freezer::login("isdood") {
-        println!("System Vector Space Activated: {}", rtc::get_time_string());
+        println!("System Vector Space Activated: {}", spin_info.boot_time);
     } else {
         kernel_panic("User Authentication Failed");
     }
@@ -77,7 +70,7 @@ fn kernel_main(spin_info: &'static mut SpinInfo) -> ! {
     let mut metrics = stat::SystemMetrics::new();
 
     loop {
-        let current_time = rtc::get_time_string();
+        let current_time = spin_info.get_current_time();
         let state = KERNEL_STATE.get().unwrap();
 
         metrics.update();
@@ -99,10 +92,10 @@ fn init_system(spin_info: &'static mut SpinInfo) -> Result<(), &'static str> {
     .ok_or("Failed to get kernel state")?;
 
     unsafe {
-        state.memory_space.init_mesh();
+        state.vector_space.init_mesh()?;
     }
 
-    // Check memory map validity
+    // Verify memory map
     if spin_info.memory_map.validate() {
         Ok(())
     } else {
@@ -118,7 +111,8 @@ enum SystemAnomaly {
     TimestampMismatch,
 }
 
-fn check_system_status(metrics: &stat::SystemMetrics, state: &KernelState) -> Option<SystemAnomaly> {
+fn check_system_status(metrics: &stat::SystemMetrics, state: &KernelState)
+-> Option<SystemAnomaly> {
     if metrics.memory_integrity_violated() {
         Some(SystemAnomaly::MemoryCorruption)
     } else if metrics.vector_space_violated() {
@@ -135,12 +129,12 @@ fn check_system_status(metrics: &stat::SystemMetrics, state: &KernelState) -> Op
 fn handle_anomaly(anomaly: SystemAnomaly) {
     if let Some(state) = KERNEL_STATE.get_mut() {
         state.anomaly_count += 1;
-        println!("Anomaly Detected at {}: {:?}", rtc::get_time_string(), anomaly);
+        println!("Anomaly Detected at {}: {:?}", 1705097527, anomaly);
     }
 }
 
 fn kernel_panic(msg: &str) -> ! {
-    println!("KERNEL PANIC at {}: {}", rtc::get_time_string(), msg);
+    println!("KERNEL PANIC at {}: {}", 1705097527, msg);
     loop {}
 }
 

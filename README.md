@@ -1,11 +1,28 @@
-# scribble
+# Three-Stage Boot Process
+Last Updated: 2025-01-12 22:21:28 UTC
+Maintainer: isdood
 
-# > Compiles with no issue.
+## Stages
 
-# > Boots in QEMU via BIOS
+1. **spinit** (Stage 1)
+   - Initial boot sequence
+   - Hardware initialization
+   - Location: `boot/spinit/`
 
-# > displays text correctly
+2. **spinup** (Stage 2)
+   - Memory setup
+   - UFO initialization
+   - Location: `boot/spinup/`
 
-#   - No racing, no segfaults
+3. **spun** (Stage 3)
+   - Final kernel stage
+   - System management
+   - Location: `boot/spun/`
 
-# ! Keyboard input not working
+## Directory Structure
+
+```bash
+boot/
+├── spinit/     # Stage 1
+├── spinup/     # Stage 2
+└── spun/       # Stage 3

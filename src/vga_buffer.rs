@@ -1,10 +1,10 @@
 // src/vga_buffer.rs
 
-use x86_64::instructions::port::Port;
 use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
-use unstable_matter::unstable_vectrix::UnstableVectrix;
+use unstable_matter::SpaceTime;
+use unstable_matter::arch::x86_64::instructions::port::Port;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,7 +80,7 @@ impl Writer {
                 let col = self.column_position;
 
                 let color_code = self.color_code;
-                self.buffer.chars[row][col].write(0, ScreenChar {  // Add index 0
+                self.buffer.chars[row][col].write(0, ScreenChar {
                     ascii_character: byte,
                     color_code,
                 });
@@ -92,8 +92,8 @@ impl Writer {
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
-                let character = self.buffer.chars[row][col].read(0);  // Add index 0
-                self.buffer.chars[row - 1][col].write(0, character);  // Add index 0
+                let character = self.buffer.chars[row][col].read(0);
+                self.buffer.chars[row - 1][col].write(0, character);
             }
         }
         self.clear_row(BUFFER_HEIGHT - 1);
@@ -106,10 +106,9 @@ impl Writer {
             color_code: self.color_code,
         };
         for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(0, blank);  // Add index 0
+            self.buffer.chars[row][col].write(0, blank);
         }
     }
-}
 
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {

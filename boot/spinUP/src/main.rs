@@ -8,7 +8,8 @@
 #![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
-use unstable_matter::unstable_vectrix::UnstableVectrix;
+use unstable_matter::unstable_vectrix::{UnstableVectrix, VirtAddr, PhysAddr, Dimensions};
+use unstable_matter::unstable_vectrix::page_table::{PageTable, PageTableEntry};
 
 const KERNEL_LOAD_ADDR: u64 = 0x100000;  // Load kernel at 1MB
 const KERNEL_SECTOR_START: u16 = 33;     // Kernel starts at sector 33
@@ -282,25 +283,84 @@ unsafe fn setup_idt() {
 }
 
 unsafe fn setup_page_tables() {
+    debug_println!("spinUP: Setting up page tables...");
 
+    // Verify we can access the memory where page tables will be
     if !verify_memory_access((&PAGE_TABLES as *const _) as u64, core::mem::size_of::<PageTables>()) {
         debug_println!("ERROR: Cannot access page table memory!");
         loop {}
     }
-    core::ptr::write_bytes(&raw mut PAGE_TABLES as *mut _, 0, 1);
 
-    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
-    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
+    // Initialize page tables with UnstableVectrix
+    let pml4_addr = PhysAddr::new(&PAGE_TABLES.pml4 as *const _ as u64);
+    let pdpt_addr = PhysAddr::new(&PAGE_TABLES.pdpt as *const _ as u64);
+    let pd_addr = PhysAddr::new(&PAGE_TABLES.pd as *const _ as u64);
 
+    let dimensions = Dimensions {
+        width: 512,  // Standard x86_64 page table width
+        height: 1,
+        depth: 1,
+    };
+
+    // Create UnstableVectrix instances for each table
+    let mut pml4 = UnstableVectrix::from_phys(pml4_addr, 512, 0, dimensions);
+    let mut pdpt = UnstableVectrix::from_phys(pdpt_addr, 512, 0, dimensions);
+    let mut pd = UnstableVectrix::from_phys(pd_addr, 512, 0, dimensions);
+
+    // Clear tables first
     for i in 0..512 {
-        PAGE_TABLES.pd.entries[i] = (i as u64 * 0x200000) | 0x83;
+        pml4.write(i, 0, 0, 0);
+        pdpt.write(i, 0, 0, 0);
+        pd.write(i, 0, 0, 0);
     }
 
+    // Set up identity mapping
+    // PML4[0] -> PDPT
+    pml4.write(0, 0, 0, pdpt_addr.as_u64() | 0x3);  // Present + Writable
+
+    // PDPT[0] -> PD
+    pdpt.write(0, 0, 0, pd_addr.as_u64() | 0x3);    // Present + Writable
+
+    // PD entries - Identity map first 1GB with 2MB pages
+    for i in 0..512 {
+        // Each entry maps 2MB
+        let addr = i as u64 * 0x200000;
+        // Flags: Present + Writable + Huge Page (2MB)
+        pd.write(i, 0, 0, addr | 0x83);
+    }
+
+    debug_println!("spinUP: Page tables initialized");
+    debug_println!("  PML4 at {:016x}", pml4_addr.as_u64());
+    debug_println!("  PDPT at {:016x}", pdpt_addr.as_u64());
+    debug_println!("  PD at {:016x}", pd_addr.as_u64());
+
+    // Load PML4 into CR3
     core::arch::asm!(
-        ".code32",
-        "mov cr3, {0:e}",
-        in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+        "mov cr3, {0:r}",
+        in(reg) pml4_addr.as_u64(),
+                     options(nostack, preserves_flags)
     );
+
+    debug_println!("spinUP: CR3 updated");
+
+    // Verify the mapping
+    let test_addr = VirtAddr::new(0x1000);
+    if verify_memory_access(test_addr.as_u64(), 0x1000) {
+        debug_println!("spinUP: Page tables verified");
+    } else {
+        debug_println!("ERROR: Page table verification failed!");
+        loop {}
+    }
+}
+
+// Helper function for page table flag combinations
+const fn make_page_entry(addr: u64, present: bool, writable: bool, huge: bool, user: bool) -> u64 {
+    let mut flags = 0u64;
+    if present { flags |= 1; }
+    if writable { flags |= 1 << 1; }
+    if user { flags |= 1 << 2; }
+    if huge { flags |= 1 << 7; }
+    (addr & 0x000f_ffff_ffff_f000) | flags
 }
 
 unsafe fn verify_memory_access(addr: u64, size: usize) -> bool {

@@ -1,6 +1,6 @@
 // src/interrupts.rs
-use x86_64::structures::idt::InterruptStackFrame;
-use x86_64::instructions::hlt;
+use unstable_matter::arch::x86_64::structures::idt::InterruptStackFrame;
+use unstable_matter::arch::x86_64::instructions::interrupts;
 use crate::pic8259::{PICS, PIC_1_OFFSET};
 
 #[derive(Debug, Clone, Copy)]

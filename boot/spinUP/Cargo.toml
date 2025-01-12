@@ -1,0 +1,18 @@
+# boot/spinup/Cargo.toml
+
+[package]
+name = "spinup"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+spinit = { path = "../spinit" }
+unstable_matter = { path = "../../lib/unstable_matter" }
+scribble = { path = "../../lib/scribble" }
+
+[package.metadata]
+boot_stage = 2
+stage_name = "Memory Setup"
+last_updated = "2025-01-12T22:21:28Z"
+maintainer = "isdood"

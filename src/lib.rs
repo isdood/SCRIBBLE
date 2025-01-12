@@ -9,8 +9,6 @@
 extern crate alloc;
 
 use spinUP::boot_params::BootParams;
-use x86_64::structures::paging::{OffsetPageTable, Size4KiB};
-use x86_64::VirtAddr;
 
 pub mod allocator;
 pub mod freezer;
@@ -24,7 +22,6 @@ pub mod serial;
 pub mod splat;
 pub mod stat;
 pub mod vga_buffer;
-pub mod unstable_vectrix;  // VSF testing
 
 // Remove this line since we're using it as a dependency
 // pub mod unstable_matter;

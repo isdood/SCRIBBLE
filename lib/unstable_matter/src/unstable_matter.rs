@@ -22,35 +22,72 @@
 //! - **Concurrency**: Carefully handle concurrent access to volatile memory to avoid data races and ensure thread safety.
 
 // lib/unstable_matter/src/unstable_matter.rs
-use super::unstable_matter::UnstableMatter;
 
-pub struct UnstableVectrix<T> {
-    matter: UnstableMatter<T>,
+/// A type that provides volatile access to memory at a specific address.
+#[derive(Debug)]
+pub struct UnstableMatter<T> {
+    ptr: *mut T,
 }
 
-unsafe impl<T> Send for UnstableVectrix<T> {}
+impl<T> UnstableMatter<T> {
+    /// Creates a new UnstableMatter instance at the specified address.
+    ///
+    /// # Safety
+    /// The caller must ensure that:
+    /// - The address is valid for the type T
+    /// - The memory at the address is properly aligned for T
+    /// - No other references to this memory exist while this UnstableMatter is in use
     pub unsafe fn at(addr: usize) -> Self {
         Self { ptr: addr as *mut T }
     }
 
+    /// Performs a volatile read of the value.
+    ///
+    /// # Safety
+    /// The caller must ensure that:
+    /// - The memory is valid for reading
+    /// - No concurrent writes are happening to this memory location
     pub unsafe fn read(&self) -> T {
         core::ptr::read_volatile(self.ptr)
     }
 
+    /// Performs a volatile write of the value.
+    ///
+    /// # Safety
+    /// The caller must ensure that:
+    /// - The memory is valid for writing
+    /// - No concurrent reads or writes are happening to this memory location
     pub unsafe fn write(&mut self, value: T) {
         core::ptr::write_volatile(self.ptr, value)
     }
 
-    // Add fence operations for hardware operations
-    pub fn fence(&self) {
-        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+    /// Returns the raw address as a usize.
+    pub fn addr(&self) -> usize {
+        self.ptr as usize
     }
 
+    /// Inserts a memory fence to ensure ordering of memory operations.
+    pub fn fence(&self) {
+        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Returns the raw pointer to the memory location.
     pub fn ptr(&self) -> *mut T {
         self.ptr
     }
 
+    /// Returns a pointer offset by the specified number of elements.
+    ///
+    /// # Safety
+    /// The caller must ensure that:
+    /// - The offset does not cause the pointer to wrap around the address space
+    /// - The resulting pointer remains within the same allocated object
     pub fn ptr_add(&self, offset: usize) -> *mut T {
         unsafe { self.ptr.add(offset) }
     }
 }
+
+// Implement Send to allow transfer between threads
+// This is safe because UnstableMatter only provides raw pointer access
+// and requires unsafe blocks for all operations
+unsafe impl<T> Send for UnstableMatter<T> {}

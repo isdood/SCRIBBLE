@@ -1,0 +1,19 @@
+# boot/spinit/Cargo.toml
+
+[package]
+name = "spinit"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+unstable_matter = { path = "../../lib/unstable_matter" }
+scribble = { path = "../../lib/scribble" }
+
+[package.metadata]
+boot_stage = 1
+stage_name = "Initial Boot"
+last_updated = "2025-01-12T22:21:28Z"
+maintainer = "isdood"
+
+
