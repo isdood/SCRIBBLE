@@ -7,28 +7,37 @@ use core::panic::PanicInfo;
 use unstable_matter::UnstableMatter;
 
 // Struct definitions
-#[derive(Clone, Copy)]
-#[repr(C)]
+#[repr(C, packed)]
 struct IdtEntry {
     offset_low: u16,
-    segment_selector: u16,
+    segment: u16,
     ist: u8,
     flags: u8,
-    offset_middle: u16,
+    offset_mid: u16,
     offset_high: u32,
     reserved: u32,
 }
 
-#[repr(align(16))]
-struct Idt {
-    entries: [IdtEntry; 256]
-}
+static mut IDT: [IdtEntry; 256] = [IdtEntry {
+    offset_low: 0,
+    segment: 0,
+    ist: 0,
+    flags: 0,
+    offset_mid: 0,
+    offset_high: 0,
+    reserved: 0,
+}; 256];
 
-#[repr(C, packed(4))]  // Ensure 4-byte alignment for 32-bit mode
+#[repr(C, packed)]
 struct IdtPointer {
     limit: u16,
-    base: u32,
+    base: u64,
 }
+
+static mut IDT_PTR: IdtPointer = IdtPointer {
+    limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
+    base: 0,
+};
 
 #[repr(C, align(4096))]
 struct PageTable {
@@ -40,15 +49,30 @@ struct PageTables {
     pml4: PageTable,
     pdpt: PageTable,
     pd: PageTable,
-    pt: PageTable,
 }
 
 static mut PAGE_TABLES: PageTables = PageTables {
     pml4: PageTable { entries: [0; 512] },
     pdpt: PageTable { entries: [0; 512] },
     pd: PageTable { entries: [0; 512] },
-    pt: PageTable { entries: [0; 512] },
 };
+
+unsafe fn setup_idt() {
+    // Set up timer interrupt handler
+    let handler = timer_interrupt_handler as u64;
+    IDT[0x20].offset_low = handler as u16;
+    IDT[0x20].segment = 0x08; // Code segment
+    IDT[0x20].ist = 0;
+    IDT[0x20].flags = 0x8E;   // Present, Ring 0, Interrupt Gate
+    IDT[0x20].offset_mid = (handler >> 16) as u16;
+    IDT[0x20].offset_high = (handler >> 32) as u32;
+
+    // Set IDT pointer
+    IDT_PTR.base = &IDT as *const _ as u64;
+
+    // Load IDT
+    core::arch::asm!("lidt [{0}]", in(reg) &IDT_PTR);
+}
 
 unsafe fn setup_page_tables() {
     // Zero out all tables first
@@ -78,34 +102,8 @@ pub struct StageInfo {
     flags: u32,
 }
 
-
-
-static mut IDT: Idt = Idt {
-    entries: {
-        const EMPTY_ENTRY: IdtEntry = IdtEntry {
-            offset_low: 0,
-            segment_selector: 0x08,
-            ist: 0,
-            flags: 0x8E,
-            offset_middle: 0,
-            offset_high: 0,
-            reserved: 0,
-        };
-        [EMPTY_ENTRY; 256]
-    }
-};
-
 static mut STACK: Stack = Stack {
     data: [0; 4096]
-};
-
-#[allow(dead_code)]
-static mut STAGE_INFO: StageInfo = StageInfo {
-    boot_drive: 0,
-    memory_map_addr: 0,
-    memory_entries: 0,
-    stage2_load_addr: 0x7E00,
-    flags: 0,
 };
 
 // Function implementations
@@ -373,28 +371,27 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
     // Disable interrupts until we're ready
-    core::arch::asm!("cli");
+    core::arch::asm!(".code32", "cli");
 
-    // Clear segment registers
+    // Set up GDT first
+    setup_gdt();
+
+    // Load GDT
     core::arch::asm!(
         ".code32",
-        "xor ax, ax",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov ss, ax",
-        "mov fs, ax",
-        "mov gs, ax",
+        "lgdt [{0:e}]",
+        in(reg) &raw const GDT_PTR,
     );
 
-    // Set up paging
+    // Set up page tables
     setup_page_tables();
 
-    // Load CR3 with PML4 address
+    // Load CR3
     core::arch::asm!(
         ".code32",
-        "mov eax, {pml4:e}",
+        "mov eax, {0:e}",
         "mov cr3, eax",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+        in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
     );
 
     // Enable PAE and PSE
@@ -410,14 +407,11 @@ pub unsafe extern "C" fn _start() -> ! {
         ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or eax, (1 << 8)",    // LME
-                     "wrmsr",
+        "or eax, 0x100",       // LME
+        "wrmsr",
     );
 
-    // Set up GDT and load it
-    setup_gdt();
-
-    // Enable paging and protection
+    // Enable paging
     core::arch::asm!(
         ".code32",
         "mov eax, cr0",
@@ -428,35 +422,51 @@ pub unsafe extern "C" fn _start() -> ! {
     // Jump to 64-bit mode
     core::arch::asm!(
         ".code32",
-        "lgdt [{gdt:e}]",
-        "push dword ptr 0x08",  // Code segment
-        "lea eax, [2f]",
-        "push eax",
-        "retf",
+        "jmp 0x08:2f",    // Far jump with new code segment
         "2:",
         ".code64",
-        // Load data segment registers
-        "mov ax, 0x10",
+        "mov ax, 0x10",   // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
+
         // Set up stack
-        "mov rsp, {stack}",
+        "mov rsp, {0}",
         "mov rbp, rsp",
+
         // Set up IDT
-        "call {setup_idt}",
+        "call {1}",
+
+        // Remap and initialize PIC
+        "call {2}",
+
         // Enable interrupts
         "sti",
+
         // Jump to Rust main
-        "jmp {main}",
-        gdt = in(reg) &raw const GDT_PTR,
-                     stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
-                     setup_idt = sym setup_idt,
-                     main = sym rust_main,
+        "jmp {3}",
+        in(reg) &raw const STACK.data as *const _ as u64 + 4096,
+                     sym setup_idt,
+                     sym setup_pic,
+                     sym rust_main,
                      options(noreturn),
     );
+}
+
+#[naked]
+extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
+    unsafe {
+        core::arch::naked_asm!(
+            ".code64",
+            "push rax",
+            "mov al, 0x20",
+            "out 0x20, al",
+            "pop rax",
+            "iretq",
+        );
+    }
 }
 
 #[no_mangle]
