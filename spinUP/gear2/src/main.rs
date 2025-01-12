@@ -57,48 +57,41 @@ struct GdtPointer {
 
 static mut GDT: [GdtEntry; 5] = [
     // Null descriptor
+    GdtEntry::null(),
+    // Kernel code (64-bit)
     GdtEntry {
         limit_low: 0,
         base_low: 0,
         base_middle: 0,
-        access: 0,
-        granularity: 0,
+        access: 0x9A,       // Present, Ring 0, Code, Executable, Readable
+        granularity: 0x20,  // Long mode
         base_high: 0,
     },
-// Kernel code (64-bit)
-GdtEntry {
-    limit_low: 0xFFFF,
-    base_low: 0,
-    base_middle: 0,
-    access: 0x9A,       // Present, Ring 0, Code, Readable
-    granularity: 0x20,  // Long mode
-    base_high: 0,
-},
 // Kernel data
 GdtEntry {
-    limit_low: 0xFFFF,
+    limit_low: 0,
     base_low: 0,
     base_middle: 0,
     access: 0x92,      // Present, Ring 0, Data, Writable
-    granularity: 0,
+    granularity: 0,    // Byte granularity
     base_high: 0,
 },
 // User code (64-bit)
 GdtEntry {
-    limit_low: 0xFFFF,
+    limit_low: 0,
     base_low: 0,
     base_middle: 0,
-    access: 0xFA,      // Present, Ring 3, Code, Readable
+    access: 0xFA,      // Present, Ring 3, Code, Executable, Readable
     granularity: 0x20, // Long mode
     base_high: 0,
 },
 // User data
 GdtEntry {
-    limit_low: 0xFFFF,
+    limit_low: 0,
     base_low: 0,
     base_middle: 0,
     access: 0xF2,      // Present, Ring 3, Data, Writable
-    granularity: 0,
+    granularity: 0,    // Byte granularity
     base_high: 0,
 },
 ];
@@ -148,7 +141,8 @@ static mut IDT_PTR: IdtDescriptor = IdtDescriptor {
 
 // Setup functions
 unsafe fn setup_gdt() {
-    GDT_PTR.base = &GDT as *const _ as u64;
+    // Use raw const for static references
+    GDT_PTR.base = &raw const GDT as *const _ as u64;
 }
 
 unsafe fn setup_idt() {
@@ -161,21 +155,35 @@ unsafe fn setup_idt() {
     IDT[0x20].offset_mid = (handler >> 16) as u16;
     IDT[0x20].offset_high = (handler >> 32) as u32;
 
-    // Set IDT pointer
-    IDT_PTR.base = &IDT as *const _ as u64;
+    // Set IDT pointer using raw const
+    IDT_PTR.base = &raw const IDT as *const _ as u64;
 
     // Load IDT
-    core::arch::asm!("lidt [{0}]", in(reg) &IDT_PTR);
+    core::arch::asm!("lidt [{0}]", in(reg) &raw const IDT_PTR);
 }
 
 
 unsafe fn setup_page_tables() {
+    // Clear tables first
+    core::ptr::write_bytes(&raw mut PAGE_TABLES as *mut _, 0, 1);
 
-    core::ptr::write_bytes(&mut PAGE_TABLES as *mut _, 0, 1);
+    // Set up identity mapping for first 1GB
+    // PML4 -> PDPT
+    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
 
-    // Similar fixes needed for other raw pointer casts
-    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
-    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3;
+    // PDPT -> PD
+    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
+
+    // PD -> 2MB pages
+    for i in 0..512 {
+        PAGE_TABLES.pd.entries[i] = (i as u64 * 0x200000) | 0x83; // Present + Write + Huge
+    }
+
+    // Load CR3 with PML4 address
+    core::arch::asm!(
+        "mov cr3, {0}",
+        in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u64
+    );
 }
 
 unsafe fn setup_pic() {
@@ -313,7 +321,7 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: Interrupt
         "mov al, 0x20",
         "out 0x20, al",  // Send EOI to PIC
         "pop rax",
-        "iretq",
+        "iretq"
     );
 }
 
