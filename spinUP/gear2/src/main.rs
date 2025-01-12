@@ -256,7 +256,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov cr0, eax",
     );
 
-    // Jump to 64-bit mode - Fix the problematic jump
+    // Jump to 64-bit mode with fixed stack pointer calculation
     core::arch::asm!(
         ".code32",
         "jmp {0}, {1}",
@@ -269,7 +269,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov gs, ax",
         "mov ss, ax",
 
-        // Set up stack
+        // Set up stack with proper type casting
         "mov rsp, {2}",
         "mov rbp, rsp",
 
@@ -286,7 +286,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "jmp {5}",
         const 0x08,        // Code segment selector
         sym long_mode_start,
-        in(reg) &STACK.data as *const _ as u64 + STACK_SIZE,
+        in(reg) (&STACK.data as *const _ as u64) + (STACK_SIZE as u64), // Fixed type casting
                      sym setup_idt,
                      sym setup_pic,
                      sym rust_main,
