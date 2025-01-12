@@ -109,8 +109,8 @@ static mut GDT_PTR: GdtPointer = GdtPointer {
 };
 
 // IDT structures
+#[derive(Copy, Clone)]
 #[repr(C, packed)]
-#[derive(Copy, Clone)]  // Add these derives
 struct IdtEntry {
     offset_low: u16,
     segment: u16,
@@ -121,21 +121,21 @@ struct IdtEntry {
     reserved: u32,
 }
 
-#[repr(C, packed)]
-struct IdtPointer {
-    limit: u16,
-    base: u64,
+impl IdtEntry {
+    const fn new() -> Self {
+        IdtEntry {
+            offset_low: 0,
+            segment: 0,
+            ist: 0,
+            flags: 0,
+            offset_mid: 0,
+            offset_high: 0,
+            reserved: 0,
+        }
+    }
 }
 
-static mut IDT: [IdtEntry; 256] = core::array::from_fn(|_| IdtEntry {
-    offset_low: 0,
-    segment: 0,
-    ist: 0,
-    flags: 0,
-    offset_mid: 0,
-    offset_high: 0,
-    reserved: 0,
-});
+static mut IDT: [IdtEntry; 256] = [IdtEntry::new(); 256];
 
 static mut IDT_PTR: IdtPointer = IdtPointer {
     limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
@@ -144,9 +144,6 @@ static mut IDT_PTR: IdtPointer = IdtPointer {
 
 // Setup functions
 unsafe fn setup_gdt() {
-    // The current line has a syntax error
-    GDT_PTR.base = &raw const GDT as *const _ as u64;
-    // Should be:
     GDT_PTR.base = &GDT as *const _ as u64;
 }
 
@@ -168,9 +165,7 @@ unsafe fn setup_idt() {
 }
 
 unsafe fn setup_page_tables() {
-    // The current raw pointer syntax is incorrect
-    core::ptr::write_bytes(&raw mut PAGE_TABLES as *mut _, 0, 1);
-    // Should be:
+
     core::ptr::write_bytes(&mut PAGE_TABLES as *mut _, 0, 1);
 
     // Similar fixes needed for other raw pointer casts
@@ -217,7 +212,7 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         ".code32",
         "lgdt [{0:e}]",
-        in(reg) &raw const GDT_PTR,
+        in(reg) &GDT_PTR,
     );
 
     // Set up page tables
@@ -284,7 +279,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
         // Jump to Rust main
         "jmp {3}",
-        in(reg) &raw const STACK.data as *const _ as u64 + 4096,
+        in(reg) &STACK.data as *const _ as u64 + 4096,
                      sym setup_idt,
                      sym setup_pic,
                      sym rust_main,
@@ -294,7 +289,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
 #[naked]
 unsafe extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    core::arch::asm!(
+    core::arch::naked_asm!(
         "push rax",
         "mov al, 0x20",
         "out 0x20, al",  // Send EOI to PIC
