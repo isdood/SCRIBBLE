@@ -1,8 +1,6 @@
 // lib/unstable_matter/src/unstable_vectrix.rs
 
-#![no_std]
-
-use crate::UnstableMatter;
+use crate::unstable_matter::UnstableMatter;
 
 pub struct UnstableVectrix<T> {
     base: UnstableMatter<T>,

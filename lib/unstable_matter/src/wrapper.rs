@@ -1,9 +1,7 @@
-// src/wrapper.rs
+// lib/unstable_matter/src/wrapper.rs
 
-mod unstable_matter;
-mod unstable_vectrix;
-
-use unstable_vectrix::UnstableVectrix;
+use crate::unstable_matter::UnstableMatter;
+use crate::unstable_vectrix::UnstableVectrix;
 
 pub struct Wrapper<T> {
     vectrix: UnstableVectrix<T>,

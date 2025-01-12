@@ -21,8 +21,6 @@
 //! - **Documentation**: Clearly document all unsafe code and the reasons for its use to help maintainers understand the context.
 //! - **Concurrency**: Carefully handle concurrent access to volatile memory to avoid data races and ensure thread safety.
 
-#![no_std]
-
 pub struct UnstableMatter<T> {
     ptr: *mut T,
 }
