@@ -1,5 +1,5 @@
 // src/main.rs
-// Last updated: 2025-01-12 11:06:00 EST
+// Last updated: 2025-01-12 11:14 EST
 // Author: Caleb J.D. Terkovics
 
 #![no_std]
@@ -178,10 +178,11 @@ unsafe fn setup_gdt() {
     // Initialize GDT pointer
     GDT_PTR.base = &raw const GDT as *const _ as u64;
 
-    // Load GDT
+    // Load GDT - using eax in 32-bit mode
     core::arch::asm!(
         ".code32",
-        "lgdt [{0}]",
+        "lea eax, [{0}]",
+        "lgdt [eax]",
         in(reg) &raw const GDT_PTR,
     );
 
@@ -230,9 +231,11 @@ unsafe fn setup_page_tables() {
         PAGE_TABLES.pd.entries[i] = (i as u64 * 0x200000) | 0x83; // Present + Write + Huge
     }
 
-    // Load CR3 with PML4 address
+    // Load CR3 with PML4 address - using eax in 32-bit mode
     core::arch::asm!(
-        "mov cr3, {0}",
+        ".code32",
+        "mov eax, {0:e}",
+        "mov cr3, eax",
         in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u64
     );
 }
