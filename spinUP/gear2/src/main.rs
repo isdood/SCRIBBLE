@@ -376,6 +376,48 @@ unsafe fn setup_long_mode() {
     );
 }
 
+unsafe fn setup_idt() {
+    // Set up timer interrupt handler (IRQ0 -> INT 0x20)
+    IDT.entries[0x20] = IDTEntry {
+        offset_low: (timer_interrupt_handler as usize & 0xFFFF) as u16,
+        segment: 0x08,  // Code segment
+        flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
+        offset_middle: ((timer_interrupt_handler as usize >> 16) & 0xFFFF) as u16,
+        offset_high: (timer_interrupt_handler as usize >> 32) as u32,
+        reserved: 0
+    };
+
+    // Set up IDT pointer
+    let idtr = GDTPointer {
+        limit: (core::mem::size_of::<IDT>() - 1) as u16,
+        base: &raw const IDT as *const _ as u64,  // Changed from u32 to u64
+    };
+
+    core::arch::asm!(
+        "lidt [{0}]",
+        in(reg) &idtr,
+                     options(readonly, nostack)
+    );
+
+    // Load IDT
+    core::arch::asm!(
+        "lidt [{0}]",
+        in(reg) &idtr,
+                     options(readonly, nostack)
+    );
+
+    let idtr = GDTPointer {
+        limit: (core::mem::size_of::<IDT>() - 1) as u16,
+        base: &raw const IDT as *const _ as u64,  // Changed from u32 to u64
+    };
+
+    core::arch::asm!(
+        "lidt [{0}]",
+        in(reg) &idtr,
+                     options(readonly, nostack)
+    );
+}
+
 unsafe fn setup_pic() {
     // Initialize PIC
     core::arch::asm!(
@@ -566,16 +608,13 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Jump to long mode with a label > 1
     core::arch::asm!(
-        // Use Intel syntax
-        ".intel_syntax noprefix",
-        "push 08h",           // Code segment
-        "lea eax, [rel 2f]",  // Get address of label 2
+        "push 0x08",          // Code segment
+        "lea eax, [2f]",      // Get address of label 2
         "push eax",
         "retf",               // Far return
         "2:",
-        ".att_syntax prefix", // Switch back to AT&T for consistency
         ".code64",
-        "mov ax, 10h",       // Data segment
+        "mov ax, 0x10",       // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
@@ -595,52 +634,9 @@ pub unsafe extern "C" fn _start() -> ! {
     );
 }
 
-unsafe fn setup_idt() {
-    // Set up timer interrupt handler (IRQ0 -> INT 0x20)
-    IDT.entries[0x20] = IDTEntry {
-        offset_low: (timer_interrupt_handler as usize & 0xFFFF) as u16,
-        segment: 0x08,  // Code segment
-        flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
-        offset_middle: ((timer_interrupt_handler as usize >> 16) & 0xFFFF) as u16,
-        offset_high: (timer_interrupt_handler as usize >> 32) as u32,
-        reserved: 0
-    };
-
-    // Set up IDT pointer
-    let idtr = GDTPointer {
-        limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &raw const IDT as *const _ as u64,  // Changed from u32 to u64
-    };
-
-    core::arch::asm!(
-        "lidt [{0}]",
-        in(reg) &idtr,
-                     options(readonly, nostack)
-    );
-
-    // Load IDT
-    core::arch::asm!(
-        "lidt [{0}]",
-        in(reg) &idtr,
-                     options(readonly, nostack)
-    );
-
-    let idtr = GDTPointer {
-        limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &raw const IDT as *const _ as u64,  // Changed from u32 to u64
-    };
-
-    core::arch::asm!(
-        "lidt [{0}]",
-        in(reg) &idtr,
-                     options(readonly, nostack)
-    );
-}
-
 #[naked]
 unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
     core::arch::naked_asm!(
-        ".intel_syntax noprefix",
         // Save registers
         "push rax",
         "push rcx",
@@ -659,8 +655,8 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
         "push r15",
 
         // Send EOI to PIC
-        "mov al, 20h",
-        "out 20h, al",
+        "mov al, 0x20",
+        "out 0x20, al",
 
         // Restore registers
         "pop r15",
@@ -680,8 +676,6 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
         "pop rax",
 
         "iretq",
-        ".att_syntax prefix",
-        options(nostack)
     );
 }
 
