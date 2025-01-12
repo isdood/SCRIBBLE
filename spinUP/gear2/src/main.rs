@@ -30,7 +30,7 @@ struct IdtPointer {
     base: u32,
 }
 
-#[repr(C)]
+#[repr(C, align(4096))]
 struct PageTable {
     entries: [u64; 512]
 }
@@ -51,21 +51,17 @@ static mut PAGE_TABLES: PageTables = PageTables {
 };
 
 unsafe fn setup_page_tables() {
-    // First clear all tables
+    // Zero out all tables first
     core::ptr::write_bytes(&raw mut PAGE_TABLES as *mut _, 0, 1);
 
-    // Identity map first 2MB with a single 2MB page
+    // Set up identity mapping for first 1GB using 2MB pages
     PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
     PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
-    PAGE_TABLES.pd.entries[0] = 0x83; // Present + writable + huge page (2MB)
 
-    // Load CR3 with PML4 address
-    core::arch::asm!(
-        ".code32",
-        "mov eax, {pml4:e}",
-        "mov cr3, eax",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-    );
+    // Map first 1GB with 2MB pages
+    for i in 0..512 {
+        PAGE_TABLES.pd.entries[i] = (i as u64 * 0x200000) | 0x83; // Present + writable + huge
+    }
 }
 
 #[repr(C, align(4096))]
@@ -348,7 +344,8 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
             "push r14",
             "push r15",
 
-            "mov al, 0x20",  // EOI
+            // EOI to PIC
+            "mov al, 0x20",
             "out 0x20, al",
 
             "pop r15",
@@ -374,88 +371,86 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    // Disable interrupts
+    // Disable interrupts until we're ready
     core::arch::asm!("cli");
 
     // Clear segment registers
     core::arch::asm!(
-        ".code32",
         "xor ax, ax",
         "mov ds, ax",
         "mov es, ax",
+        "mov ss, ax",
         "mov fs, ax",
         "mov gs, ax",
-        "mov ss, ax",
     );
 
     // Set up paging
     setup_page_tables();
 
-    // Enable PAE
+    // Load CR3 with PML4 address
     core::arch::asm!(
-        ".code32",
-        "mov eax, cr4",
-        "or eax, 1 << 5",  // PAE
-        "mov cr4, eax"
+        "mov eax, {pml4:e}",
+        "mov cr3, eax",
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
     );
 
-    // Enable long mode in EFER
+    // Enable PAE and PSE
     core::arch::asm!(
-        ".code32",
+        "mov eax, cr4",
+        "or eax, 0x30",  // PAE | PSE
+        "mov cr4, eax",
+    );
+
+    // Enable long mode
+    core::arch::asm!(
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or eax, 1 << 8",      // LME
-        "wrmsr"
+        "or eax, (1 << 8)",    // LME
+                     "wrmsr",
     );
 
-    // Set up GDT for long mode
+    // Set up GDT and load it
     setup_gdt();
 
-    // Enable paging and protected mode
+    // Enable paging and protection
     core::arch::asm!(
-        ".code32",
         "mov eax, cr0",
-        "or eax, 1 << 31 | 1", // PG | PE
-        "mov cr0, eax"
+        "or eax, 0x80000001",  // PG | PE
+        "mov cr0, eax",
     );
 
-    // Set up IDT after paging is enabled
-    setup_idt();
-
-    // Set up PIC
-    setup_pic();
-
-    // Jump to long mode
+    // Jump to 64-bit mode
     core::arch::asm!(
-        ".code32",
-        "lgdt [{gdt:e}]",     // Use 32-bit register constraint
-        "push 0x08",          // Code segment
-        "lea eax, [2f]",      // Target address, using '2' instead of '1'
-    "push eax",
-    "retf",               // Far return to 64-bit mode
-    "2:",                 // Using '2' as the label
-    ".code64",
-    // Set up segment registers
-    "mov ax, 0x10",       // Data segment
-    "mov ds, ax",
-    "mov es, ax",
-    "mov fs, ax",
-    "mov gs, ax",
-    "mov ss, ax",
-    // Set up stack
-    "mov rsp, {stack}",
-    "mov rbp, rsp",
-    // Enable interrupts
-    "sti",
-    // Jump to Rust main
-    "jmp {main}",
-    gdt = in(reg) &raw const GDT_PTR,
+        "lgdt [{gdt:e}]",
+        "push 0x08",           // Code segment
+        "lea eax, [2f]",
+        "push eax",
+        "retf",
+        "2:",
+        ".code64",
+        // Load data segment registers
+        "mov ax, 0x10",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+        // Set up stack
+        "mov rsp, {stack}",
+        "mov rbp, rsp",
+        // Set up IDT
+        "call {setup_idt}",
+        // Enable interrupts
+        "sti",
+        // Jump to Rust main
+        "jmp {main}",
+        gdt = in(reg) &raw const GDT_PTR,
                      stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
+                     setup_idt = sym setup_idt,
                      main = sym rust_main,
-                     options(noreturn)
+                     options(noreturn),
     );
 }
-
 
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
