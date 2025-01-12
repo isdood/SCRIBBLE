@@ -1,34 +1,37 @@
+// src/memory.rs
 use unstable_matter::unstable_vectrix::{UnstableVectrix, VirtAddr, PhysAddr};
-use spinUP::boot_params::BootParams;
+use crate::page_table::VectorPageTable;
 
-pub struct BootInfoFrameAllocator {
-    memory_map: UnstableVectrix<u8>,
-    memory_map_entries: u32,
+pub struct MemoryManager {
+    page_table: VectorPageTable,
+    heap_start: VirtAddr,
+    heap_size: usize,
 }
 
-impl BootInfoFrameAllocator {
-    pub fn init_from_boot_params(boot_params: &BootParams, phys_offset: u64) -> Self {
-        let memory_map = unsafe {
-            UnstableVectrix::from_phys(
-                PhysAddr::new(boot_params.memory_map_addr as u64),
-                                       (boot_params.memory_map_entries * core::mem::size_of::<u32>() as u32) as usize,
-                                       phys_offset
+impl MemoryManager {
+    pub unsafe fn new(phys_offset: u64, heap_start: u64, heap_size: usize) -> Self {
+        Self {
+            page_table: VectorPageTable::new(phys_offset),
+            heap_start: VirtAddr::new(heap_start),
+            heap_size,
+        }
+    }
+
+    pub fn init_heap(&mut self) -> Result<(), &'static str> {
+        // Initialize heap with vector operations
+        let heap_vec = unsafe {
+            UnstableVectrix::new(
+                self.heap_start.as_u64() as usize,
+                                 self.heap_size,
+                                 0
             )
         };
 
-        BootInfoFrameAllocator {
-            memory_map,
-            memory_map_entries: boot_params.memory_map_entries,
+        // Zero out the heap area
+        for i in 0..self.heap_size {
+            heap_vec.write(i, 0);
         }
+
+        Ok(())
     }
-}
-
-pub unsafe fn active_level_4_table(physical_memory_offset: u64) -> &'static mut UnstableVectrix<u64> {
-    use x86_64::registers::control::Cr3;
-
-    let (level_4_table_frame, _) = Cr3::read();
-    let phys_addr = PhysAddr::new(level_4_table_frame.start_address().as_u64());
-    let virt_addr = phys_addr.to_virt(physical_memory_offset);
-
-    UnstableVectrix::from_virt(virt_addr, 512)
 }
