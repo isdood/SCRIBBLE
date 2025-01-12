@@ -330,7 +330,6 @@ extern "x86-interrupt" fn page_fault_handler() -> ! {
 
             tables = sym PAGE_TABLES,
             pt_offset = const 3 * 4096, // Offset to PT (3 page tables * 4096 bytes each)
-        options(noreturn)
         );
     }
 }
@@ -375,7 +374,6 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
             "pop rax",
 
             "iretq",
-            options(noreturn)
         );
     }
 }
