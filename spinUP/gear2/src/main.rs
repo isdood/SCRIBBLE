@@ -72,17 +72,15 @@ static mut PAGE_TABLES: PageTables = PageTables {
 };
 
 unsafe fn setup_page_tables() {
-    // Identity map first 2MB
+    // First clear all tables
+    core::ptr::write_bytes(&mut PAGE_TABLES as *mut _, 0, 1);
+
+    // Identity map first 2MB with a single 2MB page
     PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
     PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3;
-    PAGE_TABLES.pd.entries[0] = (&PAGE_TABLES.pt as *const _ as u64) | 0x3;
+    PAGE_TABLES.pd.entries[0] = 0x83; // Present + writable + huge page (2MB)
 
-    // Map first 2MB with 4KB pages
-    for i in 0..512 {
-        PAGE_TABLES.pt.entries[i] = (i as u64 * 0x1000) | 0x3; // Present + writable
-    }
-
-    // Ensure CR3 points to PML4
+    // Load CR3 with PML4 address
     core::arch::asm!(
         ".code32",
         "mov eax, {pml4:e}",
@@ -265,6 +263,7 @@ unsafe fn setup_pic() {
 extern "x86-interrupt" fn page_fault_handler() -> ! {
     unsafe {
         core::arch::naked_asm!(
+            "cli",              // Disable interrupts
             "push rax",
             "push rcx",
             "push rdx",
@@ -281,12 +280,9 @@ extern "x86-interrupt" fn page_fault_handler() -> ! {
             "push r14",
             "push r15",
 
-            // Get faulting address from CR2
-            "mov rdi, cr2",
-            "mov rsi, rsp",    // Save original stack pointer
-            "and rsp, ~0xF",   // Align stack to 16 bytes
+            "mov rdi, cr2",     // Get fault address
+            "mov rsi, [rsp+120]", // Get error code
             "call {handle_fault}",
-            "mov rsp, rsi",    // Restore original stack pointer
 
             "pop r15",
             "pop r14",
@@ -304,7 +300,8 @@ extern "x86-interrupt" fn page_fault_handler() -> ! {
             "pop rcx",
             "pop rax",
 
-            "add rsp, 8",     // Pop error code
+            "add rsp, 8",      // Remove error code
+            "sti",             // Re-enable interrupts
             "iretq",
             handle_fault = sym handle_page_fault,
         );
@@ -312,13 +309,14 @@ extern "x86-interrupt" fn page_fault_handler() -> ! {
 }
 
 #[no_mangle]
-extern "C" fn handle_page_fault(fault_addr: u64) {
+extern "C" fn handle_page_fault(fault_addr: u64, error_code: u64) {
     unsafe {
-        let pt_idx = (fault_addr >> 12) & 0x1FF;
-        PAGE_TABLES.pt.entries[pt_idx as usize] = (fault_addr & !0xFFF) | 0x3;
-
-        // Invalidate TLB for this address
-        core::arch::asm!("invlpg [{}]", in(reg) fault_addr);
+        // Only handle page-not-present faults
+        if error_code & 1 == 0 {
+            let pd_idx = (fault_addr >> 21) & 0x1FF;
+            PAGE_TABLES.pd.entries[pd_idx as usize] = ((fault_addr & !0x1FFFFF) | 0x83);
+            core::arch::asm!("invlpg [{}]", in(reg) fault_addr);
+        }
     }
 }
 
@@ -368,9 +366,10 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
+    // Disable interrupts
     core::arch::asm!("cli");
 
-    // Clear all segment registers
+    // Clear segment registers
     core::arch::asm!(
         ".code32",
         "xor ax, ax",
@@ -381,15 +380,8 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov ss, ax",
     );
 
+    // Set up paging
     setup_page_tables();
-
-    // Load CR3
-    core::arch::asm!(
-        ".code32",
-        "mov eax, {pml4:e}",
-        "mov cr3, eax",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-    );
 
     // Enable PAE
     core::arch::asm!(
@@ -399,7 +391,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov cr4, eax"
     );
 
-    // Enable Long Mode
+    // Enable long mode in EFER
     core::arch::asm!(
         ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
@@ -408,10 +400,10 @@ pub unsafe extern "C" fn _start() -> ! {
         "wrmsr"
     );
 
+    // Set up GDT for long mode
     setup_gdt();
-    setup_idt();
 
-    // Enable paging and protection
+    // Enable paging and protected mode
     core::arch::asm!(
         ".code32",
         "mov eax, cr0",
@@ -419,37 +411,43 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov cr0, eax"
     );
 
+    // Set up IDT after paging is enabled
+    setup_idt();
+
+    // Set up PIC
     setup_pic();
 
-    // Switch to long mode
+    // Jump to long mode
     core::arch::asm!(
         ".code32",
-        "push 0x08",         // Code segment
-        "lea eax, [2f]",     // Target address
+        "lgdt [{gdt}]",        // Load GDT
+        "push 0x08",           // Code segment
+        "lea eax, [1f]",       // Target address
         "push eax",
-        "retf",              // Far return to 64-bit mode
-
-        "2:",
+        "retf",                // Far return to 64-bit mode
+        "1:",
         ".code64",
-        "mov ax, 0x10",      // Data segment
+        // Set up segment registers
+        "mov ax, 0x10",        // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
-
+        // Set up stack
         "mov rsp, {stack}",
         "mov rbp, rsp",
-
-        "sti",               // Enable interrupts
-
-        "jmp {target}",
-
-        stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
-                     target = sym rust_main,
+        // Enable interrupts
+        "sti",
+        // Jump to Rust main
+        "jmp {main}",
+        gdt = in(reg) &GDT_PTR,
+                     stack = in(reg) &STACK.data as *const _ as u64 + 4096,
+                     main = sym rust_main,
                      options(noreturn)
     );
 }
+
 
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
