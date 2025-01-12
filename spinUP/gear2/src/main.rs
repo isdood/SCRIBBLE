@@ -1,5 +1,5 @@
 // src/main.rs
-// Last updated: 2025-01-12 04:19:12 UTC
+// Last updated: 2025-01-12 04:29:27 UTC
 // Author: isdood
 
 #![no_std]
@@ -38,7 +38,7 @@ impl GdtEntry {
 #[repr(C, packed)]
 struct GdtDescriptor {
     limit: u16,
-    base: u64,
+    base: u32,  // Changed from u64 to u32 for 32-bit mode
 }
 
 // IDT Entry structure
@@ -72,7 +72,7 @@ impl IdtEntry {
 #[repr(C, packed)]
 struct IdtDescriptor {
     limit: u16,
-    base: u64,
+    base: u32,  // Changed from u64 to u32 for 32-bit mode
 }
 
 // Page table structures
@@ -176,14 +176,14 @@ struct InterruptStackFrame {
 
 unsafe fn setup_gdt() {
     // Initialize GDT pointer
-    GDT_PTR.base = &raw const GDT as *const _ as u64;
+    GDT_PTR.base = &raw const GDT as *const _ as u32;
 
     // Load GDT
     core::arch::asm!(
         ".code32",
         "lgdt [{0}]",
         in(reg) &raw const GDT_PTR as *const _ as u32,
-                     options(readonly, nostack),
+                     options(readonly),
     );
 
     // Load segment registers
@@ -195,7 +195,6 @@ unsafe fn setup_gdt() {
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
-        options(nostack),
     );
 }
 
@@ -210,14 +209,14 @@ unsafe fn setup_idt() {
     IDT[0x20].offset_high = (handler >> 32) as u32;
 
     // Set IDT pointer
-    IDT_PTR.base = &raw const IDT as *const _ as u64;
+    IDT_PTR.base = &raw const IDT as *const _ as u32;
 
     // Load IDT
     core::arch::asm!(
-        ".code64",
+        ".code32",
         "lidt [{0}]",
-        in(reg) &raw const IDT_PTR,
-                     options(readonly, nostack),
+        in(reg) &raw const IDT_PTR as *const _ as u32,
+                     options(readonly),
     );
 }
 
@@ -242,13 +241,13 @@ unsafe fn setup_page_tables() {
         ".code32",
         "mov cr3, {0}",
         in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     options(nostack),
     );
 }
 
 unsafe fn setup_pic() {
     // Initialize the PIC
     core::arch::asm!(
+        ".code32",
         "mov al, 0x11",
         "out 0x20, al",  // Master PIC command
         "out 0xA0, al",  // Slave PIC command
@@ -270,18 +269,18 @@ unsafe fn setup_pic() {
     "mov al, 0x00",
     "out 0x21, al",  // Enable all IRQs on master
     "out 0xA1, al",  // Enable all IRQs on slave
-    options(nomem, nostack),
     );
 }
 
 #[naked]
 unsafe extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     core::arch::naked_asm!(
-        "push rax",
+        ".code32",
+        "push eax",
         "mov al, 0x20",
         "out 0x20, al",  // Send EOI to PIC
-        "pop rax",
-        "iretq"
+        "pop eax",
+        "iret"
     );
 }
 
@@ -302,7 +301,6 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, cr4",
         "or eax, 0x20",     // Set PAE bit
         "mov cr4, eax",
-        options(nostack),
     );
 
     // Enable long mode
@@ -312,7 +310,6 @@ pub unsafe extern "C" fn _start() -> ! {
         "rdmsr",
         "or eax, 0x100",       // Set LME bit
         "wrmsr",
-        options(nostack),
     );
 
     // Enable paging and protected mode
@@ -321,7 +318,6 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, cr0",
         "or eax, 0x80000001",  // Set PG and PE bits
         "mov cr0, eax",
-        options(nostack),
     );
 
     // Far jump to 64-bit mode
