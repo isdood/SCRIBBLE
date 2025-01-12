@@ -150,22 +150,9 @@ struct IdtPointer {
 }
 
 unsafe fn setup_idt() {
-    // Set up timer interrupt handler
-    let handler_addr = timer_interrupt_handler as u64;
-    IDT.entries[32] = IdtEntry {
-        offset_low: (handler_addr & 0xFFFF) as u16,
-        segment_selector: 0x08,  // Code segment
-        ist: 0,
-        flags: 0x8E,  // Present, Ring 0, Interrupt Gate
-        offset_middle: ((handler_addr >> 16) & 0xFFFF) as u16,
-        offset_high: (handler_addr >> 32) as u32,
-        reserved: 0,
-    };
-
-    // Load IDT
     let idt_ptr = IdtPointer {
         limit: (core::mem::size_of::<Idt>() - 1) as u16,
-        base: &IDT as *const _ as u64,
+        base: &raw const IDT as *const _ as u64,
     };
 
     core::arch::asm!(
@@ -183,7 +170,7 @@ struct GDTPointer {
 unsafe fn setup_gdt() {
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: &GDT as *const _ as u64,
+        base: &raw const GDT as *const _ as u64,
     };
 
     core::arch::asm!(
@@ -568,7 +555,7 @@ pub unsafe extern "C" fn _start() -> ! {
     // Disable interrupts during setup
     core::arch::asm!("cli");
 
-    // Clear all segment registers to ensure we're in a known state
+    // Clear all segment registers
     core::arch::asm!(
         ".code32",
         "xor ax, ax",
@@ -585,9 +572,9 @@ pub unsafe extern "C" fn _start() -> ! {
     // Load CR3 with PML4 table address
     core::arch::asm!(
         ".code32",
-        "mov eax, {pml4}",
+        "mov eax, {pml4:e}",  // Use :e format specifier for 32-bit register
         "mov cr3, eax",
-        pml4 = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
     );
 
     // Enable PAE
@@ -629,13 +616,13 @@ pub unsafe extern "C" fn _start() -> ! {
         ".code32",
         // Push the code segment and target address
         "push 0x08",           // Code segment selector
-        "lea eax, [1f]",       // Get address of label 1
+        "lea eax, [long_mode_start]", // Get address of label
         "push eax",
         "retf",                // Far return to 64-bit code
 
         // 64-bit code starts here
+        "long_mode_start:",    // Changed from "1:" to descriptive label
         ".code64",
-        "1:",
         // Load 64-bit segment selectors
         "mov ax, 0x10",
         "mov ds, ax",
@@ -654,7 +641,7 @@ pub unsafe extern "C" fn _start() -> ! {
         // Jump to Rust main
         "jmp {target}",
 
-        stack = in(reg) &STACK.data as *const _ as u64 + 4096,
+        stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
                      target = sym rust_main,
                      options(noreturn)
     );
