@@ -24,10 +24,10 @@ struct Idt {
     entries: [IdtEntry; 256]
 }
 
-#[repr(C, packed)]
+#[repr(C, packed(4))]  // Ensure 4-byte alignment for 32-bit mode
 struct IdtPointer {
     limit: u16,
-    base: u32,  // Changed to u32 for 32-bit mode
+    base: u32,
 }
 
 #[repr(C, packed)]
@@ -45,10 +45,10 @@ struct GDTTable {
     entries: [GDTEntry; 3]
 }
 
-#[repr(C, packed)]
+#[repr(C, packed(4))]  // Ensure 4-byte alignment for 32-bit mode
 struct GDTPointer {
     limit: u16,
-    base: u32,  // Changed to u32 for 32-bit mode
+    base: u32,
 }
 
 #[repr(C)]
@@ -159,12 +159,13 @@ unsafe fn setup_idt() {
 
     let idt_ptr = IdtPointer {
         limit: (core::mem::size_of::<Idt>() - 1) as u16,
-        base: &raw const IDT as *const _ as u32,  // Changed to u32
+        base: &raw const IDT as *const _ as u32,
     };
 
     core::arch::asm!(
         ".code32",
-        "lidt [{0}]",
+        // Use explicit operand size prefix and 32-bit register
+        "lidt [{0:e}]",  // :e specifies 32-bit register
         in(reg) &idt_ptr
     );
 }
@@ -172,12 +173,13 @@ unsafe fn setup_idt() {
 unsafe fn setup_gdt() {
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: &raw const GDT as *const _ as u32,  // Changed to u32
+        base: &raw const GDT as *const _ as u32,
     };
 
     core::arch::asm!(
         ".code32",
-        "lgdt [{0}]",
+        // Use explicit operand size prefix and 32-bit register
+        "lgdt [{0:e}]",  // :e specifies 32-bit register
         in(reg) &gdt_ptr
     );
 }
