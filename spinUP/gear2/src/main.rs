@@ -328,6 +328,7 @@ extern "C" fn handle_page_fault(fault_addr: u64, error_code: u64) {
 extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
     unsafe {
         core::arch::naked_asm!(
+            ".code64",
             "push rax",
             "push rcx",
             "push rdx",
@@ -376,6 +377,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Clear segment registers
     core::arch::asm!(
+        ".code32",
         "xor ax, ax",
         "mov ds, ax",
         "mov es, ax",
@@ -389,6 +391,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Load CR3 with PML4 address
     core::arch::asm!(
+        ".code32",
         "mov eax, {pml4:e}",
         "mov cr3, eax",
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
@@ -396,6 +399,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Enable PAE and PSE
     core::arch::asm!(
+        ".code32",
         "mov eax, cr4",
         "or eax, 0x30",  // PAE | PSE
         "mov cr4, eax",
@@ -403,6 +407,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Enable long mode
     core::arch::asm!(
+        ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
         "or eax, (1 << 8)",    // LME
@@ -414,6 +419,7 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Enable paging and protection
     core::arch::asm!(
+        ".code32",
         "mov eax, cr0",
         "or eax, 0x80000001",  // PG | PE
         "mov cr0, eax",
@@ -421,8 +427,9 @@ pub unsafe extern "C" fn _start() -> ! {
 
     // Jump to 64-bit mode
     core::arch::asm!(
+        ".code32",
         "lgdt [{gdt:e}]",
-        "push 0x08",           // Code segment
+        "push dword ptr 0x08",  // Code segment
         "lea eax, [2f]",
         "push eax",
         "retf",
