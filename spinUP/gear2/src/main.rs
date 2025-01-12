@@ -678,8 +678,7 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
             "pop rcx",
             "pop rax",
 
-            "iretq",
-            options(noreturn)
+            "iretq"  // Remove options(noreturn)
         );
     }
 }
