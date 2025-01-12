@@ -528,21 +528,16 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
+#[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
     // Disable interrupts first
     core::arch::asm!("cli");
 
-    // Initialize serial for debugging
-    init_serial();
-    write_serial(b"Starting boot sequence...\r\n");
-
     // Set up IDT
     setup_idt();
-    write_serial(b"IDT setup complete\r\n");
 
     // Set up page tables
     setup_page_tables();
-    write_serial(b"Page tables initialized\r\n");
 
     // Enable PAE
     core::arch::asm!(
@@ -550,7 +545,6 @@ pub unsafe extern "C" fn _start() -> ! {
         "or eax, 1 << 5",  // PAE
         "mov cr4, eax",
     );
-    write_serial(b"PAE enabled\r\n");
 
     // Set up long mode
     core::arch::asm!(
@@ -559,11 +553,9 @@ pub unsafe extern "C" fn _start() -> ! {
         "or eax, 1 << 8",      // LME
         "wrmsr",
     );
-    write_serial(b"Long mode set in EFER\r\n");
 
     // Load GDT
     setup_gdt();
-    write_serial(b"GDT loaded\r\n");
 
     // Enable paging
     core::arch::asm!(
@@ -571,17 +563,19 @@ pub unsafe extern "C" fn _start() -> ! {
         "or eax, 0x80000001",  // PG + PE
         "mov cr0, eax",
     );
-    write_serial(b"Paging enabled\r\n");
 
-    // Jump to long mode
+    // Jump to long mode with a label > 1
     core::arch::asm!(
-        "push 0x08",          // Code segment
-        "mov eax, 2f",        // Get address of label 2
+        // Use Intel syntax
+        ".intel_syntax noprefix",
+        "push 08h",           // Code segment
+        "lea eax, [rel 2f]",  // Get address of label 2
         "push eax",
         "retf",               // Far return
         "2:",
+        ".att_syntax prefix", // Switch back to AT&T for consistency
         ".code64",
-        "mov rax, 0x10",      // Data segment
+        "mov ax, 10h",       // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
@@ -646,7 +640,8 @@ unsafe fn setup_idt() {
 #[naked]
 unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
     core::arch::naked_asm!(
-        // Save all registers, not just some
+        ".intel_syntax noprefix",
+        // Save registers
         "push rax",
         "push rcx",
         "push rdx",
@@ -667,7 +662,7 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
         "mov al, 20h",
         "out 20h, al",
 
-        // Restore all registers in reverse order
+        // Restore registers
         "pop r15",
         "pop r14",
         "pop r13",
@@ -685,6 +680,8 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
         "pop rax",
 
         "iretq",
+        ".att_syntax prefix",
+        options(nostack)
     );
 }
 
