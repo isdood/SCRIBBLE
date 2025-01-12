@@ -8,6 +8,78 @@ mod serial;
 use serial::SerialPort;
 use unstable_matter::UnstableMatter;
 
+// Struct definitions
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct IdtEntry {
+    offset_low: u16,
+    segment_selector: u16,
+    ist: u8,
+    flags: u8,
+    offset_middle: u16,
+    offset_high: u32,
+    reserved: u32,
+}
+
+#[repr(align(16))]
+struct Idt {
+    entries: [IdtEntry; 256]
+}
+
+#[repr(C, packed)]
+struct IdtPointer {
+    limit: u16,
+    base: u64,
+}
+
+#[repr(C, packed)]
+struct GDTEntry {
+    limit_low: u16,
+    base_low: u16,
+    base_middle: u8,
+    access: u8,
+    granularity: u8,
+    base_high: u8,
+}
+
+#[repr(C, packed)]
+struct GDTTable {
+    entries: [GDTEntry; 3]
+}
+
+#[repr(C, packed)]
+struct GDTPointer {
+    limit: u16,
+    base: u64,
+}
+
+#[repr(C)]
+struct PageTable {
+    entries: [u64; 512]
+}
+
+#[repr(C, align(4096))]
+struct PageTables {
+    pml4: PageTable,
+    pdpt: PageTable,
+    pd: PageTable,
+}
+
+#[repr(C, align(4096))]
+struct Stack {
+    data: [u8; 4096]
+}
+
+#[repr(C, packed)]
+pub struct StageInfo {
+    boot_drive: u8,
+    memory_map_addr: u32,
+    memory_entries: u16,
+    stage2_load_addr: u32,
+    flags: u32,
+}
+
+// Static definitions
 static mut GDT: GDTTable = GDTTable {
     entries: [
         // Null descriptor
@@ -40,59 +112,6 @@ static mut GDT: GDTTable = GDTTable {
     ]
 };
 
-#[repr(C, packed)]
-struct InterruptStackFrame {
-    instruction_pointer: u64,
-    code_segment: u64,
-    cpu_flags: u64,
-    stack_pointer: u64,
-    stack_segment: u64
-}
-
-#[repr(C)]
-struct PageTable {
-    entries: [u64; 512]
-}
-
-#[repr(C, align(4096))]
-struct PageTables {
-    pml4: PageTable,
-    pdpt: PageTable,
-    pd: PageTable,
-}
-
-#[repr(C, packed)]
-struct DescriptorTablePointer {
-    limit: u16,
-    base: u64,
-}
-
-#[repr(C, align(4096))]
-struct Stack {
-    data: [u8; 4096]
-}
-
-// In both stages
-#[repr(C, packed)]
-pub struct StageInfo {
-    boot_drive: u8,
-    memory_map_addr: u32,
-    memory_entries: u16,
-    stage2_load_addr: u32,
-    flags: u32,
-}
-
-// Use this to pass information between stages
-#[allow(dead_code)]
-static mut STAGE_INFO: StageInfo = StageInfo {
-    boot_drive: 0,
-    memory_map_addr: 0,
-    memory_entries: 0,
-    stage2_load_addr: 0x7E00,
-    flags: 0,
-};
-
-// Initialize the IDT
 static mut IDT: Idt = Idt {
     entries: {
         const EMPTY_ENTRY: IdtEntry = IdtEntry {
@@ -108,6 +127,28 @@ static mut IDT: Idt = Idt {
     }
 };
 
+static mut PAGE_TABLES: PageTables = PageTables {
+    pml4: PageTable { entries: [0; 512] },
+    pdpt: PageTable { entries: [0; 512] },
+    pd: PageTable { entries: [0; 512] },
+};
+
+static mut STACK: Stack = Stack {
+    data: [0; 4096]
+};
+
+#[allow(dead_code)]
+static mut STAGE_INFO: StageInfo = StageInfo {
+    boot_drive: 0,
+    memory_map_addr: 0,
+    memory_entries: 0,
+    stage2_load_addr: 0x7E00,
+    flags: 0,
+};
+
+static mut SERIAL_PORT: Option<SerialPort> = None;
+
+// Function implementations
 unsafe fn setup_idt() {
     // Set up timer interrupt handler
     IDT.entries[32] = IdtEntry {
@@ -144,69 +185,6 @@ unsafe fn setup_gdt() {
     );
 }
 
-static mut PAGE_TABLES: PageTables = PageTables {
-    pml4: PageTable { entries: [0; 512] },
-    pdpt: PageTable { entries: [0; 512] },
-    pd: PageTable { entries: [0; 512] },
-};
-
-static mut STACK: Stack = Stack {
-    data: [0; 4096]
-};
-
-static mut SERIAL_PORT: Option<SerialPort> = None;
-
-// Helper function to safely initialize and use the serial port
-unsafe fn init_serial() {
-    // Directly manipulate the static to avoid any potential UB
-    SERIAL_PORT = Some(SerialPort::new(0x3F8));
-
-    // Get a raw pointer to the inner SerialPort
-    if let Some(ref mut port) = SERIAL_PORT {
-        port.init();
-    }
-}
-
-unsafe fn write_serial(msg: &[u8]) {
-    // Use a raw pointer to access the port
-    if let Some(ref mut port) = SERIAL_PORT {
-        for &b in msg {
-            port.write_byte(b);
-        }
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn rust_main() -> ! {
-    unsafe {
-        let mut vga = UnstableMatter::<u16>::at(0xB8000);
-        let msg = b"Long Mode OK!";
-
-        // Clear screen
-        for _ in 0..80*25 {
-            vga.write(0x0F00);
-        }
-
-        // Write message
-        for (_, &byte) in msg.iter().enumerate() {
-            vga.write(0x0F00 | byte as u16);
-        }
-
-        loop {
-            core::arch::asm!("hlt", options(nomem, nostack));
-        }
-    }
-}
-
-unsafe fn disable_interrupts() {
-    core::arch::asm!(
-        ".code32",
-        "cli",
-        options(nomem, nostack)
-    );
-}
-
-// Update page table setup to use raw pointers
 unsafe fn setup_page_tables() {
     // Clear tables using raw pointers
     let pml4_ptr = &raw mut PAGE_TABLES.pml4.entries[0] as *mut u64;
@@ -223,59 +201,8 @@ unsafe fn setup_page_tables() {
     PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
     PAGE_TABLES.pd.entries[0] = 0x83;  // Map first 2MB with huge pages
 
-    // Flush TLB using 64-bit register
+    // Flush TLB
     core::arch::asm!("mov rax, cr3", "mov cr3, rax");
-}
-
-unsafe fn check_long_mode() -> bool {
-    // Check CPUID presence
-    let mut flags: u32;
-    core::arch::asm!(
-        ".code32",
-        "pushfd",
-        "pop eax",
-        "mov ecx, eax",
-        "xor eax, 1 << 21",
-        "push eax",
-        "popfd",
-        "pushfd",
-        "pop eax",
-        "xor eax, ecx",
-        "shr eax, 21",
-        "and eax, 1",
-        out("eax") flags,
-                     out("ecx") _,
-    );
-
-    if flags == 0 {
-        return false;
-    }
-
-    // Check for extended processor info
-    let max_cpuid: u32;
-    core::arch::asm!(
-        ".code32",
-        "cpuid",
-        inlateout("eax") 0x80000000u32 => max_cpuid,
-                     lateout("ecx") _,
-                     lateout("edx") _,
-    );
-
-    if max_cpuid < 0x80000001 {
-        return false;
-    }
-
-    // Check for long mode support
-    let edx: u32;
-    core::arch::asm!(
-        ".code32",
-        "cpuid",
-        inlateout("eax") 0x80000001u32 => _,
-                     lateout("ecx") _,
-                     lateout("edx") edx,
-    );
-
-    (edx & (1 << 29)) != 0 // LM bit
 }
 
 unsafe fn setup_pic() {
@@ -287,7 +214,7 @@ unsafe fn setup_pic() {
         "out 0x80, al"  // Delay
     );
 
-    // ICW2: vector offset (32 for master, 40 for slave)
+    // ICW2: vector offset
     core::arch::asm!(
         "mov al, 32",
         "out 0x21, al", // Master PIC
@@ -298,14 +225,14 @@ unsafe fn setup_pic() {
 
     // ICW3: cascade configuration
     core::arch::asm!(
-        "mov al, 4",    // Tell Master PIC that there is a slave PIC at IRQ2
+        "mov al, 4",    // Tell Master PIC about slave
         "out 0x21, al",
         "mov al, 2",    // Tell Slave PIC its cascade identity
         "out 0xA1, al",
         "out 0x80, al"  // Delay
     );
 
-    // ICW4: set x86 mode
+    // ICW4: x86 mode
     core::arch::asm!(
         "mov al, 1",
         "out 0x21, al",
@@ -313,114 +240,15 @@ unsafe fn setup_pic() {
         "out 0x80, al"  // Delay
     );
 
-    // OCW1: mask all interrupts except timer
+    // OCW1: mask interrupts
     core::arch::asm!(
-        "mov al, 0xfe", // Enable only IRQ0 (timer)
-    "out 0x21, al",
-    "mov al, 0xff", // Mask all slave interrupts
-    "out 0xA1, al",
-    "out 0x80, al"  // Delay
+        "mov al, 0xfe", // Enable only timer
+        "out 0x21, al",
+        "mov al, 0xff", // Mask all slave interrupts
+        "out 0xA1, al",
+        "out 0x80, al"  // Delay
     );
 }
-
-
-#[no_mangle]
-pub unsafe extern "C" fn _start() -> ! {
-    // Disable interrupts during setup
-    core::arch::asm!("cli");
-
-    // Clear all segment registers
-    core::arch::asm!(
-        ".code32",
-        "xor ax, ax",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-    );
-
-    // Set up initial page tables
-    setup_page_tables();
-
-    // Load CR3 with PML4 table address
-    core::arch::asm!(
-        ".code32",
-        "mov eax, {pml4:e}",
-        "mov cr3, eax",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-    );
-
-    // Enable PAE
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr4",
-        "or eax, 1 << 5",  // PAE
-        "mov cr4, eax"
-    );
-
-    // Enable Long Mode in EFER MSR
-    core::arch::asm!(
-        ".code32",
-        "mov ecx, 0xC0000080", // EFER MSR
-        "rdmsr",
-        "or eax, 1 << 8",      // LME
-        "wrmsr"
-    );
-
-    // Set up GDT with 64-bit segments
-    setup_gdt();
-
-    // Set up IDT before enabling paging
-    setup_idt();
-
-    // Enable paging and protection
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr0",
-        "or eax, 1 << 31 | 1", // PG | PE
-        "mov cr0, eax"
-    );
-
-    // Set up PIC before long jump
-    setup_pic();
-
-    // Long jump to 64-bit mode
-    core::arch::asm!(
-        ".code32",
-        // Push the code segment and target address
-        "push 0x08",           // Code segment selector
-        "lea eax, [2f]",       // Get address of label 2
-        "push eax",
-        "retf",                // Far return to 64-bit code
-
-        // 64-bit code starts here
-        "2:",                  // Using numeric label instead of named label
-        ".code64",
-        // Load 64-bit segment selectors
-        "mov ax, 0x10",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-
-        // Set up stack
-        "mov rsp, {stack}",
-        "mov rbp, rsp",
-
-        // Enable interrupts
-        "sti",
-
-        // Jump to Rust main
-        "jmp {target}",
-
-        stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
-                     target = sym rust_main,
-                     options(noreturn)
-    );
-}
-
 
 #[naked]
 extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
@@ -466,15 +294,112 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
     }
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn _start() -> ! {
+    core::arch::asm!("cli");
+
+    core::arch::asm!(
+        ".code32",
+        "xor ax, ax",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+    );
+
+    setup_page_tables();
+
+    core::arch::asm!(
+        ".code32",
+        "mov eax, {pml4:e}",
+        "mov cr3, eax",
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+    );
+
+    core::arch::asm!(
+        ".code32",
+        "mov eax, cr4",
+        "or eax, 1 << 5",  // PAE
+        "mov cr4, eax"
+    );
+
+    core::arch::asm!(
+        ".code32",
+        "mov ecx, 0xC0000080", // EFER MSR
+        "rdmsr",
+        "or eax, 1 << 8",      // LME
+        "wrmsr"
+    );
+
+    setup_gdt();
+    setup_idt();
+
+    core::arch::asm!(
+        ".code32",
+        "mov eax, cr0",
+        "or eax, 1 << 31 | 1", // PG | PE
+        "mov cr0, eax"
+    );
+
+    setup_pic();
+
+    core::arch::asm!(
+        ".code32",
+        "push 0x08",
+        "lea eax, [2f]",
+        "push eax",
+        "retf",
+
+        "2:",
+        ".code64",
+        "mov ax, 0x10",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+
+        "mov rsp, {stack}",
+        "mov rbp, rsp",
+
+        "sti",
+
+        "jmp {target}",
+
+        stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
+                     target = sym rust_main,
+                     options(noreturn)
+    );
+}
+
+#[no_mangle]
+pub extern "C" fn rust_main() -> ! {
+    unsafe {
+        let mut vga = UnstableMatter::<u16>::at(0xB8000);
+        let msg = b"Long Mode OK!";
+
+        // Clear screen
+        for _ in 0..80*25 {
+            vga.write(0x0F00);
+        }
+
+        // Write message
+        for (_, &byte) in msg.iter().enumerate() {
+            vga.write(0x0F00 | byte as u16);
+        }
+
+        loop {
+            core::arch::asm!("hlt", options(nomem, nostack));
+        }
+    }
+}
+
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {
         unsafe {
-            core::arch::asm!(
-                ".code32",
-                "hlt",
-                options(nomem, nostack)
-            );
+            core::arch::asm!("hlt", options(nomem, nostack));
         }
     }
 }
