@@ -664,8 +664,8 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
         "push r15",
 
         // Send EOI to PIC
-        "mov al, 0x20",
-        "out 0x20, al",
+        "mov al, 20h",
+        "out 20h, al",
 
         // Restore all registers in reverse order
         "pop r15",
@@ -685,7 +685,6 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
         "pop rax",
 
         "iretq",
-        options(noreturn)
     );
 }
 
