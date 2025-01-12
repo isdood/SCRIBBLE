@@ -13,7 +13,7 @@ pub struct UnstableVectrix<T> {
 impl<T> UnstableVectrix<T> {
     pub unsafe fn new(base_addr: usize, size: usize, offset: usize) -> Self {
         Self {
-            base: UnstableMatter::at(base_addr), // Changed from new_at_addr to at
+            base: UnstableMatter::at(base_addr),
             size,
             offset,
         }
@@ -24,12 +24,12 @@ impl<T> UnstableVectrix<T> {
         unsafe { self.base.read() }
     }
 
-    pub fn write(&mut self, idx: usize, value: T) { // Changed to &mut self
+    pub fn write(&mut self, idx: usize, value: T) {
         assert!(idx < self.size);
         unsafe { self.base.write(value) }
     }
 
     pub fn move_to(&mut self, new_addr: usize) {
-        self.base = unsafe { UnstableMatter::at(new_addr) }; // Changed from new_at_addr to at
+        self.base = unsafe { UnstableMatter::at(new_addr) };
     }
 }
