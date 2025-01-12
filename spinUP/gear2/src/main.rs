@@ -425,17 +425,18 @@ pub unsafe extern "C" fn _start() -> ! {
     // Set up PIC
     setup_pic();
 
+    // Jump to long mode
     core::arch::asm!(
         ".code32",
-        "lgdt [{gdt}]",        // Load GDT
-        "push 0x08",           // Code segment
-        "lea eax, [2f]",       // Target address, using '2' instead of '1'
+        "lgdt [{gdt:e}]",     // Use 32-bit register constraint
+        "push 0x08",          // Code segment
+        "lea eax, [2f]",      // Target address, using '2' instead of '1'
     "push eax",
-    "retf",                // Far return to 64-bit mode
-    "2:",                  // Changed to use '2' as the label
+    "retf",               // Far return to 64-bit mode
+    "2:",                 // Using '2' as the label
     ".code64",
     // Set up segment registers
-    "mov ax, 0x10",        // Data segment
+    "mov ax, 0x10",       // Data segment
     "mov ds, ax",
     "mov es, ax",
     "mov fs, ax",
