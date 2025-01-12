@@ -7,7 +7,6 @@ use core::panic::PanicInfo;
 mod serial;
 use serial::SerialPort;
 use unstable_matter::UnstableMatter;
-use core::arch::asm;
 
 static mut GDT: GDTTable = GDTTable {
     entries: [
@@ -111,7 +110,7 @@ static mut STAGE_INFO: StageInfo = StageInfo {
 
 // Define IDT entry structure
 #[derive(Clone, Copy)]
-#[repr(C, packed)]
+#[repr(C, packed, align(16))]  // Add alignment to the struct
 struct IdtEntry {
     offset_low: u16,
     segment_selector: u16,
@@ -122,9 +121,8 @@ struct IdtEntry {
     reserved: u32,
 }
 
-#[repr(align(16))]  // Ensure 16-byte alignment for IDT
-static mut IDT: [IdtEntry; 256] = [{
-    let entry = IdtEntry {
+static mut IDT: [IdtEntry; 256] = {
+    const EMPTY_ENTRY: IdtEntry = IdtEntry {
         offset_low: 0,
         segment_selector: 0x08,  // Code segment
         ist: 0,
@@ -133,8 +131,8 @@ static mut IDT: [IdtEntry; 256] = [{
         offset_high: 0,
         reserved: 0,
     };
-    entry
-}; 256];
+    [EMPTY_ENTRY; 256]
+};
 
 #[repr(C, packed)]
 struct IdtPointer {
