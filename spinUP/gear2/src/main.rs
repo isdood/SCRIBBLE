@@ -281,8 +281,7 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: Interrupt
         "mov al, 0x20",
         "out 0x20, al",  // Send EOI to PIC
         "pop rax",
-        "iretq",
-        options(nomem, nostack)
+        "iretq"
     );
 }
 
