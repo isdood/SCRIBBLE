@@ -51,6 +51,11 @@ struct GDTPointer {
     base: u32,
 }
 
+#[repr(C)]
+struct PageTable {
+    entries: [u64; 512]
+}
+
 #[repr(C, align(4096))]
 struct PageTables {
     pml4: PageTable,
@@ -65,6 +70,7 @@ static mut PAGE_TABLES: PageTables = PageTables {
     pd: PageTable { entries: [0; 512] },
     pt: PageTable { entries: [0; 512] },
 };
+
 
 #[repr(C, align(4096))]
 struct Stack {
@@ -191,70 +197,6 @@ unsafe fn setup_gdt() {
     );
 }
 
-#[naked]
-extern "x86-interrupt" fn page_fault_handler() -> ! {
-    unsafe {
-        core::arch::naked_asm!(
-            "push rax",
-            "push rcx",
-            "push rdx",
-            "push rbx",
-            "push rbp",
-            "push rsi",
-            "push rdi",
-            "push r8",
-            "push r9",
-            "push r10",
-            "push r11",
-            "push r12",
-            "push r13",
-            "push r14",
-            "push r15",
-
-            // Get error code and faulting address
-            "mov rax, cr2",     // Get the faulting address
-            "mov rbx, [rsp+120]", // Get error code from stack
-
-            // Handle the page fault by mapping the page
-            "mov rcx, rax",     // Save faulting address
-            "shr rax, 12",      // Get page number
-            "and rax, 0x1FF",   // Get index into PT
-            "shl rax, 3",       // Multiply by 8 for entry size
-            "lea rbx, [rel PAGE_TABLES]",
-            "add rbx, 24576",   // Offset to PT (4096 * 6)
-        "add rbx, rax",     // Point to PT entry
-        "mov rax, rcx",     // Get back faulting address
-        "and rax, ~0xFFF",  // Clear low 12 bits
-        "or rax, 0x3",      // Present + writable
-        "mov [rbx], rax",   // Set PT entry
-
-        // Invalidate TLB entry
-        "invlpg [rcx]",
-
-        // Restore registers and return
-        "pop r15",
-        "pop r14",
-        "pop r13",
-        "pop r12",
-        "pop r11",
-        "pop r10",
-        "pop r9",
-        "pop r8",
-        "pop rdi",
-        "pop rsi",
-        "pop rbp",
-        "pop rbx",
-        "pop rdx",
-        "pop rcx",
-        "pop rax",
-
-        "add rsp, 8",  // Remove error code
-        "iretq",
-        options(noreturn)
-        );
-    }
-}
-
 unsafe fn setup_page_tables() {
     // Clear tables
     let pml4_ptr = &raw mut PAGE_TABLES.pml4.entries[0] as *mut u64;
@@ -322,6 +264,113 @@ unsafe fn setup_pic() {
         "out 0xA1, al",
         "out 0x80, al"
     );
+}
+
+#[naked]
+extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
+    unsafe {
+        core::arch::naked_asm!(
+            "push rax",
+            "push rcx",
+            "push rdx",
+            "push rbx",
+            "push rbp",
+            "push rsi",
+            "push rdi",
+            "push r8",
+            "push r9",
+            "push r10",
+            "push r11",
+            "push r12",
+            "push r13",
+            "push r14",
+            "push r15",
+
+            "mov al, 0x20",
+            "out 0x20, al",
+
+            "pop r15",
+            "pop r14",
+            "pop r13",
+            "pop r12",
+            "pop r11",
+            "pop r10",
+            "pop r9",
+            "pop r8",
+            "pop rdi",
+            "pop rsi",
+            "pop rbp",
+            "pop rbx",
+            "pop rdx",
+            "pop rcx",
+            "pop rax",
+
+            "iretq",
+        );
+    }
+}
+
+#[naked]
+extern "x86-interrupt" fn page_fault_handler() -> ! {
+    unsafe {
+        core::arch::naked_asm!(
+            "push rax",
+            "push rcx",
+            "push rdx",
+            "push rbx",
+            "push rbp",
+            "push rsi",
+            "push rdi",
+            "push r8",
+            "push r9",
+            "push r10",
+            "push r11",
+            "push r12",
+            "push r13",
+            "push r14",
+            "push r15",
+
+            // Get error code and faulting address
+            "mov rax, cr2",     // Get the faulting address
+            "mov rbx, [rsp+120]", // Get error code from stack
+
+            // Handle the page fault by mapping the page
+            "mov rcx, rax",     // Save faulting address
+            "shr rax, 12",      // Get page number
+            "and rax, 0x1FF",   // Get index into PT
+            "shl rax, 3",       // Multiply by 8 for entry size
+            "lea rbx, [rel PAGE_TABLES]",
+            "add rbx, 24576",   // Offset to PT (4096 * 6)
+        "add rbx, rax",     // Point to PT entry
+        "mov rax, rcx",     // Get back faulting address
+        "and rax, ~0xFFF",  // Clear low 12 bits
+        "or rax, 0x3",      // Present + writable
+        "mov [rbx], rax",   // Set PT entry
+
+        // Invalidate TLB entry
+        "invlpg [rcx]",
+
+        // Restore registers and return
+        "pop r15",
+        "pop r14",
+        "pop r13",
+        "pop r12",
+        "pop r11",
+        "pop r10",
+        "pop r9",
+        "pop r8",
+        "pop rdi",
+        "pop rsi",
+        "pop rbp",
+        "pop rbx",
+        "pop rdx",
+        "pop rcx",
+        "pop rax",
+
+        "add rsp, 8",  // Remove error code
+        "iretq",
+        );
+    }
 }
 
 #[naked]
