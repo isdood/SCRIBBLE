@@ -108,9 +108,8 @@ static mut GDT_PTR: GdtPointer = GdtPointer {
     base: 0,
 };
 
-// IDT structures
-#[derive(Copy, Clone)]
 #[repr(C, packed)]
+#[derive(Copy, Clone)]
 struct IdtEntry {
     offset_low: u16,
     segment: u16,
@@ -121,26 +120,31 @@ struct IdtEntry {
     reserved: u32,
 }
 
-impl IdtEntry {
-    const fn new() -> Self {
-        IdtEntry {
-            offset_low: 0,
-            segment: 0,
-            ist: 0,
-            flags: 0,
-            offset_mid: 0,
-            offset_high: 0,
-            reserved: 0,
-        }
-    }
+#[repr(C, packed)]
+struct IdtDescriptor {
+    limit: u16,
+    base: u64,
 }
 
-static mut IDT: [IdtEntry; 256] = [IdtEntry::new(); 256];
+// Initialize the IDT with a const array
+static mut IDT: [IdtEntry; 256] = {
+    const EMPTY: IdtEntry = IdtEntry {
+        offset_low: 0,
+        segment: 0,
+        ist: 0,
+        flags: 0,
+        offset_mid: 0,
+        offset_high: 0,
+        reserved: 0,
+    };
+    [EMPTY; 256]
+};
 
-static mut IDT_PTR: IdtPointer = IdtPointer {
+static mut IDT_PTR: IdtDescriptor = IdtDescriptor {
     limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
     base: 0,
 };
+
 
 // Setup functions
 unsafe fn setup_gdt() {
@@ -163,6 +167,7 @@ unsafe fn setup_idt() {
     // Load IDT
     core::arch::asm!("lidt [{0}]", in(reg) &IDT_PTR);
 }
+
 
 unsafe fn setup_page_tables() {
 
@@ -295,7 +300,6 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: Interrupt
         "out 0x20, al",  // Send EOI to PIC
         "pop rax",
         "iretq",
-        options(noreturn)
     );
 }
 
