@@ -40,6 +40,12 @@ static mut PAGE_TABLES: PageTables = PageTables {
 
 // GDT structures
 #[repr(C, packed)]
+struct GdtPointer {
+    limit: u16,
+    base: u64,
+}
+
+#[repr(C, packed)]
 struct GdtEntry {
     limit_low: u16,
     base_low: u16,
@@ -49,15 +55,22 @@ struct GdtEntry {
     base_high: u8,
 }
 
-#[repr(C, packed)]
-struct GdtPointer {
-    limit: u16,
-    base: u64,
+impl GdtEntry {
+    const fn new_null() -> Self {
+        GdtEntry {
+            limit_low: 0,
+            base_low: 0,
+            base_middle: 0,
+            access: 0,
+            granularity: 0,
+            base_high: 0,
+        }
+    }
 }
 
 static mut GDT: [GdtEntry; 5] = [
     // Null descriptor
-    GdtEntry::null(),
+    GdtEntry::new_null(),
     // Kernel code (64-bit)
     GdtEntry {
         limit_low: 0,
@@ -95,11 +108,6 @@ GdtEntry {
     base_high: 0,
 },
 ];
-
-static mut GDT_PTR: GdtPointer = GdtPointer {
-    limit: (core::mem::size_of::<[GdtEntry; 5]>() - 1) as u16,
-    base: 0,
-};
 
 #[repr(C, packed)]
 #[derive(Copy, Clone)]
