@@ -128,12 +128,6 @@ static mut IDT: Idt = Idt {
     }
 };
 
-static mut PAGE_TABLES: PageTables = PageTables {
-    pml4: PageTable { entries: [0; 512] },
-    pdpt: PageTable { entries: [0; 512] },
-    pd: PageTable { entries: [0; 512] },
-};
-
 static mut STACK: Stack = Stack {
     data: [0; 4096]
 };
