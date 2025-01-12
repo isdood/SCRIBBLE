@@ -425,31 +425,30 @@ pub unsafe extern "C" fn _start() -> ! {
     // Set up PIC
     setup_pic();
 
-    // Jump to long mode
     core::arch::asm!(
         ".code32",
         "lgdt [{gdt}]",        // Load GDT
         "push 0x08",           // Code segment
-        "lea eax, [lm_entry]", // Target address
-        "push eax",
-        "retf",                // Far return to 64-bit mode
-        "lm_entry:",           // Changed from "1:" to "lm_entry:"
-        ".code64",
-        // Set up segment registers
-        "mov ax, 0x10",        // Data segment
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-        // Set up stack
-        "mov rsp, {stack}",
-        "mov rbp, rsp",
-        // Enable interrupts
-        "sti",
-        // Jump to Rust main
-        "jmp {main}",
-        gdt = in(reg) &raw const GDT_PTR,
+        "lea eax, [2f]",       // Target address, using '2' instead of '1'
+    "push eax",
+    "retf",                // Far return to 64-bit mode
+    "2:",                  // Changed to use '2' as the label
+    ".code64",
+    // Set up segment registers
+    "mov ax, 0x10",        // Data segment
+    "mov ds, ax",
+    "mov es, ax",
+    "mov fs, ax",
+    "mov gs, ax",
+    "mov ss, ax",
+    // Set up stack
+    "mov rsp, {stack}",
+    "mov rbp, rsp",
+    // Enable interrupts
+    "sti",
+    // Jump to Rust main
+    "jmp {main}",
+    gdt = in(reg) &raw const GDT_PTR,
                      stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
                      main = sym rust_main,
                      options(noreturn)
