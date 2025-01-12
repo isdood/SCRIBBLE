@@ -260,7 +260,7 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         ".code32",
         "jmp {0}, {1}",
-        "1:",
+        "long_mode:",    // Changed from "1:" to "long_mode:"
         ".code64",
         "mov ax, 0x10",   // Data segment
         "mov ds, ax",
@@ -269,7 +269,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov gs, ax",
         "mov ss, ax",
 
-        // Set up stack with proper type casting
+        // Set up stack
         "mov rsp, {2}",
         "mov rbp, rsp",
 
@@ -286,7 +286,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "jmp {5}",
         const 0x08,        // Code segment selector
         sym long_mode_start,
-        in(reg) (&STACK.data as *const _ as u64) + (STACK_SIZE as u64), // Fixed type casting
+        in(reg) (&STACK.data as *const _ as u64) + (STACK_SIZE as u64),
                      sym setup_idt,
                      sym setup_pic,
                      sym rust_main,
