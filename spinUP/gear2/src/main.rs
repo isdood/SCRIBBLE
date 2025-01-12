@@ -3,7 +3,6 @@
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
 
-use core::array;
 use core::panic::PanicInfo;
 use x86_64::structures::idt::InterruptStackFrame;
 
