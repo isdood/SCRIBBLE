@@ -67,22 +67,6 @@ struct DescriptorTablePointer {
     base: u64,
 }
 
-
-#[repr(C, packed)]
-struct GDTEntry {
-    limit_low: u16,
-    base_low: u16,
-    base_middle: u8,
-    access: u8,
-    granularity: u8,
-    base_high: u8,
-}
-
-#[repr(C, packed)]
-struct GDTTable {
-    entries: [GDTEntry; 3]
-}
-
 #[repr(C, align(4096))]
 struct Stack {
     data: [u8; 4096]
@@ -243,30 +227,6 @@ unsafe fn setup_page_tables() {
     core::arch::asm!("mov rax, cr3", "mov cr3, rax");
 }
 
-#[allow(dead_code)]
-fn get_cpuid() -> (u32, u32, u32, u32) {
-    let eax: u32;
-    let ecx: u32;
-    let edx: u32;
-
-    unsafe {
-        core::arch::asm!(
-            ".code32",
-            "mov edi, ebx",    // Save ebx
-            "cpuid",
-            "xchg edi, ebx",   // Restore ebx and get its value
-            inout("eax") 0 => eax,
-                         out("ecx") ecx,
-                         out("edx") edx,
-                         out("edi") _,      // Use edi instead of ebx
-        );
-    }
-
-    // Since we can't directly use ebx, we'll return 0 for that value
-    // as it's not critical for our long mode check
-    (eax, 0, ecx, edx)
-}
-
 unsafe fn check_long_mode() -> bool {
     // Check CPUID presence
     let mut flags: u32;
@@ -318,59 +278,6 @@ unsafe fn check_long_mode() -> bool {
     (edx & (1 << 29)) != 0 // LM bit
 }
 
-// Fix other CR register operations
-#[allow(dead_code)]
-unsafe fn enable_pae() {
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr4",
-        "or eax, 1 << 5",     // Set PAE bit
-        "mov cr4, eax",
-        options(nomem, nostack)
-    );
-}
-
-#[allow(dead_code)]
-unsafe fn enable_paging() {
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr0",
-        "or eax, 0x80000001", // Set PG and PE bits
-        "mov cr0, eax",
-        options(nomem, nostack)
-    );
-}
-
-#[allow(dead_code)]
-unsafe fn setup_long_mode() {
-    // Disable interrupts
-    core::arch::asm!(
-        ".code32",
-        "cli",
-        options(nomem, nostack)
-    );
-
-    // Load PML4 table
-    core::arch::asm!(
-        ".code32",
-        "mov {tmp:e}, {pml4:e}",
-        "mov cr3, {tmp:e}",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     tmp = out(reg) _,
-                     options(nomem, nostack)
-    );
-
-    // Enable long mode in EFER MSR
-    core::arch::asm!(
-        ".code32",
-        "mov ecx, 0xC0000080", // EFER MSR
-        "rdmsr",
-        "or eax, 0x100",       // Set LME bit (1 << 8)
-    "wrmsr",
-    options(nomem, nostack)
-    );
-}
-
 unsafe fn setup_pic() {
     // ICW1: start initialization
     core::arch::asm!(
@@ -416,119 +323,6 @@ unsafe fn setup_pic() {
     );
 }
 
-#[allow(dead_code)]
-unsafe fn enter_long_mode() -> ! {
-    // Disable interrupts first
-    core::arch::asm!(
-        ".code32",
-        "cli",
-        options(nomem, nostack)
-    );
-    write_serial(b"Disabled interrupts\r\n");
-
-    // Setup page tables
-    write_serial(b"Setting up page tables...\r\n");
-    setup_page_tables();
-
-    // Verify CR0 is in a known state
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr0",
-        "and eax, 0x7fffffff", // Clear PG
-        "or eax, 1",           // Set PE
-        "mov cr0, eax",
-        options(nomem, nostack)
-    );
-    write_serial(b"Set initial CR0 state\r\n");
-
-    // Enable PAE
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr4",
-        "or eax, 1 << 5",      // Set PAE
-        "mov cr4, eax",
-        "mov eax, cr4",        // Verify PAE was set
-        "test eax, 1 << 5",
-        "jz 3f",               // If PAE not set, halt
-        "jmp 4f",
-        "3: hlt",
-        "4:",
-        options(nomem, nostack)
-    );
-    write_serial(b"Enabled PAE\r\n");
-
-    // Load CR3 with PML4
-    core::arch::asm!(
-        ".code32",
-        "mov {tmp:e}, {addr:e}",
-        "mov cr3, {tmp:e}",
-        addr = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     tmp = out(reg) _,
-                     options(nomem, nostack)
-    );
-
-    // Enable long mode in EFER MSR
-    core::arch::asm!(
-        ".code32",
-        "mov ecx, 0xC0000080", // EFER MSR
-        "rdmsr",
-        "or eax, 1 << 8",      // Set LME
-        "wrmsr",
-        // Verify EFER.LME was set
-        "rdmsr",
-        "test eax, 1 << 8",
-        "jz 5f",               // If LME not set, halt
-        "jmp 6f",
-        "5: hlt",
-        "6:",
-        options(nomem, nostack)
-    );
-    write_serial(b"Enabled long mode in EFER\r\n");
-
-    // Load GDT for long mode
-    setup_gdt();
-    write_serial(b"Loaded GDT\r\n");
-
-    // Enable paging to activate long mode
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr0",
-        "or eax, 0x80000000",  // Set PG
-        "mov cr0, eax",
-        options(nomem, nostack)
-    );
-    write_serial(b"Enabled paging\r\n");
-
-    write_serial(b"Jumping to 64-bit mode...\r\n");
-
-    // Far jump to 64-bit code
-    core::arch::asm!(
-        ".code32",
-        // Ensure stack alignment
-        "and esp, -16",
-        // Prepare far jump
-        "push dword ptr 0x08",  // CS selector
-        "lea eax, [4f]",       // Target address
-        "push eax",
-        "retf",                // Far return to 64-bit code
-        ".align 8",
-        "4:",
-        ".code64",
-        // Zero segment registers
-        "xor ax, ax",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-        // Set up final stack and jump to Rust
-        "mov rsp, {stack}",
-        "jmp {target}",
-        stack = in(reg) &raw const STACK.data as *const u8 as u64 + 4096,
-                     target = sym rust_main,
-                     options(noreturn)
-    );
-}
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
