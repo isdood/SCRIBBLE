@@ -398,20 +398,6 @@ unsafe fn setup_long_mode() {
     );
 }
 
-// Function to set up the IDT
-unsafe fn setup_idt() {
-    // Set up timer interrupt handler
-    IDT.entries[32] = IdtEntry::new(timer_interrupt_handler as u64);
-
-    // Load IDT
-    let idt_descriptor = DescriptorTablePointer {
-        limit: (core::mem::size_of::<Idt>() - 1) as u16,
-        base: &IDT as *const Idt as u64,
-    };
-
-    asm!("lidt [{}]", in(reg) &idt_descriptor);
-}
-
 unsafe fn setup_pic() {
     // ICW1: start initialization
     core::arch::asm!(
