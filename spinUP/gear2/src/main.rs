@@ -110,7 +110,7 @@ static mut STAGE_INFO: StageInfo = StageInfo {
 
 // Define IDT entry structure
 #[derive(Clone, Copy)]
-#[repr(C, packed, align(16))]  // Add alignment to the struct
+#[repr(C)]  // Just use C representation for predictable layout
 struct IdtEntry {
     offset_low: u16,
     segment_selector: u16,
@@ -121,17 +121,26 @@ struct IdtEntry {
     reserved: u32,
 }
 
-static mut IDT: [IdtEntry; 256] = {
-    const EMPTY_ENTRY: IdtEntry = IdtEntry {
-        offset_low: 0,
-        segment_selector: 0x08,  // Code segment
-        ist: 0,
-        flags: 0x8E,  // Present, Ring 0, Interrupt Gate
-        offset_middle: 0,
-        offset_high: 0,
-        reserved: 0,
-    };
-    [EMPTY_ENTRY; 256]
+// Ensure alignment of the entire IDT array
+#[repr(align(16))]
+struct Idt {
+    entries: [IdtEntry; 256]
+}
+
+// Initialize the IDT
+static mut IDT: Idt = Idt {
+    entries: {
+        const EMPTY_ENTRY: IdtEntry = IdtEntry {
+            offset_low: 0,
+            segment_selector: 0x08,  // Code segment
+            ist: 0,
+            flags: 0x8E,  // Present, Ring 0, Interrupt Gate
+            offset_middle: 0,
+            offset_high: 0,
+            reserved: 0,
+        };
+        [EMPTY_ENTRY; 256]
+    }
 };
 
 #[repr(C, packed)]
@@ -143,7 +152,7 @@ struct IdtPointer {
 unsafe fn setup_idt() {
     // Set up timer interrupt handler
     let handler_addr = timer_interrupt_handler as u64;
-    IDT[32] = IdtEntry {
+    IDT.entries[32] = IdtEntry {
         offset_low: (handler_addr & 0xFFFF) as u16,
         segment_selector: 0x08,  // Code segment
         ist: 0,
@@ -155,7 +164,7 @@ unsafe fn setup_idt() {
 
     // Load IDT
     let idt_ptr = IdtPointer {
-        limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
+        limit: (core::mem::size_of::<Idt>() - 1) as u16,
         base: &IDT as *const _ as u64,
     };
 
