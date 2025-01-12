@@ -576,12 +576,12 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         ".code32",
         "push 0x08",              // Code segment
-        "mov eax, 1f",           // Get address of forward label
+        "mov eax, long_mode",     // Get address of forward label
         "push eax",              // Push target address
         "retf",                  // Far return to long mode
 
         // Forward local label
-        "1:",
+        "long_mode:",            // Changed from "1:" to "long_mode:"
         ".code64",               // Switch to 64-bit mode
         "mov ax, 0x10",         // Data segment
         "mov ds, ax",
