@@ -1,18 +1,11 @@
-# boot/spinup/Cargo.toml
-
+# boot/spinUP/Cargo.toml
 [package]
-name = "spinup"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
+name = "spinup"  # Lowercase package name
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
 
 [dependencies]
-spinit = { path = "../spinit" }
+spinit = { path = "../spINIT" }  # Use lowercase package name
 unstable_matter = { path = "../../lib/unstable_matter" }
 scribble = { path = "../../lib/scribble" }
-
-[package.metadata]
-boot_stage = 2
-stage_name = "Memory Setup"
-last_updated = "2025-01-12T22:21:28Z"
-maintainer = "isdood"

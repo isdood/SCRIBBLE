@@ -1,3 +1,4 @@
+# Cargo.toml
 [workspace]
 members = [
     "boot/spINIT",
@@ -7,13 +8,13 @@ members = [
     "lib/unstable_matter"
 ]
 
+workspace.resolver = "2"  # Add this line to fix the warning
+
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["isdood"]
 
 [workspace.metadata]
-last_updated = "2025-01-12T23:03:15Z"
+last_updated = "2025-01-12T23:12:33Z"
 maintained_by = "isdood"
-
-

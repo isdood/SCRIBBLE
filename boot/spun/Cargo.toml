@@ -1,19 +1,18 @@
 # boot/spun/Cargo.toml
-
 [package]
 name = "spun"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
 
 [dependencies]
-spinit = { path = "../spinit" }
-spinup = { path = "../spinup" }
+spinit = { path = "../spINIT" }  # Use lowercase package name
+spinup = { path = "../spinUP" }  # Use lowercase package name
 unstable_matter = { path = "../../lib/unstable_matter" }
 scribble = { path = "../../lib/scribble" }
 
 [package.metadata]
 boot_stage = 3
 stage_name = "Kernel"
-last_updated = "2025-01-12T22:21:28Z"
+last_updated = "2025-01-12T23:12:33Z"
 maintainer = "isdood"

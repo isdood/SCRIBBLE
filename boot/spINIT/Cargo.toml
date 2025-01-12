@@ -1,19 +1,10 @@
-# boot/spinit/Cargo.toml
-
+# boot/spINIT/Cargo.toml
 [package]
-name = "spinit"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
+name = "spinit"  # Lowercase package name
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
 
 [dependencies]
 unstable_matter = { path = "../../lib/unstable_matter" }
 scribble = { path = "../../lib/scribble" }
-
-[package.metadata]
-boot_stage = 1
-stage_name = "Initial Boot"
-last_updated = "2025-01-12T22:21:28Z"
-maintainer = "isdood"
-
-

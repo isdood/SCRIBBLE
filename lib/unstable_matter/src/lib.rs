@@ -1,11 +1,9 @@
-/// UnstableMatter Core Library
-/// Last Updated: 2025-01-12 21:57:39 UTC
-/// Author: isdood
-
 #![no_std]
 
-// Re-export core components
-pub use core::marker::PhantomData;
+/// UnstableMatter Core Library
+/// Last Updated: 2025-01-12 23:51:36 UTC
+/// Author: isdood
+/// Current User: isdood
 
 // Module declarations
 pub mod ufo;
@@ -13,13 +11,77 @@ pub mod vector_space;
 pub mod align;
 
 // Public exports
-pub use ufo::{UFO, Protected, MemoryTrace, ProtectedRegion};
+pub use ufo::{UFO, Protected, MemoryTrace};
 pub use vector_space::{VectorSpace, MeshCell, CellState};
 
-// Type aliases for common use
-pub type Flying = ufo::Flying;
-pub type Hovering = ufo::Hovering;
-pub type Landed = ufo::Landed;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MemoryAddress(usize);
+
+impl MemoryAddress {
+    pub const fn new(addr: usize) -> Self {
+        Self(addr)
+    }
+
+    pub const fn as_usize(&self) -> usize {
+        self.0
+    }
+}
+
+// Fluid memory space representation
+#[derive(Debug)]
+pub struct FluidMemory<T: 'static> {
+    base: MemoryAddress,
+    _marker: core::marker::PhantomData<T>,
+}
+
+impl<T: 'static> FluidMemory<T> {
+    pub const fn new(addr: usize) -> Self {
+        Self {
+            base: MemoryAddress::new(addr),
+            _marker: core::marker::PhantomData,
+        }
+    }
+
+    pub const fn base_addr(&self) -> usize {
+        self.base.as_usize()
+    }
+
+    pub unsafe fn read(&self, offset: usize) -> T {
+        core::ptr::read_volatile((self.base_addr() + offset) as *const T)
+    }
+
+    pub unsafe fn write(&mut self, offset: usize, value: T) {
+        core::ptr::write_volatile((self.base_addr() + offset) as *mut T, value)
+    }
+}
+
+// Core UnstableMatter definition
+#[derive(Debug)]
+pub struct UnstableMatter<T: 'static> {
+    memory: FluidMemory<T>,
+    _ufo: UFO<T>,
+}
+
+impl<T: 'static> UnstableMatter<T> {
+    pub const fn new(addr: usize) -> Self {
+        Self {
+            memory: FluidMemory::new(addr),
+            _ufo: UFO::new(),
+        }
+    }
+
+    pub const fn addr(&self) -> usize {
+        self.memory.base_addr()
+    }
+
+    pub unsafe fn read(&self) -> T {
+        self.memory.read(0)
+    }
+
+    pub unsafe fn write(&mut self, value: T) {
+        self.memory.write(0, value)
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Dimensions {
@@ -29,100 +91,86 @@ pub struct Dimensions {
 }
 
 impl Dimensions {
-    pub const fn const_new(width: usize, height: usize, depth: usize) -> Self {
+    pub const fn new(width: usize, height: usize, depth: usize) -> Self {
         Self { width, height, depth }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct VirtAddr(pub u64);
-
-impl VirtAddr {
-    pub const fn const_new(addr: u64) -> Self {
-        Self(addr)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PhysAddr(pub u64);
-
-impl PhysAddr {
-    pub const fn const_new(addr: u64) -> Self {
-        Self(addr)
-    }
-}
-
+// Fluid space-time mesh
 #[derive(Debug)]
-pub struct SpaceTime<T> {
-    base: UnstableMatter<T>,
+pub struct SpaceTime<T: 'static> {
+    memory: FluidMemory<T>,
     size: usize,
     offset: usize,
     stride: usize,
     dimensions: Dimensions,
-    _phantom: PhantomData<T>,
+    _ufo: UFO<T>,
 }
 
-impl<T: Copy> SpaceTime<T> {
-    pub const unsafe fn const_new(base_addr: usize, size: usize, offset: usize) -> Self {
+impl<T: 'static> SpaceTime<T> {
+    pub const fn new(base_addr: usize, size: usize, offset: usize) -> Self {
         Self {
-            base: UnstableMatter::const_at(base_addr),
+            memory: FluidMemory::new(base_addr),
             size,
             offset,
             stride: core::mem::size_of::<T>(),
-            dimensions: Dimensions::const_new(size, 1, 1),
-            _phantom: PhantomData,
+            dimensions: Dimensions::new(size, 1, 1),
+            _ufo: UFO::new(),
         }
     }
 
-    pub unsafe fn new(base_addr: usize, size: usize, offset: usize) -> Self {
-        Self::const_new(base_addr, size, offset)
+    pub const fn size(&self) -> usize {
+        self.size
+    }
+
+    pub const fn dimensions(&self) -> Dimensions {
+        self.dimensions
+    }
+
+    pub const fn stride(&self) -> usize {
+        self.stride
+    }
+
+    pub const fn offset(&self) -> usize {
+        self.offset
     }
 
     pub unsafe fn read_at(&self, index: usize) -> T {
         assert!(index < self.size);
-        let addr = self.base.addr() + (index * self.stride) + self.offset;
-        UnstableMatter::at(addr).read()
+        self.memory.read(index * self.stride + self.offset)
     }
 
     pub unsafe fn write_at(&mut self, index: usize, value: T) {
         assert!(index < self.size);
-        let addr = self.base.addr() + (index * self.stride) + self.offset;
-        UnstableMatter::at(addr).write(value)
+        self.memory.write(index * self.stride + self.offset, value)
     }
-
-    pub const fn from_virt(addr: VirtAddr, size: usize, dimensions: Dimensions) -> Self {
-        unsafe {
-            Self {
-                base: UnstableMatter::const_at(addr.0 as usize),
-                size,
-                offset: 0,
-                stride: core::mem::size_of::<T>(),
-                dimensions,
-                _phantom: PhantomData,
-            }
-        }
-    }
-
-    pub const fn from_phys(addr: PhysAddr, size: usize, phys_offset: u64, dimensions: Dimensions) -> Self {
-        unsafe {
-            Self {
-                base: UnstableMatter::const_at((addr.0 + phys_offset) as usize),
-                size,
-                offset: 0,
-                stride: core::mem::size_of::<T>(),
-                dimensions,
-                _phantom: PhantomData,
-            }
-        }
-    }
-
-    pub const fn virt_addr(&self) -> VirtAddr { VirtAddr(self.base.addr() as u64) }
-    pub const fn phys_addr(&self, phys_offset: u64) -> PhysAddr { PhysAddr(self.base.addr() as u64 - phys_offset) }
-    pub const fn size(&self) -> usize { self.size }
-    pub const fn dimensions(&self) -> Dimensions { self.dimensions }
-    pub const fn stride(&self) -> usize { self.stride }
-    pub const fn offset(&self) -> usize { self.offset }
 }
 
-unsafe impl<T> Send for SpaceTime<T> {}
-unsafe impl<T> Sync for SpaceTime<T> {}
+unsafe impl<T: 'static> Send for SpaceTime<T> {}
+unsafe impl<T: 'static> Sync for SpaceTime<T> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fluid_memory() {
+        let mut memory = FluidMemory::<u32>::new(0x1000);
+        assert_eq!(memory.base_addr(), 0x1000);
+    }
+
+    #[test]
+    fn test_dimensions() {
+        let dims = Dimensions::new(10, 20, 30);
+        assert_eq!(dims.width, 10);
+        assert_eq!(dims.height, 20);
+        assert_eq!(dims.depth, 30);
+    }
+
+    #[test]
+    fn test_space_time() {
+        let space: SpaceTime<u32> = SpaceTime::new(0x1000, 100, 0);
+        assert_eq!(space.size(), 100);
+        assert_eq!(space.stride(), core::mem::size_of::<u32>());
+    }
+}
