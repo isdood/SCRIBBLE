@@ -339,36 +339,39 @@ extern "x86-interrupt" fn page_fault_handler() -> ! {
             "shr rax, 12",      // Get page number
             "and rax, 0x1FF",   // Get index into PT
             "shl rax, 3",       // Multiply by 8 for entry size
-            "lea rbx, [rel PAGE_TABLES]",
-            "add rbx, 24576",   // Offset to PT (4096 * 6)
-        "add rbx, rax",     // Point to PT entry
-        "mov rax, rcx",     // Get back faulting address
-        "and rax, ~0xFFF",  // Clear low 12 bits
-        "or rax, 0x3",      // Present + writable
-        "mov [rbx], rax",   // Set PT entry
 
-        // Invalidate TLB entry
-        "invlpg [rcx]",
+            // Get address of page tables using sym
+            "mov rbx, {pt}",
+            "add rbx, rax",     // Point to PT entry
+            "mov rax, rcx",     // Get back faulting address
+            "and rax, ~0xFFF",  // Clear low 12 bits
+            "or rax, 0x3",      // Present + writable
+            "mov [rbx], rax",   // Set PT entry
 
-        // Restore registers and return
-        "pop r15",
-        "pop r14",
-        "pop r13",
-        "pop r12",
-        "pop r11",
-        "pop r10",
-        "pop r9",
-        "pop r8",
-        "pop rdi",
-        "pop rsi",
-        "pop rbp",
-        "pop rbx",
-        "pop rdx",
-        "pop rcx",
-        "pop rax",
+            // Invalidate TLB entry
+            "invlpg [rcx]",
 
-        "add rsp, 8",  // Remove error code
-        "iretq",
+            // Restore registers and return
+            "pop r15",
+            "pop r14",
+            "pop r13",
+            "pop r12",
+            "pop r11",
+            "pop r10",
+            "pop r9",
+            "pop r8",
+            "pop rdi",
+            "pop rsi",
+            "pop rbp",
+            "pop rbx",
+            "pop rdx",
+            "pop rcx",
+            "pop rax",
+
+            "add rsp, 8",  // Remove error code
+            "iretq",
+
+            pt = sym PAGE_TABLES.pt,
         );
     }
 }
