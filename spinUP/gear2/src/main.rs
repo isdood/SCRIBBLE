@@ -576,12 +576,12 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         ".code32",
         "push 0x08",              // Code segment
-        "mov eax, long_mode",     // Get address of forward label
+        "mov eax, 2f",           // Get address of forward label 2
         "push eax",              // Push target address
         "retf",                  // Far return to long mode
 
-        // Forward local label
-        "long_mode:",            // Changed from "1:" to "long_mode:"
+        // Forward local label (using 2 instead of 1 or "long_mode")
+        "2:",
         ".code64",               // Switch to 64-bit mode
         "mov ax, 0x10",         // Data segment
         "mov ds, ax",
@@ -599,6 +599,7 @@ pub unsafe extern "C" fn _start() -> ! {
                      in(reg) rust_main as u64,
                      options(noreturn)
     );
+}
 }
 
 unsafe fn setup_idt() {
