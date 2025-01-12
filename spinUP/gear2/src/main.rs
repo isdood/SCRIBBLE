@@ -256,15 +256,17 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov cr0, eax",
     );
 
-    // Far jump to 64-bit mode using correct syntax
+    // Far jump to 64-bit mode with fixed argument handling
     core::arch::asm!(
         ".code32",
-        // Setup the far jump
-        "push {0:e}",  // Push segment selector
-        "push {1:e}",  // Push offset
-        "retf",        // Far return will act as our far jump
+        // Move values to registers first
+        "mov eax, {0}",
+        "push eax",        // Push segment selector
+        "mov eax, offset {1}",
+        "push eax",        // Push offset
+        "retf",           // Far return will act as our far jump
         ".code64",
-        "2:",         // Target label
+        "2:",            // Target label
         // Now in 64-bit mode
         "mov ax, 0x10",   // Data segment
         "mov ds, ax",
