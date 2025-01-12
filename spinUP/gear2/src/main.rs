@@ -600,7 +600,6 @@ pub unsafe extern "C" fn _start() -> ! {
                      options(noreturn)
     );
 }
-}
 
 unsafe fn setup_idt() {
     // Set up timer interrupt handler (IRQ0 -> INT 0x20)
