@@ -213,10 +213,10 @@ pub unsafe extern "C" fn _start() -> ! {
     // Set up GDT first
     setup_gdt();
 
-    // Load GDT
+    // Load GDT with correct 32-bit registers
     core::arch::asm!(
         ".code32",
-        "lgdt [{0}]",
+        "lgdt [{0:e}]",  // Use 32-bit addressing
         in(reg) &GDT_PTR,
     );
 
@@ -226,7 +226,7 @@ pub unsafe extern "C" fn _start() -> ! {
     // Load CR3
     core::arch::asm!(
         ".code32",
-        "mov eax, {0}",
+        "mov eax, {0:e}",
         "mov cr3, eax",
         in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
     );
@@ -256,12 +256,16 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov cr0, eax",
     );
 
-    // Jump to 64-bit mode with fixed stack pointer calculation
+    // Far jump to 64-bit mode using correct syntax
     core::arch::asm!(
         ".code32",
-        "jmp {0}, {1}",
-        "2:",    // Changed to use a numeric label starting with 2
+        // Setup the far jump
+        "push {0:e}",  // Push segment selector
+        "push {1:e}",  // Push offset
+        "retf",        // Far return will act as our far jump
         ".code64",
+        "2:",         // Target label
+        // Now in 64-bit mode
         "mov ax, 0x10",   // Data segment
         "mov ds, ax",
         "mov es, ax",
