@@ -5,6 +5,7 @@
 
 use core::array;
 use core::panic::PanicInfo;
+use x86_64::structures::idt::InterruptStackFrame;
 
 // Constants
 const STACK_SIZE: usize = 4096;
