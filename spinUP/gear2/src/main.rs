@@ -1,13 +1,17 @@
+// src/main.rs
+// Last updated: 2025-01-12 11:06:00 EST
+// Author: Caleb J.D. Terkovics
+
 #![no_std]
 #![no_main]
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
 
-use core::arch::asm;
 use core::panic::PanicInfo;
 
 // GDT Entry structure
 #[repr(C, packed)]
+#[derive(Copy, Clone)]
 struct GdtEntry {
     limit_low: u16,
     base_low: u16,
@@ -39,6 +43,7 @@ struct GdtDescriptor {
 
 // IDT Entry structure
 #[repr(C, packed)]
+#[derive(Copy, Clone)]
 struct IdtEntry {
     offset_low: u16,
     segment: u16,
@@ -121,15 +126,17 @@ static mut GDT_PTR: GdtDescriptor = GdtDescriptor {
     base: 0,
 };
 
-static mut IDT: [IdtEntry; 256] = [IdtEntry {
-    offset_low: 0,
-    segment: 0,
-    ist: 0,
-    flags: 0,
-    offset_mid: 0,
-    offset_high: 0,
-    reserved: 0,
-}; 256];
+static mut IDT: [IdtEntry; 256] = unsafe {
+    core::array::from_fn(|_| IdtEntry {
+        offset_low: 0,
+        segment: 0,
+        ist: 0,
+        flags: 0,
+        offset_mid: 0,
+        offset_high: 0,
+        reserved: 0,
+    })
+};
 
 static mut IDT_PTR: IdtDescriptor = IdtDescriptor {
     limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
@@ -151,6 +158,16 @@ const STACK_SIZE: usize = 4096 * 16;
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
+}
+
+// Create our own interrupt stack frame since we're not using x86_64 crate
+#[repr(C)]
+struct InterruptStackFrame {
+    ip: u64,
+    cs: u64,
+    flags: u64,
+    sp: u64,
+    ss: u64,
 }
 
 unsafe fn setup_gdt() {
