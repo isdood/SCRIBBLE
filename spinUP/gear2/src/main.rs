@@ -264,7 +264,7 @@ unsafe fn setup_pic() {
 #[naked]
 extern "x86-interrupt" fn page_fault_handler() -> ! {
     unsafe {
-        core::arch::asm!(
+        core::arch::naked_asm!(
             "push rax",
             "push rcx",
             "push rdx",
@@ -285,7 +285,7 @@ extern "x86-interrupt" fn page_fault_handler() -> ! {
             "mov rdi, cr2",
             "mov rsi, rsp",    // Save original stack pointer
             "and rsp, ~0xF",   // Align stack to 16 bytes
-            "call handle_page_fault",
+            "call {handle_fault}",
             "mov rsp, rsi",    // Restore original stack pointer
 
             "pop r15",
@@ -306,6 +306,7 @@ extern "x86-interrupt" fn page_fault_handler() -> ! {
 
             "add rsp, 8",     // Pop error code
             "iretq",
+            handle_fault = sym handle_page_fault,
         );
     }
 }
@@ -324,7 +325,7 @@ extern "C" fn handle_page_fault(fault_addr: u64) {
 #[naked]
 extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
     unsafe {
-        core::arch::asm!(
+        core::arch::naked_asm!(
             "push rax",
             "push rcx",
             "push rdx",
