@@ -409,40 +409,47 @@ unsafe fn setup_idt() {
 }
 
 unsafe fn setup_pic() {
-    // Initialize PIC
+    // ICW1: start initialization
     core::arch::asm!(
-        // ICW1: start initialization
         "mov al, 0x11",
-        "out 0x20, al",  // Master PIC
-        "out 0xA0, al",  // Slave PIC
-        "nop", "nop",
+        "out 0x20, al", // Master PIC
+        "out 0xA0, al", // Slave PIC
+        "out 0x80, al"  // Delay
+    );
 
-        // ICW2: interrupt vector offsets
-        "mov al, 0x20",  // Master: IRQ0 -> INT 0x20
-        "out 0x21, al",
-        "mov al, 0x28",  // Slave: IRQ8 -> INT 0x28
-        "out 0xA1, al",
-        "nop", "nop",
+    // ICW2: vector offset
+    core::arch::asm!(
+        "mov al, 0x20",
+        "out 0x21, al", // Master: IRQ 0-7 → INT 0x20-0x27
+        "mov al, 0x28",
+        "out 0xA1, al", // Slave: IRQ 8-15 → INT 0x28-0x2F
+        "out 0x80, al"  // Delay
+    );
 
-        // ICW3: cascading
-        "mov al, 0x04",  // Master: IRQ2 has slave
-        "out 0x21, al",
-        "mov al, 0x02",  // Slave: cascade on IRQ2
-        "out 0xA1, al",
-        "nop", "nop",
+    // ICW3: cascading
+    core::arch::asm!(
+        "mov al, 0x04",
+        "out 0x21, al", // Master: Slave on IRQ2
+        "mov al, 0x02",
+        "out 0xA1, al", // Slave: Cascade identity
+        "out 0x80, al"  // Delay
+    );
 
-        // ICW4: 8086 mode
+    // ICW4: 8086 mode
+    core::arch::asm!(
         "mov al, 0x01",
         "out 0x21, al",
         "out 0xA1, al",
-        "nop", "nop",
+        "out 0x80, al"  // Delay
+    );
 
-        // OCW1: mask all interrupts except timer
-        "mov al, 0xFE",  // Enable only IRQ0 (timer)
-    "out 0x21, al",
-    "mov al, 0xFF",  // Disable all slave interrupts
-    "out 0xA1, al",
-    options(nomem, nostack)
+    // OCW1: enable only timer interrupt
+    core::arch::asm!(
+        "mov al, 0xFE", // Enable IRQ0 (timer), mask others
+                     "out 0x21, al",
+                     "mov al, 0xFF", // Mask all slave interrupts
+                     "out 0xA1, al",
+                     "out 0x80, al"  // Delay
     );
 }
 
@@ -560,97 +567,56 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
-#[naked]
-unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
-    core::arch::naked_asm!(
-        // Save registers
-        "push rax",
-        "push rcx",
-        "push rdx",
-        "push rbx",
-        "push rbp",
-        "push rsi",
-        "push rdi",
-        "push r8",
-        "push r9",
-        "push r10",
-        "push r11",
-        "push r12",
-        "push r13",
-        "push r14",
-        "push r15",
-
-        // Send EOI to PIC
-        "mov al, 0x20",
-        "out 0x20, al",
-
-        // Restore registers
-        "pop r15",
-        "pop r14",
-        "pop r13",
-        "pop r12",
-        "pop r11",
-        "pop r10",
-        "pop r9",
-        "pop r8",
-        "pop rdi",
-        "pop rsi",
-        "pop rbp",
-        "pop rbx",
-        "pop rdx",
-        "pop rcx",
-        "pop rax",
-
-        "iretq",
-    );
-}
-
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    // Disable interrupts first
+    // Disable interrupts during setup
     core::arch::asm!("cli");
 
-    // Set up IDT
-    setup_idt();
-
-    // Set up page tables
+    // First set up page tables before enabling paging
     setup_page_tables();
 
-    // Enable PAE in CR4
+    // Set CR3 to point to page tables
     core::arch::asm!(
-        "mov rax, cr4",
-        "or eax, 1 << 5",  // PAE
-        "mov cr4, rax",
+        "mov rax, {0}",
+        "mov cr3, rax",
+        in(reg) &PAGE_TABLES.pml4 as *const _ as u64
     );
 
-    // Set up long mode in EFER
+    // Enable PAE and other required CR4 bits
+    core::arch::asm!(
+        "mov rax, cr4",
+        "or eax, (1 << 5) | (1 << 7)",  // PAE + PGE
+                     "mov cr4, rax",
+    );
+
+    // Set EFER.LME to enable long mode
     core::arch::asm!(
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or eax, 1 << 8",      // LME
+        "or eax, 0x100",       // Set LME bit
         "wrmsr",
     );
 
-    // Load GDT
+    // Load GDT with 64-bit segments
     setup_gdt();
 
-    // Enable paging in CR0
+    // Enable protected mode and paging
     core::arch::asm!(
         "mov rax, cr0",
-        "mov rbx, 0x80000001", // PG + PE flags
-        "or rax, rbx",         // Set the flags
-        "mov cr0, rax",
+        "or eax, 0x80000001",  // Enable paging (PG) + protection (PE)
+    "mov cr0, rax",
     );
 
-    // Jump to long mode with a label > 1
+    // Jump to long mode
     core::arch::asm!(
-        "push 0x08",           // Code segment
-        "lea rax, [rip + 2f]", // Get address of label 2 using RIP-relative addressing
-        "push rax",
-        "retfq",               // Far return
+        // Push code segment and target address
+        "lea rax, [rip + 2f]",  // Get address of label 2
+        "push 0x08",            // Code segment
+        "push rax",             // Target address
+        "retfq",                // Far return to load CS and jump
         "2:",
-        ".code64",
-        "mov ax, 0x10",        // Data segment
+        // Load data segments
+        "mov ax, 0x10",
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
@@ -661,10 +627,17 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov rsp, {stack}",
         "mov rbp, rsp",
 
-        // Jump to Rust
+        // Initialize PIC
+        "call {init_pic}",
+
+        // Enable interrupts
+        "sti",
+
+        // Jump to Rust main
         "jmp {target}",
 
         stack = in(reg) &raw const STACK.data as *const u8 as u64 + 4096,
+                     init_pic = sym setup_pic,
                      target = sym rust_main,
                      options(noreturn)
     );
