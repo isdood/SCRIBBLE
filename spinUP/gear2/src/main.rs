@@ -183,14 +183,13 @@ struct GDTPointer {
 unsafe fn setup_gdt() {
     let gdt_ptr = GDTPointer {
         limit: (core::mem::size_of::<GDTTable>() - 1) as u16,
-        base: &raw const GDT as *const _ as u64,  // Changed from u32 to u64
+        base: &GDT as *const _ as u64,
     };
 
     core::arch::asm!(
         ".code32",
-        "lgdt [{0:e}]",
-        in(reg) &gdt_ptr,
-                     options(readonly)
+        "lgdt [{0}]",
+        in(reg) &gdt_ptr
     );
 }
 
@@ -569,54 +568,75 @@ pub unsafe extern "C" fn _start() -> ! {
     // Disable interrupts during setup
     core::arch::asm!("cli");
 
-    // First set up page tables before enabling paging
+    // Clear all segment registers to ensure we're in a known state
+    core::arch::asm!(
+        ".code32",
+        "xor ax, ax",
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+    );
+
+    // Set up initial page tables
     setup_page_tables();
 
-    // Set up IDT
-    setup_idt();
-
-    // Set CR3 to point to page tables
+    // Load CR3 with PML4 table address
     core::arch::asm!(
-        "mov rax, {0}",
-        "mov cr3, rax",
-        in(reg) &PAGE_TABLES.pml4 as *const _ as u64
+        ".code32",
+        "mov eax, {pml4}",
+        "mov cr3, eax",
+        pml4 = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
     );
 
-    // Enable PAE and other required CR4 bits
+    // Enable PAE
     core::arch::asm!(
-        "mov rax, cr4",
-        "or eax, (1 << 5) | (1 << 7)",  // PAE + PGE
-                     "mov cr4, rax",
+        ".code32",
+        "mov eax, cr4",
+        "or eax, 1 << 5",  // PAE
+        "mov cr4, eax"
     );
 
-    // Set EFER.LME to enable long mode
+    // Enable Long Mode in EFER MSR
     core::arch::asm!(
+        ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
-        "rdmsr",               // Read current value
-        "or eax, 0x100",       // Set LME bit
-        "wrmsr",               // Write back
+        "rdmsr",
+        "or eax, 1 << 8",      // LME
+        "wrmsr"
     );
 
-    // Load GDT with 64-bit segments
+    // Set up GDT with 64-bit segments
     setup_gdt();
 
-    // Enable protected mode and paging
+    // Set up IDT before enabling paging
+    setup_idt();
+
+    // Enable paging and protection
     core::arch::asm!(
-        "mov rax, cr0",
-        "or eax, 0x80000001",  // Enable paging (PG) + protection (PE)
-    "mov cr0, rax",
+        ".code32",
+        "mov eax, cr0",
+        "or eax, 1 << 31 | 1", // PG | PE
+        "mov cr0, eax"
     );
 
-    // Jump to long mode
-    core::arch::asm!(
-        // Push code segment and target address
-        "lea rax, [rip + 2f]",  // Get address of label 2
-        "push 0x08",            // Code segment
-        "push rax",             // Target address
-        "retfq",                // Far return to load CS and jump
+    // Set up PIC before long jump
+    setup_pic();
 
-        "2:",
-        // Load data segments
+    // Long jump to 64-bit mode
+    core::arch::asm!(
+        ".code32",
+        // Push the code segment and target address
+        "push 0x08",           // Code segment selector
+        "lea eax, [1f]",       // Get address of label 1
+        "push eax",
+        "retf",                // Far return to 64-bit code
+
+        // 64-bit code starts here
+        ".code64",
+        "1:",
+        // Load 64-bit segment selectors
         "mov ax, 0x10",
         "mov ds, ax",
         "mov es, ax",
@@ -628,17 +648,13 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov rsp, {stack}",
         "mov rbp, rsp",
 
-        // Initialize PIC
-        "call {init_pic}",
-
         // Enable interrupts
         "sti",
 
         // Jump to Rust main
         "jmp {target}",
 
-        stack = in(reg) &raw const STACK.data as *const u8 as u64 + 4096,
-                     init_pic = sym setup_pic,
+        stack = in(reg) &STACK.data as *const _ as u64 + 4096,
                      target = sym rust_main,
                      options(noreturn)
     );
@@ -648,8 +664,7 @@ pub unsafe extern "C" fn _start() -> ! {
 extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
     unsafe {
         core::arch::naked_asm!(
-            // Save all registers
-            "push rax",
+            "push rax",        // Save registers
             "push rcx",
             "push rdx",
             "push rbx",
@@ -665,8 +680,8 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
             "push r14",
             "push r15",
 
-            // Send EOI
-            "mov al, 0x20",
+            // Handle interrupt
+            "mov al, 0x20",    // EOI
             "out 0x20, al",
 
             // Restore registers
@@ -686,7 +701,7 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
             "pop rcx",
             "pop rax",
 
-            "iretq"
+            "iretq",
         );
     }
 }
