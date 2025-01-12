@@ -24,8 +24,8 @@ static mut GDT: GDTTable = GDTTable {
             limit_low: 0xFFFF,
             base_low: 0,
             base_middle: 0,
-            access: 0x9A,      // Present | DPL0 | S | Code | Read
-            granularity: 0xAF, // 4K unit | 64-bit | Limit(0xF)
+            access: 0x9A,       // Present + Ring 0 + Code Segment + Readable
+            granularity: 0xAF,  // 4K pages + Long mode + Limit bits
             base_high: 0,
         },
         // Data segment
@@ -33,8 +33,8 @@ static mut GDT: GDTTable = GDTTable {
             limit_low: 0xFFFF,
             base_low: 0,
             base_middle: 0,
-            access: 0x92,      // Present | DPL0 | S | Data | Write
-            granularity: 0xCF, // 4K unit | 32-bit | Limit(0xF)
+            access: 0x92,       // Present + Ring 0 + Data Segment + Writable
+            granularity: 0xCF,  // 4K pages + 32-bit + Limit bits
             base_high: 0,
         },
     ]
@@ -219,26 +219,32 @@ unsafe fn disable_interrupts() {
 
 unsafe fn setup_page_tables() {
     // Clear tables first
-    PAGE_TABLES.pml4.entries.fill(0);
-    PAGE_TABLES.pdpt.entries.fill(0);
-    PAGE_TABLES.pd.entries.fill(0);
+    for entry in &mut PAGE_TABLES.pml4.entries {
+        *entry = 0;
+    }
+    for entry in &mut PAGE_TABLES.pdpt.entries {
+        *entry = 0;
+    }
+    for entry in &mut PAGE_TABLES.pd.entries {
+        *entry = 0;
+    }
 
-    // PML4 -> PDPT (Present + Write)
-    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
+    // PML4 -> PDPT
+    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3; // Present + Write
 
-    // PDPT -> PD (Present + Write)
-    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
+    // PDPT -> PD
+    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3; // Present + Write
 
-    // PD -> First 2MB (Present + Write + Huge)
-    PAGE_TABLES.pd.entries[0] = 0x83;  // Map first 2MB with huge pages
+    // Map first 2MB using 2MB pages
+    PAGE_TABLES.pd.entries[0] = 0x83; // Present + Write + Huge Page
 
-    // Ensure CR3 gets the physical address
+    // Map second 2MB for good measure
+    PAGE_TABLES.pd.entries[1] = 0x200083; // Next 2MB, Present + Write + Huge Page
+
+    // Ensure TLB is flushed
     core::arch::asm!(
-        ".code32",
-        "mov eax, {pml4:e}",
-        "mov cr3, eax",
-        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-                     options(nostack)
+        "mov cr3, cr3",
+        options(nomem, nostack)
     );
 }
 
@@ -522,81 +528,75 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
-#[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    // 1. Disable interrupts first thing
-    core::arch::asm!(
-        ".code32",
-        "cli",
-    );
+    // Disable interrupts first
+    core::arch::asm!("cli");
 
-    // 2. Set up IDT before enabling any hardware
+    // Initialize serial for debugging
+    init_serial();
+    write_serial(b"Starting boot sequence...\r\n");
+
+    // Set up IDT
     setup_idt();
+    write_serial(b"IDT setup complete\r\n");
 
-    // 3. Set up and remap PIC (but keep interrupts disabled)
-    setup_pic();
-
-    // 4. Set up paging structures
+    // Set up page tables
     setup_page_tables();
+    write_serial(b"Page tables initialized\r\n");
 
-    // 5. Enable PAE (required for long mode)
+    // Enable PAE
     core::arch::asm!(
-        ".code32",
         "mov eax, cr4",
-        "or eax, 0x20",  // PAE
+        "or eax, 1 << 5",  // PAE
         "mov cr4, eax",
     );
+    write_serial(b"PAE enabled\r\n");
 
-    // 6. Load CR3 with page table
+    // Set up long mode
     core::arch::asm!(
-        ".code32",
-        "mov eax, {0:e}",
-        "mov cr3, eax",
-        in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
-    );
-
-    // 7. Enable long mode in EFER
-    core::arch::asm!(
-        ".code32",
         "mov ecx, 0xC0000080", // EFER MSR
         "rdmsr",
-        "or eax, 0x100",      // LME
+        "or eax, 1 << 8",      // LME
         "wrmsr",
     );
+    write_serial(b"Long mode set in EFER\r\n");
 
-    // 8. Enable paging and protection
+    // Load GDT
+    setup_gdt();
+    write_serial(b"GDT loaded\r\n");
+
+    // Enable paging
     core::arch::asm!(
-        ".code32",
         "mov eax, cr0",
-        "or eax, 0x80000001", // PG | PE
+        "or eax, 0x80000001",  // PG + PE
         "mov cr0, eax",
     );
+    write_serial(b"Paging enabled\r\n");
 
-    // 9. Long mode jump and final setup
+    // Jump to long mode
     core::arch::asm!(
-        ".code32",
-        "push 0x08",              // Code segment
-        "mov eax, 2f",           // Get address of forward label 2
-        "push eax",              // Push target address
-        "retf",                  // Far return to long mode
-
-        // Forward local label (using 2 instead of 1 or "long_mode")
+        "push 0x08",          // Code segment
+        "mov eax, 2f",        // Get address of label 2
+        "push eax",
+        "retf",               // Far return
         "2:",
-        ".code64",               // Switch to 64-bit mode
-        "mov ax, 0x10",         // Data segment
+        ".code64",
+        "mov rax, 0x10",      // Data segment
         "mov ds, ax",
         "mov es, ax",
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
 
-        "mov rsp, {0:r}",       // Load 64-bit stack pointer
-        "mov rcx, {1:r}",       // Load jump target into register
-        "sti",                  // Enable interrupts
-        "jmp rcx",              // Indirect jump to main
+        // Set up stack
+        "mov rsp, {stack}",
+        "mov rbp, rsp",
 
-        in(reg) &raw const STACK.data as *const _ as u64 + 4096,
-                     in(reg) rust_main as u64,
+        // Jump to Rust
+        "jmp {target}",
+
+        stack = in(reg) &STACK.data as *const u8 as u64 + 4096,
+                     target = sym rust_main,
                      options(noreturn)
     );
 }
@@ -646,31 +646,46 @@ unsafe fn setup_idt() {
 #[naked]
 unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
     core::arch::naked_asm!(
-        // Save state
-        "pushfq",
+        // Save all registers, not just some
         "push rax",
         "push rcx",
         "push rdx",
+        "push rbx",
+        "push rbp",
+        "push rsi",
+        "push rdi",
         "push r8",
         "push r9",
         "push r10",
         "push r11",
+        "push r12",
+        "push r13",
+        "push r14",
+        "push r15",
 
-        // Send EOI
+        // Send EOI to PIC
         "mov al, 0x20",
         "out 0x20, al",
 
-        // Restore state
+        // Restore all registers in reverse order
+        "pop r15",
+        "pop r14",
+        "pop r13",
+        "pop r12",
         "pop r11",
         "pop r10",
         "pop r9",
         "pop r8",
+        "pop rdi",
+        "pop rsi",
+        "pop rbp",
+        "pop rbx",
         "pop rdx",
         "pop rcx",
         "pop rax",
-        "popfq",
 
         "iretq",
+        options(noreturn)
     );
 }
 
