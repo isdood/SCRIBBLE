@@ -3,48 +3,10 @@
 #![feature(naked_functions)]
 #![feature(abi_x86_interrupt)]
 
+use core::arch::asm;
 use core::panic::PanicInfo;
-use x86_64::structures::idt::InterruptStackFrame;
 
-// Constants
-const STACK_SIZE: usize = 4096;
-
-// Stack
-#[repr(align(16))]
-struct Stack {
-    data: [u8; STACK_SIZE]
-}
-
-static mut STACK: Stack = Stack {
-    data: [0; STACK_SIZE]
-};
-
-// Page Tables
-#[repr(C, align(4096))]
-struct PageTable {
-    entries: [u64; 512]
-}
-
-#[repr(C, align(4096))]
-struct PageTables {
-    pml4: PageTable,
-    pdpt: PageTable,
-    pd: PageTable,
-}
-
-static mut PAGE_TABLES: PageTables = PageTables {
-    pml4: PageTable { entries: [0; 512] },
-    pdpt: PageTable { entries: [0; 512] },
-    pd: PageTable { entries: [0; 512] },
-};
-
-// GDT structures
-#[repr(C, packed)]
-struct GdtPointer {
-    limit: u16,
-    base: u64,
-}
-
+// GDT Entry structure
 #[repr(C, packed)]
 struct GdtEntry {
     limit_low: u16,
@@ -68,8 +30,53 @@ impl GdtEntry {
     }
 }
 
+// GDT Descriptor structure
+#[repr(C, packed)]
+struct GdtDescriptor {
+    limit: u16,
+    base: u64,
+}
+
+// IDT Entry structure
+#[repr(C, packed)]
+struct IdtEntry {
+    offset_low: u16,
+    segment: u16,
+    ist: u8,
+    flags: u8,
+    offset_mid: u16,
+    offset_high: u32,
+    reserved: u32,
+}
+
+// IDT Descriptor structure
+#[repr(C, packed)]
+struct IdtDescriptor {
+    limit: u16,
+    base: u64,
+}
+
+// Page table structures
+#[repr(C, align(4096))]
+struct PageTable {
+    entries: [u64; 512],
+}
+
+#[repr(C, align(4096))]
+struct PageTables {
+    pml4: PageTable,
+    pdpt: PageTable,
+    pd: PageTable,
+}
+
+// Stack
+#[repr(C, align(16))]
+struct Stack {
+    data: [u8; 4096 * 16], // 64KB stack
+}
+
+// Static variables
 static mut GDT: [GdtEntry; 5] = [
-    // Null descriptor
     GdtEntry::new_null(),
     // Kernel code (64-bit)
     GdtEntry {
@@ -109,48 +116,64 @@ GdtEntry {
 },
 ];
 
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-struct IdtEntry {
-    offset_low: u16,
-    segment: u16,
-    ist: u8,
-    flags: u8,
-    offset_mid: u16,
-    offset_high: u32,
-    reserved: u32,
-}
-
-#[repr(C, packed)]
-struct IdtDescriptor {
-    limit: u16,
-    base: u64,
-}
-
-// Initialize the IDT with a const array
-static mut IDT: [IdtEntry; 256] = {
-    const EMPTY: IdtEntry = IdtEntry {
-        offset_low: 0,
-        segment: 0,
-        ist: 0,
-        flags: 0,
-        offset_mid: 0,
-        offset_high: 0,
-        reserved: 0,
-    };
-    [EMPTY; 256]
+static mut GDT_PTR: GdtDescriptor = GdtDescriptor {
+    limit: (core::mem::size_of::<[GdtEntry; 5]>() - 1) as u16,
+    base: 0,
 };
+
+static mut IDT: [IdtEntry; 256] = [IdtEntry {
+    offset_low: 0,
+    segment: 0,
+    ist: 0,
+    flags: 0,
+    offset_mid: 0,
+    offset_high: 0,
+    reserved: 0,
+}; 256];
 
 static mut IDT_PTR: IdtDescriptor = IdtDescriptor {
     limit: (core::mem::size_of::<[IdtEntry; 256]>() - 1) as u16,
     base: 0,
 };
 
+static mut PAGE_TABLES: PageTables = PageTables {
+    pml4: PageTable { entries: [0; 512] },
+    pdpt: PageTable { entries: [0; 512] },
+    pd: PageTable { entries: [0; 512] },
+};
 
-// Setup functions
+static mut STACK: Stack = Stack {
+    data: [0; 4096 * 16],
+};
+
+const STACK_SIZE: usize = 4096 * 16;
+
+#[panic_handler]
+fn panic(_info: &PanicInfo) -> ! {
+    loop {}
+}
+
 unsafe fn setup_gdt() {
-    // Use raw const for static references
+    // Initialize GDT pointer
     GDT_PTR.base = &raw const GDT as *const _ as u64;
+
+    // Load GDT
+    core::arch::asm!(
+        ".code32",
+        "lgdt [{0}]",
+        in(reg) &raw const GDT_PTR,
+    );
+
+    // Load segment registers
+    core::arch::asm!(
+        ".code32",
+        "mov ax, 0x10",  // Data segment
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+    );
 }
 
 unsafe fn setup_idt() {
@@ -163,13 +186,12 @@ unsafe fn setup_idt() {
     IDT[0x20].offset_mid = (handler >> 16) as u16;
     IDT[0x20].offset_high = (handler >> 32) as u32;
 
-    // Set IDT pointer using raw const
+    // Set IDT pointer
     IDT_PTR.base = &raw const IDT as *const _ as u64;
 
     // Load IDT
     core::arch::asm!("lidt [{0}]", in(reg) &raw const IDT_PTR);
 }
-
 
 unsafe fn setup_page_tables() {
     // Clear tables first
@@ -195,131 +217,35 @@ unsafe fn setup_page_tables() {
 }
 
 unsafe fn setup_pic() {
-    // Remap PIC
-    // Start initialization
+    // Initialize the PIC
     core::arch::asm!(
+        // Start initialization
         "mov al, 0x11",
-        "out 0x20, al", // Master PIC command
-        "out 0xA0, al", // Slave PIC command
+        "out 0x20, al",  // Master PIC command
+        "out 0xA0, al",  // Slave PIC command
+
+        // Set vector offsets
         "mov al, 0x20",
-        "out 0x21, al", // Master PIC vector offset
-        "mov al, 0x28",
-        "out 0xA1, al", // Slave PIC vector offset
-        "mov al, 0x04",
-        "out 0x21, al", // Tell Master PIC about Slave
-        "mov al, 0x02",
-        "out 0xA1, al", // Tell Slave its cascade identity
-        "mov al, 0x01",
-        "out 0x21, al", // 8086 mode for Master
-        "out 0xA1, al", // 8086 mode for Slave
-        // Mask all interrupts except timer (IRQ0)
-        "mov al, 0xFE",
-        "out 0x21, al",
-        "mov al, 0xFF",
-        "out 0xA1, al",
+        "out 0x21, al",  // Master PIC vector offset (IRQ 0-7: 0x20-0x27)
+    "mov al, 0x28",
+    "out 0xA1, al",  // Slave PIC vector offset (IRQ 8-15: 0x28-0x2F)
+
+    // Set up master/slave relationship
+    "mov al, 0x04",
+    "out 0x21, al",  // Tell master there is a slave at IRQ2
+    "mov al, 0x02",
+    "out 0xA1, al",  // Tell slave its cascade identity
+
+    // Set 8086 mode
+    "mov al, 0x01",
+    "out 0x21, al",
+    "out 0xA1, al",
+
+    // Clear masks
+    "mov al, 0x00",
+    "out 0x21, al",  // Enable all IRQs on master
+    "out 0xA1, al",  // Enable all IRQs on slave
     );
-}
-
-// Entry point
-#[no_mangle]
-pub unsafe extern "C" fn _start() -> ! {
-    // Disable interrupts until we're ready
-    core::arch::asm!(".code32", "cli");
-
-    // Set up GDT first
-    setup_gdt();
-
-    // Load GDT with correct 32-bit registers
-    core::arch::asm!(
-        ".code32",
-        "lgdt [{0:e}]",  // Use 32-bit addressing
-        in(reg) &GDT_PTR,
-    );
-
-    // Set up page tables
-    setup_page_tables();
-
-    // Load CR3
-    core::arch::asm!(
-        ".code32",
-        "mov eax, {0:e}",
-        "mov cr3, eax",
-        in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
-    );
-
-    // Enable PAE and PSE
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr4",
-        "or eax, 0x30",  // PAE | PSE
-        "mov cr4, eax",
-    );
-
-    // Enable long mode
-    core::arch::asm!(
-        ".code32",
-        "mov ecx, 0xC0000080", // EFER MSR
-        "rdmsr",
-        "or eax, 0x100",       // LME
-        "wrmsr",
-    );
-
-    // Enable paging
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr0",
-        "or eax, 0x80000001",  // PG | PE
-        "mov cr0, eax",
-    );
-
-    // Far jump to 64-bit mode with fixed argument handling
-    core::arch::asm!(
-        ".code32",
-        // Move values to registers first
-        "mov eax, {0}",
-        "push eax",        // Push segment selector
-        "mov eax, offset {1}",
-        "push eax",        // Push offset
-        "retf",           // Far return will act as our far jump
-        ".code64",
-        "2:",            // Target label
-        // Now in 64-bit mode
-        "mov ax, 0x10",   // Data segment
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-
-        // Set up stack
-        "mov rsp, {2}",
-        "mov rbp, rsp",
-
-        // Set up IDT
-        "call {3}",
-
-        // Remap and initialize PIC
-        "call {4}",
-
-        // Enable interrupts
-        "sti",
-
-        // Jump to Rust main
-        "jmp {5}",
-        const 0x08,        // Code segment selector
-        sym long_mode_start,
-        in(reg) (&STACK.data as *const _ as u64) + (STACK_SIZE as u64),
-                     sym setup_idt,
-                     sym setup_pic,
-                     sym rust_main,
-                     options(noreturn),
-    );
-}
-
-#[no_mangle]
-unsafe extern "C" fn long_mode_start() -> ! {
-    // This function will never be called directly - it's just a target for the jump
-    rust_main()
 }
 
 #[naked]
@@ -334,16 +260,90 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: Interrupt
 }
 
 #[no_mangle]
-pub extern "C" fn rust_main() -> ! {
-    loop {
-        unsafe {
-            core::arch::asm!("hlt");
-        }
-    }
+pub unsafe extern "C" fn _start() -> ! {
+    // Disable interrupts until we're ready
+    core::arch::asm!(".code32", "cli");
+
+    // Set up GDT first
+    setup_gdt();
+
+    // Set up page tables
+    setup_page_tables();
+
+    // Enable PAE
+    core::arch::asm!(
+        ".code32",
+        "mov eax, cr4",
+        "or eax, 0x20",     // Set PAE bit
+        "mov cr4, eax",
+    );
+
+    // Enable long mode
+    core::arch::asm!(
+        ".code32",
+        "mov ecx, 0xC0000080", // EFER MSR
+        "rdmsr",
+        "or eax, 0x100",       // Set LME bit
+        "wrmsr",
+    );
+
+    // Enable paging and protected mode
+    core::arch::asm!(
+        ".code32",
+        "mov eax, cr0",
+        "or eax, 0x80000001",  // Set PG and PE bits
+        "mov cr0, eax",
+    );
+
+    // Far jump to 64-bit mode
+    core::arch::asm!(
+        ".code32",
+        // Setup the far jump using push/retf
+        "push {0}",     // Push segment selector
+        "push {1}",     // Push offset
+        "retf",         // Far return acts as far jump
+        "2:",          // Target label
+        ".code64",
+        // Now in 64-bit mode
+        "mov ax, 0x10", // Data segment
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+
+        // Set up stack
+        "mov rsp, {2}",
+        "mov rbp, rsp",
+
+        // Set up IDT
+        "call {3}",
+
+        // Set up PIC
+        "call {4}",
+
+        // Enable interrupts
+        "sti",
+
+        // Jump to Rust main
+        "jmp {5}",
+        const 0x08,    // Code segment selector
+        sym long_mode_start,
+        in(reg) (&raw const STACK.data as *const _ as u64) + (STACK_SIZE as u64),
+                     sym setup_idt,
+                     sym setup_pic,
+                     sym rust_main,
+                     options(noreturn),
+    );
 }
 
-#[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+#[no_mangle]
+unsafe extern "C" fn long_mode_start() -> ! {
+    rust_main()
+}
+
+#[no_mangle]
+pub extern "C" fn rust_main() -> ! {
     loop {
         unsafe {
             core::arch::asm!("hlt");
