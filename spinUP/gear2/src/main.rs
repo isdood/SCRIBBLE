@@ -1,6 +1,6 @@
 // src/main.rs
-// Last updated: 2025-01-12 11:14 EST
-// Author: Caleb J.D. Terkovics
+// Last updated: 2025-01-12 04:19:12 UTC
+// Author: isdood
 
 #![no_std]
 #![no_main]
@@ -178,12 +178,12 @@ unsafe fn setup_gdt() {
     // Initialize GDT pointer
     GDT_PTR.base = &raw const GDT as *const _ as u64;
 
-    // Load GDT - using eax in 32-bit mode
+    // Load GDT
     core::arch::asm!(
         ".code32",
-        "lea eax, [{0}]",
-        "lgdt [eax]",
-        in(reg) &raw const GDT_PTR,
+        "lgdt [{0}]",
+        in(reg) &raw const GDT_PTR as *const _ as u32,
+                     options(readonly, nostack),
     );
 
     // Load segment registers
@@ -195,6 +195,7 @@ unsafe fn setup_gdt() {
         "mov fs, ax",
         "mov gs, ax",
         "mov ss, ax",
+        options(nostack),
     );
 }
 
@@ -212,7 +213,12 @@ unsafe fn setup_idt() {
     IDT_PTR.base = &raw const IDT as *const _ as u64;
 
     // Load IDT
-    core::arch::asm!("lidt [{0}]", in(reg) &raw const IDT_PTR);
+    core::arch::asm!(
+        ".code64",
+        "lidt [{0}]",
+        in(reg) &raw const IDT_PTR,
+                     options(readonly, nostack),
+    );
 }
 
 unsafe fn setup_page_tables() {
@@ -231,44 +237,40 @@ unsafe fn setup_page_tables() {
         PAGE_TABLES.pd.entries[i] = (i as u64 * 0x200000) | 0x83; // Present + Write + Huge
     }
 
-    // Load CR3 with PML4 address - using eax in 32-bit mode
+    // Load CR3 with PML4 address
     core::arch::asm!(
         ".code32",
-        "mov eax, {0:e}",
-        "mov cr3, eax",
-        in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u64
+        "mov cr3, {0}",
+        in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
+                     options(nostack),
     );
 }
 
 unsafe fn setup_pic() {
     // Initialize the PIC
     core::arch::asm!(
-        // Start initialization
         "mov al, 0x11",
         "out 0x20, al",  // Master PIC command
         "out 0xA0, al",  // Slave PIC command
 
-        // Set vector offsets
         "mov al, 0x20",
         "out 0x21, al",  // Master PIC vector offset (IRQ 0-7: 0x20-0x27)
     "mov al, 0x28",
     "out 0xA1, al",  // Slave PIC vector offset (IRQ 8-15: 0x28-0x2F)
 
-    // Set up master/slave relationship
     "mov al, 0x04",
     "out 0x21, al",  // Tell master there is a slave at IRQ2
     "mov al, 0x02",
     "out 0xA1, al",  // Tell slave its cascade identity
 
-    // Set 8086 mode
     "mov al, 0x01",
     "out 0x21, al",
     "out 0xA1, al",
 
-    // Clear masks
     "mov al, 0x00",
     "out 0x21, al",  // Enable all IRQs on master
     "out 0xA1, al",  // Enable all IRQs on slave
+    options(nomem, nostack),
     );
 }
 
@@ -279,7 +281,8 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: Interrupt
         "mov al, 0x20",
         "out 0x20, al",  // Send EOI to PIC
         "pop rax",
-        "iretq"
+        "iretq",
+        options(noreturn)
     );
 }
 
@@ -300,6 +303,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, cr4",
         "or eax, 0x20",     // Set PAE bit
         "mov cr4, eax",
+        options(nostack),
     );
 
     // Enable long mode
@@ -309,6 +313,7 @@ pub unsafe extern "C" fn _start() -> ! {
         "rdmsr",
         "or eax, 0x100",       // Set LME bit
         "wrmsr",
+        options(nostack),
     );
 
     // Enable paging and protected mode
@@ -317,18 +322,16 @@ pub unsafe extern "C" fn _start() -> ! {
         "mov eax, cr0",
         "or eax, 0x80000001",  // Set PG and PE bits
         "mov cr0, eax",
+        options(nostack),
     );
 
     // Far jump to 64-bit mode
     core::arch::asm!(
         ".code32",
-        // Setup the far jump using push/retf
         "push {0}",     // Push segment selector
         "push {1}",     // Push offset
         "retf",         // Far return acts as far jump
-        "2:",          // Target label
         ".code64",
-        // Now in 64-bit mode
         "mov ax, 0x10", // Data segment
         "mov ds, ax",
         "mov es, ax",
@@ -374,5 +377,3 @@ pub extern "C" fn rust_main() -> ! {
         }
     }
 }
-
-// Author: Caleb J.D. Terkovics
