@@ -61,7 +61,7 @@ struct PageTables {
     pml4: PageTable,
     pdpt: PageTable,
     pd: PageTable,
-    pt: PageTable,  // Add a page table for finer-grained mapping
+    pt: PageTable,
 }
 
 static mut PAGE_TABLES: PageTables = PageTables {
@@ -71,6 +71,25 @@ static mut PAGE_TABLES: PageTables = PageTables {
     pt: PageTable { entries: [0; 512] },
 };
 
+unsafe fn setup_page_tables() {
+    // Identity map first 2MB
+    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
+    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3;
+    PAGE_TABLES.pd.entries[0] = (&PAGE_TABLES.pt as *const _ as u64) | 0x3;
+
+    // Map first 2MB with 4KB pages
+    for i in 0..512 {
+        PAGE_TABLES.pt.entries[i] = (i as u64 * 0x1000) | 0x3; // Present + writable
+    }
+
+    // Ensure CR3 points to PML4
+    core::arch::asm!(
+        ".code32",
+        "mov eax, {pml4:e}",
+        "mov cr3, eax",
+        pml4 = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+    );
+}
 
 #[repr(C, align(4096))]
 struct Stack {
@@ -269,7 +288,7 @@ unsafe fn setup_pic() {
 #[naked]
 extern "x86-interrupt" fn page_fault_handler() -> ! {
     unsafe {
-        core::arch::naked_asm!(
+        core::arch::asm!(
             "push rax",
             "push rcx",
             "push rdx",
@@ -286,29 +305,13 @@ extern "x86-interrupt" fn page_fault_handler() -> ! {
             "push r14",
             "push r15",
 
-            // Get error code and faulting address
-            "mov rax, cr2",     // Get the faulting address
-            "mov rbx, [rsp+120]", // Get error code from stack
+            // Get faulting address from CR2
+            "mov rdi, cr2",
+            "mov rsi, rsp",    // Save original stack pointer
+            "and rsp, ~0xF",   // Align stack to 16 bytes
+            "call handle_page_fault",
+            "mov rsp, rsi",    // Restore original stack pointer
 
-            // Handle the page fault by mapping the page
-            "mov rcx, rax",     // Save faulting address
-            "shr rax, 12",      // Get page number
-            "and rax, 0x1FF",   // Get index into PT
-            "shl rax, 3",       // Multiply by 8 for entry size
-
-            // Get address of page tables
-            "lea rbx, [{tables}]",
-            "add rbx, {pt_offset}", // Offset to page table
-            "add rbx, rax",     // Point to PT entry
-            "mov rax, rcx",     // Get back faulting address
-            "and rax, ~0xFFF",  // Clear low 12 bits
-            "or rax, 0x3",      // Present + writable
-            "mov [rbx], rax",   // Set PT entry
-
-            // Invalidate TLB entry
-            "invlpg [rcx]",
-
-            // Restore registers and return
             "pop r15",
             "pop r14",
             "pop r13",
@@ -325,19 +328,27 @@ extern "x86-interrupt" fn page_fault_handler() -> ! {
             "pop rcx",
             "pop rax",
 
-            "add rsp, 8",  // Remove error code
+            "add rsp, 8",     // Pop error code
             "iretq",
-
-            tables = sym PAGE_TABLES,
-            pt_offset = const 3 * 4096, // Offset to PT (3 page tables * 4096 bytes each)
         );
+    }
+}
+
+#[no_mangle]
+extern "C" fn handle_page_fault(fault_addr: u64) {
+    unsafe {
+        let pt_idx = (fault_addr >> 12) & 0x1FF;
+        PAGE_TABLES.pt.entries[pt_idx as usize] = (fault_addr & !0xFFF) | 0x3;
+
+        // Invalidate TLB for this address
+        core::arch::asm!("invlpg [{}]", in(reg) fault_addr);
     }
 }
 
 #[naked]
 extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
     unsafe {
-        core::arch::naked_asm!(
+        core::arch::asm!(
             "push rax",
             "push rcx",
             "push rdx",
@@ -354,7 +365,7 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
             "push r14",
             "push r15",
 
-            "mov al, 0x20",
+            "mov al, 0x20",  // EOI
             "out 0x20, al",
 
             "pop r15",
