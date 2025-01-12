@@ -7,7 +7,48 @@ use core::panic::PanicInfo;
 mod serial;
 use serial::SerialPort;
 use unstable_matter::UnstableMatter;
-use core::arch::asm;
+
+static mut GDT: GDTTable = GDTTable {
+    entries: [
+        // Null descriptor
+        GDTEntry {
+            limit_low: 0,
+            base_low: 0,
+            base_middle: 0,
+            access: 0,
+            granularity: 0,
+            base_high: 0,
+        },
+        // 64-bit code segment
+        GDTEntry {
+            limit_low: 0xFFFF,
+            base_low: 0,
+            base_middle: 0,
+            access: 0x9A,      // Present | DPL0 | S | Code | Read
+            granularity: 0xAF, // 4K unit | 64-bit | Limit(0xF)
+            base_high: 0,
+        },
+        // Data segment
+        GDTEntry {
+            limit_low: 0xFFFF,
+            base_low: 0,
+            base_middle: 0,
+            access: 0x92,      // Present | DPL0 | S | Data | Write
+            granularity: 0xCF, // 4K unit | 32-bit | Limit(0xF)
+            base_high: 0,
+        },
+    ]
+};
+
+// Create a const default entry
+const DEFAULT_IDT_ENTRY: IDTEntry = IDTEntry {
+    offset_low: 0,
+    segment: 0,
+    flags: 0,
+    offset_middle: 0,
+    offset_high: 0,
+    reserved: 0,
+};
 
 #[repr(C, packed)]
 struct InterruptStackFrame {
@@ -87,16 +128,6 @@ struct IDT {
     entries: [IDTEntry; 256],
 }
 
-// Create a const default entry
-const DEFAULT_IDT_ENTRY: IDTEntry = IDTEntry {
-    offset_low: 0,
-    segment: 0,
-    flags: 0,
-    offset_middle: 0,
-    offset_high: 0,
-    reserved: 0,
-};
-
 // Single definition of IDT using const array
 #[no_mangle]
 #[link_section = ".data"]
@@ -128,29 +159,6 @@ static mut PAGE_TABLES: PageTables = PageTables {
     pml4: PageTable { entries: [0; 512] },
     pdpt: PageTable { entries: [0; 512] },
     pd: PageTable { entries: [0; 512] },
-};
-
-static mut GDT: GDTTable = GDTTable {
-    entries: [
-        // Null descriptor - properly initialized with all fields
-        GDTEntry {
-            limit_low: 0,
-            base_low: 0,
-            base_middle: 0,
-            access: 0,
-            granularity: 0,
-            base_high: 0,
-        },
-        // Data segment
-        GDTEntry {
-            limit_low: 0xFFFF,
-            base_low: 0,
-            base_middle: 0,
-            access: 0x92,      // Present | DPL0 | S | Data | Write
-            granularity: 0xCF, // 4K unit | 32-bit | Limit(0xF)
-            base_high: 0,
-        },
-    ]
 };
 
 static mut STACK: Stack = Stack {
@@ -607,8 +615,14 @@ unsafe fn setup_idt() {
     // Set up IDT pointer
     let idtr = GDTPointer {
         limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &raw const IDT as *const _ as u32,
+        base: &raw const IDT as *const _ as u64,  // Changed from u32 to u64
     };
+
+    core::arch::asm!(
+        "lidt [{0}]",
+        in(reg) &idtr,
+                     options(readonly, nostack)
+    );
 
     // Load IDT
     core::arch::asm!(
