@@ -7,6 +7,7 @@ use core::panic::PanicInfo;
 mod serial;
 use serial::SerialPort;
 use unstable_matter::UnstableMatter;
+use core::arch::asm;
 
 static mut GDT: GDTTable = GDTTable {
     entries: [
@@ -72,6 +73,13 @@ struct PageTables {
 }
 
 #[repr(C, packed)]
+struct DescriptorTablePointer {
+    limit: u16,
+    base: u64,
+}
+
+
+#[repr(C, packed)]
 struct GDTEntry {
     limit_low: u16,
     base_low: u16,
@@ -112,27 +120,45 @@ static mut STAGE_INFO: StageInfo = StageInfo {
 };
 
 // Define IDT entry structure
+#[derive(Clone, Copy)]
 #[repr(C, packed)]
-#[derive(Copy, Clone)]
-struct IDTEntry {
+struct IdtEntry {
     offset_low: u16,
-    segment: u16,
-    flags: u16,
+    segment_selector: u16,
+    ist: u8,
+    flags: u8,
     offset_middle: u16,
     offset_high: u32,
     reserved: u32,
 }
 
-#[repr(C, align(16))]
-struct IDT {
-    entries: [IDTEntry; 256],
+impl IdtEntry {
+    const fn new(handler: u64) -> Self {
+        IdtEntry {
+            offset_low: (handler & 0xFFFF) as u16,
+            segment_selector: 0x08, // Code segment
+            ist: 0,
+            flags: 0x8E, // Present, Ring 0, Interrupt Gate
+            offset_middle: ((handler >> 16) & 0xFFFF) as u16,
+            offset_high: (handler >> 32) as u32,
+            reserved: 0,
+        }
+    }
+
+    const fn missing() -> Self {
+        Self::new(0)
+    }
 }
 
-// Single definition of IDT using const array
-#[no_mangle]
-#[link_section = ".data"]
-static mut IDT: IDT = IDT {
-    entries: [DEFAULT_IDT_ENTRY; 256],
+// Define the IDT structure
+#[repr(C, packed)]
+struct Idt {
+    entries: [IdtEntry; 256],
+}
+
+// Static IDT instance
+static mut IDT: Idt = Idt {
+    entries: [IdtEntry::missing(); 256],
 };
 
 #[repr(C, packed)]
@@ -366,47 +392,20 @@ unsafe fn setup_long_mode() {
     );
 }
 
+// Function to set up the IDT
 unsafe fn setup_idt() {
-    // Set up timer interrupt handler (IRQ0 -> INT 0x20)
-    IDT.entries[0x20] = IDTEntry {
-        offset_low: (timer_interrupt_handler as usize & 0xFFFF) as u16,
-        segment: 0x08,  // Code segment
-        flags: 0x8E00,  // Present, Ring 0, Interrupt Gate
-        offset_middle: ((timer_interrupt_handler as usize >> 16) & 0xFFFF) as u16,
-        offset_high: (timer_interrupt_handler as usize >> 32) as u32,
-        reserved: 0
-    };
-
-    // Set up IDT pointer
-    let idtr = GDTPointer {
-        limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &raw const IDT as *const _ as u64,  // Changed from u32 to u64
-    };
-
-    core::arch::asm!(
-        "lidt [{0}]",
-        in(reg) &idtr,
-                     options(readonly, nostack)
-    );
+    // Set up timer interrupt handler
+    IDT.entries[32] = IdtEntry::new(timer_interrupt_handler as u64);
 
     // Load IDT
-    core::arch::asm!(
-        "lidt [{0}]",
-        in(reg) &idtr,
-                     options(readonly, nostack)
-    );
-
-    let idtr = GDTPointer {
-        limit: (core::mem::size_of::<IDT>() - 1) as u16,
-        base: &raw const IDT as *const _ as u64,  // Changed from u32 to u64
+    let idt_descriptor = DescriptorTablePointer {
+        limit: (core::mem::size_of::<Idt>() - 1) as u16,
+        base: &IDT as *const Idt as u64,
     };
 
-    core::arch::asm!(
-        "lidt [{0}]",
-        in(reg) &idtr,
-                     options(readonly, nostack)
-    );
+    asm!("lidt [{}]", in(reg) &idt_descriptor);
 }
+
 
 unsafe fn setup_pic() {
     // ICW1: start initialization
@@ -575,6 +574,9 @@ pub unsafe extern "C" fn _start() -> ! {
     // First set up page tables before enabling paging
     setup_page_tables();
 
+    // Set up IDT
+    setup_idt();
+
     // Set CR3 to point to page tables
     core::arch::asm!(
         "mov rax, {0}",
@@ -641,6 +643,54 @@ pub unsafe extern "C" fn _start() -> ! {
                      target = sym rust_main,
                      options(noreturn)
     );
+}
+
+#[naked]
+extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
+    unsafe {
+        asm!(
+            // Save registers
+            "push rax",
+             "push rcx",
+             "push rdx",
+             "push rbx",
+             "push rbp",
+             "push rsi",
+             "push rdi",
+             "push r8",
+             "push r9",
+             "push r10",
+             "push r11",
+             "push r12",
+             "push r13",
+             "push r14",
+             "push r15",
+
+             // Send EOI
+             "mov al, 0x20",
+             "out 0x20, al",
+
+             // Restore registers
+             "pop r15",
+             "pop r14",
+             "pop r13",
+             "pop r12",
+             "pop r11",
+             "pop r10",
+             "pop r9",
+             "pop r8",
+             "pop rdi",
+             "pop rsi",
+             "pop rbp",
+             "pop rbx",
+             "pop rdx",
+             "pop rcx",
+             "pop rax",
+
+             "iretq",
+             options(noreturn)
+        );
+    }
 }
 
 #[panic_handler]
