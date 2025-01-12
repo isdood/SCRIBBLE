@@ -217,35 +217,25 @@ unsafe fn disable_interrupts() {
     );
 }
 
+// Update page table setup to use raw pointers
 unsafe fn setup_page_tables() {
-    // Clear tables first
-    for entry in &mut PAGE_TABLES.pml4.entries {
-        *entry = 0;
-    }
-    for entry in &mut PAGE_TABLES.pdpt.entries {
-        *entry = 0;
-    }
-    for entry in &mut PAGE_TABLES.pd.entries {
-        *entry = 0;
-    }
+    // Clear tables using raw pointers
+    let pml4_ptr = &raw mut PAGE_TABLES.pml4.entries[0] as *mut u64;
+    let pdpt_ptr = &raw mut PAGE_TABLES.pdpt.entries[0] as *mut u64;
+    let pd_ptr = &raw mut PAGE_TABLES.pd.entries[0] as *mut u64;
 
-    // PML4 -> PDPT
-    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3; // Present + Write
+    // Zero out tables
+    core::ptr::write_bytes(pml4_ptr, 0, 512);
+    core::ptr::write_bytes(pdpt_ptr, 0, 512);
+    core::ptr::write_bytes(pd_ptr, 0, 512);
 
-    // PDPT -> PD
-    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3; // Present + Write
+    // Set up mappings using raw pointers
+    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
+    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
+    PAGE_TABLES.pd.entries[0] = 0x83;  // Map first 2MB with huge pages
 
-    // Map first 2MB using 2MB pages
-    PAGE_TABLES.pd.entries[0] = 0x83; // Present + Write + Huge Page
-
-    // Map second 2MB for good measure
-    PAGE_TABLES.pd.entries[1] = 0x200083; // Next 2MB, Present + Write + Huge Page
-
-    // Ensure TLB is flushed
-    core::arch::asm!(
-        "mov cr3, cr3",
-        options(nomem, nostack)
-    );
+    // Flush TLB using 64-bit register
+    core::arch::asm!("mov rax, cr3", "mov cr3, rax");
 }
 
 #[allow(dead_code)]
@@ -570,70 +560,6 @@ unsafe fn enter_long_mode() -> ! {
     );
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn _start() -> ! {
-    // Disable interrupts first
-    core::arch::asm!("cli");
-
-    // Set up IDT
-    setup_idt();
-
-    // Set up page tables
-    setup_page_tables();
-
-    // Enable PAE
-    core::arch::asm!(
-        "mov eax, cr4",
-        "or eax, 1 << 5",  // PAE
-        "mov cr4, eax",
-    );
-
-    // Set up long mode
-    core::arch::asm!(
-        "mov ecx, 0xC0000080", // EFER MSR
-        "rdmsr",
-        "or eax, 1 << 8",      // LME
-        "wrmsr",
-    );
-
-    // Load GDT
-    setup_gdt();
-
-    // Enable paging
-    core::arch::asm!(
-        "mov eax, cr0",
-        "or eax, 0x80000001",  // PG + PE
-        "mov cr0, eax",
-    );
-
-    // Jump to long mode with a label > 1
-    core::arch::asm!(
-        "push 0x08",          // Code segment
-        "lea eax, [2f]",      // Get address of label 2
-        "push eax",
-        "retf",               // Far return
-        "2:",
-        ".code64",
-        "mov ax, 0x10",       // Data segment
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-
-        // Set up stack
-        "mov rsp, {stack}",
-        "mov rbp, rsp",
-
-        // Jump to Rust
-        "jmp {target}",
-
-        stack = in(reg) &STACK.data as *const u8 as u64 + 4096,
-                     target = sym rust_main,
-                     options(noreturn)
-    );
-}
-
 #[naked]
 unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
     core::arch::naked_asm!(
@@ -676,6 +602,70 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler() {
         "pop rax",
 
         "iretq",
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _start() -> ! {
+    // Disable interrupts first
+    core::arch::asm!("cli");
+
+    // Set up IDT
+    setup_idt();
+
+    // Set up page tables
+    setup_page_tables();
+
+    // Enable PAE in CR4
+    core::arch::asm!(
+        "mov rax, cr4",
+        "or rax, 1 << 5",  // PAE
+        "mov cr4, rax",
+    );
+
+    // Set up long mode in EFER
+    core::arch::asm!(
+        "mov ecx, 0xC0000080", // EFER MSR
+        "rdmsr",
+        "or eax, 1 << 8",      // LME
+        "wrmsr",
+    );
+
+    // Load GDT
+    setup_gdt();
+
+    // Enable paging in CR0
+    core::arch::asm!(
+        "mov rax, cr0",
+        "or rax, 0x80000001",  // PG + PE
+        "mov cr0, rax",
+    );
+
+    // Jump to long mode with a label > 1
+    core::arch::asm!(
+        "push qword ptr 0x08",  // Code segment
+        "lea rax, [rip + 2f]",  // Get address of label 2 using RIP-relative addressing
+        "push rax",
+        "retfq",                // Far return
+        "2:",
+        ".code64",
+        "mov ax, 0x10",         // Data segment
+        "mov ds, ax",
+        "mov es, ax",
+        "mov fs, ax",
+        "mov gs, ax",
+        "mov ss, ax",
+
+        // Set up stack using raw pointer
+        "mov rsp, {stack}",
+        "mov rbp, rsp",
+
+        // Jump to Rust
+        "jmp {target}",
+
+        stack = in(reg) &raw const STACK.data as *const u8 as u64 + 4096,
+                     target = sym rust_main,
+                     options(noreturn)
     );
 }
 
