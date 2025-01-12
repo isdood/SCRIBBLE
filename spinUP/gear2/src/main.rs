@@ -52,11 +52,11 @@ static mut PAGE_TABLES: PageTables = PageTables {
 
 unsafe fn setup_page_tables() {
     // First clear all tables
-    core::ptr::write_bytes(&mut PAGE_TABLES as *mut _, 0, 1);
+    core::ptr::write_bytes(&raw mut PAGE_TABLES as *mut _, 0, 1);
 
     // Identity map first 2MB with a single 2MB page
-    PAGE_TABLES.pml4.entries[0] = (&PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
-    PAGE_TABLES.pdpt.entries[0] = (&PAGE_TABLES.pd as *const _ as u64) | 0x3;
+    PAGE_TABLES.pml4.entries[0] = (&raw const PAGE_TABLES.pdpt as *const _ as u64) | 0x3;
+    PAGE_TABLES.pdpt.entries[0] = (&raw const PAGE_TABLES.pd as *const _ as u64) | 0x3;
     PAGE_TABLES.pd.entries[0] = 0x83; // Present + writable + huge page (2MB)
 
     // Load CR3 with PML4 address
@@ -64,7 +64,7 @@ unsafe fn setup_page_tables() {
         ".code32",
         "mov eax, {pml4:e}",
         "mov cr3, eax",
-        pml4 = in(reg) &PAGE_TABLES.pml4 as *const _ as u32,
+        pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
     );
 }
 
@@ -219,7 +219,7 @@ static mut GDT_PTR: GdtPointer = GdtPointer {
 
 unsafe fn setup_gdt() {
     // Set the GDT base address
-    GDT_PTR.base = &GDT as *const _ as u64;
+    GDT_PTR.base = &raw const GDT as *const _ as u64;
 }
 
 unsafe fn setup_pic() {
@@ -430,10 +430,10 @@ pub unsafe extern "C" fn _start() -> ! {
         ".code32",
         "lgdt [{gdt}]",        // Load GDT
         "push 0x08",           // Code segment
-        "lea eax, [1f]",       // Target address
+        "lea eax, [lm_entry]", // Target address
         "push eax",
         "retf",                // Far return to 64-bit mode
-        "1:",
+        "lm_entry:",           // Changed from "1:" to "lm_entry:"
         ".code64",
         // Set up segment registers
         "mov ax, 0x10",        // Data segment
@@ -449,8 +449,8 @@ pub unsafe extern "C" fn _start() -> ! {
         "sti",
         // Jump to Rust main
         "jmp {main}",
-        gdt = in(reg) &GDT_PTR,
-                     stack = in(reg) &STACK.data as *const _ as u64 + 4096,
+        gdt = in(reg) &raw const GDT_PTR,
+                     stack = in(reg) &raw const STACK.data as *const _ as u64 + 4096,
                      main = sym rust_main,
                      options(noreturn)
     );
