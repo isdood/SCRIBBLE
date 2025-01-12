@@ -260,7 +260,7 @@ pub unsafe extern "C" fn _start() -> ! {
     core::arch::asm!(
         ".code32",
         "jmp {0}, {1}",
-        "long_mode:",    // Changed from "1:" to "long_mode:"
+        "2:",    // Changed to use a numeric label starting with 2
         ".code64",
         "mov ax, 0x10",   // Data segment
         "mov ds, ax",
