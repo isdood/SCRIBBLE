@@ -1,10 +1,9 @@
 // src/wrapper.rs
 
-mod unstable_matter;
-mod unstable_vectrix;
+// lib/unstable_matter/src/wrapper.rs
 
-use unstable_matter::UnstableMatter;
-use unstable_vectrix::UnstableVectrix;
+use crate::unstable_matter::UnstableMatter;
+use crate::unstable_vectrix::UnstableVectrix;
 
 pub enum Implementation {
     Old,
@@ -22,7 +21,7 @@ impl<T> Wrapper<T> {
         match implementation {
             Implementation::Old => Self {
                 implementation,
-                old: Some(UnstableMatter::new_at_addr(addr)),
+                old: Some(UnstableMatter::at(addr)), // Changed from new_at_addr to at
                 new: None,
             },
             Implementation::New => Self {
@@ -35,14 +34,14 @@ impl<T> Wrapper<T> {
 
     pub fn read(&self, idx: usize) -> T where T: Copy {
         match self.implementation {
-            Implementation::Old => self.old.as_ref().unwrap().read(),
+            Implementation::Old => unsafe { self.old.as_ref().unwrap().read() },
             Implementation::New => self.new.as_ref().unwrap().read(idx),
         }
     }
 
     pub fn write(&self, idx: usize, value: T) {
         match self.implementation {
-            Implementation::Old => self.old.as_ref().unwrap().write(value),
+            Implementation::Old => unsafe { self.old.as_ref().unwrap().write(value) },
             Implementation::New => self.new.as_ref().unwrap().write(idx, value),
         }
     }
@@ -50,7 +49,7 @@ impl<T> Wrapper<T> {
     pub fn move_to(&mut self, new_addr: usize) {
         match self.implementation {
             Implementation::Old => {
-                self.old = Some(unsafe { UnstableMatter::new_at_addr(new_addr) });
+                self.old = Some(unsafe { UnstableMatter::at(new_addr) }); // Changed from new_at_addr to at
             },
             Implementation::New => {
                 self.new.as_mut().unwrap().move_to(new_addr);
