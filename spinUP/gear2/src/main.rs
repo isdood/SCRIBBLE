@@ -267,6 +267,75 @@ unsafe fn setup_pic() {
 }
 
 #[naked]
+extern "x86-interrupt" fn page_fault_handler() -> ! {
+    unsafe {
+        core::arch::naked_asm!(
+            "push rax",
+            "push rcx",
+            "push rdx",
+            "push rbx",
+            "push rbp",
+            "push rsi",
+            "push rdi",
+            "push r8",
+            "push r9",
+            "push r10",
+            "push r11",
+            "push r12",
+            "push r13",
+            "push r14",
+            "push r15",
+
+            // Get error code and faulting address
+            "mov rax, cr2",     // Get the faulting address
+            "mov rbx, [rsp+120]", // Get error code from stack
+
+            // Handle the page fault by mapping the page
+            "mov rcx, rax",     // Save faulting address
+            "shr rax, 12",      // Get page number
+            "and rax, 0x1FF",   // Get index into PT
+            "shl rax, 3",       // Multiply by 8 for entry size
+
+            // Get address of page tables
+            "lea rbx, [{tables}]",
+            "add rbx, {pt_offset}", // Offset to page table
+            "add rbx, rax",     // Point to PT entry
+            "mov rax, rcx",     // Get back faulting address
+            "and rax, ~0xFFF",  // Clear low 12 bits
+            "or rax, 0x3",      // Present + writable
+            "mov [rbx], rax",   // Set PT entry
+
+            // Invalidate TLB entry
+            "invlpg [rcx]",
+
+            // Restore registers and return
+            "pop r15",
+            "pop r14",
+            "pop r13",
+            "pop r12",
+            "pop r11",
+            "pop r10",
+            "pop r9",
+            "pop r8",
+            "pop rdi",
+            "pop rsi",
+            "pop rbp",
+            "pop rbx",
+            "pop rdx",
+            "pop rcx",
+            "pop rax",
+
+            "add rsp, 8",  // Remove error code
+            "iretq",
+
+            tables = sym PAGE_TABLES,
+            pt_offset = const 3 * 4096, // Offset to PT (3 page tables * 4096 bytes each)
+        options(noreturn)
+        );
+    }
+}
+
+#[naked]
 extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
     unsafe {
         core::arch::naked_asm!(
@@ -306,72 +375,7 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
             "pop rax",
 
             "iretq",
-        );
-    }
-}
-
-#[naked]
-extern "x86-interrupt" fn page_fault_handler() -> ! {
-    unsafe {
-        core::arch::naked_asm!(
-            "push rax",
-            "push rcx",
-            "push rdx",
-            "push rbx",
-            "push rbp",
-            "push rsi",
-            "push rdi",
-            "push r8",
-            "push r9",
-            "push r10",
-            "push r11",
-            "push r12",
-            "push r13",
-            "push r14",
-            "push r15",
-
-            // Get error code and faulting address
-            "mov rax, cr2",     // Get the faulting address
-            "mov rbx, [rsp+120]", // Get error code from stack
-
-            // Handle the page fault by mapping the page
-            "mov rcx, rax",     // Save faulting address
-            "shr rax, 12",      // Get page number
-            "and rax, 0x1FF",   // Get index into PT
-            "shl rax, 3",       // Multiply by 8 for entry size
-
-            // Get address of page tables using sym
-            "mov rbx, {pt}",
-            "add rbx, rax",     // Point to PT entry
-            "mov rax, rcx",     // Get back faulting address
-            "and rax, ~0xFFF",  // Clear low 12 bits
-            "or rax, 0x3",      // Present + writable
-            "mov [rbx], rax",   // Set PT entry
-
-            // Invalidate TLB entry
-            "invlpg [rcx]",
-
-            // Restore registers and return
-            "pop r15",
-            "pop r14",
-            "pop r13",
-            "pop r12",
-            "pop r11",
-            "pop r10",
-            "pop r9",
-            "pop r8",
-            "pop rdi",
-            "pop rsi",
-            "pop rbp",
-            "pop rbx",
-            "pop rdx",
-            "pop rcx",
-            "pop rax",
-
-            "add rsp, 8",  // Remove error code
-            "iretq",
-
-            pt = sym PAGE_TABLES.pt,
+            options(noreturn)
         );
     }
 }
