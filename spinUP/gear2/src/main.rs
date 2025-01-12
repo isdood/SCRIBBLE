@@ -108,25 +108,6 @@ static mut STAGE_INFO: StageInfo = StageInfo {
     flags: 0,
 };
 
-// Define IDT entry structure
-#[derive(Clone, Copy)]
-#[repr(C)]  // Just use C representation for predictable layout
-struct IdtEntry {
-    offset_low: u16,
-    segment_selector: u16,
-    ist: u8,
-    flags: u8,
-    offset_middle: u16,
-    offset_high: u32,
-    reserved: u32,
-}
-
-// Ensure alignment of the entire IDT array
-#[repr(align(16))]
-struct Idt {
-    entries: [IdtEntry; 256]
-}
-
 // Initialize the IDT
 static mut IDT: Idt = Idt {
     entries: {
@@ -143,13 +124,18 @@ static mut IDT: Idt = Idt {
     }
 };
 
-#[repr(C, packed)]
-struct IdtPointer {
-    limit: u16,
-    base: u64,
-}
-
 unsafe fn setup_idt() {
+    // Set up timer interrupt handler
+    IDT.entries[32] = IdtEntry {
+        offset_low: (timer_interrupt_handler as u64 & 0xFFFF) as u16,
+        segment_selector: 0x08,
+        ist: 0,
+        flags: 0x8E,
+        offset_middle: ((timer_interrupt_handler as u64 >> 16) & 0xFFFF) as u16,
+        offset_high: (timer_interrupt_handler as u64 >> 32) as u32,
+        reserved: 0,
+    };
+
     let idt_ptr = IdtPointer {
         limit: (core::mem::size_of::<Idt>() - 1) as u16,
         base: &raw const IDT as *const _ as u64,
@@ -159,12 +145,6 @@ unsafe fn setup_idt() {
         "lidt [{0}]",
         in(reg) &idt_ptr
     );
-}
-
-#[repr(C, packed)]
-struct GDTPointer {
-    limit: u16,
-    base: u64,  // Changed from u32 to u64
 }
 
 unsafe fn setup_gdt() {
@@ -572,7 +552,7 @@ pub unsafe extern "C" fn _start() -> ! {
     // Load CR3 with PML4 table address
     core::arch::asm!(
         ".code32",
-        "mov eax, {pml4:e}",  // Use :e format specifier for 32-bit register
+        "mov eax, {pml4:e}",
         "mov cr3, eax",
         pml4 = in(reg) &raw const PAGE_TABLES.pml4 as *const _ as u32,
     );
@@ -616,12 +596,12 @@ pub unsafe extern "C" fn _start() -> ! {
         ".code32",
         // Push the code segment and target address
         "push 0x08",           // Code segment selector
-        "lea eax, [long_mode_start]", // Get address of label
+        "lea eax, [2f]",       // Get address of label 2
         "push eax",
         "retf",                // Far return to 64-bit code
 
         // 64-bit code starts here
-        "long_mode_start:",    // Changed from "1:" to descriptive label
+        "2:",                  // Using numeric label instead of named label
         ".code64",
         // Load 64-bit segment selectors
         "mov ax, 0x10",
@@ -647,11 +627,12 @@ pub unsafe extern "C" fn _start() -> ! {
     );
 }
 
+
 #[naked]
 extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
     unsafe {
         core::arch::naked_asm!(
-            "push rax",        // Save registers
+            "push rax",
             "push rcx",
             "push rdx",
             "push rbx",
@@ -667,11 +648,9 @@ extern "x86-interrupt" fn timer_interrupt_handler() -> ! {
             "push r14",
             "push r15",
 
-            // Handle interrupt
-            "mov al, 0x20",    // EOI
+            "mov al, 0x20",
             "out 0x20, al",
 
-            // Restore registers
             "pop r15",
             "pop r14",
             "pop r13",
