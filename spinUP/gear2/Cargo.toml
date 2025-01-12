@@ -15,4 +15,5 @@ panic = "abort"
 strip = true
 
 [dependencies]
+x86_64 = "0.14"  # Add this line
 unstable_matter = { path = "../../lib/unstable_matter" }
