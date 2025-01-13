@@ -5,22 +5,23 @@
 // Theory: Quantum Pattern Transfer enables replication of quantum states through
 // data pattern copying without triggering wave function collapse through observation.
 
-use crate::vector::FloatVector3D;  // Changed from vector_space to vector
-use crate::align::*;  // Import align module
+use crate::vector::Vector3D;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::f64::consts::PI;
+use libm::{sin, sqrt};  // Use libm for math functions
 
 // New quantum pattern structure for non-observational transfers
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct QuantumDataPattern {
-    pub mesh_shape: [Vector3D<f64>; 2],  // Fixed size array instead of vec
+    pub mesh_shape: [Vector3D<f64>; 2],  // Fixed array instead of vec
     pub quantum_signature: [u8; 32],
     pub pattern_coherence: f64,
-    pub timestamp: AtomicUsize,
+    // Use Arc instead of raw AtomicUsize for Clone
+    pub timestamp: std::sync::Arc<AtomicUsize>,
 }
 
 pub struct ProtectedQuantumState {
-    internal_state: Mutex<Option<QuantumData>>,
+    internal_state: Option<QuantumData>,
     observation_count: AtomicUsize,
 }
 
@@ -34,18 +35,22 @@ struct QuantumData {
 pub struct MeshClock {
     alpha_cell: MeshCell,
     omega_cell: MeshCell,
-    signal_vector: FloatVector3D,
+    signal_vector: Vector3D<f64>,
     last_ping: AtomicUsize,
     oscillation_count: AtomicUsize,
     measured_interval: AtomicUsize,
     quantum_state: QuantumState,
     entanglement_strength: AtomicUsize,
+    pattern_buffer: Option<QuantumDataPattern>,
 }
 
 pub struct MeshCell {
     pub position: Vector3D<f64>,
     pub state: CellState,
     pub quantum_signature: [u8; 32],
+    pub energy_level: AtomicUsize,
+    pub last_interaction: AtomicUsize,
+    pub protected_state: ProtectedQuantumState,
 }
 
 #[derive(Debug, PartialEq)]
@@ -58,7 +63,7 @@ pub enum CellState {
     PatternReplication,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum QuantumState {
     Coherent,
     Entangled,
