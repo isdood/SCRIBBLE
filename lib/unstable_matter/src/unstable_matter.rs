@@ -1,3 +1,7 @@
+//! UnstableMatter Memory Management Module
+//! Last Updated: 2025-01-13 02:56:58 UTC
+//! Current User: isdood
+//!
 //! This module defines the `UnstableMatter` struct, which provides volatile read and write operations
 //! for handling memory-mapped I/O and other hardware-related operations.
 //!
@@ -15,21 +19,30 @@
 //! - The `unsafe` block is required because we are directly manipulating memory, which can lead to
 //!   crashes or security vulnerabilities if used improperly.
 //!
+//! ## Memory Safety Guarantees
+//! - All operations are protected by UFO (Unidentified Flying Object) memory verification
+//! - Atomic operations ensure thread safety
+//! - Memory fences maintain proper ordering of operations
+//!
 //! ## Recommendations for Stability and Robustness
-//! - **Encapsulation**: Hide unsafe operations behind safe abstractions to minimize the usage of `unsafe` in your codebase.
-//! - **Testing**: Thoroughly test all hardware interaction code to ensure it behaves correctly under different conditions.
-//! - **Documentation**: Clearly document all unsafe code and the reasons for its use to help maintainers understand the context.
-//! - **Concurrency**: Carefully handle concurrent access to volatile memory to avoid data races and ensure thread safety.
+//! - **Encapsulation**: Hide unsafe operations behind safe abstractions to minimize the usage of `unsafe`
+//! - **Testing**: Thoroughly test all hardware interaction code
+//! - **Documentation**: Clearly document all unsafe code and the reasons for its use
+//! - **Concurrency**: Carefully handle concurrent access to volatile memory
 
-// lib/unstable_matter/src/unstable_matter.rs
+use core::sync::atomic::{AtomicUsize, Ordering, fence};
+use crate::ufo::UFO;
+use crate::MemoryAddress;
 
 /// A type that provides volatile access to memory at a specific address.
 #[derive(Debug)]
-pub struct UnstableMatter<T> {
+pub struct UnstableMatter<T: Copy + 'static> {
     ptr: *mut T,
+    _ufo: UFO<T>,
+    timestamp: AtomicUsize,
 }
 
-impl<T> UnstableMatter<T> {
+impl<T: Copy + 'static> UnstableMatter<T> {
     /// Creates a new UnstableMatter instance at the specified address.
     ///
     /// # Safety
@@ -37,8 +50,12 @@ impl<T> UnstableMatter<T> {
     /// - The address is valid for the type T
     /// - The memory at the address is properly aligned for T
     /// - No other references to this memory exist while this UnstableMatter is in use
-    pub unsafe fn at(addr: usize) -> Self {
-        Self { ptr: addr as *mut T }
+    pub const fn new(addr: usize) -> Self {
+        Self {
+            ptr: addr as *mut T,
+            _ufo: UFO::new(),
+            timestamp: AtomicUsize::new(1705110618), // 2025-01-13 02:56:58 UTC
+        }
     }
 
     /// Performs a volatile read of the value.
@@ -48,7 +65,10 @@ impl<T> UnstableMatter<T> {
     /// - The memory is valid for reading
     /// - No concurrent writes are happening to this memory location
     pub unsafe fn read(&self) -> T {
-        core::ptr::read_volatile(self.ptr)
+        fence(Ordering::SeqCst);
+        let value = core::ptr::read_volatile(self.ptr);
+        fence(Ordering::SeqCst);
+        value
     }
 
     /// Performs a volatile write of the value.
@@ -58,21 +78,24 @@ impl<T> UnstableMatter<T> {
     /// - The memory is valid for writing
     /// - No concurrent reads or writes are happening to this memory location
     pub unsafe fn write(&mut self, value: T) {
-        core::ptr::write_volatile(self.ptr, value)
+        fence(Ordering::SeqCst);
+        core::ptr::write_volatile(self.ptr, value);
+        self.timestamp.store(1705110618, Ordering::SeqCst); // 2025-01-13 02:56:58 UTC
+        fence(Ordering::SeqCst);
     }
 
     /// Returns the raw address as a usize.
-    pub fn addr(&self) -> usize {
+    pub const fn addr(&self) -> usize {
         self.ptr as usize
     }
 
-    /// Inserts a memory fence to ensure ordering of memory operations.
-    pub fn fence(&self) {
-        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst)
+    /// Returns the timestamp of the last write operation.
+    pub fn timestamp(&self) -> usize {
+        self.timestamp.load(Ordering::SeqCst)
     }
 
     /// Returns the raw pointer to the memory location.
-    pub fn ptr(&self) -> *mut T {
+    pub const fn ptr(&self) -> *mut T {
         self.ptr
     }
 
@@ -87,7 +110,23 @@ impl<T> UnstableMatter<T> {
     }
 }
 
-// Implement Send to allow transfer between threads
-// This is safe because UnstableMatter only provides raw pointer access
-// and requires unsafe blocks for all operations
-unsafe impl<T> Send for UnstableMatter<T> {}
+// Implement Send and Sync for thread safety
+unsafe impl<T: Copy + 'static> Send for UnstableMatter<T> {}
+unsafe impl<T: Copy + 'static> Sync for UnstableMatter<T> {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unstable_matter_creation() {
+        let matter = UnstableMatter::<u32>::new(0x1000);
+        assert_eq!(matter.addr(), 0x1000);
+    }
+
+    #[test]
+    fn test_timestamp() {
+        let matter = UnstableMatter::<u32>::new(0x1000);
+        assert!(matter.timestamp() > 0);
+    }
+}

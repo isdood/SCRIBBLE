@@ -1,12 +1,16 @@
-#[derive(Debug, Clone)]
-pub struct Vector3D {
-    pub x: isize,
-    pub y: isize,
-    pub z: isize,
+// lib/unstable_matter/src/vector.rs
+#[derive(Debug, Clone, Copy)]
+pub struct Vector3D<T> {
+    pub x: T,
+    pub y: T,
+    pub z: T,
 }
 
-impl Vector3D {
-    pub fn new(x: isize, y: isize, z: isize) -> Self {
+impl<T> Vector3D<T> {
+    pub const fn new(x: T, y: T, z: T) -> Self {
         Self { x, y, z }
     }
 }
+
+pub type IntVector3D = Vector3D<isize>;
+pub type FloatVector3D = Vector3D<f64>;

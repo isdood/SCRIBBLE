@@ -1,51 +1,41 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-use crate::vector::Vector3D;
+// lib/unstable_matter/src/morph_tracker.rs
+use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::vector::FloatVector3D;
 
-#[derive(Debug, Clone)]
-pub struct MorphTracker {
-    pub timestamp: AtomicUsize,
-    pub modifier: &'static str,
-    morph_types: Vec<MorphType>,
-}
-
-#[derive(Debug, Clone)]
-pub struct MorphType {
-    pub file_type: FileType,
-    pub edge_markers: [Option<EdgeMarker>; 6],
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct EdgeMarker {
-    pub position: Vector3D,
+    pub position: FloatVector3D,
     pub marker_type: MarkerType,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum FileType {
-    Rust,
-    Other,
+#[derive(Debug, Clone, Copy)]
+pub struct MorphTracker {
+    pub timestamp: AtomicUsize,
+    pub modifier: &'static str,
+    markers: [Option<EdgeMarker>; 6],
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum MarkerType {
     Point,
 }
 
-impl Default for EdgeMarker {
-    fn default() -> Self {
+impl EdgeMarker {
+    pub const fn new() -> Self {
         Self {
-            position: Vector3D::new(0, 0, 0),
+            position: FloatVector3D::new(0.0, 0.0, 0.0),
             marker_type: MarkerType::Point,
         }
     }
 }
 
 impl MorphTracker {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
+        const EMPTY_MARKER: Option<EdgeMarker> = None;
         Self {
-            timestamp: AtomicUsize::new(1705108505), // 2025-01-13 02:35:05 UTC
+            timestamp: AtomicUsize::new(1705109902), // 2025-01-13 02:53:22 UTC
             modifier: "isdood",
-            morph_types: Vec::new(),
+            markers: [EMPTY_MARKER; 6],
         }
     }
 

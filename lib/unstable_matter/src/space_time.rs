@@ -29,6 +29,8 @@
 use crate::wrapper::UnstableMatter;
 use core::marker::PhantomData;
 
+
+
 /// Represents dimensions in the vector space
 #[derive(Debug, Clone, Copy)]
 pub struct Dimensions {
@@ -56,13 +58,14 @@ pub enum SpaceType {
 
 /// Represents a space-time region for memory operations
 #[derive(Debug)]
-pub struct SpaceTime<T> {
-    base: UnstableMatter<T>,
+pub struct SpaceTime<T: Copy + 'static> {
+    memory: FluidMemory<T>,
     size: usize,
     offset: usize,
     stride: usize,
     dimensions: Dimensions,
-    _phantom: PhantomData<T>,
+    timestamp: AtomicUsize,
+    _ufo: UFO<T>,
 }
 
 impl<T> SpaceTime<T> {
