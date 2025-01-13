@@ -1,7 +1,7 @@
 #![no_std]
 
 /// Scribble Core Library
-/// Last Updated: 2025-01-13 00:48:50 UTC
+/// Last Updated: 2025-01-13 03:41:08 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -9,6 +9,7 @@
 extern crate unstable_matter;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
+use unstable_matter::UFO;
 
 // Public exports from unstable_matter
 pub use unstable_matter::{
@@ -17,12 +18,6 @@ pub use unstable_matter::{
     mesh::MeshCell,
     vector_space::VectorSpace,
 };
-
-// Module declarations
-pub mod align;
-
-// Public exports from local modules
-pub use align::{Alignment, AlignedRegion};
 
 // Type aliases for common use
 pub type Flying = unstable_matter::ufo::Flying;
@@ -59,7 +54,7 @@ impl<T: 'static> ScribbleMemory<T> {
     pub const fn const_at(addr: usize) -> Self {
         Self {
             addr: MemoryAddress::new(addr),
-            timestamp: AtomicUsize::new(1705102130), // 2025-01-13 00:48:50 UTC
+            timestamp: AtomicUsize::new(1705113668), // 2025-01-13 03:41:08 UTC
             _ufo: UFO::new(),
         }
     }
@@ -67,7 +62,7 @@ impl<T: 'static> ScribbleMemory<T> {
     pub fn at(addr: usize) -> Self {
         Self {
             addr: MemoryAddress::new(addr),
-            timestamp: AtomicUsize::new(1705102130), // 2025-01-13 00:48:50 UTC
+            timestamp: AtomicUsize::new(1705113668), // 2025-01-13 03:41:08 UTC
             _ufo: UFO::new(),
         }
     }
@@ -82,7 +77,7 @@ impl<T: 'static> ScribbleMemory<T> {
 
     pub unsafe fn write(&mut self, value: T) {
         core::ptr::write_volatile(self.addr.as_ptr(), value);
-        self.timestamp.store(1705102130, Ordering::SeqCst); // 2025-01-13 00:48:50 UTC
+        self.timestamp.store(1705113668, Ordering::SeqCst); // 2025-01-13 03:41:08 UTC
     }
 
     pub const fn addr(&self) -> usize {
@@ -122,7 +117,7 @@ impl<T: 'static + Copy> MemorySpace<T> {
             offset,
             stride: core::mem::size_of::<T>(),
             dimensions: Dimensions::new(size, 1, 1),
-            timestamp: AtomicUsize::new(1705102130), // 2025-01-13 00:48:50 UTC
+            timestamp: AtomicUsize::new(1705113668), // 2025-01-13 03:41:08 UTC
             _ufo: UFO::new(),
         }
     }
@@ -145,7 +140,7 @@ impl<T: 'static + Copy> MemorySpace<T> {
         assert!(index < self.size);
         let addr = self.base.addr() + (index * self.stride) + self.offset;
         ScribbleMemory::at(addr).write(value);
-        self.timestamp.store(1705102130, Ordering::SeqCst); // 2025-01-13 00:48:50 UTC
+        self.timestamp.store(1705113668, Ordering::SeqCst); // 2025-01-13 03:41:08 UTC
     }
 
     pub const fn size(&self) -> usize {
