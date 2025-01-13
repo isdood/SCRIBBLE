@@ -5,7 +5,7 @@
 
 use crate::{
     SpaceTime,
-    ufo::{Flying, TrackedUFO},
+    ufo::{Flying, Hovering, Landed, Protected, TrackedUFO},
 };
 use core::{
     sync::atomic::{AtomicUsize, Ordering},
@@ -22,11 +22,239 @@ pub struct VectorSpace<S = Flying> {
     /// Spatial configuration
     pub(crate) config: SpaceConfig,
     /// UFO tracking for memory safety
-    ufo: TrackedUFO<MeshCell>,
+    ufo_state: TrackedUFO<MeshCell>,
     /// Creation metadata
     metadata: SpaceMetadata,
     /// State marker
     _state: PhantomData<S>,
+}
+
+#[derive(Debug)]
+pub struct VectorSpace<S = Flying> {
+    /// Base address of the physical memory
+    pub(crate) origin: usize,
+    /// 3D mesh representing our memory space
+    pub(crate) mesh: SpaceTime<MeshCell>,
+    /// Spatial configuration
+    pub(crate) config: SpaceConfig,
+    /// UFO tracking for memory safety
+    ufo_state: TrackedUFO<MeshCell>,
+    /// Creation metadata
+    metadata: SpaceMetadata,
+    /// State marker
+    _state: PhantomData<S>,
+}
+
+// Implementation for Flying state
+impl VectorSpace<Flying> {
+    pub fn new(origin: usize, size: usize) -> Self {
+        let config = SpaceConfig {
+            dimensions: Vector3D::new(size as isize, size as isize, size as isize),
+            cell_size: 256,
+            cells: Vector3D::new(16, 16, 16),
+        };
+
+        let mesh_size = (config.cells.x * config.cells.y * config.cells.z) as usize;
+        let current_time = 1705100589; // 2025-01-13 00:23:09 UTC
+
+        let metadata = SpaceMetadata {
+            creation_time: AtomicUsize::new(current_time),
+            last_modified: AtomicUsize::new(current_time),
+            creator: "isdood",
+            last_modifier: "isdood",
+        };
+
+        Self {
+            origin,
+            mesh: SpaceTime::new(origin + size, mesh_size, 0),
+            config,
+            ufo_state: TrackedUFO::with_boundary(origin, size),
+            metadata,
+            _state: PhantomData,
+        }
+    }
+
+    pub fn land(mut self) -> VectorSpace<Landed> {
+        self.ufo_state.track();
+        VectorSpace {
+            origin: self.origin,
+            mesh: self.mesh,
+            config: self.config,
+            ufo_state: self.ufo_state,
+            metadata: self.metadata,
+            _state: PhantomData,
+        }
+    }
+
+    pub fn hover(mut self) -> VectorSpace<Hovering> {
+        self.ufo_state.track();
+        VectorSpace {
+            origin: self.origin,
+            mesh: self.mesh,
+            config: self.config,
+            ufo_state: self.ufo_state,
+            metadata: self.metadata,
+            _state: PhantomData,
+        }
+    }
+}
+
+// Implementation for Hovering state
+impl VectorSpace<Hovering> {
+    pub fn land(mut self) -> VectorSpace<Landed> {
+        self.ufo_state.track();
+        VectorSpace {
+            origin: self.origin,
+            mesh: self.mesh,
+            config: self.config,
+            ufo_state: self.ufo_state,
+            metadata: self.metadata,
+            _state: PhantomData,
+        }
+    }
+
+    pub fn take_off(mut self) -> VectorSpace<Flying> {
+        self.ufo_state.untrack();
+        VectorSpace {
+            origin: self.origin,
+            mesh: self.mesh,
+            config: self.config,
+            ufo_state: self.ufo_state,
+            metadata: self.metadata,
+            _state: PhantomData,
+        }
+    }
+}
+
+// Implementation for Landed state
+impl VectorSpace<Landed> {
+    pub fn take_off(mut self) -> VectorSpace<Flying> {
+        self.ufo_state.untrack();
+        VectorSpace {
+            origin: self.origin,
+            mesh: self.mesh,
+            config: self.config,
+            ufo_state: self.ufo_state,
+            metadata: self.metadata,
+            _state: PhantomData,
+        }
+    }
+
+    pub fn hover(mut self) -> VectorSpace<Hovering> {
+        VectorSpace {
+            origin: self.origin,
+            mesh: self.mesh,
+            config: self.config,
+            ufo_state: self.ufo_state,
+            metadata: self.metadata,
+            _state: PhantomData,
+        }
+    }
+}
+
+// Common implementations for all states
+impl<S> VectorSpace<S> {
+    pub fn init_mesh(&mut self) -> Result<(), &'static str> {
+        self.check_protection()?;
+        let current_time = 1705100589; // 2025-01-13 00:23:09 UTC
+
+        for z in 0..self.config.cells.z {
+            for y in 0..self.config.cells.y {
+                for x in 0..self.config.cells.x {
+                    let position = Vector3D::new(x, y, z);
+                    let idx = self.position_to_index(&position);
+                    let links = self.calculate_cell_links(&position);
+                    let cell = MeshCell::new(
+                        position,
+                        CellState::Free,
+                        current_time,
+                        "isdood",
+                    ).with_links(links);
+
+                    unsafe { self.mesh.write_at(idx, cell); }
+                }
+            }
+        }
+
+        self.metadata.last_modified.store(current_time, Ordering::SeqCst);
+        self.metadata.last_modifier = "isdood";
+        Ok(())
+    }
+
+    pub fn ufo_status(&self) -> bool {
+        self.ufo_state.is_tracked()
+    }
+
+    pub fn ufo_timestamp(&self) -> usize {
+        self.ufo_state.timestamp()
+    }
+
+    pub fn ufo_owner(&self) -> &'static str {
+        self.ufo_state.owner()
+    }
+
+    pub fn check_protection(&self) -> Result<(), &'static str> {
+        if !self.ufo_state.is_tracked() {
+            return Err("UFO protection is not active");
+        }
+        Ok(())
+    }
+
+    pub fn calculate_cell_links(&self, pos: &Vector3D) -> [Option<Vector3D>; 6] {
+        let mut links = [None; 6];
+        let directions = [
+            Vector3D::new(-1, 0, 0), // Left
+            Vector3D::new(1, 0, 0),  // Right
+            Vector3D::new(0, -1, 0), // Down
+            Vector3D::new(0, 1, 0),  // Up
+            Vector3D::new(0, 0, -1), // Back
+            Vector3D::new(0, 0, 1),  // Front
+        ];
+
+        for (i, dir) in directions.iter().enumerate() {
+            let neighbor = *pos + *dir;
+            if self.is_valid_position(&neighbor) {
+                links[i] = Some(neighbor);
+            }
+        }
+
+        links
+    }
+
+    pub fn is_valid_position(&self, pos: &Vector3D) -> bool {
+        pos.x >= 0 && pos.x < self.config.cells.x &&
+        pos.y >= 0 && pos.y < self.config.cells.y &&
+        pos.z >= 0 && pos.z < self.config.cells.z
+    }
+
+    pub fn position_to_index(&self, pos: &Vector3D) -> usize {
+        (pos.z * self.config.cells.x * self.config.cells.y +
+        pos.y * self.config.cells.x +
+        pos.x) as usize
+    }
+
+    pub fn index_to_position(&self, idx: usize) -> Vector3D {
+        let x = (idx % self.config.cells.x as usize) as isize;
+        let y = ((idx / self.config.cells.x as usize) % self.config.cells.y as usize) as isize;
+        let z = (idx / (self.config.cells.x * self.config.cells.y) as usize) as isize;
+        Vector3D::new(x, y, z)
+    }
+
+    pub fn addr_to_cell(&self, addr: usize) -> Option<Vector3D> {
+        if addr < self.origin || addr >= self.origin + self.config.cell_size * self.mesh.size() {
+            return None;
+        }
+        let idx = (addr - self.origin) / self.config.cell_size;
+        Some(self.index_to_position(idx))
+    }
+
+    pub fn config(&self) -> &SpaceConfig {
+        &self.config
+    }
+
+    pub fn metadata(&self) -> &SpaceMetadata {
+        &self.metadata
+    }
 }
 
 #[derive(Debug)]
