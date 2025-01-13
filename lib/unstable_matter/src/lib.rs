@@ -7,6 +7,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 /// Author: Caleb J.D. Terkovics (isdood)
 /// Current User: isdood
 
+mod align;
 pub mod vector;
 pub mod mesh;
 pub mod space_config;
@@ -17,6 +18,8 @@ pub mod ufo;
 pub mod mesh_clock;
 pub mod vector_space;
 
+// Re-export align module internals
+pub use align::*;
 
 // Re-export core components
 pub use vector::{Vector3D, IntVector3D};

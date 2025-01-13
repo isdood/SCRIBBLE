@@ -5,19 +5,22 @@
 // Theory: Quantum Pattern Transfer enables replication of quantum states through
 // data pattern copying without triggering wave function collapse through observation.
 
-use crate::vector::Vector3D;
+use crate::vector::Vector3D;  // Not FloatVector3D
+use crate::align::{Alignment, AlignedRegion, VECTOR_ALIGN, CACHE_LINE};
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::f64::consts::PI;
-use libm::{sin, sqrt};  // Use libm for math functions
+use libm::{sin, sqrt};
+
+const CURRENT_TIMESTAMP: usize = 1705130266; // 2025-01-13 07:17:46 UTC
 
 // New quantum pattern structure for non-observational transfers
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct QuantumDataPattern {
-    pub mesh_shape: [Vector3D<f64>; 2],  // Fixed array instead of vec
+    pub mesh_shape: [Vector3D<f64>; 2],  // Fixed size array for quantum patterns
     pub quantum_signature: [u8; 32],
     pub pattern_coherence: f64,
-    // Use Arc instead of raw AtomicUsize for Clone
-    pub timestamp: std::sync::Arc<AtomicUsize>,
+    pub timestamp: AtomicUsize,
+    alignment: Alignment,
 }
 
 pub struct ProtectedQuantumState {
@@ -42,15 +45,14 @@ pub struct MeshClock {
     quantum_state: QuantumState,
     entanglement_strength: AtomicUsize,
     pattern_buffer: Option<QuantumDataPattern>,
+    alignment: Alignment,
 }
 
 pub struct MeshCell {
     pub position: Vector3D<f64>,
     pub state: CellState,
     pub quantum_signature: [u8; 32],
-    pub energy_level: AtomicUsize,
-    pub last_interaction: AtomicUsize,
-    pub protected_state: ProtectedQuantumState,
+    region: AlignedRegion,
 }
 
 #[derive(Debug, PartialEq)]
@@ -75,11 +77,11 @@ pub enum QuantumState {
 impl ProtectedQuantumState {
     pub fn new() -> Self {
         Self {
-            internal_state: Mutex::new(Some(QuantumData {
+            internal_state: Some(QuantumData {
                 phase: 0.0,
                 coherence: 1.0,
-                last_update: 1705128225, // 2025-01-13 06:43:45 UTC
-            })),
+                last_update: CURRENT_TIMESTAMP,
+            }),
             observation_count: AtomicUsize::new(0),
         }
     }
@@ -131,34 +133,29 @@ impl ProtectedQuantumState {
 
 // Implementation of MeshCell
 impl MeshCell {
-    pub fn new(position: FloatVector3D) -> Self {
+    pub fn new(position: Vector3D<f64>) -> Self {
+        let alignment = Alignment::new(VECTOR_ALIGN);
+        let region = AlignedRegion::new(
+            0,  // Will be aligned by AlignedRegion
+            core::mem::size_of::<Self>(),
+                                        alignment
+        );
+
         Self {
             position,
             state: CellState::Calibrating,
-            energy_level: AtomicUsize::new(100),
-            last_interaction: AtomicUsize::new(1705128225), // 2025-01-13 06:43:45 UTC
             quantum_signature: [0; 32],
-            protected_state: ProtectedQuantumState::new(),
+            region,
         }
-    }
-
-    pub fn update_quantum_pattern(&mut self, pattern: &QuantumDataPattern) -> Result<(), &'static str> {
-        self.quantum_signature = pattern.quantum_signature;
-        self.state = CellState::PatternReplication;
-        self.last_interaction.store(1705128225, Ordering::SeqCst); // 2025-01-13 06:43:45 UTC
-        self.protected_state.update_from_pattern(pattern)
-    }
-
-    pub fn measure(&self) -> Result<f64, &'static str> {
-        self.protected_state.observe()
     }
 }
 
 // Implementation of MeshClock
 impl MeshClock {
-    pub fn new(origin: FloatVector3D, distance: f64) -> Self {
+    pub fn new(origin: Vector3D<f64>, distance: f64) -> Self {  // Changed from FloatVector3D
+        let alignment = Alignment::new(CACHE_LINE);
         let alpha_pos = origin;
-        let omega_pos = FloatVector3D::new(
+        let omega_pos = Vector3D::new(
             origin.x + distance,
             origin.y,
             origin.z
@@ -167,12 +164,14 @@ impl MeshClock {
         Self {
             alpha_cell: MeshCell::new(alpha_pos),
             omega_cell: MeshCell::new(omega_pos),
-            signal_vector: FloatVector3D::new(distance, 0.0, 0.0),
-            last_ping: AtomicUsize::new(1705128589), // Current timestamp
+            signal_vector: Vector3D::new(distance, 0.0, 0.0),
+            last_ping: AtomicUsize::new(CURRENT_TIMESTAMP),
             oscillation_count: AtomicUsize::new(0),
             measured_interval: AtomicUsize::new(0),
             quantum_state: QuantumState::Coherent,
             entanglement_strength: AtomicUsize::new(1000),
+            pattern_buffer: None,
+            alignment,
         }
     }
 
@@ -198,18 +197,18 @@ impl MeshClock {
     }
 
     pub fn transfer_quantum_pattern(&mut self) -> Result<(), &'static str> {
-        let pattern = self.alpha_cell.protected_state.transfer_pattern()?;
-
-        self.pattern_buffer = Some(QuantumDataPattern {
-            mesh_shape: vec![
+        let pattern = QuantumDataPattern {
+            mesh_shape: [
                 self.alpha_cell.position.clone(),
-                                   self.omega_cell.position.clone()
+                self.omega_cell.position.clone()
             ],
             quantum_signature: self.alpha_cell.quantum_signature,
-            pattern_coherence: pattern.pattern_coherence,
-            timestamp: AtomicUsize::new(1705128225), // 2025-01-13 06:43:45 UTC
-        });
+            pattern_coherence: 1.0,
+            timestamp: AtomicUsize::new(CURRENT_TIMESTAMP),
+            alignment: self.alignment.clone(),
+        };
 
+        self.pattern_buffer = Some(pattern);
         self.quantum_state = QuantumState::PatternTransfer;
         Ok(())
     }
