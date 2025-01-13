@@ -11,8 +11,12 @@ extern crate unstable_matter;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 // Public exports from unstable_matter
-pub use unstable_matter::vector_space::{Vector3D, VectorSpace, MeshCell, CellState};
-pub use unstable_matter::ufo::{UFO, Protected, MemoryTrace};
+pub use unstable_matter::{
+    Vector3D,
+    mesh::CellState,
+    mesh::MeshCell,
+    vector_space::VectorSpace,
+};
 
 // Module declarations
 pub mod align;

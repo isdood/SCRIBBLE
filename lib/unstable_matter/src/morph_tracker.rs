@@ -1,6 +1,5 @@
 // lib/unstable_matter/src/morph_tracker.rs
-
-use core::sync::atomic::AtomicUsize;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::vector::FloatVector3D;
 
 /// Represents different types of files that can be morphed
@@ -44,7 +43,7 @@ impl MorphTracker {
     pub const fn new() -> Self {
         const EMPTY_MARKER: Option<EdgeMarker> = None;
         Self {
-            timestamp: AtomicUsize::new(1705110709), // 2025-01-13 02:58:29 UTC
+            timestamp: AtomicUsize::new(1705113119), // 2025-01-13 03:31:59 UTC
             modifier: "isdood",
             markers: [EMPTY_MARKER; 6],
             file_type: FileType::Rust,
@@ -60,13 +59,13 @@ impl MorphTracker {
 
     fn create_rust_morph_type(&self) -> Result<(), &'static str> {
         // Implementation for Rust file morphing
-        self.timestamp.store(1705110709, Ordering::SeqCst); // 2025-01-13 02:58:29 UTC
+        self.timestamp.store(1705113119, Ordering::SeqCst); // 2025-01-13 03:31:59 UTC
         Ok(())
     }
 
     pub fn set_file_type(&mut self, file_type: FileType) {
         self.file_type = file_type;
-        self.timestamp.store(1705110709, Ordering::SeqCst); // 2025-01-13 02:58:29 UTC
+        self.timestamp.store(1705113119, Ordering::SeqCst); // 2025-01-13 03:31:59 UTC
     }
 
     pub fn get_file_type(&self) -> FileType {
@@ -75,10 +74,27 @@ impl MorphTracker {
 
     pub fn register_file_type(&mut self, file_type: FileType) -> Result<(), &'static str> {
         self.file_type = file_type;
-        self.timestamp.store(1705111512, Ordering::SeqCst); // 2025-01-13 03:05:12 UTC
+        self.timestamp.store(1705113119, Ordering::SeqCst); // 2025-01-13 03:31:59 UTC
         Ok(())
     }
 
+    pub fn get_marker(&self, index: usize) -> Option<EdgeMarker> {
+        if index < 6 {
+            self.markers[index]
+        } else {
+            None
+        }
+    }
+
+    pub fn set_marker(&mut self, index: usize, marker: EdgeMarker) -> Result<(), &'static str> {
+        if index < 6 {
+            self.markers[index] = Some(marker);
+            self.timestamp.store(1705113119, Ordering::SeqCst); // 2025-01-13 03:31:59 UTC
+            Ok(())
+        } else {
+            Err("Marker index out of bounds")
+        }
+    }
 }
 
 #[cfg(test)]
@@ -103,5 +119,21 @@ mod tests {
         let tracker = MorphTracker::new();
         tracker.set_file_type(FileType::Other);
         assert!(tracker.create_morph_type().is_err());
+    }
+
+    #[test]
+    fn test_marker_operations() {
+        let mut tracker = MorphTracker::new();
+        let marker = EdgeMarker::new();
+
+        // Test setting a marker
+        assert!(tracker.set_marker(0, marker).is_ok());
+
+        // Test getting a marker
+        assert!(tracker.get_marker(0).is_some());
+        assert!(tracker.get_marker(6).is_none());
+
+        // Test out of bounds
+        assert!(tracker.set_marker(6, marker).is_err());
     }
 }

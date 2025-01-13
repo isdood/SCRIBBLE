@@ -1,14 +1,12 @@
 #![no_std]
 
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::vector::IntVector3D;
 
 /// UnstableMatter Core Library
-/// Last Updated: 2025-01-13 03:11:38 UTC
+/// Last Updated: 2025-01-13 03:23:37 UTC
 /// Author: Caleb J.D. Terkovics (isdood)
 /// Current User: isdood
 
-// Module declarations
 pub mod vector;
 pub mod mesh;
 pub mod space_config;
@@ -18,12 +16,12 @@ pub mod vector_space;
 pub mod ufo_states;
 pub mod ufo;
 
-// Re-export core components from modules
-pub use vector::Vector3D;
-pub use mesh::{MeshCell, SpaceTime, CellState};
+// Re-export core components
+pub use vector::{Vector3D, IntVector3D};
+pub use mesh::MeshCell;
 pub use space_config::{SpaceConfig, SpaceMetadata};
 pub use tracked_ufo::TrackedUFO;
-pub use morph_tracker::MorphTracker;
+pub use morph_tracker::{MorphTracker, FileType};
 pub use vector_space::VectorSpace;
 pub use ufo_states::UFOState;
 

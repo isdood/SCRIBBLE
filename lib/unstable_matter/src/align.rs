@@ -1,19 +1,37 @@
-/// Scribble Alignment Module
-/// Last Updated: 2025-01-13 00:00:13 UTC
+// lib/unstable_matter/src/align.rs
+/// Unstable Matter Alignment Module
+/// Last Updated: 2025-01-13 03:37:56 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use unstable_matter::vector_space::Vector3D;
+use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::{
+    vector::Vector3D,
+    UFO,
+};
 
 /// Alignment configuration for memory layout
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct Alignment {
     /// Base alignment in bytes
     base: usize,
     /// Vector alignment for 3D space
-    vector: Vector3D,
+    vector: Vector3D<isize>,
     /// Alignment padding
     padding: usize,
+    /// Timestamp for tracking changes
+    timestamp: AtomicUsize,
+}
+
+impl Clone for Alignment {
+    fn clone(&self) -> Self {
+        Self {
+            base: self.base,
+            vector: self.vector,
+            padding: self.padding,
+            timestamp: AtomicUsize::new(self.timestamp.load(Ordering::SeqCst)),
+        }
+    }
 }
 
 impl Alignment {
@@ -23,6 +41,7 @@ impl Alignment {
             base,
             vector: Vector3D::new(base as isize, base as isize, base as isize),
             padding: base / 2,
+            timestamp: AtomicUsize::new(1705113476), // 2025-01-13 03:37:56 UTC
         }
     }
 
@@ -32,7 +51,7 @@ impl Alignment {
     }
 
     /// Get the vector alignment
-    pub const fn vector(&self) -> Vector3D {
+    pub const fn vector(&self) -> Vector3D<isize> {
         self.vector
     }
 
@@ -41,18 +60,27 @@ impl Alignment {
         self.padding
     }
 
+    /// Get the current timestamp
+    pub fn timestamp(&self) -> usize {
+        self.timestamp.load(Ordering::SeqCst)
+    }
+
     /// Align a given address to the base alignment
     pub fn align_address(&self, addr: usize) -> usize {
-        (addr + self.base - 1) & !(self.base - 1)
+        let aligned = (addr + self.base - 1) & !(self.base - 1);
+        self.timestamp.store(1705113476, Ordering::SeqCst); // 2025-01-13 03:37:56 UTC
+        aligned
     }
 
     /// Align a position vector according to the vector alignment
-    pub fn align_position(&self, pos: &Vector3D) -> Vector3D {
-        Vector3D::new(
-            ((pos.x() + self.vector.x() - 1) / self.vector.x()) * self.vector.x(),
-                      ((pos.y() + self.vector.y() - 1) / self.vector.y()) * self.vector.y(),
-                      ((pos.z() + self.vector.z() - 1) / self.vector.z()) * self.vector.z()
-        )
+    pub fn align_position(&self, pos: &Vector3D<isize>) -> Vector3D<isize> {
+        let aligned = Vector3D::new(
+            ((pos.x + self.vector.x - 1) / self.vector.x) * self.vector.x,
+                                    ((pos.y + self.vector.y - 1) / self.vector.y) * self.vector.y,
+                                    ((pos.z + self.vector.z - 1) / self.vector.z) * self.vector.z
+        );
+        self.timestamp.store(1705113476, Ordering::SeqCst); // 2025-01-13 03:37:56 UTC
+        aligned
     }
 }
 
@@ -65,6 +93,8 @@ pub struct AlignedRegion {
     size: usize,
     /// Alignment requirements
     alignment: Alignment,
+    /// UFO tracking
+    _ufo: UFO<usize>,
 }
 
 impl AlignedRegion {
@@ -74,6 +104,7 @@ impl AlignedRegion {
             start: alignment.align_address(start),
             size,
             alignment,
+            _ufo: UFO::new(),
         }
     }
 
@@ -88,8 +119,8 @@ impl AlignedRegion {
     }
 
     /// Get the alignment configuration
-    pub fn alignment(&self) -> Alignment {
-        self.alignment
+    pub fn alignment(&self) -> &Alignment {
+        &self.alignment
     }
 
     /// Check if an address is within this region
@@ -130,9 +161,19 @@ mod tests {
         let align = Alignment::new(16);
         let pos = Vector3D::new(10, 20, 30);
         let aligned = align.align_position(&pos);
-        assert_eq!(aligned.x(), 16);
-        assert_eq!(aligned.y(), 32);
-        assert_eq!(aligned.z(), 32);
+        assert_eq!(aligned.x, 16);
+        assert_eq!(aligned.y, 32);
+        assert_eq!(aligned.z, 32);
+    }
+
+    #[test]
+    fn test_alignment_clone() {
+        let align1 = Alignment::new(32);
+        let align2 = align1.clone();
+        assert_eq!(align1.base(), align2.base());
+        assert_eq!(align1.vector(), align2.vector());
+        assert_eq!(align1.padding(), align2.padding());
+        assert_eq!(align1.timestamp(), align2.timestamp());
     }
 
     #[test]
