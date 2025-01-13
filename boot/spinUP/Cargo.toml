@@ -3,11 +3,23 @@ name = "spinup"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "spinup"
+path = "src/lib.rs"
+
+[[bin]]
+name = "spinup"
+path = "src/main.rs"
+
+[dependencies]
+unstable_matter = { path = "../../lib/unstable_matter" }
+
 [profile.dev]
 panic = "abort"
 
 [profile.release]
 panic = "abort"
 
-[dependencies]
-unstable_matter = { path = "../../lib/unstable_matter" }
+[features]
+default = ["no_std"]
+no_std = []

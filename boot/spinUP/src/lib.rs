@@ -1,5 +1,5 @@
 // boot/spinUP/src/lib.rs
-// Last Updated: 2025-01-13 05:30:37 UTC
+// Last Updated: 2025-01-13 05:41:39 UTC
 // Author: Caleb J.D. Terkovics (isdood)
 // Current User: isdood
 
@@ -7,7 +7,7 @@
 
 pub mod boot_params;
 pub mod serial;
+pub mod memory;  // New module for memory operations
 
-// Re-export types that should be public
-pub use crate::boot_params::BootParams;
-pub use crate::serial::*;
+// Re-export memory functions
+pub use memory::*;

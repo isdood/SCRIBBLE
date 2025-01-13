@@ -1,5 +1,5 @@
 // boot/spinUP/src/main.rs
-// Last Updated: 2025-01-13 05:25:31 UTC
+// Last Updated: 2025-01-13 06:04:16 UTC
 // Author: Caleb J.D. Terkovics (isdood)
 // Current User: isdood
 
@@ -7,7 +7,12 @@
 #![no_main]
 #![feature(naked_functions)]
 
-use crate::boot_params::BootParams;
+use spinup::{
+    serial,
+    serial_println,
+    memory::{self, init_memory, is_aligned, AlignedMemoryRegion},
+};
+
 use core::panic::PanicInfo;
 use unstable_matter::{
     SpaceTime,
@@ -26,8 +31,8 @@ const MESH_DENSITY: usize = 16;          // 16x16x16 mesh
 const VGA_BUFFER: *mut u8 = 0xb8000 as *mut u8;
 static mut VGA_CURSOR: usize = 0;
 
-#[repr(C)]
-pub struct BootParams {
+#[repr(C, align(4096))]
+pub struct MainBootParams {
     pub kernel_load_addr: u32,
     pub kernel_size: u32,
     pub space_metadata: *const SpaceMetadata,
@@ -40,12 +45,6 @@ fn init_space_config() -> SpaceConfig {
         Vector3D::new(MESH_DENSITY, MESH_DENSITY, MESH_DENSITY),
                      Vector3D::new(VECTOR_CELL_SIZE, VECTOR_CELL_SIZE, VECTOR_CELL_SIZE)
     )
-}
-
-// Initialize vector space
-fn init_vector_space(base_addr: usize) -> VectorSpace {
-    let metadata = SpaceMetadata::new(VECTOR_CELL_SIZE * MESH_DENSITY.pow(3));
-    VectorSpace::new(base_addr, metadata)
 }
 
 #[panic_handler]
@@ -91,30 +90,107 @@ unsafe fn println(s: &str) {
     VGA_CURSOR = VGA_CURSOR + 80 - VGA_CURSOR % 80; // New line
 }
 
+#[naked]
 #[no_mangle]
+#[link_section = ".text._start"]
 pub unsafe extern "C" fn _start() -> ! {
+    core::arch::naked_asm!(
+        // Save registers
+        "push rax",
+        "push rbx",
+        "push rcx",
+        "push rdx",
+        "push rsi",
+        "push rdi",
+        "push rbp",
+
+        // Call our real entry point
+        "call {}",
+
+        // We shouldn't return, but if we do:
+        "cli",
+        "2:",
+        "hlt",
+        "jmp 2b",
+
+        sym real_start
+    );
+}
+
+#[no_mangle]
+unsafe extern "C" fn real_start() -> ! {
     serial::init_serial();
     serial_println!("spinUP: Bootloader starting...");
-    let _space_config = init_space_config();
-    let mut vector_space = init_vector_space(KERNEL_LOAD_ADDR as usize);
+
+    // Initialize vector space with proper memory checks
+    let vector_space = {
+        // Verify alignment
+        assert!(
+            is_aligned(KERNEL_LOAD_ADDR as usize, VECTOR_CELL_SIZE),
+                "Kernel load address must be aligned to vector cell size"
+        );
+
+        // Create space configuration
+        let space_config = init_space_config();
+
+        // Initialize memory system
+        let vs = init_memory(KERNEL_LOAD_ADDR as usize);
+
+        // Ensure proper initialization state
+        if vs.get_state() != UFOState::Hovering {
+            serial_println!("spinUP: WARNING - Vector space in unexpected state: {:?}", vs.get_state());
+            memory::transition_vector_space(vs, UFOState::Hovering);
+
+            // Verify state transition
+            assert_eq!(
+                vs.get_state(),
+                       UFOState::Hovering,
+                       "Failed to transition vector space to hovering state"
+            );
+        }
+
+        serial_println!(
+            "spinUP: Vector space initialized at {:#x} with {} cells",
+            KERNEL_LOAD_ADDR,
+            MESH_DENSITY.pow(3)
+        );
+        vs
+    };
 
     // Set up the space-time region for kernel loading
     println("spinUP: Setting up kernel space...");
-    let _kernel_space = SpaceTime::<u8>::new(
-        KERNEL_LOAD_ADDR as usize,
-        (SECTORS_TO_READ as usize) * 512,
-                                             0
-    );
+    let kernel_space = {
+        let size = (SECTORS_TO_READ as usize) * 512;
+        SpaceTime::<u8>::new(
+            KERNEL_LOAD_ADDR as usize,
+            size,
+            0
+        )
+    };
 
     // Load kernel into vector space
     println("spinUP: Loading kernel...");
-    vector_space.transition_state(UFOState::Hovering);
+    assert_eq!(
+        vector_space.get_state(),
+               UFOState::Hovering,
+               "Vector space not in hovering state"
+    );
 
+    let mut aligned_buffer = AlignedMemoryRegion::new();
     for sector in 0..SECTORS_TO_READ {
         let sector_offset = (sector * 512) as usize;
+        let target_addr = KERNEL_LOAD_ADDR as usize + sector_offset;
+
         read_disk_sector(
             KERNEL_SECTOR_START + sector,
-            (KERNEL_LOAD_ADDR as usize + sector_offset) as *mut u8
+            aligned_buffer.as_mut_ptr()
+        );
+
+        // Copy from aligned buffer to target location
+        core::ptr::copy_nonoverlapping(
+            aligned_buffer.as_ptr(),
+                                       target_addr as *mut u8,
+                                       512
         );
 
         if sector % 10 == 0 {
@@ -123,21 +199,35 @@ pub unsafe extern "C" fn _start() -> ! {
     }
     println("\nspinUP: Kernel loaded successfully");
 
+    // Transition vector space state
     vector_space.transition_state(UFOState::Landed);
-    println("spinUP: Vector space initialized");
+    println("spinUP: Vector space landed");
 
-    // Set up boot parameters with proper memory addressing
-    let boot_params = BootParams {
+    // Set up boot parameters
+    let boot_params = MainBootParams {
         kernel_load_addr: KERNEL_LOAD_ADDR as u32,
         kernel_size: (SECTORS_TO_READ as u32) * 512,
         space_metadata: vector_space.get_metadata() as *const SpaceMetadata,
-        vector_space: &vector_space as *const VectorSpace,
+        vector_space: vector_space as *const VectorSpace,
     };
+
+    // Log memory configuration
+    serial_println!(
+        "spinUP: Memory configuration:\n\
+- Kernel at: {:#x}\n\
+- Kernel size: {} bytes\n\
+- Vector cells: {}\n\
+- Cell size: {} bytes",
+KERNEL_LOAD_ADDR,
+boot_params.kernel_size,
+MESH_DENSITY.pow(3),
+                    VECTOR_CELL_SIZE
+    );
 
     println("spinUP: Jumping to kernel...");
 
-    // Get kernel entry point from memory address and jump to it
-    let kernel_entry = KERNEL_LOAD_ADDR as *const fn(*const BootParams) -> !;
+    // Jump to kernel entry point
+    let kernel_entry = KERNEL_LOAD_ADDR as *const fn(*const MainBootParams) -> !;
     (*kernel_entry)(&boot_params)
 }
 

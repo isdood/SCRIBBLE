@@ -1,5 +1,5 @@
 // boot/spinUP/src/serial.rs
-// Last Updated: 2025-01-13 05:37:02 UTC
+// Last Updated: 2025-01-13 05:41:39 UTC
 // Author: Caleb J.D. Terkovics (isdood)
 // Current User: isdood
 
