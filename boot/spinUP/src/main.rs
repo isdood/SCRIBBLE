@@ -1,5 +1,5 @@
 // boot/spinUP/src/main.rs
-// Last Updated: 2025-01-13 05:19:08 UTC
+// Last Updated: 2025-01-13 05:25:31 UTC
 // Author: Caleb J.D. Terkovics (isdood)
 // Current User: isdood
 
@@ -7,6 +7,7 @@
 #![no_main]
 #![feature(naked_functions)]
 
+use crate::boot_params::BootParams;
 use core::panic::PanicInfo;
 use unstable_matter::{
     SpaceTime,
@@ -14,8 +15,6 @@ use unstable_matter::{
     ufo_states::UFOState,
     space_config::{SpaceConfig, SpaceMetadata},
     vector::Vector3D,
-    MemoryAddress,
-    Dimensions,
 };
 
 // Memory configuration constants
@@ -51,7 +50,12 @@ fn init_vector_space(base_addr: usize) -> VectorSpace {
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    loop {}
+    unsafe {
+        println("PANIC: System halted");
+        loop {
+            core::arch::asm!("hlt");
+        }
+    }
 }
 
 unsafe fn read_disk_sector(sector: u16, buffer: *mut u8) {
@@ -89,24 +93,23 @@ unsafe fn println(s: &str) {
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    // Initialize space-time system
-    println("spinUP: Initializing space-time system...");
-    let space_config = init_space_config();
+    serial::init_serial();
+    serial_println!("spinUP: Bootloader starting...");
+    let _space_config = init_space_config();
     let mut vector_space = init_vector_space(KERNEL_LOAD_ADDR as usize);
 
     // Set up the space-time region for kernel loading
     println("spinUP: Setting up kernel space...");
-    let mut kernel_space = SpaceTime::<u8>::new(
+    let _kernel_space = SpaceTime::<u8>::new(
         KERNEL_LOAD_ADDR as usize,
         (SECTORS_TO_READ as usize) * 512,
-                                                0
+                                             0
     );
 
     // Load kernel into vector space
     println("spinUP: Loading kernel...");
     vector_space.transition_state(UFOState::Hovering);
 
-    let mut progress = 0;
     for sector in 0..SECTORS_TO_READ {
         let sector_offset = (sector * 512) as usize;
         read_disk_sector(
@@ -116,7 +119,6 @@ pub unsafe extern "C" fn _start() -> ! {
 
         if sector % 10 == 0 {
             print(".");
-            progress += 1;
         }
     }
     println("\nspinUP: Kernel loaded successfully");
@@ -134,22 +136,16 @@ pub unsafe extern "C" fn _start() -> ! {
 
     println("spinUP: Jumping to kernel...");
 
-    // Get kernel entry point from memory address
+    // Get kernel entry point from memory address and jump to it
     let kernel_entry = KERNEL_LOAD_ADDR as *const fn(*const BootParams) -> !;
-    (*kernel_entry)(&boot_params);
-
-    loop {
-        core::arch::asm!("hlt");
-    }
+    (*kernel_entry)(&boot_params)
 }
 
 #[no_mangle]
 pub extern "C" fn rust_main() -> ! {
     unsafe {
         println("spinUP: System initialized");
-    }
-    loop {
-        unsafe {
+        loop {
             core::arch::asm!("hlt");
         }
     }

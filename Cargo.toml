@@ -1,6 +1,4 @@
-# Root Cargo.toml
 [workspace]
-resolver = "2"  # Use edition 2021 resolver
 members = [
     "boot/spinUP",
     "boot/spINIT",
@@ -9,8 +7,8 @@ members = [
     "lib/scribble"
 ]
 
-[workspace.dependencies]
-x86_64 = "0.14.13"
-spin = "0.9.8"
-volatile = "0.4.6"
-bit_field = "0.10.2"
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
