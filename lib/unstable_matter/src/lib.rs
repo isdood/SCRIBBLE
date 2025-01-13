@@ -1,6 +1,7 @@
 #![no_std]
 
 use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::mesh;
 
 /// UnstableMatter Core Library
 /// Last Updated: 2025-01-13 03:23:37 UTC
