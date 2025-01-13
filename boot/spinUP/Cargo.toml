@@ -1,11 +1,13 @@
-# boot/spinUP/Cargo.toml
 [package]
-name = "spinup"  # Lowercase package name
+name = "spinup"
 version = "0.1.0"
 edition = "2021"
-authors = ["isdood"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
 
 [dependencies]
-spinit = { path = "../spINIT" }  # Use lowercase package name
 unstable_matter = { path = "../../lib/unstable_matter" }
-scribble = { path = "../../lib/scribble" }
