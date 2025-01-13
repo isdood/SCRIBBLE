@@ -1,8 +1,16 @@
-// lib/unstable_matter/src/lib.rs
+// lib/unstable_matter/src/vector_space.rs
 #![no_std]
 
-/// Unstable Matter Core Library
-/// Last Updated: 2025-01-13 04:02:27 UTC
+use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::{
+    space_config::SpaceMetadata,
+    tracked_ufo::TrackedUFO,
+    morph_tracker::MorphTracker,
+    UFOState,
+};
+
+/// Vector Space Implementation
+/// Last Updated: 2025-01-13 04:07:33 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -68,7 +76,7 @@ impl Clone for VectorSpace {
             metadata: self.metadata.clone(),
             morph_tracker: self.morph_tracker.clone(),
             state: self.state,
-            timestamp: AtomicUsize::new(1705114947), // 2025-01-13 04:02:27 UTC
+            timestamp: AtomicUsize::new(1705115253), // 2025-01-13 04:07:33 UTC
         }
     }
 }
@@ -81,7 +89,7 @@ impl VectorSpace {
             metadata,
             morph_tracker: MorphTracker::new(),
             state: UFOState::Flying,
-            timestamp: AtomicUsize::new(1705114947), // 2025-01-13 04:02:27 UTC
+            timestamp: AtomicUsize::new(1705115253), // 2025-01-13 04:07:33 UTC
         }
     }
 
@@ -108,12 +116,12 @@ impl VectorSpace {
     pub fn update_origin(&self, new_origin: usize) {
         self.origin.store(new_origin, Ordering::SeqCst);
         self.ufo_state.update_origin(new_origin);
-        self.timestamp.store(1705114947, Ordering::SeqCst); // 2025-01-13 04:02:27 UTC
+        self.timestamp.store(1705115253, Ordering::SeqCst); // 2025-01-13 04:07:33 UTC
     }
 
     pub fn transition_state(&mut self, new_state: UFOState) {
         self.state = new_state;
-        self.timestamp.store(1705114947, Ordering::SeqCst); // 2025-01-13 04:02:27 UTC
+        self.timestamp.store(1705115253, Ordering::SeqCst); // 2025-01-13 04:07:33 UTC
     }
 
     pub fn is_valid_address(&self, addr: usize) -> bool {
@@ -290,16 +298,26 @@ mod tests {
 
         assert_eq!(space.get_origin(), cloned_space.get_origin());
         assert_eq!(space.get_metadata().get_size(), cloned_space.get_metadata().get_size());
+        assert_eq!(space.get_state(), cloned_space.get_state());
     }
 
     #[test]
-    fn test_mesh_cell() {
-        let pos = Vector3D::new(1, 2, 3);
-        let cell1: MeshCell<u32> = MeshCell::new(42, pos);
-        let cell2 = cell1.clone();
+    fn test_vector_space_state_transition() {
+        let metadata = SpaceMetadata::new(0x1000);
+        let mut space = VectorSpace::new(0x1000, metadata);
 
-        assert_eq!(*cell1.get_data(), *cell2.get_data());
-        assert_eq!(cell1.get_position(), cell2.get_position());
-        assert_eq!(cell1.get_state(), cell2.get_state());
+        assert_eq!(space.get_state(), UFOState::Flying);
+        space.transition_state(UFOState::Hovering);
+        assert_eq!(space.get_state(), UFOState::Hovering);
+    }
+
+    #[test]
+    fn test_vector_space_address_validation() {
+        let metadata = SpaceMetadata::new(0x1000);
+        let space = VectorSpace::new(0x1000, metadata);
+
+        assert!(space.is_valid_address(0x1500));
+        assert!(!space.is_valid_address(0x500));
+        assert!(!space.is_valid_address(0x2001));
     }
 }
