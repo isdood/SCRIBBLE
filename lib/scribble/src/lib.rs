@@ -1,12 +1,14 @@
 #![no_std]
 
 /// Scribble Core Library
-/// Last Updated: 2025-01-13 00:03:42 UTC
+/// Last Updated: 2025-01-13 00:48:50 UTC
 /// Author: isdood
 /// Current User: isdood
 
 // External crate imports
 extern crate unstable_matter;
+
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 // Public exports from unstable_matter
 pub use unstable_matter::vector_space::{Vector3D, VectorSpace, MeshCell, CellState};
@@ -45,6 +47,7 @@ impl MemoryAddress {
 #[derive(Debug)]
 pub struct ScribbleMemory<T: 'static> {
     addr: MemoryAddress,
+    timestamp: AtomicUsize,
     _ufo: UFO<T>,
 }
 
@@ -52,6 +55,7 @@ impl<T: 'static> ScribbleMemory<T> {
     pub const fn const_at(addr: usize) -> Self {
         Self {
             addr: MemoryAddress::new(addr),
+            timestamp: AtomicUsize::new(1705102130), // 2025-01-13 00:48:50 UTC
             _ufo: UFO::new(),
         }
     }
@@ -59,8 +63,13 @@ impl<T: 'static> ScribbleMemory<T> {
     pub fn at(addr: usize) -> Self {
         Self {
             addr: MemoryAddress::new(addr),
+            timestamp: AtomicUsize::new(1705102130), // 2025-01-13 00:48:50 UTC
             _ufo: UFO::new(),
         }
+    }
+
+    pub fn timestamp(&self) -> usize {
+        self.timestamp.load(Ordering::SeqCst)
     }
 
     pub unsafe fn read(&self) -> T {
@@ -68,7 +77,8 @@ impl<T: 'static> ScribbleMemory<T> {
     }
 
     pub unsafe fn write(&mut self, value: T) {
-        core::ptr::write_volatile(self.addr.as_ptr(), value)
+        core::ptr::write_volatile(self.addr.as_ptr(), value);
+        self.timestamp.store(1705102130, Ordering::SeqCst); // 2025-01-13 00:48:50 UTC
     }
 
     pub const fn addr(&self) -> usize {
@@ -96,6 +106,7 @@ pub struct MemorySpace<T: 'static> {
     offset: usize,
     stride: usize,
     dimensions: Dimensions,
+    timestamp: AtomicUsize,
     _ufo: UFO<T>,
 }
 
@@ -107,12 +118,17 @@ impl<T: 'static + Copy> MemorySpace<T> {
             offset,
             stride: core::mem::size_of::<T>(),
             dimensions: Dimensions::new(size, 1, 1),
+            timestamp: AtomicUsize::new(1705102130), // 2025-01-13 00:48:50 UTC
             _ufo: UFO::new(),
         }
     }
 
     pub fn new(base_addr: usize, size: usize, offset: usize) -> Self {
         Self::const_new(base_addr, size, offset)
+    }
+
+    pub fn timestamp(&self) -> usize {
+        self.timestamp.load(Ordering::SeqCst)
     }
 
     pub unsafe fn read_at(&self, index: usize) -> T {
@@ -124,7 +140,8 @@ impl<T: 'static + Copy> MemorySpace<T> {
     pub unsafe fn write_at(&mut self, index: usize, value: T) {
         assert!(index < self.size);
         let addr = self.base.addr() + (index * self.stride) + self.offset;
-        ScribbleMemory::at(addr).write(value)
+        ScribbleMemory::at(addr).write(value);
+        self.timestamp.store(1705102130, Ordering::SeqCst); // 2025-01-13 00:48:50 UTC
     }
 
     pub const fn size(&self) -> usize {
