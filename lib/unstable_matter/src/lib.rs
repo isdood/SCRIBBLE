@@ -1,10 +1,9 @@
 #![no_std]
 
 use core::sync::atomic::{AtomicUsize, Ordering};
-use crate::mesh;
 
 /// UnstableMatter Core Library
-/// Last Updated: 2025-01-13 03:23:37 UTC
+/// Last Updated: 2025-01-13 04:05:24 UTC
 /// Author: Caleb J.D. Terkovics (isdood)
 /// Current User: isdood
 
@@ -36,7 +35,7 @@ pub use ufo::{
     Landed,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MemoryAddress(usize);
 
 impl MemoryAddress {
@@ -49,7 +48,7 @@ impl MemoryAddress {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Dimensions {
     pub width: usize,
     pub height: usize,
@@ -86,7 +85,6 @@ impl Dimensions {
     }
 }
 
-// Fluid memory space representation
 #[derive(Debug)]
 pub struct FluidMemory<T: 'static> {
     base: MemoryAddress,
@@ -98,7 +96,7 @@ impl<T: 'static> FluidMemory<T> {
     pub const fn new(base: MemoryAddress) -> Self {
         Self {
             base,
-            timestamp: AtomicUsize::new(1705111898), // 2025-01-13 03:11:38 UTC
+            timestamp: AtomicUsize::new(1705115124), // 2025-01-13 04:05:24 UTC
             _ufo: UFO::new(),
         }
     }
@@ -109,6 +107,10 @@ impl<T: 'static> FluidMemory<T> {
 
     pub const fn base_addr(&self) -> usize {
         self.base.as_usize()
+    }
+
+    pub fn get_timestamp(&self) -> usize {
+        self.timestamp.load(Ordering::SeqCst)
     }
 }
 
@@ -121,7 +123,7 @@ impl<T: Copy + 'static> FluidMemory<T> {
     pub unsafe fn write(&mut self, offset: usize, value: T) {
         let addr = self.base.as_usize() + offset;
         core::ptr::write_volatile(addr as *mut T, value);
-        self.timestamp.store(1705111898, Ordering::SeqCst); // 2025-01-13 03:11:38 UTC
+        self.timestamp.store(1705115124, Ordering::SeqCst); // 2025-01-13 04:05:24 UTC
     }
 }
 
@@ -144,7 +146,7 @@ impl<T: Copy + 'static> SpaceTime<T> {
             offset,
             stride: core::mem::size_of::<T>(),
             dimensions: Dimensions::new(size, 1, 1),
-            timestamp: AtomicUsize::new(1705111898), // 2025-01-13 03:11:38 UTC
+            timestamp: AtomicUsize::new(1705115124), // 2025-01-13 04:05:24 UTC
             _ufo: UFO::new(),
         }
     }
@@ -177,7 +179,7 @@ impl<T: Copy + 'static> SpaceTime<T> {
     pub unsafe fn write_at(&mut self, index: usize, value: T) {
         assert!(index < self.size);
         self.memory.write(index * self.stride + self.offset, value);
-        self.timestamp.store(1705111898, Ordering::SeqCst); // 2025-01-13 03:11:38 UTC
+        self.timestamp.store(1705115124, Ordering::SeqCst); // 2025-01-13 04:05:24 UTC
     }
 }
 
@@ -192,6 +194,7 @@ mod tests {
     fn test_fluid_memory() {
         let memory = FluidMemory::<u32>::new(MemoryAddress::new(0x1000));
         assert_eq!(memory.base_addr(), 0x1000);
+        assert!(memory.get_timestamp() > 0);
     }
 
     #[test]
@@ -222,5 +225,15 @@ mod tests {
         let space: SpaceTime<u32> = SpaceTime::new(0x1000, 100, 0);
         assert_eq!(space.size(), 100);
         assert_eq!(space.stride(), core::mem::size_of::<u32>());
+        assert!(space.timestamp() > 0);
+    }
+
+    #[test]
+    fn test_memory_address() {
+        let addr = MemoryAddress::new(0x1000);
+        assert_eq!(addr.as_usize(), 0x1000);
+
+        let addr2 = addr;
+        assert_eq!(addr, addr2);
     }
 }

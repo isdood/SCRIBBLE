@@ -1,9 +1,13 @@
 // lib/unstable_matter/src/morph_tracker.rs
+/// Last Updated: 2025-01-13 04:03:53 UTC
+/// Author: isdood
+/// Current User: isdood
+
 use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::vector::FloatVector3D;
 
 /// Represents different types of files that can be morphed
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileType {
     /// Rust source files (.rs)
     Rust,
@@ -11,21 +15,21 @@ pub enum FileType {
     Other,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EdgeMarker {
     pub position: FloatVector3D,
     pub marker_type: MarkerType,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MarkerType {
     Point,
 }
 
 #[derive(Debug)]
 pub struct MorphTracker {
-    pub timestamp: AtomicUsize,
-    pub modifier: &'static str,
+    timestamp: AtomicUsize,
+    modifier: &'static str,
     markers: [Option<EdgeMarker>; 6],
     file_type: FileType,
 }
@@ -39,11 +43,22 @@ impl EdgeMarker {
     }
 }
 
+impl Clone for MorphTracker {
+    fn clone(&self) -> Self {
+        Self {
+            timestamp: AtomicUsize::new(1705115033), // 2025-01-13 04:03:53 UTC
+            modifier: self.modifier,
+            markers: self.markers,
+            file_type: self.file_type,
+        }
+    }
+}
+
 impl MorphTracker {
     pub const fn new() -> Self {
         const EMPTY_MARKER: Option<EdgeMarker> = None;
         Self {
-            timestamp: AtomicUsize::new(1705113119), // 2025-01-13 03:31:59 UTC
+            timestamp: AtomicUsize::new(1705115033), // 2025-01-13 04:03:53 UTC
             modifier: "isdood",
             markers: [EMPTY_MARKER; 6],
             file_type: FileType::Rust,
@@ -59,13 +74,13 @@ impl MorphTracker {
 
     fn create_rust_morph_type(&self) -> Result<(), &'static str> {
         // Implementation for Rust file morphing
-        self.timestamp.store(1705113119, Ordering::SeqCst); // 2025-01-13 03:31:59 UTC
+        self.timestamp.store(1705115033, Ordering::SeqCst); // 2025-01-13 04:03:53 UTC
         Ok(())
     }
 
     pub fn set_file_type(&mut self, file_type: FileType) {
         self.file_type = file_type;
-        self.timestamp.store(1705113119, Ordering::SeqCst); // 2025-01-13 03:31:59 UTC
+        self.timestamp.store(1705115033, Ordering::SeqCst); // 2025-01-13 04:03:53 UTC
     }
 
     pub fn get_file_type(&self) -> FileType {
@@ -74,7 +89,7 @@ impl MorphTracker {
 
     pub fn register_file_type(&mut self, file_type: FileType) -> Result<(), &'static str> {
         self.file_type = file_type;
-        self.timestamp.store(1705113119, Ordering::SeqCst); // 2025-01-13 03:31:59 UTC
+        self.timestamp.store(1705115033, Ordering::SeqCst); // 2025-01-13 04:03:53 UTC
         Ok(())
     }
 
@@ -89,11 +104,19 @@ impl MorphTracker {
     pub fn set_marker(&mut self, index: usize, marker: EdgeMarker) -> Result<(), &'static str> {
         if index < 6 {
             self.markers[index] = Some(marker);
-            self.timestamp.store(1705113119, Ordering::SeqCst); // 2025-01-13 03:31:59 UTC
+            self.timestamp.store(1705115033, Ordering::SeqCst); // 2025-01-13 04:03:53 UTC
             Ok(())
         } else {
             Err("Marker index out of bounds")
         }
+    }
+
+    pub fn get_modifier(&self) -> &'static str {
+        self.modifier
+    }
+
+    pub fn get_timestamp(&self) -> usize {
+        self.timestamp.load(Ordering::SeqCst)
     }
 }
 
@@ -105,6 +128,15 @@ mod tests {
     fn test_morph_tracker_creation() {
         let tracker = MorphTracker::new();
         assert_eq!(tracker.get_file_type(), FileType::Rust);
+        assert_eq!(tracker.get_modifier(), "isdood");
+    }
+
+    #[test]
+    fn test_morph_tracker_clone() {
+        let tracker = MorphTracker::new();
+        let cloned = tracker.clone();
+        assert_eq!(tracker.get_file_type(), cloned.get_file_type());
+        assert_eq!(tracker.get_modifier(), cloned.get_modifier());
     }
 
     #[test]
@@ -135,5 +167,13 @@ mod tests {
 
         // Test out of bounds
         assert!(tracker.set_marker(6, marker).is_err());
+    }
+
+    #[test]
+    fn test_edge_marker_clone() {
+        let marker = EdgeMarker::new();
+        let cloned = marker.clone();
+        assert_eq!(marker.position.x, cloned.position.x);
+        assert_eq!(marker.marker_type, cloned.marker_type);
     }
 }
