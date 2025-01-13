@@ -1,20 +1,16 @@
-# Cargo.toml
+# Root Cargo.toml
 [workspace]
+resolver = "2"  # Use edition 2021 resolver
 members = [
-    "boot/spINIT",
     "boot/spinUP",
+    "boot/spINIT",
     "boot/spun",
-    "lib/scribble",
-    "lib/unstable_matter"
+    "lib/unstable_matter",
+    "lib/scribble"
 ]
 
-workspace.resolver = "2"  # Add this line to fix the warning
-
-[workspace.package]
-version = "0.1.0"
-edition = "2021"
-authors = ["isdood"]
-
-[workspace.metadata]
-last_updated = "2025-01-12T23:12:33Z"
-maintained_by = "isdood"
+[workspace.dependencies]
+x86_64 = "0.14.13"
+spin = "0.9.8"
+volatile = "0.4.6"
+bit_field = "0.10.2"

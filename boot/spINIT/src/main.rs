@@ -1,53 +1,48 @@
+// boot/spINIT/src/main.rs
 #![no_std]
 #![no_main]
 
-#[panic_handler]
-fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
+use core::sync::atomic::{AtomicUsize, Ordering};
 
-#[link_section = ".boot.text"]
+const CELL1_ADDR: usize = 0x100000;  // 1MB mark
+const SPINUP_SIGNATURE: u64 = 0x5350494E55505F5F; // "SPINUP__"
+
+static BOOT_TIMESTAMP: AtomicUsize = AtomicUsize::new(1705117333); // 2025-01-13 04:42:13 UTC
+
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    // Load spinUP to cell1
     unsafe {
-        core::arch::asm!(
-            // Setup
-            "xor ax, ax",
-            "mov ds, ax",
-            "mov ss, ax",
-            "mov sp, 0x7C00",
-            "mov byte ptr [0x7E00], dl",
-
-            // Enable A20
-            "in al, 0x92",
-            "or al, 2",
-            "out 0x92, al",
-
-            // Load sectors using DAP
-            "mov si, 3f",          // Point to DAP
-            "mov ah, 0x42",
-            "int 0x13",
-            "jc 2f",              // Jump to error if carry set
-
-            // Jump to gear2
-            "push word ptr 0x07E0",
-            "push word ptr 0",
-            "retf",
-
-            // Error handler
-            "2:",
-            "mov ax, 0x0E45",     // Print 'E'
-        "int 0x10",
-        "cli",
-        "hlt",
-
-        // Disk Address Packet (DAP)
-        "3:",
-        ".byte 16",           // size of DAP
-        ".byte 0",            // unused
-        ".word 16",           // sectors to read
-        ".word 0",            // offset
-        ".word 0x07E0",       // segment
-        ".quad 1",            // LBA
-        options(noreturn)
-        );
+        load_spinup_to_cell1();
     }
+
+    // Transfer control to spinUP
+    jump_to_spinup();
+}
+
+unsafe fn load_spinup_to_cell1() {
+    // Copy spinUP binary to cell1
+    let spinup_binary: &[u8] = include_bytes!("../../spinUP/target/spinup.bin");
+    let dest = CELL1_ADDR as *mut u8;
+
+    for (i, &byte) in spinup_binary.iter().enumerate() {
+        *dest.add(i) = byte;
+    }
+
+    // Verify signature
+    let signature = *(CELL1_ADDR as *const u64);
+    if signature != SPINUP_SIGNATURE {
+        panic!("Invalid spinUP signature");
+    }
+}
+
+fn jump_to_spinup() -> ! {
+    let spinup_entry = CELL1_ADDR as *const ();
+    let spinup_fn: fn() -> ! = unsafe { core::mem::transmute(spinup_entry) };
+    spinup_fn()
+}
+
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
 }
