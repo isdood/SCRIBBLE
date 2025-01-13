@@ -1,24 +1,27 @@
 #![no_std]
 
-/// UnstableMatter Core Library
-/// Last Updated: 2025-01-12 23:44:33 UTC
+/// Scribble Core Library
+/// Last Updated: 2025-01-13 00:03:42 UTC
 /// Author: isdood
 /// Current User: isdood
 
+// External crate imports
+extern crate unstable_matter;
+
+// Public exports from unstable_matter
+pub use unstable_matter::vector_space::{Vector3D, VectorSpace, MeshCell, CellState};
+pub use unstable_matter::ufo::{UFO, Protected, MemoryTrace};
+
 // Module declarations
-pub mod ufo;
-pub mod vector_space;
 pub mod align;
+
+// Public exports from local modules
 pub use align::{Alignment, AlignedRegion};
 
-// Public exports
-pub use ufo::{UFO, Protected, MemoryTrace};
-pub use vector_space::{VectorSpace, MeshCell, CellState};
-
 // Type aliases for common use
-pub type Flying = ufo::Flying;
-pub type Hovering = ufo::Hovering;
-pub type Landed = ufo::Landed;
+pub type Flying = unstable_matter::ufo::Flying;
+pub type Hovering = unstable_matter::ufo::Hovering;
+pub type Landed = unstable_matter::ufo::Landed;
 
 /// Memory address representation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,14 +41,14 @@ impl MemoryAddress {
     }
 }
 
-// Core UnstableMatter definition
+// Core Scribble memory management
 #[derive(Debug)]
-pub struct UnstableMatter<T: 'static> {
+pub struct ScribbleMemory<T: 'static> {
     addr: MemoryAddress,
     _ufo: UFO<T>,
 }
 
-impl<T: 'static> UnstableMatter<T> {
+impl<T: 'static> ScribbleMemory<T> {
     pub const fn const_at(addr: usize) -> Self {
         Self {
             addr: MemoryAddress::new(addr),
@@ -81,14 +84,14 @@ pub struct Dimensions {
 }
 
 impl Dimensions {
-    pub const fn const_new(width: usize, height: usize, depth: usize) -> Self {
+    pub const fn new(width: usize, height: usize, depth: usize) -> Self {
         Self { width, height, depth }
     }
 }
 
 #[derive(Debug)]
-pub struct SpaceTime<T: 'static> {
-    base: UnstableMatter<T>,
+pub struct MemorySpace<T: 'static> {
+    base: ScribbleMemory<T>,
     size: usize,
     offset: usize,
     stride: usize,
@@ -96,14 +99,14 @@ pub struct SpaceTime<T: 'static> {
     _ufo: UFO<T>,
 }
 
-impl<T: 'static + Copy> SpaceTime<T> {
+impl<T: 'static + Copy> MemorySpace<T> {
     pub const fn const_new(base_addr: usize, size: usize, offset: usize) -> Self {
         Self {
-            base: UnstableMatter::const_at(base_addr),
+            base: ScribbleMemory::const_at(base_addr),
             size,
             offset,
             stride: core::mem::size_of::<T>(),
-            dimensions: Dimensions::const_new(size, 1, 1),
+            dimensions: Dimensions::new(size, 1, 1),
             _ufo: UFO::new(),
         }
     }
@@ -115,13 +118,13 @@ impl<T: 'static + Copy> SpaceTime<T> {
     pub unsafe fn read_at(&self, index: usize) -> T {
         assert!(index < self.size);
         let addr = self.base.addr() + (index * self.stride) + self.offset;
-        UnstableMatter::at(addr).read()
+        ScribbleMemory::at(addr).read()
     }
 
     pub unsafe fn write_at(&mut self, index: usize, value: T) {
         assert!(index < self.size);
         let addr = self.base.addr() + (index * self.stride) + self.offset;
-        UnstableMatter::at(addr).write(value)
+        ScribbleMemory::at(addr).write(value)
     }
 
     pub const fn size(&self) -> usize {
@@ -141,8 +144,8 @@ impl<T: 'static + Copy> SpaceTime<T> {
     }
 }
 
-unsafe impl<T: 'static> Send for SpaceTime<T> {}
-unsafe impl<T: 'static> Sync for SpaceTime<T> {}
+unsafe impl<T: 'static> Send for MemorySpace<T> {}
+unsafe impl<T: 'static> Sync for MemorySpace<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -156,15 +159,15 @@ mod tests {
 
     #[test]
     fn test_dimensions() {
-        let dims = Dimensions::const_new(10, 20, 30);
+        let dims = Dimensions::new(10, 20, 30);
         assert_eq!(dims.width, 10);
         assert_eq!(dims.height, 20);
         assert_eq!(dims.depth, 30);
     }
 
     #[test]
-    fn test_space_time() {
-        let space: SpaceTime<u32> = SpaceTime::new(0x1000, 100, 0);
+    fn test_memory_space() {
+        let space: MemorySpace<u32> = MemorySpace::new(0x1000, 100, 0);
         assert_eq!(space.size(), 100);
         assert_eq!(space.stride(), core::mem::size_of::<u32>());
     }

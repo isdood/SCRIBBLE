@@ -1,18 +1,36 @@
 #![no_std]
 
 /// UnstableMatter Core Library
-/// Last Updated: 2025-01-12 23:51:36 UTC
-/// Author: isdood
+/// Last Updated: 2025-01-13 00:18:26 UTC
+/// Author: Caleb J.D. Terkovics (isdood)
 /// Current User: isdood
 
 // Module declarations
 pub mod ufo;
 pub mod vector_space;
-pub mod align;
+
+// Re-export core types
+pub use vector_space::{
+    VectorSpace,
+    Vector3D,
+    MeshCell,
+    CellState,
+    SpaceConfig,
+    SpaceMetadata,
+};
 
 // Public exports
-pub use ufo::{UFO, Protected, MemoryTrace};
-pub use vector_space::{VectorSpace, MeshCell, CellState};
+pub use ufo::{
+    UFO,
+    TrackedUFO,
+    Protected,
+    MemoryTrace,
+    Flying,
+    Hovering,
+    Landed,
+};
+
+pub use crate::vector_space::SpaceTime;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MemoryAddress(usize);

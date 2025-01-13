@@ -1,9 +1,9 @@
 /// Scribble Alignment Module
-/// Last Updated: 2025-01-12 23:54:51 UTC
+/// Last Updated: 2025-01-13 00:00:13 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use crate::unstable_matter::vector_space::Vector3D;
+use unstable_matter::vector_space::Vector3D;
 
 /// Alignment configuration for memory layout
 #[derive(Debug, Clone, Copy)]

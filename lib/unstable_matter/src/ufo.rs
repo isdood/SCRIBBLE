@@ -1,160 +1,184 @@
-/// UFO Module - Core Memory Protection System
-/// Last Updated: 2025-01-12 23:37:37 UTC
-/// Author: isdood
+/// UnstableMatter UFO Protection System
+/// Last Updated: 2025-01-13 00:16:36 UTC
+/// Author: Caleb J.D. Terkovics (isdood)
 /// Current User: isdood
 
 use core::{
-    sync::atomic::{AtomicUsize, Ordering},
-    any::TypeId,
     marker::PhantomData,
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
-/// Memory region trait
-pub trait Region {
-    fn start_addr(&self) -> usize;
-    fn size(&self) -> usize;
-}
-
-/// UFO Protection States
-pub trait State: 'static {}
-
-/// State Types for UFO
-#[derive(Debug, Clone, Copy)]
+/// UFO State markers
+#[derive(Debug)]
 pub struct Flying;
-#[derive(Debug, Clone, Copy)]
+
+#[derive(Debug)]
 pub struct Hovering;
-#[derive(Debug, Clone, Copy)]
+
+#[derive(Debug)]
 pub struct Landed;
 
-impl State for Flying {}
-impl State for Hovering {}
-impl State for Landed {}
-
-/// Core UFO type with enhanced memory protection
-#[derive(Debug)]
-pub struct UFO<T: 'static, S: State = Flying> {
-    state_bits: usize,  // Replace AtomicUsize for const-fn compatibility
-    _state_marker: PhantomData<S>,
-    _data_marker: PhantomData<T>,
+/// UFO Protection trait
+pub trait Protected {
+    fn protect(&self);
+    fn unprotect(&self);
+    fn is_protected(&self) -> bool;
 }
 
-impl<T: 'static, S: State> UFO<T, S> {
-    pub const fn new() -> Self {
+/// Memory trace for UFO tracking
+#[derive(Debug)]
+pub struct MemoryTrace {
+    active: AtomicBool,
+    timestamp: AtomicUsize,
+    owner: &'static str,
+}
+
+impl MemoryTrace {
+    pub const fn new(owner: &'static str) -> Self {
         Self {
-            state_bits: 0,
-            _state_marker: PhantomData,
-            _data_marker: PhantomData,
+            active: AtomicBool::new(false),
+            timestamp: AtomicUsize::new(0),
+            owner,
         }
     }
 
-    pub const fn verify(&self) -> bool {
-        true  // Simplified for const-fn compatibility
+    pub fn activate(&self) {
+        self.active.store(true, Ordering::SeqCst);
+        self.timestamp.store(1705100196, Ordering::SeqCst); // 2025-01-13 00:16:36 UTC
     }
 
-    pub const fn protection_level(&self) -> usize {
-        self.state_bits & 0xFF
-    }
-}
-
-/// Memory tracking capabilities
-pub trait MemoryTrace {
-    fn trace_address(&self) -> usize;
-    fn trace_size(&self) -> usize;
-}
-
-/// Memory protection guarantees
-pub trait Protected {
-    fn is_protected(&self) -> bool;
-    fn protection_level(&self) -> usize;
-}
-
-impl<T: 'static, S: State> Protected for UFO<T, S> {
-    fn is_protected(&self) -> bool {
-        self.verify()
+    pub fn deactivate(&self) {
+        self.active.store(false, Ordering::SeqCst);
+        self.timestamp.store(1705100196, Ordering::SeqCst); // 2025-01-13 00:16:36 UTC
     }
 
-    fn protection_level(&self) -> usize {
-        self.protection_level()
+    pub fn is_active(&self) -> bool {
+        self.active.load(Ordering::SeqCst)
+    }
+
+    pub fn timestamp(&self) -> usize {
+        self.timestamp.load(Ordering::SeqCst)
+    }
+
+    pub fn owner(&self) -> &'static str {
+        self.owner
     }
 }
 
-/// Fluid UFO with const-compatible state handling
+/// UFO Protection system
+#[derive(Debug)]
+pub struct UFO<T: 'static> {
+    trace: MemoryTrace,
+    _marker: PhantomData<T>,
+}
+
+impl<T: 'static> UFO<T> {
+    pub const fn new() -> Self {
+        Self {
+            trace: MemoryTrace::new("isdood"),
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn track(&self) {
+        self.trace.activate();
+    }
+
+    pub fn untrack(&self) {
+        self.trace.deactivate();
+    }
+
+    pub fn is_tracked(&self) -> bool {
+        self.trace.is_active()
+    }
+
+    pub fn timestamp(&self) -> usize {
+        self.trace.timestamp()
+    }
+
+    pub fn owner(&self) -> &'static str {
+        self.trace.owner()
+    }
+}
+
+/// Tracked UFO for enhanced protection
 #[derive(Debug)]
 pub struct TrackedUFO<T: 'static> {
-    inner: UFO<T>,
-    tracking_bits: usize,  // Replace tracking_id for const-fn compatibility
+    base: UFO<T>,
+    origin: usize,
+    boundary: usize,
 }
 
 impl<T: 'static> TrackedUFO<T> {
-    pub const fn new(tracking_id: usize) -> Self {
+    pub const fn new(origin: usize) -> Self {
         Self {
-            inner: UFO::new(),
-            tracking_bits: tracking_id,
+            base: UFO::new(),
+            origin,
+            boundary: origin + 0x1000,
         }
     }
 
-    pub const fn verify(&self) -> bool {
-        self.inner.verify()
-    }
-
-    pub const fn protection_level(&self) -> usize {
-        self.inner.protection_level()
-    }
-
-    pub const fn tracking_id(&self) -> usize {
-        self.tracking_bits
-    }
-}
-
-/// State transition functions
-impl<T: 'static> UFO<T, Flying> {
-    pub const fn hover(self) -> UFO<T, Hovering> {
-        UFO {
-            state_bits: self.state_bits | 1,
-            _state_marker: PhantomData,
-            _data_marker: PhantomData,
+    pub fn with_boundary(origin: usize, size: usize) -> Self {
+        Self {
+            base: UFO::new(),
+            origin,
+            boundary: origin + size,
         }
     }
-}
 
-impl<T: 'static> UFO<T, Hovering> {
-    pub const fn land(self) -> UFO<T, Landed> {
-        UFO {
-            state_bits: self.state_bits | 2,
-            _state_marker: PhantomData,
-            _data_marker: PhantomData,
+    pub fn origin(&self) -> usize {
+        self.origin
+    }
+
+    pub fn boundary(&self) -> usize {
+        self.boundary
+    }
+
+    pub fn track(&self) {
+        self.base.track();
+    }
+
+    pub fn untrack(&self) {
+        self.base.untrack();
+    }
+
+    pub fn is_tracked(&self) -> bool {
+        self.base.is_tracked()
+    }
+
+    pub fn timestamp(&self) -> usize {
+        self.base.timestamp()
+    }
+
+    pub fn owner(&self) -> &'static str {
+        self.base.owner()
+    }
+
+    pub fn contains(&self, addr: usize) -> bool {
+        addr >= self.origin && addr < self.boundary
+    }
+
+    pub fn check_access(&self, addr: usize) -> Result<(), &'static str> {
+        if !self.is_tracked() {
+            return Err("UFO protection is not active");
         }
-    }
-}
-
-impl<T: 'static> UFO<T, Landed> {
-    pub const fn take_off(self) -> UFO<T, Flying> {
-        UFO {
-            state_bits: self.state_bits & !3,
-            _state_marker: PhantomData,
-            _data_marker: PhantomData,
+        if !self.contains(addr) {
+            return Err("Address out of UFO protected range");
         }
+        Ok(())
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_ufo_transitions() {
-        let ufo: UFO<u32> = UFO::new();
-        let hovering = ufo.hover();
-        let landed = hovering.land();
-        let flying = landed.take_off();
-        assert_eq!(flying.protection_level(), 0);
+impl<T: 'static> Protected for TrackedUFO<T> {
+    fn protect(&self) {
+        self.track();
     }
 
-    #[test]
-    fn test_tracked_ufo() {
-        const TRACKING_ID: usize = 0x1234;
-        let tracked = TrackedUFO::<u32>::new(TRACKING_ID);
-        assert_eq!(tracked.tracking_id(), TRACKING_ID);
-        assert!(tracked.verify());
+    fn unprotect(&self) {
+        self.untrack();
+    }
+
+    fn is_protected(&self) -> bool {
+        self.is_tracked()
     }
 }

@@ -1,11 +1,14 @@
 // src/vga_buffer.rs
-
 use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
-use unstable_matter::SpaceTime;
-use unstable_matter::arch::x86_64::instructions::port::Port;
+use unstable_matter::{
+    SpaceTime, Vector3D, VectorSpace, MeshCell,
+    ufo::{UFO, Protected},
+};
+use x86_64::instructions::port::Port;
 
+// Color enums remain the same...
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -33,7 +36,7 @@ pub enum Color {
 struct ColorCode(u8);
 
 impl ColorCode {
-    fn new(foreground: Color, background: Color) -> ColorCode {
+    const fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
 }
@@ -47,24 +50,49 @@ struct ScreenChar {
 
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
+const VGA_BUFFER_ADDR: usize = 0xb8000;
 
-#[repr(transparent)]
-struct Buffer {
-    chars: [[UnstableVectrix<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT],
+/// VGA buffer using UnstableMatter's vector space
+struct VGABuffer {
+    space: SpaceTime<ScreenChar>,
+    ufo: UFO<ScreenChar>,
+}
+
+impl VGABuffer {
+    fn new() -> Self {
+        Self {
+            space: SpaceTime::new(VGA_BUFFER_ADDR, BUFFER_WIDTH * BUFFER_HEIGHT, 0),
+            ufo: UFO::new(),
+        }
+    }
+
+    unsafe fn write_char(&mut self, pos: Vector3D, char: ScreenChar) {
+        let idx = self.pos_to_index(pos);
+        self.space.write_at(idx, char);
+    }
+
+    unsafe fn read_char(&self, pos: Vector3D) -> ScreenChar {
+        let idx = self.pos_to_index(pos);
+        self.space.read_at(idx)
+    }
+
+    fn pos_to_index(&self, pos: Vector3D) -> usize {
+        (pos.y() * BUFFER_WIDTH + pos.x()) as usize
+    }
 }
 
 pub struct Writer {
     column_position: usize,
     color_code: ColorCode,
-    buffer: &'static mut Buffer,
+    buffer: VGABuffer,
 }
 
 impl Writer {
-    fn verify_text_mode(&self) -> bool {
-        unsafe {
-            let mut misc_port = Port::<u8>::new(0x3CC);
-            let misc_output: u8 = misc_port.read();
-            (misc_output & 0x01) == 0x01
+    pub fn new() -> Self {
+        Self {
+            column_position: 0,
+            color_code: ColorCode::new(Color::Yellow, Color::Black),
+            buffer: VGABuffer::new(),
         }
     }
 
@@ -76,14 +104,21 @@ impl Writer {
                     self.new_line();
                 }
 
-                let row = BUFFER_HEIGHT - 1;
-                let col = self.column_position;
+                let pos = Vector3D::new(
+                    self.column_position as isize,
+                    (BUFFER_HEIGHT - 1) as isize,
+                                        0,
+                );
 
-                let color_code = self.color_code;
-                self.buffer.chars[row][col].write(0, ScreenChar {
+                let screen_char = ScreenChar {
                     ascii_character: byte,
-                    color_code,
-                });
+                    color_code: self.color_code,
+                };
+
+                unsafe {
+                    self.buffer.write_char(pos, screen_char);
+                }
+
                 self.column_position += 1;
             }
         }
@@ -92,8 +127,13 @@ impl Writer {
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
-                let character = self.buffer.chars[row][col].read(0);
-                self.buffer.chars[row - 1][col].write(0, character);
+                let src_pos = Vector3D::new(col as isize, row as isize, 0);
+                let dst_pos = Vector3D::new(col as isize, (row - 1) as isize, 0);
+
+                unsafe {
+                    let character = self.buffer.read_char(src_pos);
+                    self.buffer.write_char(dst_pos, character);
+                }
             }
         }
         self.clear_row(BUFFER_HEIGHT - 1);
@@ -105,28 +145,21 @@ impl Writer {
             ascii_character: b' ',
             color_code: self.color_code,
         };
+
         for col in 0..BUFFER_WIDTH {
-            self.buffer.chars[row][col].write(0, blank);
+            let pos = Vector3D::new(col as isize, row as isize, 0);
+            unsafe {
+                self.buffer.write_char(pos, blank);
+            }
         }
     }
 
     pub fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
-                // printable ASCII byte or newline
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
-                // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
-        }
-    }
-
-    pub fn blink_cursor(&mut self) {
-        if self.column_position > 0 {
-            let last_pos = self.column_position - 1;
-            let row = BUFFER_HEIGHT - 1;
-            let screen_char = self.buffer.chars[row][last_pos].read();
-            self.buffer.chars[row][last_pos].write(screen_char);
         }
     }
 
@@ -149,23 +182,22 @@ impl fmt::Write for Writer {
 
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = {
-        let mut writer = Writer {
-            column_position: 0,
-            color_code: ColorCode::new(Color::Yellow, Color::Black),
-            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-        };
+        let mut writer = Writer::new();
 
-        // Validate VGA memory is accessible
+        // Validate VGA memory
         let test_char = ScreenChar {
             ascii_character: b'T',
             color_code: ColorCode::new(Color::White, Color::Black),
         };
 
-        writer.buffer.chars[0][0].write(test_char);
-        let read_char = writer.buffer.chars[0][0].read();
+        let pos = Vector3D::new(0, 0, 0);
+        unsafe {
+            writer.buffer.write_char(pos, test_char);
+            let read_char = writer.buffer.read_char(pos);
 
-        if read_char.ascii_character != b'T' {
-            panic!("VGA buffer not accessible");
+            if read_char.ascii_character != b'T' {
+                panic!("VGA buffer not accessible");
+            }
         }
 
         Mutex::new(writer)
