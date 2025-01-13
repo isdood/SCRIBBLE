@@ -12,10 +12,12 @@ pub mod mesh;
 pub mod space_config;
 pub mod tracked_ufo;
 pub mod morph_tracker;
-pub mod vector_space;
 pub mod ufo_states;
 pub mod ufo;
+pub mod mesh_clock;
+pub mod vector_space;
 
+pub use align;
 // Re-export core components
 pub use vector::{Vector3D, IntVector3D};
 pub use mesh::MeshCell;

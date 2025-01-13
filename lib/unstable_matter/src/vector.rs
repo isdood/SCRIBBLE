@@ -11,6 +11,12 @@ pub struct Vector3D<T: PartialEq> {
     pub z: T,
 }
 
+impl Vector3D<f64> {
+    pub fn magnitude(&self) -> f64 {
+        libm::sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
+    }
+}
+
 pub type FloatVector3D = Vector3D<f64>;
 pub type IntVector3D = Vector3D<isize>;
 

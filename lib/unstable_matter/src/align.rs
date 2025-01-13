@@ -4,6 +4,8 @@
 /// Author: isdood
 /// Current User: isdood
 
+pub mod align;
+
 use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::{
     vector::Vector3D,

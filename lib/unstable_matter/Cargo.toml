@@ -2,6 +2,16 @@
 name = "unstable_matter"
 version = "0.1.0"
 edition = "2021"
+authors = ["isdood"]
 
 [dependencies]
-spin = "0.9.8"
+# For mathematical functions like sqrt() and sin()
+libm = "0.2"
+
+[lib]
+name = "unstable_matter"
+path = "src/lib.rs"
+
+[[example]]
+name = "mesh_clock_demo"
+path = "examples/mesh_clock_demo.rs"
