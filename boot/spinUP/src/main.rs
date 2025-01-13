@@ -1,27 +1,25 @@
-// src/main.rs
+// boot/spinUP/src/main.rs
 // Last updated: 2025-01-12 04:43:17 UTC
 // Author: isdood
 
 #![no_std]
 #![no_main]
 #![feature(naked_functions)]
-#![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
-use unstable_matter::unstable_vectrix::{UnstableVectrix, VirtAddr, PhysAddr, Dimensions};
-use unstable_matter::unstable_vectrix::page_table::{PageTable, PageTableEntry};
+use unstable_matter::{
+    space_time::SpaceTime,
+    vector_space::{VectorSpace, UFOState},
+    space_config::{SpaceConfig, SpaceMetadata},
+    vector::Vector3D,
+};
 
+// Updated constants
 const KERNEL_LOAD_ADDR: u64 = 0x100000;  // Load kernel at 1MB
 const KERNEL_SECTOR_START: u16 = 33;     // Kernel starts at sector 33
 const SECTORS_TO_READ: u16 = 100;        // Adjust based on kernel size
-
-const VGA_BUFFER: *mut u8 = 0xb8000 as *mut u8;
-static mut VGA_CURSOR: usize = 0;
-
-// At the top of main.rs
-pub const BOOT_START: u64 = 0x7E00;
-pub const BOOT_STACK_START: u64 = 0x9000;
-pub const BOOT_STACK_SIZE: u64 = 0x4000;
+const VECTOR_CELL_SIZE: usize = 4096;    // 4KB per cell
+const MESH_DENSITY: usize = 16;          // 16x16x16 mesh
 
 mod debug {
     use super::UnstableChar;
@@ -85,32 +83,8 @@ impl UnstableChar {
 pub struct BootParams {
     pub kernel_load_addr: u32,
     pub kernel_size: u32,
-    pub memory_map_addr: u32,
-    pub memory_map_entries: u32,
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-struct GdtEntry {
-    limit_low: u16,
-    base_low: u16,
-    base_middle: u8,
-    access: u8,
-    granularity: u8,
-    base_high: u8,
-}
-
-impl GdtEntry {
-    const fn new_null() -> Self {
-        GdtEntry {
-            limit_low: 0,
-            base_low: 0,
-            base_middle: 0,
-            access: 0,
-            granularity: 0,
-            base_high: 0,
-        }
-    }
+    pub space_metadata: *const SpaceMetadata,
+    pub vector_space: *const VectorSpace,
 }
 
 #[repr(C, packed)]
@@ -416,59 +390,56 @@ unsafe extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: Interrupt
 
 #[no_mangle]
 pub unsafe extern "C" fn _start() -> ! {
-    core::arch::asm!(".code32", "cli");
+    // Initialize space-time system
+    let space_config = init_space_config();
+    let mut vector_space = init_vector_space(KERNEL_LOAD_ADDR as usize);
 
-    setup_gdt();
-    setup_page_tables();
-
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr4",
-        "or eax, 0x20",
-        "mov cr4, eax",
+    // Set up the space-time region for kernel loading
+    let mut kernel_space = SpaceTime::<u8>::new(
+        KERNEL_LOAD_ADDR as usize,
+        (SECTORS_TO_READ as usize) * 512,
+                                                0
     );
 
-    core::arch::asm!(
-        ".code32",
-        "mov ecx, 0xC0000080",
-        "rdmsr",
-        "or eax, 0x100",
-        "wrmsr",
-    );
+    // Load kernel into cell 1
+    vector_space.transition_state(UFOState::Landing);
 
-    core::arch::asm!(
-        ".code32",
-        "mov eax, cr0",
-        "or eax, 0x80000001",
-        "mov cr0, eax",
-    );
+    for sector in 0..SECTORS_TO_READ {
+        let sector_buffer = &mut kernel_space as *mut _ as *mut u8;
+        read_disk_sector(KERNEL_SECTOR_START + sector, sector_buffer.add((sector * 512) as usize));
+    }
 
-    core::arch::asm!(
-        ".code32",
-        "push {0}",
-        "push {1}",
-        "retf",
-        ".code64",
-        "mov ax, 0x10",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-        "mov ss, ax",
-        "mov rsp, {2}",
-        "mov rbp, rsp",
-        "call {3}",
-        "call {4}",
-        "sti",
-        "jmp {5}",
-        const 0x08,
-        sym long_mode_start,
-        in(reg) (&raw const STACK.data as *const _ as u64) + (STACK_SIZE as u64),
-                     sym setup_idt,
-                     sym setup_pic,
-                     sym rust_main,
-                     options(noreturn),
-    );
+    vector_space.transition_state(UFOState::Landed);
+
+    // Set up boot parameters
+    let boot_params = BootParams {
+        kernel_load_addr: KERNEL_LOAD_ADDR as u32,
+        kernel_size: (SECTORS_TO_READ as u32) * 512,
+        space_metadata: &vector_space.get_metadata() as *const _,
+        vector_space: &vector_space as *const _,
+    };
+
+    // Jump to kernel with updated parameters
+    let kernel_entry = kernel_space.base.as_usize() as *const fn(*const BootParams) -> !;
+    (*kernel_entry)(&boot_params as *const _);
+
+    loop {
+        core::arch::asm!("hlt");
+    }
+}
+
+// Initialize space configuration
+fn init_space_config() -> SpaceConfig {
+    SpaceConfig::new(
+        Vector3D::new(MESH_DENSITY, MESH_DENSITY, MESH_DENSITY),
+                     Vector3D::new(VECTOR_CELL_SIZE, VECTOR_CELL_SIZE, VECTOR_CELL_SIZE)
+    )
+}
+
+// Initialize vector space
+fn init_vector_space(base_addr: usize) -> VectorSpace {
+    let metadata = SpaceMetadata::new(VECTOR_CELL_SIZE * MESH_DENSITY.pow(3));
+    VectorSpace::new(base_addr, metadata)
 }
 
 unsafe fn read_disk_sector(sector: u16, buffer: *mut u8) {
