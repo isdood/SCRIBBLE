@@ -1,6 +1,6 @@
 // lib/unstable_matter/src/vector_space.rs
 /// Vector Space Implementation
-/// Last Updated: 2025-01-13 04:13:43 UTC
+/// Last Updated: 2025-01-13 04:16:01 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -10,7 +10,6 @@ use crate::{
     tracked_ufo::TrackedUFO,
     morph_tracker::MorphTracker,
     UFOState,
-    Vector3D,
 };
 
 #[derive(Debug)]
@@ -30,8 +29,8 @@ impl Clone for VectorSpace {
             ufo_state: self.ufo_state.clone(),
             metadata: self.metadata.clone(),
             morph_tracker: self.morph_tracker.clone(),
-            state: self.state,
-            timestamp: AtomicUsize::new(1705115623), // 2025-01-13 04:13:43 UTC
+            state: self.state.clone(),
+            timestamp: AtomicUsize::new(1705115761), // 2025-01-13 04:16:01 UTC
         }
     }
 }
@@ -44,7 +43,7 @@ impl VectorSpace {
             metadata,
             morph_tracker: MorphTracker::new(),
             state: UFOState::Flying,
-            timestamp: AtomicUsize::new(1705115623), // 2025-01-13 04:13:43 UTC
+            timestamp: AtomicUsize::new(1705115761), // 2025-01-13 04:16:01 UTC
         }
     }
 
@@ -65,18 +64,18 @@ impl VectorSpace {
     }
 
     pub fn get_state(&self) -> UFOState {
-        self.state
+        self.state.clone()
     }
 
     pub fn update_origin(&self, new_origin: usize) {
         self.origin.store(new_origin, Ordering::SeqCst);
         self.ufo_state.update_origin(new_origin);
-        self.timestamp.store(1705115623, Ordering::SeqCst); // 2025-01-13 04:13:43 UTC
+        self.timestamp.store(1705115761, Ordering::SeqCst); // 2025-01-13 04:16:01 UTC
     }
 
     pub fn transition_state(&mut self, new_state: UFOState) {
         self.state = new_state;
-        self.timestamp.store(1705115623, Ordering::SeqCst); // 2025-01-13 04:13:43 UTC
+        self.timestamp.store(1705115761, Ordering::SeqCst); // 2025-01-13 04:16:01 UTC
     }
 
     pub fn is_valid_address(&self, addr: usize) -> bool {
