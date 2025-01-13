@@ -1,9 +1,10 @@
 #![no_std]
 
 use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::vector::IntVector3D;
 
 /// UnstableMatter Core Library
-/// Last Updated: 2025-01-13 02:51:19 UTC
+/// Last Updated: 2025-01-13 03:11:38 UTC
 /// Author: Caleb J.D. Terkovics (isdood)
 /// Current User: isdood
 
@@ -49,19 +50,56 @@ impl MemoryAddress {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Dimensions {
+    pub width: usize,
+    pub height: usize,
+    pub depth: usize,
+}
+
+impl Dimensions {
+    pub const fn new(width: usize, height: usize, depth: usize) -> Self {
+        Self {
+            width,
+            height,
+            depth,
+        }
+    }
+
+    pub fn to_vector(&self) -> IntVector3D {
+        IntVector3D::new(
+            self.width as isize,
+            self.height as isize,
+            self.depth as isize,
+        )
+    }
+
+    pub fn from_vector(vec: &IntVector3D) -> Self {
+        Self {
+            width: vec.x.max(0) as usize,
+            height: vec.y.max(0) as usize,
+            depth: vec.z.max(0) as usize,
+        }
+    }
+
+    pub fn volume(&self) -> usize {
+        self.width * self.height * self.depth
+    }
+}
+
 // Fluid memory space representation
 #[derive(Debug)]
-pub struct FluidMemory<T: Copy + 'static> {
+pub struct FluidMemory<T: 'static> {
     base: MemoryAddress,
     timestamp: AtomicUsize,
     _ufo: UFO<T>,
 }
 
-impl<T: Copy + 'static> FluidMemory<T> {
+impl<T: 'static> FluidMemory<T> {
     pub const fn new(base: MemoryAddress) -> Self {
         Self {
             base,
-            timestamp: AtomicUsize::new(1705109902), // 2025-01-13 02:53:22 UTC
+            timestamp: AtomicUsize::new(1705111898), // 2025-01-13 03:11:38 UTC
             _ufo: UFO::new(),
         }
     }
@@ -73,68 +111,21 @@ impl<T: Copy + 'static> FluidMemory<T> {
     pub const fn base_addr(&self) -> usize {
         self.base.as_usize()
     }
+}
 
+impl<T: Copy + 'static> FluidMemory<T> {
     pub unsafe fn read(&self, offset: usize) -> T {
         let addr = self.base.as_usize() + offset;
-        *(addr as *const T)
+        core::ptr::read_volatile(addr as *const T)
     }
 
     pub unsafe fn write(&mut self, offset: usize, value: T) {
         let addr = self.base.as_usize() + offset;
-        *(addr as *mut T) = value;
-        self.timestamp.store(1705109902, Ordering::SeqCst); // 2025-01-13 02:53:22 UTC
+        core::ptr::write_volatile(addr as *mut T, value);
+        self.timestamp.store(1705111898, Ordering::SeqCst); // 2025-01-13 03:11:38 UTC
     }
 }
 
-// Core UnstableMatter definition
-#[derive(Debug)]
-pub struct UnstableMatter<T: 'static> {
-    memory: FluidMemory<T>,
-    _ufo: UFO<T>,
-    timestamp: AtomicUsize,
-}
-
-impl<T: 'static> UnstableMatter<T> {
-    pub const fn new(addr: usize) -> Self {
-        Self {
-            memory: FluidMemory::new(MemoryAddress::new(addr)),
-            _ufo: UFO::new(),
-            timestamp: AtomicUsize::new(1705109879), // 2025-01-13 02:51:19 UTC
-        }
-    }
-
-    pub const fn addr(&self) -> usize {
-        self.memory.base_addr()
-    }
-
-    pub fn timestamp(&self) -> usize {
-        self.timestamp.load(Ordering::SeqCst)
-    }
-
-    pub unsafe fn read(&self) -> T {
-        self.memory.read(0)
-    }
-
-    pub unsafe fn write(&mut self, value: T) {
-        self.memory.write(0, value);
-        self.timestamp.store(1705109879, Ordering::SeqCst); // 2025-01-13 02:51:19 UTC
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Dimensions {
-    pub width: usize,
-    pub height: usize,
-    pub depth: usize,
-}
-
-impl Dimensions {
-    pub const fn new(width: usize, height: usize, depth: usize) -> Self {
-        Self { width, height, depth }
-    }
-}
-
-// Fluid space-time mesh
 #[derive(Debug)]
 pub struct SpaceTime<T: 'static> {
     memory: FluidMemory<T>,
@@ -146,7 +137,7 @@ pub struct SpaceTime<T: 'static> {
     _ufo: UFO<T>,
 }
 
-impl<T: 'static> SpaceTime<T> {
+impl<T: Copy + 'static> SpaceTime<T> {
     pub const fn new(base_addr: usize, size: usize, offset: usize) -> Self {
         Self {
             memory: FluidMemory::new(MemoryAddress::new(base_addr)),
@@ -154,7 +145,7 @@ impl<T: 'static> SpaceTime<T> {
             offset,
             stride: core::mem::size_of::<T>(),
             dimensions: Dimensions::new(size, 1, 1),
-            timestamp: AtomicUsize::new(1705109879), // 2025-01-13 02:51:19 UTC
+            timestamp: AtomicUsize::new(1705111898), // 2025-01-13 03:11:38 UTC
             _ufo: UFO::new(),
         }
     }
@@ -187,12 +178,12 @@ impl<T: 'static> SpaceTime<T> {
     pub unsafe fn write_at(&mut self, index: usize, value: T) {
         assert!(index < self.size);
         self.memory.write(index * self.stride + self.offset, value);
-        self.timestamp.store(1705109879, Ordering::SeqCst); // 2025-01-13 02:51:19 UTC
+        self.timestamp.store(1705111898, Ordering::SeqCst); // 2025-01-13 03:11:38 UTC
     }
 }
 
-unsafe impl<T: 'static> Send for SpaceTime<T> {}
-unsafe impl<T: 'static> Sync for SpaceTime<T> {}
+unsafe impl<T: Copy + 'static> Send for SpaceTime<T> {}
+unsafe impl<T: Copy + 'static> Sync for SpaceTime<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -210,6 +201,21 @@ mod tests {
         assert_eq!(dims.width, 10);
         assert_eq!(dims.height, 20);
         assert_eq!(dims.depth, 30);
+        assert_eq!(dims.volume(), 6000);
+    }
+
+    #[test]
+    fn test_dimensions_vector_conversion() {
+        let dims = Dimensions::new(10, 20, 30);
+        let vec = dims.to_vector();
+        assert_eq!(vec.x, 10);
+        assert_eq!(vec.y, 20);
+        assert_eq!(vec.z, 30);
+
+        let dims2 = Dimensions::from_vector(&vec);
+        assert_eq!(dims2.width, 10);
+        assert_eq!(dims2.height, 20);
+        assert_eq!(dims2.depth, 30);
     }
 
     #[test]

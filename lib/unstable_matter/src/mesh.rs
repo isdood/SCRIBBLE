@@ -3,7 +3,7 @@
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::align::Align;
-use crate::MemoryAddress;
+use crate::vector::Vector3D;
 use crate::ufo::UFO;
 
 #[derive(Debug)]
@@ -89,24 +89,26 @@ impl<T> SpaceTime<T> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct MeshCell {
+#[derive(Debug)]
+pub struct MeshCell<T: 'static> {
     pub state: CellState,
     pub timestamp: AtomicUsize,
+    _ufo: UFO<T>,
 }
 
-#[derive(Debug, Clone)]
+impl<T: 'static> MeshCell<T> {
+    pub const fn new() -> Self {
+        Self {
+            state: CellState::Free,
+            timestamp: AtomicUsize::new(1705112019), // 2025-01-13 03:13:39 UTC
+            _ufo: UFO::new(),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum CellState {
     Free,
     Allocated,
     Reserved,
-}
-
-impl Default for MeshCell {
-    fn default() -> Self {
-        Self {
-            state: CellState::Free,
-            timestamp: AtomicUsize::new(1705109638), // 2025-01-13 02:47:18 UTC
-        }
-    }
 }

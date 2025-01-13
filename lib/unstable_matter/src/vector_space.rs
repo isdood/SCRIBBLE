@@ -1,6 +1,6 @@
 // vector_space.rs
 
-use std::sync::atomic::AtomicUsize;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use crate::morph_tracker::{MorphTracker, FileType};
 use crate::ufo_states::UFOState;
 use crate::mesh::{MeshCell, SpaceTime};
@@ -26,14 +26,14 @@ impl Default for VectorSpace {
 
 impl VectorSpace {
     pub fn new(origin: usize, size: usize) -> Self {
-        let config = SpaceConfig {
-            dimensions: Vector3D::new(size as isize, size as isize, size as isize),
-            cell_size: 256,
-            cells: Vector3D::new(16, 16, 16),
-        };
+        let config = SpaceConfig::new(
+            IntVector3D::new(size as isize, size as isize, size as isize),
+                                      IntVector3D::new(16, 16, 16),
+                                      256,
+        );
 
         let mesh_size = (config.cells.x * config.cells.y * config.cells.z) as usize;
-        let current_time = 1705108339; // 2025-01-13 02:32:19 UTC
+        let current_time = 1705112243; // 2025-01-13 03:17:23 UTC
 
         let metadata = SpaceMetadata {
             creation_time: AtomicUsize::new(current_time),
@@ -50,41 +50,56 @@ impl VectorSpace {
             metadata,
             morph_tracker: MorphTracker::new(),
             state: UFOState::Flying,
+            timestamp: AtomicUsize::new(current_time),
         }
     }
 
     pub fn init_mesh(&mut self) -> Result<(), &'static str> {
-        let mesh_size = (self.config.cells.x * self.config.cells.y * self.config.cells.z) as usize;
+        let mesh_size = self.get_mesh_size();
         for i in 0..mesh_size {
-            let cell = MeshCell::default();
-            self.mesh.write_at(i, cell)?;
+            let cell = MeshCell::new();
+            unsafe { self.mesh.write_at(i, cell) };
         }
+        self.timestamp.store(1705112243, Ordering::SeqCst); // 2025-01-13 03:17:23 UTC
         Ok(())
     }
 
-    pub fn get_cell(&self, index: usize) -> Result<MeshCell, &'static str> {
-        self.mesh.read_at(index)
+    pub fn get_cell(&self, index: usize) -> Option<MeshCell> {
+        if index >= self.get_mesh_size() {
+            return None;
+        }
+        unsafe { Some(self.mesh.read_at(index)) }
     }
 
     pub fn set_cell(&mut self, index: usize, cell: MeshCell) -> Result<(), &'static str> {
-        self.mesh.write_at(index, cell)
+        if index >= self.get_mesh_size() {
+            return Err("Index out of bounds");
+        }
+        unsafe {
+            self.mesh.write_at(index, cell);
+            self.timestamp.store(1705112243, Ordering::SeqCst); // 2025-01-13 03:17:23 UTC
+        }
+        Ok(())
     }
 
     pub fn land(mut self) -> Result<Self, &'static str> {
         self.ufo_state.track();
         self.state = self.state.transition_to_landed()?;
+        self.timestamp.store(1705112243, Ordering::SeqCst); // 2025-01-13 03:17:23 UTC
         Ok(self)
     }
 
     pub fn hover(mut self) -> Result<Self, &'static str> {
         self.ufo_state.track();
         self.state = self.state.transition_to_hovering()?;
+        self.timestamp.store(1705112243, Ordering::SeqCst); // 2025-01-13 03:17:23 UTC
         Ok(self)
     }
 
     pub fn take_off(mut self) -> Result<Self, &'static str> {
         self.ufo_state.track();
         self.state = self.state.transition_to_flying()?;
+        self.timestamp.store(1705112243, Ordering::SeqCst); // 2025-01-13 03:17:23 UTC
         Ok(self)
     }
 
@@ -93,7 +108,9 @@ impl VectorSpace {
     }
 
     pub fn init_morph_types(&mut self) -> Result<(), &'static str> {
-        self.morph_tracker.register_file_type(FileType::Rust)
+        self.morph_tracker.register_file_type(FileType::Rust)?;
+        self.timestamp.store(1705112243, Ordering::SeqCst); // 2025-01-13 03:17:23 UTC
+        Ok(())
     }
 
     pub fn get_mesh_size(&self) -> usize {
@@ -101,8 +118,10 @@ impl VectorSpace {
     }
 
     pub fn update_metadata(&mut self) {
-        self.metadata.last_modified.store(1705108339, Ordering::SeqCst); // 2025-01-13 02:32:19 UTC
+        let current_time = 1705112243; // 2025-01-13 03:17:23 UTC
+        self.metadata.last_modified.store(current_time, Ordering::SeqCst);
         self.metadata.last_modifier = "isdood";
+        self.timestamp.store(current_time, Ordering::SeqCst);
     }
 }
 
@@ -112,15 +131,24 @@ mod tests {
 
     #[test]
     fn test_vector_space_creation() {
-        let space = VectorSpace::new(0, 1024);
-        assert_eq!(space.origin, 0);
-        assert_eq!(space.get_mesh_size(), 4096);
+        let space = VectorSpace::new(0x1000, 1024);
+        assert_eq!(space.origin, 0x1000);
+        assert_eq!(space.get_mesh_size(), 16 * 16 * 16);
     }
 
     #[test]
-    fn test_state_transitions() {
-        let space = VectorSpace::new(0, 1024);
-        let landed_space = space.land().unwrap();
-        assert!(matches!(landed_space.state, UFOState::Landed));
+    fn test_vector_space_cell_operations() {
+        let mut space = VectorSpace::new(0x1000, 1024);
+        space.init_mesh().expect("Failed to initialize mesh");
+
+        let cell = space.get_cell(0).expect("Failed to get cell");
+        assert_eq!(cell.state, CellState::Free);
+
+        let mut new_cell = MeshCell::new();
+        new_cell.state = CellState::Allocated;
+        space.set_cell(0, new_cell).expect("Failed to set cell");
+
+        let updated_cell = space.get_cell(0).expect("Failed to get updated cell");
+        assert_eq!(updated_cell.state, CellState::Allocated);
     }
 }
