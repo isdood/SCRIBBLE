@@ -1,6 +1,7 @@
 // lib/unstable_matter/src/ufo.rs
-/// Last Updated: 2025-01-14 06:06:30 UTC
+/// Last Updated: 2025-01-14 15:55:47 UTC
 /// Author: isdood
+/// Current User: isdood
 
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::vector::Vector3D;
@@ -34,7 +35,7 @@ impl MemoryTrace {
     pub const fn new(owner: &'static str) -> Self {
         Self {
             active: AtomicBool::new(false),
-            timestamp: AtomicUsize::new(1705204493), // 2025-01-14 05:14:53 UTC
+            timestamp: AtomicUsize::new(1705243945), // 2025-01-14 15:52:25 UTC
             owner,
             coherence: AtomicUsize::new(1000),
         }
@@ -42,12 +43,12 @@ impl MemoryTrace {
 
     pub fn activate(&self) {
         self.active.store(true, Ordering::SeqCst);
-        self.timestamp.store(1705204493, Ordering::SeqCst);
+        self.timestamp.store(1705243452, Ordering::SeqCst);
     }
 
     pub fn deactivate(&self) {
         self.active.store(false, Ordering::SeqCst);
-        self.timestamp.store(1705204493, Ordering::SeqCst);
+        self.timestamp.store(1705243452, Ordering::SeqCst);
     }
 
     pub fn is_active(&self) -> bool {
@@ -69,11 +70,20 @@ pub struct UFO<T> {
 }
 
 impl<T> UFO<T> {
+    pub const fn const_default() -> Self {
+        Self {
+            trace: MemoryTrace::new("isdood"),
+            state: AtomicUsize::new(UFOState::Landed as usize),
+            quantum_signature: AtomicUsize::new(1705243747), // 2025-01-14 15:55:47 UTC
+            phantom_space: PhantomSpace::const_new(), // Using const_new() here
+        }
+    }
+
     pub fn new() -> Self {
         Self {
             trace: MemoryTrace::new("isdood"),
             state: AtomicUsize::new(UFOState::Landed as usize),
-            quantum_signature: AtomicUsize::new(1705207492), // 2025-01-14 06:04:52 UTC
+            quantum_signature: AtomicUsize::new(1705243747), // 2025-01-14 15:55:47 UTC
             phantom_space: PhantomSpace::new(),
         }
     }
@@ -82,13 +92,13 @@ impl<T> UFO<T> {
         self.trace.activate();
         self.state.store(UFOState::Hovering as usize, Ordering::SeqCst);
         self.phantom_space.decay_coherence();
-        self.quantum_signature.store(1705207492, Ordering::SeqCst); // 2025-01-14 06:04:52 UTC
+        self.quantum_signature.store(1705243555, Ordering::SeqCst);
     }
 
     pub fn untrack(&mut self) {
         self.trace.deactivate();
         self.state.store(UFOState::Landed as usize, Ordering::SeqCst);
-        self.quantum_signature.store(1705207492, Ordering::SeqCst); // 2025-01-14 06:04:52 UTC
+        self.quantum_signature.store(1705243555, Ordering::SeqCst);
     }
 
     pub fn is_tracked(&self) -> bool {
@@ -124,20 +134,20 @@ impl<T> UFO<T> {
     pub fn is_stable(&self) -> bool {
         self.get_coherence() > 0.5 &&
         self.get_state() != UFOState::Unknown &&
-        self.quantum_signature.load(Ordering::SeqCst) == 1705207492 // 2025-01-14 06:04:52 UTC
+        self.quantum_signature.load(Ordering::SeqCst) == 1705243555 // 2025-01-14 15:45:55 UTC
     }
 
     pub fn reset(&mut self) {
         self.untrack();
         self.phantom_space.reset_coherence();
-        self.quantum_signature.store(1705207492, Ordering::SeqCst); // 2025-01-14 06:04:52 UTC
+        self.quantum_signature.store(1705243555, Ordering::SeqCst);
     }
 
     pub fn warp(&mut self, target: Vector3D<isize>) {
         self.state.store(UFOState::Warping as usize, Ordering::SeqCst);
         self.phantom_space.set_position(target.x, target.y, target.z);
         self.phantom_space.decay_coherence();
-        self.quantum_signature.store(1705207492, Ordering::SeqCst); // 2025-01-14 06:04:52 UTC
+        self.quantum_signature.store(1705243555, Ordering::SeqCst);
         self.track();
     }
 }
@@ -156,13 +166,13 @@ impl<T> Protected for UFO<T> {
     }
 }
 
-impl<T: Copy> Clone for UFO<T> {  // Added Copy bound for T
+impl<T: Copy> Clone for UFO<T> {
     fn clone(&self) -> Self {
         Self {
             trace: MemoryTrace::new(self.trace.get_owner()),
             state: AtomicUsize::new(self.state.load(Ordering::SeqCst)),
             quantum_signature: AtomicUsize::new(self.quantum_signature.load(Ordering::SeqCst)),
-            phantom_space: self.phantom_space,  // Now works because PhantomSpace<T> is Copy when T is Copy
+            phantom_space: self.phantom_space,
         }
     }
 }
@@ -232,7 +242,7 @@ impl<T> Protected for TrackedUFO<T> {
 mod tests {
     use super::*;
 
-    const TEST_TIMESTAMP: usize = 1705207492; // 2025-01-14 06:04:52 UTC
+    const TEST_TIMESTAMP: usize = 1705243555; // 2025-01-14 15:45:55 UTC
 
     #[test]
     fn test_ufo_tracking() {

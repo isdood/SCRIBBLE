@@ -1,12 +1,12 @@
 // lib/unstable_matter/src/phantom.rs
 /// Quantum PhantomSpace Module
-/// Last Updated: 2025-01-14 05:55:43 UTC
+/// Last Updated: 2025-01-14 15:54:29 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::Vector3D;
 
-const CURRENT_TIMESTAMP: usize = 1705206943; // 2025-01-14 05:55:43 UTC
+const CURRENT_TIMESTAMP: usize = 1705243769; // 2025-01-14 15:54:29 UTC
 const COHERENCE_DECAY_FACTOR: f64 = 0.99;
 const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
 
@@ -27,6 +27,16 @@ impl<T> Default for PhantomSpace<T> {
 }
 
 impl<T> PhantomSpace<T> {
+    pub const fn const_new() -> Self {
+        Self {
+            position: Vector3D { x: 0, y: 0, z: 0 },
+            coherence: 1.0,
+            quantum_state: false,
+            _data: None,
+            last_update: CURRENT_TIMESTAMP,
+        }
+    }
+
     pub fn new() -> Self {
         Self {
             position: Vector3D::new(0, 0, 0),
@@ -80,7 +90,7 @@ impl<T> PhantomSpace<T> {
 mod tests {
     use super::*;
 
-    const TEST_TIMESTAMP: usize = 1705206943; // 2025-01-14 05:55:43 UTC
+    const TEST_TIMESTAMP: usize = 1705243769; // 2025-01-14 15:54:29 UTC
 
     #[test]
     fn test_phantom_space() {
@@ -138,6 +148,14 @@ mod tests {
     fn test_default() {
         let space: PhantomSpace<u32> = PhantomSpace::default();
         assert_eq!(space.get_position(), Vector3D::new(0, 0, 0));
+        assert_eq!(space.get_coherence(), 1.0);
+        assert_eq!(space.get_last_update(), TEST_TIMESTAMP);
+    }
+
+    #[test]
+    fn test_const_new() {
+        let space: PhantomSpace<u32> = PhantomSpace::const_new();
+        assert_eq!(space.get_position(), Vector3D { x: 0, y: 0, z: 0 });
         assert_eq!(space.get_coherence(), 1.0);
         assert_eq!(space.get_last_update(), TEST_TIMESTAMP);
     }

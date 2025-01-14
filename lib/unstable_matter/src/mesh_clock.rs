@@ -1,12 +1,11 @@
-// lib/unstable_matter/src/mesh_clock.rs
-/// Last Updated: 2025-01-14 06:02:26 UTC
+// lib/unstable_matter/src/mesh.rs
+/// Last Updated: 2025-01-14 16:05:09 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
     Vector3D,
-    Alignment,
-    align::AlignedSpace as AlignedRegion, // Alias for backward compatibility
+    align::{Alignment, AlignedSpace as AlignedRegion},
     Helium,
     HeliumSize,
     VECTOR_ALIGN,
@@ -16,7 +15,7 @@ use core::f64::consts::PI;
 use libm;
 use core::sync::atomic::Ordering;
 
-const CURRENT_TIMESTAMP: usize = 1705207346; // 2025-01-14 06:02:26 UTC UTC
+const CURRENT_TIMESTAMP: usize = 1705244709; // 2025-01-14 16:05:09 UTC
 const MESH_VECTOR_ALIGN: usize = 16;
 const MESH_CACHE_LINE: usize = 64;
 
@@ -39,10 +38,13 @@ pub struct MeshCell {
 
 impl MeshCell {
     pub fn new(position: Vector3D<f64>) -> Self {
+        let alignment = Alignment::new(MESH_VECTOR_ALIGN);
+
+        // Use the correct constructor from AlignedSpace
         let region = AlignedRegion::new(
-            0,
-            core::mem::size_of::<Self>(),
-                                        alignment.clone()
+            0,                          // base address
+            MESH_CACHE_LINE,           // size
+            alignment.clone()           // alignment configuration
         );
 
         Self {
@@ -153,6 +155,8 @@ pub struct MeshClock {
 /// Current User: isdood
 
 impl MeshClock {
+    const CURRENT_TIMESTAMP: usize = 1705245045; // 2025-01-14 16:10:45 UTC
+
     pub fn new(origin: Vector3D<f64>, distance: f64) -> Self {
         let alignment = Alignment::new(MESH_CACHE_LINE);
         let alpha_pos = origin;
@@ -166,7 +170,7 @@ impl MeshClock {
             alpha_cell: MeshCell::new(alpha_pos),
             omega_cell: MeshCell::new(omega_pos),
             signal_vector: Helium::new(Vector3D::new(distance, 0.0, 0.0)),
-            last_ping: Helium::new(CURRENT_TIMESTAMP),
+            last_ping: Helium::new(Self::CURRENT_TIMESTAMP),
             oscillation_count: HeliumSize::new(0),
             measured_interval: HeliumSize::new(0),
             quantum_state: QuantumState::Coherent,
@@ -207,7 +211,7 @@ impl MeshClock {
             ],
             quantum_signature: self.generate_quantum_signature(),
             pattern_coherence: 1.0,
-            timestamp: Helium::new(1705205999), // 2025-01-14 05:39:59 UTC
+            timestamp: Helium::new(Self::CURRENT_TIMESTAMP),
             alignment: Alignment::new(VECTOR_ALIGN),
         };
 
@@ -233,7 +237,7 @@ impl MeshClock {
             ],
             quantum_signature: self.generate_quantum_signature(),
             pattern_coherence: 1.0,
-            timestamp: Helium::new(1705205999), // 2025-01-14 05:39:59 UTC
+            timestamp: Helium::new(Self::CURRENT_TIMESTAMP),
             alignment: Alignment::new(VECTOR_ALIGN),
         };
 
@@ -263,7 +267,7 @@ impl MeshClock {
             return Err("Entanglement too weak");
         }
 
-        self.last_ping.store(CURRENT_TIMESTAMP, Ordering::SeqCst);
+        self.last_ping.store(Self::CURRENT_TIMESTAMP, Ordering::SeqCst);
         self.oscillation_count.store(
             self.oscillation_count.load(Ordering::SeqCst) + 1,
                                      Ordering::SeqCst
@@ -281,9 +285,8 @@ impl MeshClock {
             return Err("Alpha cell not ready to transmit");
         }
 
-        let current_time = 1705205999; // 2025-01-14 05:39:59 UTC
         let signal_time = self.propagate_signal()?;
-        self.last_ping.store(current_time, Ordering::SeqCst);
+        self.last_ping.store(Self::CURRENT_TIMESTAMP, Ordering::SeqCst);
         self.oscillation_count.store(
             self.oscillation_count.load(Ordering::SeqCst) + 1,
                                      Ordering::SeqCst
@@ -297,7 +300,6 @@ impl MeshClock {
             return Err("Omega cell not ready to transmit");
         }
 
-        let current_time = 1705205999; // 2025-01-14 05:39:59 UTC
         let signal_time = self.propagate_signal()?;
         self.measured_interval.store(signal_time, Ordering::SeqCst);
 
@@ -309,7 +311,6 @@ impl MeshClock {
         let distance = distance_vector.magnitude();
         let c = 299_792_458.0; // speed of light m/s
 
-        // Calculate propagation time including relativistic effects
         let time_dilation = self.calculate_time_dilation();
         let propagation_time = (distance / c * time_dilation) * 1_000_000_000.0; // Convert to ns
 
@@ -330,9 +331,8 @@ impl MeshClock {
     }
 
     pub fn sync_with_rtc(&mut self) -> Result<(), &'static str> {
-        let current_time = 1705205999; // 2025-01-14 05:39:59 UTC
         let mesh_time = self.last_ping.load(Ordering::SeqCst);
-        let drift = (current_time as i64 - mesh_time as i64).abs() as usize;
+        let drift = (Self::CURRENT_TIMESTAMP as i64 - mesh_time as i64).abs() as usize;
 
         if drift > 1000 { // More than 1µs drift
             self.calibrate()?;
@@ -344,11 +344,10 @@ impl MeshClock {
         self.alpha_cell.state = CellState::Calibrating;
         self.omega_cell.state = CellState::Calibrating;
 
-        // Quantum state reset
         self.quantum_state = QuantumState::Coherent;
         self.entanglement_strength.store(1000, Ordering::SeqCst);
+        self.last_ping.store(Self::CURRENT_TIMESTAMP, Ordering::SeqCst);
 
-        // Generate new quantum signature and entangle cells
         let new_signature = self.generate_quantum_signature();
         self.alpha_cell.quantum_signature = new_signature;
         self.omega_cell.quantum_signature = new_signature;
@@ -363,7 +362,6 @@ impl MeshClock {
         let mut signature = [0u8; 32];
         let oscillations = self.oscillation_count.load(Ordering::SeqCst);
 
-        // Fill signature with oscillation-based pattern
         for i in 0..32 {
             signature[i] = ((oscillations + i) & 0xFF) as u8;
         }
@@ -379,7 +377,7 @@ impl MeshClock {
             mesh_shape: [alpha_pos, omega_pos],
             quantum_signature: self.alpha_cell.quantum_signature,
             pattern_coherence: 1.0,
-            timestamp: Helium::new(1705205999), // 2025-01-14 05:39:59 UTC
+            timestamp: Helium::new(Self::CURRENT_TIMESTAMP),
             alignment: Alignment::new(VECTOR_ALIGN),
         };
 
@@ -409,8 +407,9 @@ impl MeshClock {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use core::sync::atomic::Ordering;
 
-    const TEST_TIMESTAMP: usize = 1705206113; // 2025-01-14 05:41:53 UTC
+    const TEST_TIMESTAMP: usize = 1705245045; // 2025-01-14 16:10:45 UTC
 
     #[test]
     fn test_quantum_sync() {
