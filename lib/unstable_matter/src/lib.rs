@@ -12,14 +12,8 @@ pub mod helium;
 pub mod grav;
 pub mod blackhole;
 pub mod wormhole;
-pub mod unstable;
 pub mod zeronaut;
 pub mod scribe;
-
-pub mod unstable_matter {
-    mod unstable;
-    pub use self::unstable::UnstableDescriptor;
-}
 
 // Re-exports
 pub use constants::*;
