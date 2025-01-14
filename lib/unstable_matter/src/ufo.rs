@@ -1,6 +1,6 @@
 // lib/unstable_matter/src/ufo.rs
 /// UnstableMatter UFO Protection System
-/// Last Updated: 2025-01-14 01:34:59 UTC
+/// Last Updated: 2025-01-14 05:14:53 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -35,13 +35,29 @@ impl MemoryTrace {
     pub const fn new(owner: &'static str) -> Self {
         Self {
             active: AtomicBool::new(false),
-            timestamp: AtomicUsize::new(1705192499), // 2025-01-14 01:34:59 UTC
+            timestamp: AtomicUsize::new(1705204493), // 2025-01-14 05:14:53 UTC
             owner,
             coherence: AtomicUsize::new(1000),
         }
     }
 
-    // ... rest of MemoryTrace implementation remains the same ...
+    pub fn activate(&self) {
+        self.active.store(true, Ordering::SeqCst);
+        self.timestamp.store(1705204493, Ordering::SeqCst);
+    }
+
+    pub fn deactivate(&self) {
+        self.active.store(false, Ordering::SeqCst);
+        self.timestamp.store(1705204493, Ordering::SeqCst);
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.active.load(Ordering::SeqCst)
+    }
+
+    pub fn get_owner(&self) -> &'static str {
+        self.owner
+    }
 }
 
 /// UFO Protection system with quantum state tracking
@@ -106,13 +122,13 @@ impl<T> Protected for UFO<T> {
     }
 }
 
-impl<T> Clone for UFO<T> {
+impl<T: Copy> Clone for UFO<T> {  // Added Copy bound for T
     fn clone(&self) -> Self {
         Self {
-            trace: MemoryTrace::new(self.trace.owner()),
+            trace: MemoryTrace::new(self.trace.get_owner()),
             state: AtomicUsize::new(self.state.load(Ordering::SeqCst)),
             quantum_signature: AtomicUsize::new(self.quantum_signature.load(Ordering::SeqCst)),
-            phantom_space: self.phantom_space,
+            phantom_space: self.phantom_space,  // Now works because PhantomSpace<T> is Copy when T is Copy
         }
     }
 }

@@ -1,6 +1,5 @@
 // lib/unstable_matter/src/helium.rs
-/// Helium - Quantum Coherent Memory System
-/// Last Updated: 2025-01-14 01:23:26 UTC
+/// Last Updated: 2025-01-14 05:11:16 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -16,7 +15,7 @@ pub struct Helium<T> {
     coherence: UnsafeCell<f64>,
     timestamp: AtomicUsize,
     active: AtomicBool,
-    ufo: UFO,
+    ufo: UFO<T>,
 }
 
 unsafe impl<T: Send> Send for Helium<T> {}
@@ -27,7 +26,7 @@ impl<T: Copy> Helium<T> {
         Self {
             inner: UnsafeCell::new(value),
             coherence: UnsafeCell::new(1.0),
-            timestamp: AtomicUsize::new(1705191806), // 2025-01-14 01:23:26 UTC
+            timestamp: AtomicUsize::new(1705204276), // 2025-01-14 05:11:16 UTC
             active: AtomicBool::new(true),
             ufo: UFO::new(),
         }
@@ -37,7 +36,7 @@ impl<T: Copy> Helium<T> {
         unsafe {
             let value = *self.inner.get();
             *self.coherence.get() *= 0.99; // Observation affects coherence
-            self.timestamp.store(1705191806, Ordering::SeqCst);
+            self.timestamp.store(1705204276, Ordering::SeqCst);
             self.ufo.protect();
             value
         }
@@ -46,7 +45,7 @@ impl<T: Copy> Helium<T> {
     pub fn store(&self, value: T, _order: Ordering) {
         unsafe {
             *self.inner.get() = value;
-            self.timestamp.store(1705191806, Ordering::SeqCst);
+            self.timestamp.store(1705204276, Ordering::SeqCst);
             self.ufo.protect();
         }
     }
@@ -56,7 +55,7 @@ impl<T: Copy> Helium<T> {
             let value = *self.inner.get();
             let coherence = *self.coherence.get();
             *self.coherence.get() *= 0.99;
-            self.timestamp.store(1705191806, Ordering::SeqCst);
+            self.timestamp.store(1705204276, Ordering::SeqCst);
             self.ufo.protect();
             (value, coherence)
         }
@@ -68,7 +67,7 @@ impl<T: Copy> Helium<T> {
 
     pub fn reset_coherence(&self) {
         unsafe { *self.coherence.get() = 1.0; }
-        self.timestamp.store(1705191806, Ordering::SeqCst);
+        self.timestamp.store(1705204276, Ordering::SeqCst);
         self.ufo.protect();
     }
 }
@@ -103,7 +102,7 @@ pub struct HeliumSize {
     value: AtomicUsize,
     coherence: UnsafeCell<f64>,
     timestamp: AtomicUsize,
-    ufo: UFO,
+    ufo: UFO<usize>,
 }
 
 impl HeliumSize {
@@ -111,34 +110,34 @@ impl HeliumSize {
         Self {
             value: AtomicUsize::new(value),
             coherence: UnsafeCell::new(1.0),
-            timestamp: AtomicUsize::new(1705191806), // 2025-01-14 01:23:26 UTC
+            timestamp: AtomicUsize::new(1705204276), // 2025-01-14 05:11:16 UTC
             ufo: UFO::new(),
         }
     }
 
     pub fn load(&self, order: Ordering) -> usize {
         unsafe { *self.coherence.get() *= 0.99; }
-        self.timestamp.store(1705191806, Ordering::SeqCst);
+        self.timestamp.store(1705204276, Ordering::SeqCst);
         self.ufo.protect();
         self.value.load(order)
     }
 
     pub fn store(&self, value: usize, order: Ordering) {
         self.value.store(value, order);
-        self.timestamp.store(1705191806, Ordering::SeqCst);
+        self.timestamp.store(1705204276, Ordering::SeqCst);
         self.ufo.protect();
     }
 
     pub fn fetch_add(&self, value: usize, order: Ordering) -> usize {
         unsafe { *self.coherence.get() *= 0.995; }
-        self.timestamp.store(1705191806, Ordering::SeqCst);
+        self.timestamp.store(1705204276, Ordering::SeqCst);
         self.ufo.protect();
         self.value.fetch_add(value, order)
     }
 
     pub fn fetch_sub(&self, value: usize, order: Ordering) -> usize {
         unsafe { *self.coherence.get() *= 0.995; }
-        self.timestamp.store(1705191806, Ordering::SeqCst);
+        self.timestamp.store(1705204276, Ordering::SeqCst);
         self.ufo.protect();
         self.value.fetch_sub(value, order)
     }

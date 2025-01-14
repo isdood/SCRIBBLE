@@ -1,57 +1,47 @@
-use unstable_matter::mesh_clock::{MeshClock, CellState, QuantumState};
-use unstable_matter::vector_space::FloatVector3D;
+// lib/unstable_matter/examples/mesh_clock_demo.rs
+/// Last Updated: 2025-01-14 05:16:42 UTC
+/// Author: isdood
+/// Current User: isdood
+
+use unstable_matter::{
+    mesh_clock::{MeshClock, MeshCell},
+    Vector3D,
+};
 
 fn main() {
-    println!("MeshClock Quantum Pattern Transfer Demo");
-    println!("Time: 2025-01-13 06:48:01 UTC");
-    println!("----------------------------------------\n");
+    println!("MeshClock Quantum State Demo");
+    println!("Timestamp: 2025-01-14 05:16:42 UTC");
+    println!("Current User: isdood\n");
 
-    // Create a mesh clock with 1 light-microsecond spacing
-    let origin = Vector3D::new(0.0, 0.0, 0.0);
-    let mut clock = MeshClock::new(origin, 299.792458); // 1 microsecond light distance
+    // Initialize mesh with origin point
+    let origin = Vector3D::new(0, 0, 0);
+    let mut mesh = MeshClock::new();
 
-    // Test 1: Basic entanglement
-    println!("Test 1: Creating quantum entanglement...");
-    match clock.entangle_cells() {
-        Ok(_) => println!("✓ Cells successfully entangled"),
-        Err(e) => println!("✗ Entanglement failed: {}", e),
-    }
-    println!("Entanglement strength: {:.6}", clock.get_entanglement_strength());
+    println!("Initializing quantum mesh at origin: {:?}", origin);
 
-    // Test 2: Quantum pattern transfer
-    println!("\nTest 2: Transferring quantum pattern...");
-    match clock.transfer_quantum_pattern() {
-        Ok(_) => println!("✓ Pattern successfully transferred"),
-        Err(e) => println!("✗ Pattern transfer failed: {}", e),
-    }
+    // Create some test cells
+    let test_positions = [
+        (0, 0, 0),
+        (1, 0, 0),
+        (0, 1, 0),
+        (1, 1, 0),
+    ];
 
-    // Test 3: Pattern replication
-    println!("\nTest 3: Replicating pattern to new cell...");
-    match clock.replicate_pattern() {
-        Ok(new_cell) => {
-            println!("✓ New cell created with pattern");
-            println!("  - Cell state: {:?}", new_cell.state);
-            println!("  - Position: {:?}", new_cell.position);
-        },
-        Err(e) => println!("✗ Pattern replication failed: {}", e),
+    println!("\nCreating test cells...");
+    for (x, y, z) in test_positions.iter() {
+        let position = Vector3D::new(*x, *y, *z);
+        let new_cell = mesh.create_cell(position);
+
+        println!("\nCell at position {:?}:", position);
+        println!("  - State: {:?}", new_cell.get_state());
+        println!("  - Cell ID: {}", new_cell.get_id());
+
+        // Update cell state
+        mesh.update_cell(&new_cell);
     }
 
-    // Test 4: Check pattern coherence
-    println!("\nTest 4: Checking pattern coherence...");
-    match clock.get_pattern_coherence() {
-        Ok(coherence) => println!("✓ Pattern coherence: {:.6}", coherence),
-        Err(e) => println!("✗ Coherence check failed: {}", e),
-    }
-
-    // Test 5: Quantum ping demonstration
-    println!("\nTest 5: Performing quantum ping...");
-    match clock.ping() {
-        Ok(time) => println!("✓ Ping completed in {} ns", time),
-        Err(e) => println!("✗ Ping failed: {}", e),
-    }
-
-    // Test 6: Time dilation calculation
-    println!("\nTest 6: Calculating time dilation...");
-    let dilation = clock.calculate_time_dilation();
-    println!("✓ Time dilation factor: {:.12}", dilation);
+    println!("\nMesh statistics:");
+    println!("  - Active cells: {}", mesh.get_active_cells());
+    println!("  - Total updates: {}", mesh.get_update_count());
+    println!("  - Quantum coherence: {:.2}", mesh.get_coherence());
 }

@@ -1,13 +1,13 @@
 // lib/unstable_matter/src/phantom.rs
 /// Quantum PhantomSpace Module
-/// Last Updated: 2025-01-14 01:39:17 UTC
+/// Last Updated: 2025-01-14 05:13:19 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::vector::Vector3D;
 
 /// Quantum space marker for tracking objects in 3D space with coherence
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]  // Added Copy trait
 pub struct PhantomSpace<T> {
     position: Vector3D<isize>,
     coherence: f64,
