@@ -7,7 +7,7 @@ fn main() {
     println!("----------------------------------------\n");
 
     // Create a mesh clock with 1 light-microsecond spacing
-    let origin = FloatVector3D::new(0.0, 0.0, 0.0);
+    let origin = Vector3D::new(0.0, 0.0, 0.0);
     let mut clock = MeshClock::new(origin, 299.792458); // 1 microsecond light distance
 
     // Test 1: Basic entanglement

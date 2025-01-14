@@ -1,44 +1,31 @@
 #![no_std]
 
-use core::sync::atomic::{AtomicUsize, Ordering};
-
 /// UnstableMatter Core Library
-/// Last Updated: 2025-01-13 04:05:24 UTC
-/// Author: Caleb J.D. Terkovics (isdood)
+/// Last Updated: 2025-01-14 01:43:19 UTC
+/// Author: isdood
 /// Current User: isdood
 
-mod align;
 pub mod vector;
-pub mod mesh;
-pub mod space_config;
-pub mod tracked_ufo;
-pub mod morph_tracker;
-pub mod ufo_states;
-pub mod ufo;
+pub mod align;
+pub mod helium;
+pub mod valence;
 pub mod mesh_clock;
-pub mod vector_space;
+pub mod ufo;
+pub mod phantom;
 
-// Re-export align module internals
-pub use align::*;
-
-// Re-export core components
-pub use vector::{Vector3D, IntVector3D};
-pub use mesh::MeshCell;
-pub use space_config::{SpaceConfig, SpaceMetadata};
-pub use tracked_ufo::TrackedUFO;
-pub use morph_tracker::{MorphTracker, FileType};
-pub use vector_space::VectorSpace;
-pub use ufo_states::UFOState;
-
-// Re-export UFO-related types
-pub use ufo::{
-    UFO,
-    Protected,
-    MemoryTrace,
-    Flying,
-    Hovering,
-    Landed,
+use core::sync::atomic::{AtomicUsize, Ordering};
+pub use {
+    vector::{Vector3D, FloatVector3D, IntVector3D},
+    align::{Alignment, AlignedRegion, VECTOR_ALIGN, CACHE_LINE},
+    helium::{Helium, HeliumSize},
+    valence::{ValenceOrder, compare_vectors},
+    mesh_clock::{MeshClock, MeshCell, CellState},
+    ufo::{UFO, Protected, MemoryTrace},
+    phantom::PhantomSpace,
 };
+
+// System Constants
+pub const QUANTUM_TIMESTAMP: usize = 1705193599; // 2025-01-14 01:43:19 UTC
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MemoryAddress(usize);
@@ -94,15 +81,17 @@ impl Dimensions {
 pub struct FluidMemory<T: 'static> {
     base: MemoryAddress,
     timestamp: AtomicUsize,
-    _ufo: UFO<T>,
+    ufo: UFO<T>,
+    phantom_space: PhantomSpace<T>,
 }
 
 impl<T: 'static> FluidMemory<T> {
     pub const fn new(base: MemoryAddress) -> Self {
         Self {
             base,
-            timestamp: AtomicUsize::new(1705115124), // 2025-01-13 04:05:24 UTC
-            _ufo: UFO::new(),
+            timestamp: AtomicUsize::new(1705192646), // 2025-01-14 01:37:26 UTC
+            ufo: UFO::new(),
+            phantom_space: PhantomSpace::new(),
         }
     }
 
@@ -117,18 +106,37 @@ impl<T: 'static> FluidMemory<T> {
     pub fn get_timestamp(&self) -> usize {
         self.timestamp.load(Ordering::SeqCst)
     }
+
+    pub fn is_protected(&self) -> bool {
+        self.ufo.is_protected()
+    }
+
+    pub fn get_position(&self) -> Vector3D<isize> {
+        self.phantom_space.get_position()
+    }
+
+    pub fn set_position(&mut self, x: isize, y: isize, z: isize) {
+        self.phantom_space.set_position(x, y, z);
+        self.ufo.track();
+    }
 }
 
 impl<T: Copy + 'static> FluidMemory<T> {
-    pub unsafe fn read(&self, offset: usize) -> T {
+    pub unsafe fn read(&mut self, offset: usize) -> T {
+        self.ufo.protect();
+        self.phantom_space.decay_coherence();
         let addr = self.base.as_usize() + offset;
-        core::ptr::read_volatile(addr as *const T)
+        let value = core::ptr::read_volatile(addr as *const T);
+        self.timestamp.store(1705192646, Ordering::SeqCst);
+        value
     }
 
     pub unsafe fn write(&mut self, offset: usize, value: T) {
+        self.ufo.protect();
+        self.phantom_space.decay_coherence();
         let addr = self.base.as_usize() + offset;
         core::ptr::write_volatile(addr as *mut T, value);
-        self.timestamp.store(1705115124, Ordering::SeqCst); // 2025-01-13 04:05:24 UTC
+        self.timestamp.store(1705192646, Ordering::SeqCst);
     }
 }
 
@@ -140,7 +148,8 @@ pub struct SpaceTime<T: 'static> {
     stride: usize,
     dimensions: Dimensions,
     timestamp: AtomicUsize,
-    _ufo: UFO<T>,
+    ufo: UFO<T>,
+    phantom_space: PhantomSpace<T>,
 }
 
 impl<T: Copy + 'static> SpaceTime<T> {
@@ -151,94 +160,28 @@ impl<T: Copy + 'static> SpaceTime<T> {
             offset,
             stride: core::mem::size_of::<T>(),
             dimensions: Dimensions::new(size, 1, 1),
-            timestamp: AtomicUsize::new(1705115124), // 2025-01-13 04:05:24 UTC
-            _ufo: UFO::new(),
+            timestamp: AtomicUsize::new(1705192646), // 2025-01-14 01:37:26 UTC
+            ufo: UFO::new(),
+            phantom_space: PhantomSpace::new(),
         }
     }
 
-    pub const fn size(&self) -> usize {
-        self.size
+    pub fn get_position(&self) -> Vector3D<isize> {
+        self.phantom_space.get_position()
     }
 
-    pub const fn dimensions(&self) -> Dimensions {
-        self.dimensions
+    pub fn set_position(&mut self, x: isize, y: isize, z: isize) {
+        self.phantom_space.set_position(x, y, z);
+        self.memory.set_position(x, y, z);
+        self.ufo.track();
     }
 
-    pub const fn stride(&self) -> usize {
-        self.stride
+    pub fn is_protected(&self) -> bool {
+        self.ufo.is_protected() && self.memory.is_protected()
     }
 
-    pub const fn offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn timestamp(&self) -> usize {
-        self.timestamp.load(Ordering::SeqCst)
-    }
-
-    pub unsafe fn read_at(&self, index: usize) -> T {
-        assert!(index < self.size);
-        self.memory.read(index * self.stride + self.offset)
-    }
-
-    pub unsafe fn write_at(&mut self, index: usize, value: T) {
-        assert!(index < self.size);
-        self.memory.write(index * self.stride + self.offset, value);
-        self.timestamp.store(1705115124, Ordering::SeqCst); // 2025-01-13 04:05:24 UTC
-    }
-}
-
-unsafe impl<T: Copy + 'static> Send for SpaceTime<T> {}
-unsafe impl<T: Copy + 'static> Sync for SpaceTime<T> {}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_fluid_memory() {
-        let memory = FluidMemory::<u32>::new(MemoryAddress::new(0x1000));
-        assert_eq!(memory.base_addr(), 0x1000);
-        assert!(memory.get_timestamp() > 0);
-    }
-
-    #[test]
-    fn test_dimensions() {
-        let dims = Dimensions::new(10, 20, 30);
-        assert_eq!(dims.width, 10);
-        assert_eq!(dims.height, 20);
-        assert_eq!(dims.depth, 30);
-        assert_eq!(dims.volume(), 6000);
-    }
-
-    #[test]
-    fn test_dimensions_vector_conversion() {
-        let dims = Dimensions::new(10, 20, 30);
-        let vec = dims.to_vector();
-        assert_eq!(vec.x, 10);
-        assert_eq!(vec.y, 20);
-        assert_eq!(vec.z, 30);
-
-        let dims2 = Dimensions::from_vector(&vec);
-        assert_eq!(dims2.width, 10);
-        assert_eq!(dims2.height, 20);
-        assert_eq!(dims2.depth, 30);
-    }
-
-    #[test]
-    fn test_space_time() {
-        let space: SpaceTime<u32> = SpaceTime::new(0x1000, 100, 0);
-        assert_eq!(space.size(), 100);
-        assert_eq!(space.stride(), core::mem::size_of::<u32>());
-        assert!(space.timestamp() > 0);
-    }
-
-    #[test]
-    fn test_memory_address() {
-        let addr = MemoryAddress::new(0x1000);
-        assert_eq!(addr.as_usize(), 0x1000);
-
-        let addr2 = addr;
-        assert_eq!(addr, addr2);
+    pub fn get_coherence(&self) -> f64 {
+        (self.phantom_space.get_coherence() +
+        self.memory.phantom_space.get_coherence()) / 2.0
     }
 }

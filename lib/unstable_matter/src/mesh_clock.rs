@@ -1,76 +1,104 @@
 // lib/unstable_matter/src/mesh_clock.rs
-// Last Updated: 2025-01-13 06:43:45 UTC
+// Last Updated: 2025-01-14 00:51:45 UTC
 // Author: isdood
 // Current User: isdood
-// Theory: Quantum Pattern Transfer enables replication of quantum states through
-// data pattern copying without triggering wave function collapse through observation.
 
-use crate::vector::Vector3D;  // Not FloatVector3D
-use crate::align::{Alignment, AlignedRegion, VECTOR_ALIGN, CACHE_LINE};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use crate::{
+    vector::Vector3D,
+    align::{Alignment, AlignedRegion, VECTOR_ALIGN},
+    helium::{Helium, HeliumSize},
+};
 use core::f64::consts::PI;
-use libm::{sin, sqrt};
+use libm;
+use crate::CACHE_LINE;
 
-const CURRENT_TIMESTAMP: usize = 1705130266; // 2025-01-13 07:17:46 UTC
+const CURRENT_TIMESTAMP: usize = 1705189905; // 2025-01-14 00:51:45 UTC
 
-// New quantum pattern structure for non-observational transfers
-#[derive(Clone)]
-pub struct QuantumDataPattern {
-    pub mesh_shape: [Vector3D<f64>; 2],  // Fixed size array for quantum patterns
-    pub quantum_signature: [u8; 32],
-    pub pattern_coherence: f64,
-    pub timestamp: AtomicUsize,
-    alignment: Alignment,
-}
-
-pub struct ProtectedQuantumState {
-    internal_state: Option<QuantumData>,
-    observation_count: AtomicUsize,
-}
-
-#[derive(Clone)]
-struct QuantumData {
-    phase: f64,
-    coherence: f64,
-    last_update: usize,
-}
-
-pub struct MeshClock {
-    alpha_cell: MeshCell,
-    omega_cell: MeshCell,
-    signal_vector: Vector3D<f64>,
-    last_ping: AtomicUsize,
-    oscillation_count: AtomicUsize,
-    measured_interval: AtomicUsize,
-    quantum_state: QuantumState,
-    entanglement_strength: AtomicUsize,
-    pattern_buffer: Option<QuantumDataPattern>,
-    alignment: Alignment,
-}
-
-pub struct MeshCell {
-    pub position: Vector3D<f64>,
-    pub state: CellState,
-    pub quantum_signature: [u8; 32],
-    region: AlignedRegion,
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CellState {
     Calibrating,
-    Transmitting,
-    Receiving,
+    Coherent,
     Entangled,
     Superposition,
     PatternReplication,
+    Transmitting,
+    Receiving,
 }
 
-#[derive(Clone, Debug)]
+pub struct MeshCell {
+    position_helium: Helium<Vector3D<f64>>,
+    state: CellState,
+    quantum_signature: [u8; 32],
+    region: AlignedRegion,
+}
+
+impl MeshCell {
+    pub fn new(position: Vector3D<f64>) -> Self {
+        let alignment = Alignment::new(VECTOR_ALIGN);
+        let region = AlignedRegion::new(
+            0,
+            core::mem::size_of::<Self>(),
+                                        alignment.clone()
+        );
+
+        Self {
+            position_helium: Helium::new(position),
+            state: CellState::Calibrating,
+            quantum_signature: [0; 32],
+            region,
+        }
+    }
+
+    pub fn get_position_helium(&self) -> &Helium<Vector3D<f64>> {
+        &self.position_helium
+    }
+
+    pub fn update_quantum_pattern(&mut self, pattern: &QuantumDataPattern) -> Result<(), &'static str> {
+        self.quantum_signature = pattern.quantum_signature;
+        self.state = CellState::PatternReplication;
+        Ok(())
+    }
+}
+
+// New quantum pattern structure for non-observational transfers
+#[derive(Clone, Copy, Debug)]
 pub enum QuantumState {
     Coherent,
     Entangled,
     Superposition(f64),
     PatternTransfer,
+}
+
+pub struct QuantumData {
+    phase: f64,
+    coherence: f64,
+    last_update: usize,
+}
+
+pub struct QuantumDataPattern {
+    pub mesh_shape: [Vector3D<f64>; 2],
+    pub quantum_signature: [u8; 32],
+    pub pattern_coherence: f64,
+    pub timestamp: Helium<usize>,  // Changed from AtomicUsize
+    pub alignment: Alignment,
+}
+
+impl Clone for QuantumDataPattern {
+    fn clone(&self) -> Self {
+        Self {
+            mesh_shape: self.mesh_shape.clone(),
+            quantum_signature: self.quantum_signature,
+            pattern_coherence: self.pattern_coherence,
+            timestamp: Helium::new(self.timestamp.load(core::sync::atomic::Ordering::SeqCst)),
+            alignment: self.alignment.clone(),
+        }
+    }
+}
+
+pub struct ProtectedQuantumState {
+    internal_state: Option<QuantumData>,
+    observation_count: Helium<usize>,  // Changed from AtomicUsize
+    alignment: Alignment,
 }
 
 // Implementation of Protected Quantum State
@@ -82,77 +110,47 @@ impl ProtectedQuantumState {
                 coherence: 1.0,
                 last_update: CURRENT_TIMESTAMP,
             }),
-            observation_count: AtomicUsize::new(0),
+            observation_count: Helium::new(0),
+            alignment: Alignment::new(VECTOR_ALIGN),
         }
     }
 
     pub fn observe(&self) -> Result<f64, &'static str> {
-        let mut state = self.internal_state.lock().unwrap();
-
-        self.observation_count.fetch_add(1, Ordering::SeqCst);
-
-        match *state {
-            Some(ref mut data) => {
-                data.coherence *= 0.5; // Observation reduces coherence
-
-                if self.observation_count.load(Ordering::SeqCst) > 3 {
-                    *state = None;
+        match &self.internal_state {
+            Some(data) => {
+                let count = self.observation_count.load(core::sync::atomic::Ordering::SeqCst);
+                if count > 3 {
                     return Err("Quantum state collapsed due to observation");
                 }
-
-                Ok(data.phase * data.coherence)
+                self.observation_count.store(count + 1, core::sync::atomic::Ordering::SeqCst);
+                Ok(data.phase * data.coherence * 0.5)
             }
-            None => Err("Quantum state already collapsed"),
-        }
-    }
-
-    // Pattern transfer without observation
-    pub fn transfer_pattern(&self) -> Result<QuantumDataPattern, &'static str> {
-        if let Some(data) = &*self.internal_state.lock().unwrap() {
-            Ok(QuantumDataPattern {
-                mesh_shape: Vec::new(),
-               quantum_signature: [0; 32],
-               pattern_coherence: data.coherence,
-               timestamp: AtomicUsize::new(1705128225), // 2025-01-13 06:43:45 UTC
-            })
-        } else {
-            Err("Cannot transfer pattern from collapsed state")
-        }
-    }
-
-    pub fn update_from_pattern(&mut self, pattern: &QuantumDataPattern) -> Result<(), &'static str> {
-        let mut state = self.internal_state.lock().unwrap();
-        *state = Some(QuantumData {
-            phase: 0.0, // Phase is reset during transfer
-            coherence: pattern.pattern_coherence,
-            last_update: pattern.timestamp.load(Ordering::SeqCst),
-        });
-        Ok(())
-    }
-}
-
-// Implementation of MeshCell
-impl MeshCell {
-    pub fn new(position: Vector3D<f64>) -> Self {
-        let alignment = Alignment::new(VECTOR_ALIGN);
-        let region = AlignedRegion::new(
-            0,  // Will be aligned by AlignedRegion
-            core::mem::size_of::<Self>(),
-                                        alignment
-        );
-
-        Self {
-            position,
-            state: CellState::Calibrating,
-            quantum_signature: [0; 32],
-            region,
+            None => Err("Quantum state already collapsed")
         }
     }
 }
+
+pub struct MeshClock {
+    alpha_cell: MeshCell,
+    omega_cell: MeshCell,
+    signal_vector: Helium<Vector3D<f64>>,  // Changed to use Helium
+    last_ping: Helium<usize>,              // Changed from AtomicUsize
+    oscillation_count: HeliumSize,         // Using our new HeliumSize
+    measured_interval: HeliumSize,         // Using our new HeliumSize
+    quantum_state: QuantumState,
+    entanglement_strength: Helium<usize>,  // Changed from AtomicUsize
+    pattern_buffer: Option<QuantumDataPattern>,
+    alignment: Alignment,
+}
+
+// lib/unstable_matter/src/mesh_clock.rs
+// Last Updated: 2025-01-14 00:42:42 UTC
+// Author: isdood
+// Current User: isdood
 
 // Implementation of MeshClock
 impl MeshClock {
-    pub fn new(origin: Vector3D<f64>, distance: f64) -> Self {  // Changed from FloatVector3D
+    pub fn new(origin: Vector3D<f64>, distance: f64) -> Self {
         let alignment = Alignment::new(CACHE_LINE);
         let alpha_pos = origin;
         let omega_pos = Vector3D::new(
@@ -164,12 +162,12 @@ impl MeshClock {
         Self {
             alpha_cell: MeshCell::new(alpha_pos),
             omega_cell: MeshCell::new(omega_pos),
-            signal_vector: Vector3D::new(distance, 0.0, 0.0),
-            last_ping: AtomicUsize::new(CURRENT_TIMESTAMP),
-            oscillation_count: AtomicUsize::new(0),
-            measured_interval: AtomicUsize::new(0),
+            signal_vector: Helium::new(Vector3D::new(distance, 0.0, 0.0)),
+            last_ping: Helium::new(1705189362), // 2025-01-14 00:42:42 UTC
+            oscillation_count: HeliumSize::new(0),
+            measured_interval: HeliumSize::new(0),
             quantum_state: QuantumState::Coherent,
-            entanglement_strength: AtomicUsize::new(1000),
+            entanglement_strength: Helium::new(1000),
             pattern_buffer: None,
             alignment,
         }
@@ -177,98 +175,64 @@ impl MeshClock {
 
     pub fn calculate_time_dilation(&self) -> f64 {
         let c = 299_792_458.0; // speed of light m/s
-        let distance = self.signal_vector.magnitude();
-        let classical_dilation = 1.0 / (1.0 - (distance * distance) / (c * c)).sqrt();
+        let (distance_vector, coherence) = self.signal_vector.quantum_load(core::sync::atomic::Ordering::SeqCst);
+        let distance = distance_vector.magnitude();
+        let classical_dilation = 1.0 / libm::sqrt(1.0 - (distance * distance) / (c * c));
 
         match self.quantum_state {
             QuantumState::Entangled => {
-                let entanglement_factor = self.entanglement_strength.load(Ordering::SeqCst) as f64 / 1000.0;
-                classical_dilation * (1.0 - 1e-10 * entanglement_factor)
+                let entanglement_factor = self.entanglement_strength.load(core::sync::atomic::Ordering::SeqCst) as f64 / 1000.0;
+                classical_dilation * (1.0 - 1e-10 * entanglement_factor * coherence)
             },
             QuantumState::Superposition(phase) => {
-                classical_dilation * (1.0 + phase.sin() * 1e-10)
-            },
-            QuantumState::PatternTransfer => {
-                // Pattern transfer has no time dilation effect
-                classical_dilation
+                classical_dilation * (1.0 + libm::sin(phase) * coherence * 1e-10)
             },
             _ => classical_dilation
         }
     }
 
-    pub fn transfer_quantum_pattern(&mut self) -> Result<(), &'static str> {
-        let pattern = QuantumDataPattern {
-            mesh_shape: [
-                self.alpha_cell.position.clone(),
-                self.omega_cell.position.clone()
-            ],
-            quantum_signature: self.alpha_cell.quantum_signature,
-            pattern_coherence: 1.0,
-            timestamp: AtomicUsize::new(CURRENT_TIMESTAMP),
-            alignment: self.alignment.clone(),
-        };
-
-        self.pattern_buffer = Some(pattern);
-        self.quantum_state = QuantumState::PatternTransfer;
-        Ok(())
-    }
-
-    pub fn replicate_pattern(&self) -> Result<MeshCell, &'static str> {
-        if let Some(pattern) = &self.pattern_buffer {
-            let mut new_cell = MeshCell::new(pattern.mesh_shape[0].clone());
-            new_cell.update_quantum_pattern(pattern)?;
-            Ok(new_cell)
-        } else {
-            Err("No pattern available for replication")
-        }
-    }
-
-    pub fn get_pattern_coherence(&self) -> Result<f64, &'static str> {
-        match &self.pattern_buffer {
-            Some(pattern) => Ok(pattern.pattern_coherence),
-            None => Err("No pattern in buffer"),
-        }
-    }
-
     pub fn entangle_cells(&mut self) -> Result<(), &'static str> {
-        let shared_phase = (self.oscillation_count.load(Ordering::SeqCst) as f64 * PI) / 1000.0;
+        let shared_phase = (self.oscillation_count.load(core::sync::atomic::Ordering::SeqCst) as f64 * PI) / 1000.0;
 
         self.alpha_cell.state = CellState::Entangled;
         self.omega_cell.state = CellState::Entangled;
 
         // Update through pattern to avoid observation
         let pattern = QuantumDataPattern {
-            mesh_shape: vec![self.alpha_cell.position.clone()],
+            mesh_shape: [self.alpha_cell.get_position_helium().quantum_load(core::sync::atomic::Ordering::SeqCst).0,
+            self.omega_cell.get_position_helium().quantum_load(core::sync::atomic::Ordering::SeqCst).0],
             quantum_signature: self.generate_quantum_signature(),
             pattern_coherence: 1.0,
-            timestamp: AtomicUsize::new(1705128225), // 2025-01-13 06:43:45 UTC
+            timestamp: Helium::new(1705189362), // 2025-01-14 00:42:42 UTC
+            alignment: Alignment::new(VECTOR_ALIGN),
         };
 
         self.alpha_cell.update_quantum_pattern(&pattern)?;
         self.omega_cell.update_quantum_pattern(&pattern)?;
 
         self.quantum_state = QuantumState::Entangled;
-        self.entanglement_strength.store(1000, Ordering::SeqCst);
+        self.entanglement_strength.store(1000, core::sync::atomic::Ordering::SeqCst);
 
         Ok(())
     }
 
     pub fn create_superposition(&mut self) -> Result<(), &'static str> {
-        let base_phase = (self.oscillation_count.load(Ordering::SeqCst) as f64 * PI) / 1000.0;
+        let base_phase = (self.oscillation_count.load(core::sync::atomic::Ordering::SeqCst) as f64 * PI) / 1000.0;
 
         self.alpha_cell.state = CellState::Superposition;
         self.omega_cell.state = CellState::Superposition;
 
-        // Create superposition through pattern transfer
         let alpha_pattern = QuantumDataPattern {
-            mesh_shape: vec![self.alpha_cell.position.clone()],
+            mesh_shape: [self.alpha_cell.get_position_helium().quantum_load(core::sync::atomic::Ordering::SeqCst).0,
+            self.omega_cell.get_position_helium().quantum_load(core::sync::atomic::Ordering::SeqCst).0],
             quantum_signature: self.generate_quantum_signature(),
             pattern_coherence: 1.0,
-            timestamp: AtomicUsize::new(1705128225), // 2025-01-13 06:43:45 UTC
+            timestamp: Helium::new(1705189362), // 2025-01-14 00:42:42 UTC
+            alignment: Alignment::new(VECTOR_ALIGN),
         };
 
         let mut omega_pattern = alpha_pattern.clone();
-        omega_pattern.pattern_coherence *= -1.0; // Opposite phase
+        omega_pattern.pattern_coherence *= -1.0;
 
         self.alpha_cell.update_quantum_pattern(&alpha_pattern)?;
         self.omega_cell.update_quantum_pattern(&omega_pattern)?;
@@ -287,16 +251,22 @@ impl MeshClock {
     }
 
     fn quantum_ping(&mut self) -> Result<usize, &'static str> {
-        let now = 1705128225; // 2025-01-13 06:43:45 UTC
-        let entanglement_strength = self.entanglement_strength.load(Ordering::SeqCst);
+        let current_time = 1705189362; // 2025-01-14 00:42:42 UTC
+        let entanglement_strength = self.entanglement_strength.load(core::sync::atomic::Ordering::SeqCst);
 
         if entanglement_strength < 100 {
             return Err("Entanglement too weak");
         }
 
-        self.last_ping.store(now, Ordering::SeqCst);
-        self.oscillation_count.fetch_add(1, Ordering::SeqCst);
-        self.entanglement_strength.fetch_sub(1, Ordering::SeqCst);
+        self.last_ping.store(current_time, core::sync::atomic::Ordering::SeqCst);
+        self.oscillation_count.store(
+            self.oscillation_count.load(core::sync::atomic::Ordering::SeqCst) + 1,
+                                     core::sync::atomic::Ordering::SeqCst
+        );
+        self.entanglement_strength.store(
+            entanglement_strength - 1,
+            core::sync::atomic::Ordering::SeqCst
+        );
 
         Ok(0) // Instantaneous due to quantum entanglement
     }
@@ -306,10 +276,13 @@ impl MeshClock {
             return Err("Alpha cell not ready to transmit");
         }
 
-        let now = 1705128225; // 2025-01-13 06:43:45 UTC
+        let current_time = 1705189362; // 2025-01-14 00:42:42 UTC
         let signal_time = self.propagate_signal()?;
-        self.last_ping.store(now, Ordering::SeqCst);
-        self.oscillation_count.fetch_add(1, Ordering::SeqCst);
+        self.last_ping.store(current_time, core::sync::atomic::Ordering::SeqCst);
+        self.oscillation_count.store(
+            self.oscillation_count.load(core::sync::atomic::Ordering::SeqCst) + 1,
+                                     core::sync::atomic::Ordering::SeqCst
+        );
 
         Ok(signal_time)
     }
@@ -319,15 +292,16 @@ impl MeshClock {
             return Err("Omega cell not ready to transmit");
         }
 
-        let now = 1705128323; // 2025-01-13 06:45:23 UTC
+        let current_time = 1705189362; // 2025-01-14 00:42:42 UTC
         let signal_time = self.propagate_signal()?;
-        self.measured_interval.store(signal_time, Ordering::SeqCst);
+        self.measured_interval.store(signal_time, core::sync::atomic::Ordering::SeqCst);
 
         Ok(signal_time)
     }
 
     fn propagate_signal(&self) -> Result<usize, &'static str> {
-        let distance = self.signal_vector.magnitude();
+        let (distance_vector, _) = self.signal_vector.quantum_load(core::sync::atomic::Ordering::SeqCst);
+        let distance = distance_vector.magnitude();
         let c = 299_792_458.0; // speed of light m/s
 
         // Calculate propagation time including relativistic effects
@@ -338,7 +312,7 @@ impl MeshClock {
     }
 
     pub fn get_frequency(&self) -> f64 {
-        let interval = self.measured_interval.load(Ordering::SeqCst) as f64;
+        let interval = self.measured_interval.load(core::sync::atomic::Ordering::SeqCst) as f64;
         1_000_000_000.0 / interval // Convert nanoseconds to Hz
     }
 
@@ -347,13 +321,13 @@ impl MeshClock {
     }
 
     pub fn get_entanglement_strength(&self) -> f64 {
-        self.entanglement_strength.load(Ordering::SeqCst) as f64 / 1000.0
+        self.entanglement_strength.load(core::sync::atomic::Ordering::SeqCst) as f64 / 1000.0
     }
 
     pub fn sync_with_rtc(&mut self) -> Result<(), &'static str> {
-        let rtc_time = 1705128323; // 2025-01-13 06:45:23 UTC
-        let mesh_time = self.last_ping.load(Ordering::SeqCst);
-        let drift = (rtc_time as i64 - mesh_time as i64).abs() as usize;
+        let current_time = 1705189362; // 2025-01-14 00:42:42 UTC
+        let mesh_time = self.last_ping.load(core::sync::atomic::Ordering::SeqCst);
+        let drift = (current_time as i64 - mesh_time as i64).abs() as usize;
 
         if drift > 1000 { // More than 1µs drift
             self.calibrate()?;
@@ -367,7 +341,7 @@ impl MeshClock {
 
         // Quantum state reset
         self.quantum_state = QuantumState::Coherent;
-        self.entanglement_strength.store(1000, Ordering::SeqCst);
+        self.entanglement_strength.store(1000, core::sync::atomic::Ordering::SeqCst);
 
         // Generate new quantum signature and entangle cells
         let new_signature = self.generate_quantum_signature();
@@ -382,7 +356,7 @@ impl MeshClock {
 
     fn generate_quantum_signature(&self) -> [u8; 32] {
         let mut signature = [0u8; 32];
-        let oscillations = self.oscillation_count.load(Ordering::SeqCst);
+        let oscillations = self.oscillation_count.load(core::sync::atomic::Ordering::SeqCst);
 
         // Fill signature with oscillation-based pattern
         for i in 0..32 {
@@ -392,16 +366,16 @@ impl MeshClock {
         signature
     }
 
-    // New quantum pattern transfer methods
     pub fn transfer_quantum_pattern(&mut self) -> Result<(), &'static str> {
+        let (alpha_pos, _) = self.alpha_cell.get_position_helium().quantum_load(core::sync::atomic::Ordering::SeqCst);
+        let (omega_pos, _) = self.omega_cell.get_position_helium().quantum_load(core::sync::atomic::Ordering::SeqCst);
+
         let pattern = QuantumDataPattern {
-            mesh_shape: vec![
-                self.alpha_cell.position.clone(),
-                self.omega_cell.position.clone()
-            ],
+            mesh_shape: [alpha_pos, omega_pos],
             quantum_signature: self.alpha_cell.quantum_signature,
             pattern_coherence: 1.0,
-            timestamp: AtomicUsize::new(1705128323), // 2025-01-13 06:45:23 UTC
+            timestamp: Helium::new(1705189362), // 2025-01-14 00:42:42 UTC
+            alignment: Alignment::new(VECTOR_ALIGN),
         };
 
         self.pattern_buffer = Some(pattern);
@@ -432,15 +406,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_quantum_sync() {
+        let mut clock = MeshClock::new(Vector3D::new(0.0, 0.0, 0.0), 1.0);
+        assert!(clock.quantum_sync().is_ok());
+    }
+
+    #[test]
+    fn test_time_dilation() {
+        let clock = MeshClock::new(Vector3D::new(0.0, 0.0, 0.0), 0.5);
+        let dilation = clock.calculate_time_dilation();
+        assert!(dilation >= 1.0);
+    }
+
+    #[test]
     fn test_mesh_clock_creation() {
-        let origin = FloatVector3D::new(0.0, 0.0, 0.0);
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
         let clock = MeshClock::new(origin, 1.0);
         assert_eq!(clock.oscillation_count.load(Ordering::SeqCst), 0);
     }
 
     #[test]
     fn test_quantum_entanglement() {
-        let origin = FloatVector3D::new(0.0, 0.0, 0.0);
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
         let mut clock = MeshClock::new(origin, 1.0);
         assert!(clock.entangle_cells().is_ok());
         assert_eq!(clock.quantum_state, QuantumState::Entangled);
@@ -448,7 +435,7 @@ mod tests {
 
     #[test]
     fn test_superposition() {
-        let origin = FloatVector3D::new(0.0, 0.0, 0.0);
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
         let mut clock = MeshClock::new(origin, 1.0);
         assert!(clock.create_superposition().is_ok());
         match clock.quantum_state {
@@ -459,7 +446,7 @@ mod tests {
 
     #[test]
     fn test_entanglement_degradation() {
-        let origin = FloatVector3D::new(0.0, 0.0, 0.0);
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
         let mut clock = MeshClock::new(origin, 1.0);
         clock.entangle_cells().unwrap();
 
@@ -473,7 +460,7 @@ mod tests {
 
     #[test]
     fn test_quantum_coherence() {
-        let origin = FloatVector3D::new(0.0, 0.0, 0.0);
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
         let mut clock = MeshClock::new(origin, 1.0);
         clock.entangle_cells().unwrap();
 
@@ -485,7 +472,7 @@ mod tests {
 
     #[test]
     fn test_quantum_pattern_transfer() {
-        let origin = FloatVector3D::new(0.0, 0.0, 0.0);
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
         let mut clock = MeshClock::new(origin, 1.0);
 
         assert!(clock.transfer_quantum_pattern().is_ok());
@@ -494,7 +481,7 @@ mod tests {
 
     #[test]
     fn test_pattern_replication() {
-        let origin = FloatVector3D::new(0.0, 0.0, 0.0);
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
         let mut clock = MeshClock::new(origin, 1.0);
 
         clock.transfer_quantum_pattern().unwrap();
@@ -505,7 +492,7 @@ mod tests {
 
     #[test]
     fn test_pattern_coherence_preservation() {
-        let origin = FloatVector3D::new(0.0, 0.0, 0.0);
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
         let mut clock = MeshClock::new(origin, 1.0);
 
         clock.transfer_quantum_pattern().unwrap();

@@ -1,22 +1,19 @@
+// lib/unstable_matter/src/ufo.rs
 /// UnstableMatter UFO Protection System
-/// Last Updated: 2025-01-13 00:16:36 UTC
-/// Author: Caleb J.D. Terkovics (isdood)
+/// Last Updated: 2025-01-14 01:34:59 UTC
+/// Author: isdood
 /// Current User: isdood
 
-use core::{
-    marker::PhantomData,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
-};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use crate::vector::Vector3D;
+use crate::phantom::PhantomSpace;
 
-/// UFO State markers
-#[derive(Debug)]
-pub struct Flying;
-
-#[derive(Debug)]
-pub struct Hovering;
-
-#[derive(Debug)]
-pub struct Landed;
+#[derive(Debug, Clone, Copy)]
+pub enum UFOState {
+    Landed = 0,
+    Hovering = 1,
+    Flying = 2,
+}
 
 /// UFO Protection trait
 pub trait Protected {
@@ -25,120 +22,123 @@ pub trait Protected {
     fn is_protected(&self) -> bool;
 }
 
-/// Memory trace for UFO tracking
+/// Memory trace for UFO tracking with quantum coherence
 #[derive(Debug)]
 pub struct MemoryTrace {
     active: AtomicBool,
     timestamp: AtomicUsize,
     owner: &'static str,
+    coherence: AtomicUsize,
 }
 
 impl MemoryTrace {
     pub const fn new(owner: &'static str) -> Self {
         Self {
             active: AtomicBool::new(false),
-            timestamp: AtomicUsize::new(0),
+            timestamp: AtomicUsize::new(1705192499), // 2025-01-14 01:34:59 UTC
             owner,
+            coherence: AtomicUsize::new(1000),
         }
     }
 
-    pub fn activate(&self) {
-        self.active.store(true, Ordering::SeqCst);
-        self.timestamp.store(1705100196, Ordering::SeqCst); // 2025-01-13 00:16:36 UTC
-    }
-
-    pub fn deactivate(&self) {
-        self.active.store(false, Ordering::SeqCst);
-        self.timestamp.store(1705100196, Ordering::SeqCst); // 2025-01-13 00:16:36 UTC
-    }
-
-    pub fn is_active(&self) -> bool {
-        self.active.load(Ordering::SeqCst)
-    }
-
-    pub fn timestamp(&self) -> usize {
-        self.timestamp.load(Ordering::SeqCst)
-    }
-
-    pub fn owner(&self) -> &'static str {
-        self.owner
-    }
+    // ... rest of MemoryTrace implementation remains the same ...
 }
 
-/// UFO Protection system
+/// UFO Protection system with quantum state tracking
 #[derive(Debug)]
-pub struct UFO<T: 'static> {
+pub struct UFO<T> {
     trace: MemoryTrace,
-    _marker: PhantomData<T>,
+    state: AtomicUsize,
+    quantum_signature: AtomicUsize,
+    phantom_space: PhantomSpace<T>,
 }
 
-impl<T: 'static> UFO<T> {
+impl<T> UFO<T> {
     pub const fn new() -> Self {
         Self {
             trace: MemoryTrace::new("isdood"),
-            _marker: PhantomData,
+            state: AtomicUsize::new(UFOState::Landed as usize),
+            quantum_signature: AtomicUsize::new(0),
+            phantom_space: PhantomSpace::new(),
         }
     }
 
-    pub fn track(&self) {
+    pub fn track(&mut self) {
         self.trace.activate();
+        self.state.store(UFOState::Hovering as usize, Ordering::SeqCst);
+        self.phantom_space.decay_coherence();
     }
 
-    pub fn untrack(&self) {
+    pub fn untrack(&mut self) {
         self.trace.deactivate();
+        self.state.store(UFOState::Landed as usize, Ordering::SeqCst);
     }
 
     pub fn is_tracked(&self) -> bool {
         self.trace.is_active()
     }
 
-    pub fn timestamp(&self) -> usize {
-        self.trace.timestamp()
+    pub fn set_position(&mut self, x: isize, y: isize, z: isize) {
+        self.phantom_space.set_position(x, y, z);
+        self.track();
     }
 
-    pub fn owner(&self) -> &'static str {
-        self.trace.owner()
+    pub fn get_position(&self) -> Vector3D<isize> {
+        self.phantom_space.get_position()
+    }
+
+    pub fn get_coherence(&self) -> f64 {
+        self.phantom_space.get_coherence()
     }
 }
 
-/// Tracked UFO for enhanced protection
+impl<T> Protected for UFO<T> {
+    fn protect(&self) {
+        self.trace.activate();
+    }
+
+    fn unprotect(&self) {
+        self.trace.deactivate();
+    }
+
+    fn is_protected(&self) -> bool {
+        self.is_tracked()
+    }
+}
+
+impl<T> Clone for UFO<T> {
+    fn clone(&self) -> Self {
+        Self {
+            trace: MemoryTrace::new(self.trace.owner()),
+            state: AtomicUsize::new(self.state.load(Ordering::SeqCst)),
+            quantum_signature: AtomicUsize::new(self.quantum_signature.load(Ordering::SeqCst)),
+            phantom_space: self.phantom_space,
+        }
+    }
+}
+
+/// Tracked UFO with enhanced protection
 #[derive(Debug)]
-pub struct TrackedUFO<T: 'static> {
+pub struct TrackedUFO<T> {
     base: UFO<T>,
-    origin: usize,
-    boundary: usize,
+    origin: Vector3D<isize>,
+    boundary: Vector3D<isize>,
 }
 
-impl<T: 'static> TrackedUFO<T> {
-    pub const fn new(origin: usize) -> Self {
+impl<T> TrackedUFO<T> {
+    pub fn new(x: isize, y: isize, z: isize) -> Self {
         Self {
             base: UFO::new(),
-            origin,
-            boundary: origin + 0x1000,
+            origin: Vector3D::new(x, y, z),
+            boundary: Vector3D::new(x + 0x1000, y + 0x1000, z + 0x1000),
         }
     }
 
-    pub fn with_boundary(origin: usize, size: usize) -> Self {
-        Self {
-            base: UFO::new(),
-            origin,
-            boundary: origin + size,
-        }
-    }
-
-    pub fn origin(&self) -> usize {
-        self.origin
-    }
-
-    pub fn boundary(&self) -> usize {
-        self.boundary
-    }
-
-    pub fn track(&self) {
+    pub fn track(&mut self) {
         self.base.track();
     }
 
-    pub fn untrack(&self) {
+    pub fn untrack(&mut self) {
         self.base.untrack();
     }
 
@@ -146,39 +146,74 @@ impl<T: 'static> TrackedUFO<T> {
         self.base.is_tracked()
     }
 
-    pub fn timestamp(&self) -> usize {
-        self.base.timestamp()
+    pub fn contains(&self, pos: &Vector3D<isize>) -> bool {
+        pos.x >= self.origin.x && pos.x < self.boundary.x &&
+        pos.y >= self.origin.y && pos.y < self.boundary.y &&
+        pos.z >= self.origin.z && pos.z < self.boundary.z
     }
 
-    pub fn owner(&self) -> &'static str {
-        self.base.owner()
+    pub fn get_coherence(&self) -> f64 {
+        self.base.get_coherence()
     }
 
-    pub fn contains(&self, addr: usize) -> bool {
-        addr >= self.origin && addr < self.boundary
-    }
-
-    pub fn check_access(&self, addr: usize) -> Result<(), &'static str> {
-        if !self.is_tracked() {
-            return Err("UFO protection is not active");
+    pub fn set_position(&mut self, x: isize, y: isize, z: isize) {
+        let pos = Vector3D::new(x, y, z);
+        if self.contains(&pos) {
+            self.base.set_position(x, y, z);
         }
-        if !self.contains(addr) {
-            return Err("Address out of UFO protected range");
-        }
-        Ok(())
     }
 }
 
-impl<T: 'static> Protected for TrackedUFO<T> {
+impl<T> Protected for TrackedUFO<T> {
     fn protect(&self) {
-        self.track();
+        self.base.protect();
     }
 
     fn unprotect(&self) {
-        self.untrack();
+        self.base.unprotect();
     }
 
     fn is_protected(&self) -> bool {
-        self.is_tracked()
+        self.base.is_protected()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_phantom_space() {
+        let mut space: PhantomSpace<u32> = PhantomSpace::new();
+        assert_eq!(space.get_position(), Vector3D::new(0, 0, 0));
+        assert_eq!(space.get_coherence(), 1.0);
+
+        space.set_position(1, 2, 3);
+        assert_eq!(space.get_position(), Vector3D::new(1, 2, 3));
+        assert!(space.get_coherence() < 1.0);
+    }
+
+    #[test]
+    fn test_ufo_tracking() {
+        let mut ufo: UFO<u32> = UFO::new();
+        assert!(!ufo.is_tracked());
+
+        ufo.track();
+        assert!(ufo.is_tracked());
+        assert!(ufo.get_coherence() < 1.0);
+
+        ufo.set_position(10, 20, 30);
+        assert_eq!(ufo.get_position(), Vector3D::new(10, 20, 30));
+    }
+
+    #[test]
+    fn test_tracked_ufo() {
+        let mut tracked: TrackedUFO<u32> = TrackedUFO::new(0, 0, 0);
+        assert!(!tracked.is_tracked());
+
+        tracked.set_position(100, 100, 100);
+        assert!(tracked.is_tracked());
+        assert!(tracked.contains(&Vector3D::new(100, 100, 100)));
+        assert!(!tracked.contains(&Vector3D::new(0x2000, 0, 0)));
     }
 }

@@ -42,6 +42,10 @@ pub struct UnstableMatter<T: Copy + 'static> {
     timestamp: AtomicUsize,
 }
 
+pub trait Align {
+    fn align(&self) -> f64;
+}
+
 impl<T: Copy + 'static> UnstableMatter<T> {
     /// Creates a new UnstableMatter instance at the specified address.
     ///

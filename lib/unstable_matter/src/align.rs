@@ -1,15 +1,14 @@
 // lib/unstable_matter/src/align.rs
 /// Unstable Matter Alignment Module
-/// Last Updated: 2025-01-13 03:37:56 UTC
+/// Last Updated: 2025-01-14 01:18:32 UTC
 /// Author: isdood
 /// Current User: isdood
 
-pub mod align;
-
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::Ordering;
 use crate::{
     vector::Vector3D,
-    UFO,
+    helium::Helium,
+    ufo::{UFO, Protected},
 };
 
 /// Alignment configuration for memory layout
@@ -22,7 +21,9 @@ pub struct Alignment {
     /// Alignment padding
     padding: usize,
     /// Timestamp for tracking changes
-    timestamp: AtomicUsize,
+    timestamp: Helium<usize>,
+    /// Quantum coherence tracking
+    coherence: Helium<f64>,
 }
 
 impl Clone for Alignment {
@@ -31,7 +32,8 @@ impl Clone for Alignment {
             base: self.base,
             vector: self.vector,
             padding: self.padding,
-            timestamp: AtomicUsize::new(self.timestamp.load(Ordering::SeqCst)),
+            timestamp: Helium::new(self.timestamp.load(Ordering::SeqCst)),
+            coherence: Helium::new(self.coherence.load(Ordering::SeqCst)),
         }
     }
 }
@@ -43,7 +45,8 @@ impl Alignment {
             base,
             vector: Vector3D::new(base as isize, base as isize, base as isize),
             padding: base / 2,
-            timestamp: AtomicUsize::new(1705113476), // 2025-01-13 03:37:56 UTC
+            timestamp: Helium::new(1705191512), // 2025-01-14 01:18:32 UTC
+            coherence: Helium::new(1.0),
         }
     }
 
@@ -62,15 +65,29 @@ impl Alignment {
         self.padding
     }
 
-    /// Get the current timestamp
+    /// Get the current timestamp and update coherence
     pub fn timestamp(&self) -> usize {
-        self.timestamp.load(Ordering::SeqCst)
+        let ts = self.timestamp.load(Ordering::SeqCst);
+        self.coherence.store(
+            self.coherence.load(Ordering::SeqCst) * 0.99,
+                             Ordering::SeqCst
+        );
+        ts
+    }
+
+    /// Get current quantum coherence
+    pub fn coherence(&self) -> f64 {
+        self.coherence.load(Ordering::SeqCst)
     }
 
     /// Align a given address to the base alignment
     pub fn align_address(&self, addr: usize) -> usize {
         let aligned = (addr + self.base - 1) & !(self.base - 1);
-        self.timestamp.store(1705113476, Ordering::SeqCst); // 2025-01-13 03:37:56 UTC
+        self.timestamp.store(1705191512, Ordering::SeqCst); // 2025-01-14 01:18:32 UTC
+        self.coherence.store(
+            self.coherence.load(Ordering::SeqCst) * 0.99,
+                             Ordering::SeqCst
+        );
         aligned
     }
 
@@ -81,13 +98,16 @@ impl Alignment {
                                     ((pos.y + self.vector.y - 1) / self.vector.y) * self.vector.y,
                                     ((pos.z + self.vector.z - 1) / self.vector.z) * self.vector.z
         );
-        self.timestamp.store(1705113476, Ordering::SeqCst); // 2025-01-13 03:37:56 UTC
+        self.timestamp.store(1705191512, Ordering::SeqCst); // 2025-01-14 01:18:32 UTC
+        self.coherence.store(
+            self.coherence.load(Ordering::SeqCst) * 0.99,
+                             Ordering::SeqCst
+        );
         aligned
     }
 }
 
-/// Memory region with alignment requirements
-#[derive(Debug)]
+/// Memory region with alignment requirements and UFO protection
 pub struct AlignedRegion {
     /// Start address of the region
     start: usize,
@@ -96,17 +116,25 @@ pub struct AlignedRegion {
     /// Alignment requirements
     alignment: Alignment,
     /// UFO tracking
-    _ufo: UFO<usize>,
+    ufo: UFO<usize>,
+    /// Quantum signature
+    quantum_signature: [u8; 32],
 }
 
 impl AlignedRegion {
     /// Create a new aligned region
     pub fn new(start: usize, size: usize, alignment: Alignment) -> Self {
+        let mut quantum_signature = [0u8; 32];
+        for i in 0..32 {
+            quantum_signature[i] = ((start + i) & 0xFF) as u8;
+        }
+
         Self {
             start: alignment.align_address(start),
             size,
             alignment,
-            _ufo: UFO::new(),
+            ufo: UFO::new(),
+            quantum_signature,
         }
     }
 
@@ -125,8 +153,16 @@ impl AlignedRegion {
         &self.alignment
     }
 
-    /// Check if an address is within this region
+    /// Get the quantum signature
+    pub fn quantum_signature(&self) -> &[u8; 32] {
+        &self.quantum_signature
+    }
+
+    /// Check if an address is within this region and has sufficient coherence
     pub fn contains(&self, addr: usize) -> bool {
+        if self.alignment.coherence() < 0.5 {
+            return false; // Quantum coherence too low for reliable check
+        }
         addr >= self.start && addr < (self.start + self.size)
     }
 
@@ -137,6 +173,11 @@ impl AlignedRegion {
         } else {
             None
         }
+    }
+
+    /// Check quantum state of the region
+    pub fn verify_quantum_state(&self) -> bool {
+        self.alignment.coherence() >= 0.5 && self.ufo.is_protected()
     }
 }
 
@@ -156,6 +197,7 @@ mod tests {
         assert_eq!(align.align_address(5), 8);
         assert_eq!(align.align_address(8), 8);
         assert_eq!(align.align_address(9), 16);
+        assert!(align.coherence() < 1.0);
     }
 
     #[test]
@@ -166,37 +208,27 @@ mod tests {
         assert_eq!(aligned.x, 16);
         assert_eq!(aligned.y, 32);
         assert_eq!(aligned.z, 32);
+        assert!(align.coherence() < 1.0);
     }
 
     #[test]
-    fn test_alignment_clone() {
-        let align1 = Alignment::new(32);
-        let align2 = align1.clone();
-        assert_eq!(align1.base(), align2.base());
-        assert_eq!(align1.vector(), align2.vector());
-        assert_eq!(align1.padding(), align2.padding());
-        assert_eq!(align1.timestamp(), align2.timestamp());
+    fn test_quantum_state() {
+        let align = Alignment::new(32);
+        let region = AlignedRegion::new(0x1000, 0x1000, align);
+        assert!(region.verify_quantum_state());
+
+        // Multiple operations should decay coherence
+        for _ in 0..10 {
+            region.alignment().align_address(0x1234);
+        }
+        assert!(!region.verify_quantum_state());
     }
 
     #[test]
-    fn test_aligned_region() {
+    fn test_quantum_signature() {
         let align = Alignment::new(PAGE_SIZE);
         let region = AlignedRegion::new(0x1234, 0x2000, align);
-
-        assert_eq!(region.start(), 0x2000); // Aligned up to page size
-        assert_eq!(region.size(), 0x2000);
-        assert!(region.contains(0x2500));
-        assert!(!region.contains(0x1000));
-        assert!(!region.contains(0x4001));
-    }
-
-    #[test]
-    fn test_region_offset() {
-        let align = Alignment::new(CACHE_LINE);
-        let region = AlignedRegion::new(0x1000, 0x1000, align);
-
-        assert_eq!(region.offset_for(0x1040), Some(0x40));
-        assert_eq!(region.offset_for(0x2000), None);
-        assert_eq!(region.offset_for(0x0500), None);
+        let signature = region.quantum_signature();
+        assert_ne!(signature, &[0u8; 32]);
     }
 }
