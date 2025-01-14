@@ -5,13 +5,15 @@
 /// Author: isdood
 /// Current User: isdood
 
-pub mod vector;
-pub mod align;
-pub mod helium;
+mod vector;
+mod align;
+mod helium;
 pub mod valence;
 pub mod mesh_clock;
 pub mod ufo;
-pub mod phantom;
+mod phantom;
+mod cube;
+mod constants;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 

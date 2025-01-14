@@ -1,25 +1,17 @@
-// lib/unstable_matter/src/align.rs
-/// Memory Alignment Module for Vector Space
-/// Last Updated: 2025-01-14 06:01:15 UTC
-/// Author: isdood
-/// Current User: isdood
+use crate::vector::Vector3D;
+use crate::phantom::PhantomSpace;
+use core::alloc::Layout;
+use crate::constants::{VECTOR_ALIGN, CACHE_LINE};
 
-use crate::{
-    vector::Vector3D,
-    phantom::PhantomSpace,
-    VECTOR_ALIGN,
-    CACHE_LINE,
-};
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Alignment {
     value: usize,
     phantom_space: PhantomSpace<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AlignedSpace {
-    base: usize,
+    base: *mut u8,
     size: usize,
     alignment: Alignment,
     phantom_space: PhantomSpace<usize>,
@@ -56,22 +48,34 @@ impl Alignment {
 impl AlignedSpace {
     pub fn new(base: usize, size: usize, alignment: Alignment) -> Self {
         let aligned_base = alignment.align_address(base);
-        let mut space = Self {
-            base: aligned_base,
-            size,
-            alignment,
-            phantom_space: PhantomSpace::new(),
-        };
-        space.phantom_space.set_position(
-            aligned_base as isize,
-            aligned_base as isize,
-            aligned_base as isize
-        );
-        space
+        let layout = Layout::from_size_align(size, alignment.get_value()).unwrap();
+        unsafe {
+            let ptr = AlignedSpace::alloc(layout);
+            let mut space = Self {
+                base: ptr,
+                size,
+                alignment,
+                phantom_space: PhantomSpace::new(),
+            };
+            space.phantom_space.set_position(
+                aligned_base as isize,
+                aligned_base as isize,
+                aligned_base as isize
+            );
+            space
+        }
+    }
+
+    pub unsafe fn alloc(layout: Layout) -> *mut u8 {
+        core::ptr::null_mut() // Placeholder for custom allocation logic
+    }
+
+    pub unsafe fn dealloc(ptr: *mut u8, layout: Layout) {
+        // Placeholder for custom deallocation logic
     }
 
     pub fn get_base(&self) -> usize {
-        self.base
+        self.base as usize
     }
 
     pub fn get_size(&self) -> usize {
@@ -97,17 +101,17 @@ impl AlignedSpace {
     }
 
     pub fn decay_coherence(&mut self) {
-        self.phantom_space.decay_coherence();
+        self.phantom_space.decay_coherence()
     }
 
     pub fn reset_coherence(&mut self) {
-        self.phantom_space.reset_coherence();
+        self.phantom_space.reset_coherence()
     }
 
     pub fn realign(&mut self) {
-        let new_base = self.alignment.align_address(self.base);
-        if new_base != self.base {
-            self.base = new_base;
+        let new_base = self.alignment.align_address(self.base as usize);
+        if new_base != self.base as usize {
+            self.base = new_base as *mut u8;
             self.phantom_space.set_position(
                 new_base as isize,
                 new_base as isize,

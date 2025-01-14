@@ -1,17 +1,16 @@
-// lib/unstable_matter/src/phantom.rs
 /// Quantum PhantomSpace Module
 /// Last Updated: 2025-01-14 15:54:29 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use crate::Vector3D;
+use crate::vector::Vector3D;
 
 const CURRENT_TIMESTAMP: usize = 1705243769; // 2025-01-14 15:54:29 UTC
 const COHERENCE_DECAY_FACTOR: f64 = 0.99;
 const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
 
 /// Quantum space marker for tracking objects in 3D space with coherence
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PhantomSpace<T> {
     position: Vector3D<isize>,
     coherence: f64,
@@ -54,7 +53,7 @@ impl<T> PhantomSpace<T> {
     }
 
     pub fn get_position(&self) -> Vector3D<isize> {
-        self.position
+        self.position.clone()
     }
 
     pub fn decay_coherence(&mut self) {

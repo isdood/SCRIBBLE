@@ -1,0 +1,4 @@
+pub const MESH_TIMESTAMP: usize = 1705251145; // 2025-01-14 17:32:25 UTC
+pub const PLANCK_LENGTH: f64 = 1.616255e-35;
+pub const VECTOR_QUANTUM_STATE: usize = 1;
+pub const QUANTUM_THRESHOLD: f64 = 1e-9;
