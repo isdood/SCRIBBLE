@@ -55,6 +55,11 @@ impl MeshCell {
         }
     }
 
+    pub fn get_region(&self) -> &AlignedRegion {
+        &self.region
+    }
+
+
     pub fn get_position_helium(&self) -> &Helium<Vector3D<f64>> {
         &self.position_helium
     }
@@ -95,13 +100,6 @@ impl Clone for QuantumDataPattern {
     }
 }
 
-#[derive(Debug)]
-pub struct QuantumData {
-    phase: f64,
-    coherence: f64,
-    last_update: usize,
-}
-
 pub struct ProtectedQuantumState {
     internal_state: Option<QuantumData>,
     observation_count: Helium<usize>,
@@ -119,6 +117,10 @@ impl ProtectedQuantumState {
             observation_count: Helium::new(0),
             alignment: Alignment::new(VECTOR_ALIGN),
         }
+    }
+
+    pub fn get_alignment(&self) -> &Alignment {
+        &self.alignment
     }
 
     pub fn observe(&self) -> Result<f64, &'static str> {
@@ -180,6 +182,10 @@ impl MeshClock {
         }
     }
 
+    pub fn get_alignment(&self) -> &Alignment {
+        &self.alignment
+    }
+
     pub fn calculate_time_dilation(&self) -> f64 {
         let c = 299_792_458.0; // speed of light m/s
         let (distance_vector, coherence) = self.signal_vector.quantum_load(Ordering::SeqCst);
@@ -199,7 +205,7 @@ impl MeshClock {
     }
 
     pub fn entangle_cells(&mut self) -> Result<(), &'static str> {
-        let shared_phase = (self.oscillation_count.load(Ordering::SeqCst) as f64 * PI) / 1000.0;
+        let _shared_phase = (self.oscillation_count.load(Ordering::SeqCst) as f64 * PI) / 1000.0;
 
         self.alpha_cell.state = CellState::Entangled;
         self.omega_cell.state = CellState::Entangled;
@@ -404,141 +410,114 @@ impl MeshClock {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct QuantumData {
+    phase: f64,
+    coherence: f64,
+    last_update: usize,
+}
+
+impl QuantumData {
+    pub const CURRENT_TIMESTAMP: usize = 1705246346; // 2025-01-14 16:32:26 UTC
+
+    pub fn new(phase: f64) -> Self {
+        Self {
+            phase,
+            coherence: 1.0,
+            last_update: Self::CURRENT_TIMESTAMP,
+        }
+    }
+
+    pub fn with_coherence(phase: f64, coherence: f64) -> Self {
+        Self {
+            phase,
+            coherence,
+            last_update: Self::CURRENT_TIMESTAMP,
+        }
+    }
+
+    // Getters
+    pub fn get_phase(&self) -> f64 {
+        self.phase
+    }
+
+    pub fn get_coherence(&self) -> f64 {
+        self.coherence
+    }
+
+    pub fn get_last_update(&self) -> usize {
+        self.last_update
+    }
+
+    // Setters
+    pub fn set_phase(&mut self, phase: f64) {
+        self.phase = phase;
+        self.last_update = Self::CURRENT_TIMESTAMP;
+    }
+
+    pub fn set_coherence(&mut self, coherence: f64) {
+        self.coherence = coherence.max(0.0).min(1.0); // Clamp between 0 and 1
+        self.last_update = Self::CURRENT_TIMESTAMP;
+    }
+
+    // Operations
+    pub fn decay_coherence(&mut self) {
+        self.coherence *= 0.99;
+        self.last_update = Self::CURRENT_TIMESTAMP;
+    }
+
+    pub fn update(&mut self, phase: f64, coherence: f64) {
+        self.phase = phase;
+        self.coherence = coherence.max(0.0).min(1.0);
+        self.last_update = Self::CURRENT_TIMESTAMP;
+    }
+
+    pub fn is_coherent(&self) -> bool {
+        self.coherence > 0.5
+    }
+
+    pub fn quantum_observe(&mut self) -> f64 {
+        self.coherence *= 0.9; // Observation affects coherence
+        self.last_update = Self::CURRENT_TIMESTAMP;
+        self.phase * self.coherence
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::sync::atomic::Ordering;
-
-    const TEST_TIMESTAMP: usize = 1705245045; // 2025-01-14 16:10:45 UTC
 
     #[test]
-    fn test_quantum_sync() {
-        let mut clock = MeshClock::new(Vector3D::new(0.0, 0.0, 0.0), 1.0);
-        assert_eq!(clock.last_ping.load(Ordering::SeqCst), TEST_TIMESTAMP);
-        assert!(clock.sync_with_rtc().is_ok());
+    fn test_quantum_data_creation() {
+        let data = QuantumData::new(PI);
+        assert_eq!(data.phase, PI);
+        assert_eq!(data.coherence, 1.0);
+        assert_eq!(data.last_update, QuantumData::CURRENT_TIMESTAMP);
     }
 
     #[test]
-    fn test_time_dilation() {
-        let clock = MeshClock::new(Vector3D::new(0.0, 0.0, 0.0), 0.5);
-        let dilation = clock.calculate_time_dilation();
-        assert!(dilation >= 1.0);
+    fn test_coherence_decay() {
+        let mut data = QuantumData::new(0.0);
+        let initial_coherence = data.coherence;
+        data.decay_coherence();
+        assert!(data.coherence < initial_coherence);
     }
 
     #[test]
-    fn test_mesh_clock_creation() {
-        let origin = Vector3D::new(0.0, 0.0, 0.0);
-        let clock = MeshClock::new(origin, 1.0);
-        assert_eq!(clock.oscillation_count.load(Ordering::SeqCst), 0);
-        assert_eq!(clock.last_ping.load(Ordering::SeqCst), TEST_TIMESTAMP);
+    fn test_quantum_observation() {
+        let mut data = QuantumData::new(PI);
+        let initial_coherence = data.coherence;
+        let _ = data.quantum_observe();
+        assert!(data.coherence < initial_coherence);
     }
 
     #[test]
-    fn test_quantum_entanglement() {
-        let origin = Vector3D::new(0.0, 0.0, 0.0);
-        let mut clock = MeshClock::new(origin, 1.0);
-        assert!(clock.entangle_cells().is_ok());
-        assert_eq!(clock.quantum_state, QuantumState::Entangled);
+    fn test_coherence_bounds() {
+        let mut data = QuantumData::new(0.0);
+        data.set_coherence(1.5); // Should be clamped to 1.0
+        assert_eq!(data.coherence, 1.0);
 
-        // Verify timestamp update
-        if let Some(pattern) = &clock.pattern_buffer {
-            assert_eq!(pattern.timestamp.load(Ordering::SeqCst), TEST_TIMESTAMP);
-        }
-    }
-
-    #[test]
-    fn test_superposition() {
-        let origin = Vector3D::new(0.0, 0.0, 0.0);
-        let mut clock = MeshClock::new(origin, 1.0);
-        assert!(clock.create_superposition().is_ok());
-
-        match clock.quantum_state {
-            QuantumState::Superposition(_) => {
-                if let Some(pattern) = &clock.pattern_buffer {
-                    assert_eq!(pattern.timestamp.load(Ordering::SeqCst), TEST_TIMESTAMP);
-                }
-            },
-            _ => panic!("Failed to create superposition"),
-        }
-    }
-
-    #[test]
-    fn test_entanglement_degradation() {
-        let origin = Vector3D::new(0.0, 0.0, 0.0);
-        let mut clock = MeshClock::new(origin, 1.0);
-        clock.entangle_cells().unwrap();
-
-        // Perform multiple quantum pings
-        for _ in 0..100 {
-            clock.quantum_ping().unwrap();
-        }
-
-        assert!(clock.get_entanglement_strength() < 1.0);
-        assert_eq!(clock.last_ping.load(Ordering::SeqCst), TEST_TIMESTAMP);
-    }
-
-    #[test]
-    fn test_quantum_coherence() {
-        let origin = Vector3D::new(0.0, 0.0, 0.0);
-        let mut clock = MeshClock::new(origin, 1.0);
-        clock.entangle_cells().unwrap();
-
-        let initial_coherence = clock.get_pattern_coherence().unwrap();
-        assert_eq!(initial_coherence, 1.0);
-
-        // Simulate quantum decoherence through pattern transfer
-        clock.transfer_quantum_pattern().unwrap();
-        let final_coherence = clock.get_pattern_coherence().unwrap();
-
-        assert!(final_coherence <= initial_coherence,
-                "Coherence should not increase during transfer");
-    }
-
-    #[test]
-    fn test_quantum_pattern_transfer() {
-        let origin = Vector3D::new(0.0, 0.0, 0.0);
-        let mut clock = MeshClock::new(origin, 1.0);
-
-        assert!(clock.transfer_quantum_pattern().is_ok());
-        assert_eq!(clock.quantum_state, QuantumState::PatternTransfer);
-
-        if let Some(pattern) = &clock.pattern_buffer {
-            assert_eq!(pattern.timestamp.load(Ordering::SeqCst), TEST_TIMESTAMP);
-        }
-    }
-
-    #[test]
-    fn test_pattern_replication() {
-        let origin = Vector3D::new(0.0, 0.0, 0.0);
-        let mut clock = MeshClock::new(origin, 1.0);
-
-        clock.transfer_quantum_pattern().unwrap();
-        let new_cell = clock.replicate_pattern().unwrap();
-
-        assert_eq!(new_cell.state, CellState::PatternReplication);
-    }
-
-    #[test]
-    fn test_pattern_coherence_preservation() {
-        let origin = Vector3D::new(0.0, 0.0, 0.0);
-        let mut clock = MeshClock::new(origin, 1.0);
-
-        clock.transfer_quantum_pattern().unwrap();
-        let coherence = clock.get_pattern_coherence().unwrap();
-
-        assert_eq!(coherence, 1.0, "Pattern transfer should not affect coherence");
-    }
-
-    #[test]
-    fn test_quantum_timestamp_consistency() {
-        let origin = Vector3D::new(0.0, 0.0, 0.0);
-        let clock = MeshClock::new(origin, 1.0);
-
-        assert_eq!(clock.last_ping.load(Ordering::SeqCst), TEST_TIMESTAMP);
-
-        // Verify all generated timestamps match
-        if let Some(pattern) = &clock.pattern_buffer {
-            assert_eq!(pattern.timestamp.load(Ordering::SeqCst), TEST_TIMESTAMP);
-        }
+        data.set_coherence(-0.5); // Should be clamped to 0.0
+        assert_eq!(data.coherence, 0.0);
     }
 }

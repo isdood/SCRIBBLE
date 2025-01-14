@@ -1,7 +1,7 @@
 #![no_std]
 
 /// UnstableMatter Core Library
-/// Last Updated: 2025-01-14 06:02:26 UTC
+/// Last Updated: 2025-01-14 16:26:27 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -18,7 +18,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 // Re-exports
 pub use {
     vector::Vector3D,
-    align::{Alignment, AlignedSpace},  // Changed from AlignedRegion
+    align::{Alignment, AlignedSpace},
     helium::{Helium, HeliumSize},
     valence::{ValenceOrder, compare_vectors},
     mesh_clock::{MeshClock, MeshCell, CellState},
@@ -27,7 +27,7 @@ pub use {
 };
 
 // System Constants
-pub const QUANTUM_TIMESTAMP: usize = 1705207346; // 2025-01-14 06:02:26 UTC
+pub const QUANTUM_TIMESTAMP: usize = 1705245987; // 2025-01-14 16:26:27 UTC
 pub const VECTOR_ALIGN: usize = 16;
 pub const CACHE_LINE: usize = 64;
 
@@ -170,6 +170,27 @@ impl<T: Copy + 'static> SpaceTime<T> {
         }
     }
 
+    // Add getters for all fields to fix "never read" warnings
+    pub fn get_size(&self) -> usize {
+        self.size
+    }
+
+    pub fn get_offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn get_stride(&self) -> usize {
+        self.stride
+    }
+
+    pub fn get_dimensions(&self) -> Dimensions {
+        self.dimensions
+    }
+
+    pub fn get_timestamp(&self) -> usize {
+        self.timestamp.load(Ordering::SeqCst)
+    }
+
     pub fn get_position(&self) -> Vector3D<isize> {
         self.phantom_space.get_position()
     }
@@ -187,5 +208,11 @@ impl<T: Copy + 'static> SpaceTime<T> {
     pub fn get_coherence(&self) -> f64 {
         (self.phantom_space.get_coherence() +
         self.memory.phantom_space.get_coherence()) / 2.0
+    }
+
+    pub fn calculate_index(&self, x: usize, y: usize, z: usize) -> usize {
+        (z * self.dimensions.width * self.dimensions.height +
+        y * self.dimensions.width +
+        x + self.offset) * self.stride
     }
 }

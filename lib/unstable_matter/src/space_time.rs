@@ -1,35 +1,19 @@
 // lib/unstable_matter/src/space_time.rs
+/// Last Updated: 2025-01-14 16:22:31 UTC
+/// Author: isdood
+/// Current User: isdood
 
 //! < SpaceTime: A Memory-Space-Time Abstraction Layer >
 
-//! SpaceTime provides an abstraction over physical and
-//! virtual memory spaces, treating them as
-//! multi-dimensional regions existing in space-time.
-//! This allows for safe and controlled access
-//! to memory while maintaining awareness of both
-//! spatial (addressing) and temporal (access patterns)
-//! characteristics.
-
-//! Key features:
-//! - Multi-dimensional memory space representation
-//!   (1D, 2D, 3D)
-
-//! - Safe abstraction over volatile memory operations
-//! - Hardware-level memory mapping capabilities
-//! - Architecture-specific implementations (x86_64)
-//! - Thread-safe memory access patterns
-
-//! The SpaceTime abstraction is built on top of
-//! UnstableMatter, providing a higher-level interface
-//! for memory operations while maintaining direct
-//! control over hardware interactions.
-//!
-//! Author: Caleb J.D. Terkovics
-
-use crate::wrapper::UnstableMatter;
+use crate::{
+    wrapper::UnstableMatter,
+    ufo::UFO,
+    fluid::FluidMemory,
+};
+use core::sync::atomic::AtomicUsize;
 use core::marker::PhantomData;
 
-
+const CURRENT_TIMESTAMP: usize = 1705245751; // 2025-01-14 16:22:31 UTC
 
 /// Represents dimensions in the vector space
 #[derive(Debug, Clone, Copy)]
@@ -68,66 +52,62 @@ pub struct SpaceTime<T: Copy + 'static> {
     _ufo: UFO<T>,
 }
 
-impl<T> SpaceTime<T> {
-    pub unsafe fn new(base_addr: usize, size: usize, offset: usize) -> Self {
+impl<T: Copy + 'static> SpaceTime<T> {
+    pub fn new(memory: FluidMemory<T>, dimensions: Dimensions) -> Self {
         Self {
-            base: UnstableMatter::at(base_addr),
-            size,
-            offset,
+            size: dimensions.width * dimensions.height * dimensions.depth,
+            offset: 0,
             stride: core::mem::size_of::<T>(),
-            dimensions: Dimensions {
-                width: size,
-                height: 1,
-                depth: 1,
-            },
-            _phantom: PhantomData,
+            dimensions,
+            timestamp: AtomicUsize::new(CURRENT_TIMESTAMP),
+            memory,
+            _ufo: UFO::new(),
         }
     }
 
     pub fn from_virt(addr: VirtAddr, size: usize, dimensions: Dimensions) -> Self {
-        unsafe {
-            let mut instance = Self::new(addr.0 as usize, size, 0);
-            instance.dimensions = dimensions;
-            instance
-        }
+        let memory = FluidMemory::new(addr.0 as usize, size);
+        Self::new(memory, dimensions)
     }
 
     pub fn from_phys(addr: PhysAddr, size: usize, phys_offset: u64, dimensions: Dimensions) -> Self {
-        unsafe {
-            let mut instance = Self::new((addr.0 + phys_offset) as usize, size, 0);
-            instance.dimensions = dimensions;
-            instance
-        }
+        let virt_addr = VirtAddr(addr.0 + phys_offset);
+        Self::from_virt(virt_addr, size, dimensions)
     }
 
     /// Reads a value from the space-time region
-    pub fn read(&self, x: usize, y: usize, z: usize) -> T
-    where
-    T: Copy
-    {
+    pub fn read(&self, x: usize, y: usize, z: usize) -> Option<T> {
         let idx = self.calculate_index(x, y, z);
-        assert!(idx < self.size);
-        unsafe { self.base.read() }
+        if idx < self.size {
+            Some(self.memory.read(idx))
+        } else {
+            None
+        }
     }
 
     /// Writes a value to the space-time region
-    pub fn write(&mut self, x: usize, y: usize, z: usize, value: T) {
+    pub fn write(&mut self, x: usize, y: usize, z: usize, value: T) -> Result<(), &'static str> {
         let idx = self.calculate_index(x, y, z);
-        assert!(idx < self.size);
-        unsafe { self.base.write(value) }
-    }
-
-    /// Relocates the space-time region to a new base address
-    pub fn move_to(&mut self, new_addr: usize) {
-        self.base = unsafe { UnstableMatter::at(new_addr) };
+        if idx < self.size {
+            self.memory.write(idx, value);
+            Ok(())
+        } else {
+            Err("Index out of bounds")
+        }
     }
 
     /// Maps a region of memory into this space-time region
-    pub unsafe fn map_region(&mut self, source: &SpaceTime<T>, dest_offset: usize) -> Result<(), &'static str> {
+    pub fn map_region(&mut self, source: &SpaceTime<T>, dest_offset: usize) -> Result<(), &'static str> {
         if dest_offset + source.size > self.size {
             return Err("Region mapping would exceed space-time bounds");
         }
+
         // Perform the mapping
+        for i in 0..source.size {
+            if let Some(value) = source.read(i, 0, 0) {
+                self.write(dest_offset + i, 0, 0, value)?;
+            }
+        }
         Ok(())
     }
 
@@ -138,13 +118,22 @@ impl<T> SpaceTime<T> {
         x + self.offset) * self.stride
     }
 
-    // Getters
-    pub fn virt_addr(&self) -> VirtAddr { VirtAddr(self.base.addr() as u64) }
-    pub fn phys_addr(&self, phys_offset: u64) -> PhysAddr { PhysAddr(self.base.addr() as u64 - phys_offset) }
-    pub fn size(&self) -> usize { self.size }
-    pub fn offset(&self) -> usize { self.offset }
-    pub fn stride(&self) -> usize { self.stride }
-    pub fn dimensions(&self) -> Dimensions { self.dimensions }
+    // Metadata access methods
+    pub fn get_metadata(&self) -> (usize, usize, usize, Dimensions) {
+        (self.size, self.offset, self.stride, self.dimensions)
+    }
+
+    pub fn get_timestamp(&self) -> usize {
+        self.timestamp.load(core::sync::atomic::Ordering::SeqCst)
+    }
+
+    pub fn dimensions(&self) -> Dimensions {
+        self.dimensions
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
 }
 
 /// Architecture-specific implementations
@@ -157,7 +146,7 @@ pub mod arch {
     }
 
     impl PageTable {
-        pub unsafe fn new(base_addr: PhysAddr) -> Self {
+        pub fn new(base_addr: PhysAddr) -> Self {
             let dimensions = Dimensions {
                 width: 512,  // Standard x86_64 page table size
                 height: 1,
@@ -169,11 +158,7 @@ pub mod arch {
         }
 
         pub fn entry(&self, index: usize) -> Option<PageTableEntry> {
-            if index < 512 {
-                Some(PageTableEntry::new(self.entries.read(index, 0, 0)))
-            } else {
-                None
-            }
+            self.entries.read(index, 0, 0).map(PageTableEntry::new)
         }
     }
 
@@ -196,4 +181,4 @@ pub mod arch {
 }
 
 /// Required for safe usage across threads
-unsafe impl<T> Send for SpaceTime<T> {}
+unsafe impl<T: Copy + 'static> Send for SpaceTime<T> {}

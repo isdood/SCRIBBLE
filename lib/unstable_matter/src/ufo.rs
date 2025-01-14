@@ -41,6 +41,10 @@ impl MemoryTrace {
         }
     }
 
+    pub fn get_coherence(&self) -> usize {
+        self.coherence.load(Ordering::SeqCst)
+    }
+
     pub fn activate(&self) {
         self.active.store(true, Ordering::SeqCst);
         self.timestamp.store(1705243452, Ordering::SeqCst);
