@@ -1,7 +1,7 @@
 #![no_std]
 
 /// UnstableMatter Core Library
-/// Last Updated: 2025-01-14 01:43:19 UTC
+/// Last Updated: 2025-01-14 06:02:26 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -14,9 +14,11 @@ pub mod ufo;
 pub mod phantom;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
+
+// Re-exports
 pub use {
-    vector::{Vector3D, FloatVector3D, IntVector3D},
-    align::{Alignment, AlignedRegion, VECTOR_ALIGN, CACHE_LINE},
+    vector::Vector3D,
+    align::{Alignment, AlignedSpace},  // Changed from AlignedRegion
     helium::{Helium, HeliumSize},
     valence::{ValenceOrder, compare_vectors},
     mesh_clock::{MeshClock, MeshCell, CellState},
@@ -25,7 +27,9 @@ pub use {
 };
 
 // System Constants
-pub const QUANTUM_TIMESTAMP: usize = 1705193599; // 2025-01-14 01:43:19 UTC
+pub const QUANTUM_TIMESTAMP: usize = 1705207346; // 2025-01-14 06:02:26 UTC
+pub const VECTOR_ALIGN: usize = 16;
+pub const CACHE_LINE: usize = 64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MemoryAddress(usize);
@@ -56,15 +60,15 @@ impl Dimensions {
         }
     }
 
-    pub fn to_vector(&self) -> IntVector3D {
-        IntVector3D::new(
+    pub fn to_vector(&self) -> Vector3D<isize> {
+        Vector3D::new(
             self.width as isize,
             self.height as isize,
             self.depth as isize,
         )
     }
 
-    pub fn from_vector(vec: &IntVector3D) -> Self {
+    pub fn from_vector(vec: &Vector3D<isize>) -> Self {
         Self {
             width: vec.x.max(0) as usize,
             height: vec.y.max(0) as usize,
@@ -86,10 +90,10 @@ pub struct FluidMemory<T: 'static> {
 }
 
 impl<T: 'static> FluidMemory<T> {
-    pub const fn new(base: MemoryAddress) -> Self {
+    pub fn new(base: MemoryAddress) -> Self {
         Self {
             base,
-            timestamp: AtomicUsize::new(1705192646), // 2025-01-14 01:37:26 UTC
+            timestamp: AtomicUsize::new(QUANTUM_TIMESTAMP),
             ufo: UFO::new(),
             phantom_space: PhantomSpace::new(),
         }
@@ -127,7 +131,7 @@ impl<T: Copy + 'static> FluidMemory<T> {
         self.phantom_space.decay_coherence();
         let addr = self.base.as_usize() + offset;
         let value = core::ptr::read_volatile(addr as *const T);
-        self.timestamp.store(1705192646, Ordering::SeqCst);
+        self.timestamp.store(QUANTUM_TIMESTAMP, Ordering::SeqCst);
         value
     }
 
@@ -136,7 +140,7 @@ impl<T: Copy + 'static> FluidMemory<T> {
         self.phantom_space.decay_coherence();
         let addr = self.base.as_usize() + offset;
         core::ptr::write_volatile(addr as *mut T, value);
-        self.timestamp.store(1705192646, Ordering::SeqCst);
+        self.timestamp.store(QUANTUM_TIMESTAMP, Ordering::SeqCst);
     }
 }
 
@@ -153,14 +157,14 @@ pub struct SpaceTime<T: 'static> {
 }
 
 impl<T: Copy + 'static> SpaceTime<T> {
-    pub const fn new(base_addr: usize, size: usize, offset: usize) -> Self {
+    pub fn new(base_addr: usize, size: usize, offset: usize) -> Self {
         Self {
             memory: FluidMemory::new(MemoryAddress::new(base_addr)),
             size,
             offset,
             stride: core::mem::size_of::<T>(),
             dimensions: Dimensions::new(size, 1, 1),
-            timestamp: AtomicUsize::new(1705192646), // 2025-01-14 01:37:26 UTC
+            timestamp: AtomicUsize::new(QUANTUM_TIMESTAMP),
             ufo: UFO::new(),
             phantom_space: PhantomSpace::new(),
         }

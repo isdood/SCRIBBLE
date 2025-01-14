@@ -1,234 +1,199 @@
 // lib/unstable_matter/src/align.rs
-/// Unstable Matter Alignment Module
-/// Last Updated: 2025-01-14 01:18:32 UTC
+/// Memory Alignment Module for Vector Space
+/// Last Updated: 2025-01-14 06:01:15 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use core::sync::atomic::Ordering;
 use crate::{
     vector::Vector3D,
-    helium::Helium,
-    ufo::{UFO, Protected},
+    phantom::PhantomSpace,
+    VECTOR_ALIGN,
+    CACHE_LINE,
 };
 
-/// Alignment configuration for memory layout
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Alignment {
-    /// Base alignment in bytes
-    base: usize,
-    /// Vector alignment for 3D space
-    vector: Vector3D<isize>,
-    /// Alignment padding
-    padding: usize,
-    /// Timestamp for tracking changes
-    timestamp: Helium<usize>,
-    /// Quantum coherence tracking
-    coherence: Helium<f64>,
+    value: usize,
+    phantom_space: PhantomSpace<usize>,
 }
 
-impl Clone for Alignment {
-    fn clone(&self) -> Self {
-        Self {
-            base: self.base,
-            vector: self.vector,
-            padding: self.padding,
-            timestamp: Helium::new(self.timestamp.load(Ordering::SeqCst)),
-            coherence: Helium::new(self.coherence.load(Ordering::SeqCst)),
-        }
-    }
+#[derive(Debug)]
+pub struct AlignedSpace {
+    base: usize,
+    size: usize,
+    alignment: Alignment,
+    phantom_space: PhantomSpace<usize>,
 }
 
 impl Alignment {
-    /// Create a new alignment configuration
-    pub const fn new(base: usize) -> Self {
-        Self {
-            base,
-            vector: Vector3D::new(base as isize, base as isize, base as isize),
-            padding: base / 2,
-            timestamp: Helium::new(1705191512), // 2025-01-14 01:18:32 UTC
-            coherence: Helium::new(1.0),
-        }
+    pub fn new(value: usize) -> Self {
+        assert!(value.is_power_of_two(), "Alignment must be a power of 2");
+        let mut alignment = Self {
+            value,
+            phantom_space: PhantomSpace::new(),
+        };
+        alignment.phantom_space.set_position(value as isize, 0, 0);
+        alignment
     }
 
-    /// Get the base alignment
-    pub const fn base(&self) -> usize {
+    pub fn get_value(&self) -> usize {
+        self.value
+    }
+
+    pub fn align_address(&self, addr: usize) -> usize {
+        (addr + self.value - 1) & !(self.value - 1)
+    }
+
+    pub fn get_coherence(&self) -> f64 {
+        self.phantom_space.get_coherence()
+    }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        self.phantom_space.is_quantum_stable()
+    }
+}
+
+impl AlignedSpace {
+    pub fn new(base: usize, size: usize, alignment: Alignment) -> Self {
+        let aligned_base = alignment.align_address(base);
+        let mut space = Self {
+            base: aligned_base,
+            size,
+            alignment,
+            phantom_space: PhantomSpace::new(),
+        };
+        space.phantom_space.set_position(
+            aligned_base as isize,
+            aligned_base as isize,
+            aligned_base as isize
+        );
+        space
+    }
+
+    pub fn get_base(&self) -> usize {
         self.base
     }
 
-    /// Get the vector alignment
-    pub const fn vector(&self) -> Vector3D<isize> {
-        self.vector
-    }
-
-    /// Get the padding
-    pub const fn padding(&self) -> usize {
-        self.padding
-    }
-
-    /// Get the current timestamp and update coherence
-    pub fn timestamp(&self) -> usize {
-        let ts = self.timestamp.load(Ordering::SeqCst);
-        self.coherence.store(
-            self.coherence.load(Ordering::SeqCst) * 0.99,
-                             Ordering::SeqCst
-        );
-        ts
-    }
-
-    /// Get current quantum coherence
-    pub fn coherence(&self) -> f64 {
-        self.coherence.load(Ordering::SeqCst)
-    }
-
-    /// Align a given address to the base alignment
-    pub fn align_address(&self, addr: usize) -> usize {
-        let aligned = (addr + self.base - 1) & !(self.base - 1);
-        self.timestamp.store(1705191512, Ordering::SeqCst); // 2025-01-14 01:18:32 UTC
-        self.coherence.store(
-            self.coherence.load(Ordering::SeqCst) * 0.99,
-                             Ordering::SeqCst
-        );
-        aligned
-    }
-
-    /// Align a position vector according to the vector alignment
-    pub fn align_position(&self, pos: &Vector3D<isize>) -> Vector3D<isize> {
-        let aligned = Vector3D::new(
-            ((pos.x + self.vector.x - 1) / self.vector.x) * self.vector.x,
-                                    ((pos.y + self.vector.y - 1) / self.vector.y) * self.vector.y,
-                                    ((pos.z + self.vector.z - 1) / self.vector.z) * self.vector.z
-        );
-        self.timestamp.store(1705191512, Ordering::SeqCst); // 2025-01-14 01:18:32 UTC
-        self.coherence.store(
-            self.coherence.load(Ordering::SeqCst) * 0.99,
-                             Ordering::SeqCst
-        );
-        aligned
-    }
-}
-
-/// Memory region with alignment requirements and UFO protection
-pub struct AlignedRegion {
-    /// Start address of the region
-    start: usize,
-    /// Size of the region in bytes
-    size: usize,
-    /// Alignment requirements
-    alignment: Alignment,
-    /// UFO tracking
-    ufo: UFO<usize>,
-    /// Quantum signature
-    quantum_signature: [u8; 32],
-}
-
-impl AlignedRegion {
-    /// Create a new aligned region
-    pub fn new(start: usize, size: usize, alignment: Alignment) -> Self {
-        let mut quantum_signature = [0u8; 32];
-        for i in 0..32 {
-            quantum_signature[i] = ((start + i) & 0xFF) as u8;
-        }
-
-        Self {
-            start: alignment.align_address(start),
-            size,
-            alignment,
-            ufo: UFO::new(),
-            quantum_signature,
-        }
-    }
-
-    /// Get the aligned start address
-    pub fn start(&self) -> usize {
-        self.start
-    }
-
-    /// Get the size of the region
-    pub fn size(&self) -> usize {
+    pub fn get_size(&self) -> usize {
         self.size
     }
 
-    /// Get the alignment configuration
-    pub fn alignment(&self) -> &Alignment {
+    pub fn get_alignment(&self) -> &Alignment {
         &self.alignment
     }
 
-    /// Get the quantum signature
-    pub fn quantum_signature(&self) -> &[u8; 32] {
-        &self.quantum_signature
+    pub fn get_vector_position(&self) -> Vector3D<isize> {
+        self.phantom_space.get_position()
     }
 
-    /// Check if an address is within this region and has sufficient coherence
-    pub fn contains(&self, addr: usize) -> bool {
-        if self.alignment.coherence() < 0.5 {
-            return false; // Quantum coherence too low for reliable check
+    pub fn get_coherence(&self) -> f64 {
+        (self.phantom_space.get_coherence() +
+        self.alignment.get_coherence()) / 2.0
+    }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        self.phantom_space.is_quantum_stable() &&
+        self.alignment.is_quantum_stable()
+    }
+
+    pub fn decay_coherence(&mut self) {
+        self.phantom_space.decay_coherence();
+    }
+
+    pub fn reset_coherence(&mut self) {
+        self.phantom_space.reset_coherence();
+    }
+
+    pub fn realign(&mut self) {
+        let new_base = self.alignment.align_address(self.base);
+        if new_base != self.base {
+            self.base = new_base;
+            self.phantom_space.set_position(
+                new_base as isize,
+                new_base as isize,
+                new_base as isize
+            );
         }
-        addr >= self.start && addr < (self.start + self.size)
-    }
-
-    /// Get the alignment offset for an address within this region
-    pub fn offset_for(&self, addr: usize) -> Option<usize> {
-        if self.contains(addr) {
-            Some(addr - self.start)
-        } else {
-            None
-        }
-    }
-
-    /// Check quantum state of the region
-    pub fn verify_quantum_state(&self) -> bool {
-        self.alignment.coherence() >= 0.5 && self.ufo.is_protected()
     }
 }
 
-/// Alignment constants
-pub const PAGE_SIZE: usize = 4096;
-pub const CACHE_LINE: usize = 64;
-pub const VECTOR_ALIGN: usize = 32;
-pub const DEFAULT_ALIGN: usize = 8;
+pub fn vector_align() -> Alignment {
+    Alignment::new(VECTOR_ALIGN)
+}
+
+pub fn cache_align() -> Alignment {
+    Alignment::new(CACHE_LINE)
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    const TEST_TIMESTAMP: usize = 1705207275; // 2025-01-14 06:01:15 UTC
+
     #[test]
     fn test_alignment() {
-        let align = Alignment::new(8);
-        assert_eq!(align.align_address(5), 8);
-        assert_eq!(align.align_address(8), 8);
-        assert_eq!(align.align_address(9), 16);
-        assert!(align.coherence() < 1.0);
-    }
-
-    #[test]
-    fn test_vector_alignment() {
         let align = Alignment::new(16);
-        let pos = Vector3D::new(10, 20, 30);
-        let aligned = align.align_position(&pos);
-        assert_eq!(aligned.x, 16);
-        assert_eq!(aligned.y, 32);
-        assert_eq!(aligned.z, 32);
-        assert!(align.coherence() < 1.0);
+        assert_eq!(align.get_value(), 16);
+        assert_eq!(align.align_address(10), 16);
+        assert_eq!(align.align_address(16), 16);
+        assert_eq!(align.align_address(17), 32);
+        assert!(align.get_coherence() <= 1.0);
     }
 
     #[test]
-    fn test_quantum_state() {
-        let align = Alignment::new(32);
-        let region = AlignedRegion::new(0x1000, 0x1000, align);
-        assert!(region.verify_quantum_state());
+    #[should_panic(expected = "Alignment must be a power of 2")]
+    fn test_invalid_alignment() {
+        Alignment::new(3);
+    }
 
-        // Multiple operations should decay coherence
+    #[test]
+    fn test_aligned_space() {
+        let align = Alignment::new(16);
+        let space = AlignedSpace::new(10, 100, align);
+        assert_eq!(space.get_base(), 16);
+        assert_eq!(space.get_size(), 100);
+        assert_eq!(space.get_alignment().get_value(), 16);
+        assert!(space.get_coherence() <= 1.0);
+    }
+
+    #[test]
+    fn test_quantum_stability() {
+        let mut space = AlignedSpace::new(
+            10,
+            100,
+            Alignment::new(16)
+        );
+        assert!(!space.is_quantum_stable());
+
+        space.reset_coherence();
+        assert!(space.is_quantum_stable());
+
         for _ in 0..10 {
-            region.alignment().align_address(0x1234);
+            space.decay_coherence();
         }
-        assert!(!region.verify_quantum_state());
+        assert!(!space.is_quantum_stable());
     }
 
     #[test]
-    fn test_quantum_signature() {
-        let align = Alignment::new(PAGE_SIZE);
-        let region = AlignedRegion::new(0x1234, 0x2000, align);
-        let signature = region.quantum_signature();
-        assert_ne!(signature, &[0u8; 32]);
+    fn test_realignment() {
+        let mut space = AlignedSpace::new(10, 100, Alignment::new(16));
+        let initial_pos = space.get_vector_position();
+        space.realign();
+        let final_pos = space.get_vector_position();
+        assert_eq!(initial_pos, final_pos);
+        assert_eq!(space.get_base(), 16);
+    }
+
+    #[test]
+    fn test_vector_space_coherence() {
+        let mut space = AlignedSpace::new(16, 100, Alignment::new(16));
+        assert!(space.get_coherence() <= 1.0);
+
+        space.reset_coherence();
+        assert_eq!(space.get_coherence(), 1.0);
+
+        space.decay_coherence();
+        assert!(space.get_coherence() < 1.0);
     }
 }

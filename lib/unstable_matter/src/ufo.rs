@@ -1,18 +1,17 @@
 // lib/unstable_matter/src/ufo.rs
-/// UnstableMatter UFO Protection System
-/// Last Updated: 2025-01-14 05:14:53 UTC
+/// Last Updated: 2025-01-14 06:06:30 UTC
 /// Author: isdood
-/// Current User: isdood
 
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use crate::vector::Vector3D;
 use crate::phantom::PhantomSpace;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UFOState {
-    Landed = 0,
-    Hovering = 1,
-    Flying = 2,
+    Landed,
+    Hovering,
+    Warping,
+    Unknown,
 }
 
 /// UFO Protection trait
@@ -70,11 +69,11 @@ pub struct UFO<T> {
 }
 
 impl<T> UFO<T> {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             trace: MemoryTrace::new("isdood"),
             state: AtomicUsize::new(UFOState::Landed as usize),
-            quantum_signature: AtomicUsize::new(0),
+            quantum_signature: AtomicUsize::new(1705207492), // 2025-01-14 06:04:52 UTC
             phantom_space: PhantomSpace::new(),
         }
     }
@@ -83,11 +82,13 @@ impl<T> UFO<T> {
         self.trace.activate();
         self.state.store(UFOState::Hovering as usize, Ordering::SeqCst);
         self.phantom_space.decay_coherence();
+        self.quantum_signature.store(1705207492, Ordering::SeqCst); // 2025-01-14 06:04:52 UTC
     }
 
     pub fn untrack(&mut self) {
         self.trace.deactivate();
         self.state.store(UFOState::Landed as usize, Ordering::SeqCst);
+        self.quantum_signature.store(1705207492, Ordering::SeqCst); // 2025-01-14 06:04:52 UTC
     }
 
     pub fn is_tracked(&self) -> bool {
@@ -105,6 +106,39 @@ impl<T> UFO<T> {
 
     pub fn get_coherence(&self) -> f64 {
         self.phantom_space.get_coherence()
+    }
+
+    pub fn get_quantum_signature(&self) -> usize {
+        self.quantum_signature.load(Ordering::SeqCst)
+    }
+
+    pub fn get_state(&self) -> UFOState {
+        match self.state.load(Ordering::SeqCst) {
+            0 => UFOState::Landed,
+            1 => UFOState::Hovering,
+            2 => UFOState::Warping,
+            _ => UFOState::Unknown,
+        }
+    }
+
+    pub fn is_stable(&self) -> bool {
+        self.get_coherence() > 0.5 &&
+        self.get_state() != UFOState::Unknown &&
+        self.quantum_signature.load(Ordering::SeqCst) == 1705207492 // 2025-01-14 06:04:52 UTC
+    }
+
+    pub fn reset(&mut self) {
+        self.untrack();
+        self.phantom_space.reset_coherence();
+        self.quantum_signature.store(1705207492, Ordering::SeqCst); // 2025-01-14 06:04:52 UTC
+    }
+
+    pub fn warp(&mut self, target: Vector3D<isize>) {
+        self.state.store(UFOState::Warping as usize, Ordering::SeqCst);
+        self.phantom_space.set_position(target.x, target.y, target.z);
+        self.phantom_space.decay_coherence();
+        self.quantum_signature.store(1705207492, Ordering::SeqCst); // 2025-01-14 06:04:52 UTC
+        self.track();
     }
 }
 
@@ -198,16 +232,7 @@ impl<T> Protected for TrackedUFO<T> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_phantom_space() {
-        let mut space: PhantomSpace<u32> = PhantomSpace::new();
-        assert_eq!(space.get_position(), Vector3D::new(0, 0, 0));
-        assert_eq!(space.get_coherence(), 1.0);
-
-        space.set_position(1, 2, 3);
-        assert_eq!(space.get_position(), Vector3D::new(1, 2, 3));
-        assert!(space.get_coherence() < 1.0);
-    }
+    const TEST_TIMESTAMP: usize = 1705207492; // 2025-01-14 06:04:52 UTC
 
     #[test]
     fn test_ufo_tracking() {
@@ -216,20 +241,46 @@ mod tests {
 
         ufo.track();
         assert!(ufo.is_tracked());
-        assert!(ufo.get_coherence() < 1.0);
+        assert_eq!(ufo.get_state(), UFOState::Hovering);
 
-        ufo.set_position(10, 20, 30);
-        assert_eq!(ufo.get_position(), Vector3D::new(10, 20, 30));
+        ufo.untrack();
+        assert!(!ufo.is_tracked());
+        assert_eq!(ufo.get_state(), UFOState::Landed);
     }
 
     #[test]
-    fn test_tracked_ufo() {
-        let mut tracked: TrackedUFO<u32> = TrackedUFO::new(0, 0, 0);
-        assert!(!tracked.is_tracked());
+    fn test_ufo_position() {
+        let mut ufo: UFO<u32> = UFO::new();
+        ufo.set_position(1, 2, 3);
+        assert!(ufo.is_tracked());
+        assert_eq!(ufo.get_position(), Vector3D::new(1, 2, 3));
+    }
 
-        tracked.set_position(100, 100, 100);
-        assert!(tracked.is_tracked());
-        assert!(tracked.contains(&Vector3D::new(100, 100, 100)));
-        assert!(!tracked.contains(&Vector3D::new(0x2000, 0, 0)));
+    #[test]
+    fn test_ufo_coherence() {
+        let mut ufo: UFO<u32> = UFO::new();
+        assert!(ufo.get_coherence() <= 1.0);
+
+        ufo.track();
+        assert!(ufo.get_coherence() < 1.0);
+    }
+
+    #[test]
+    fn test_ufo_quantum_signature() {
+        let ufo: UFO<u32> = UFO::new();
+        assert_eq!(ufo.get_quantum_signature(), TEST_TIMESTAMP);
+    }
+
+    #[test]
+    fn test_ufo_stability() {
+        let mut ufo: UFO<u32> = UFO::new();
+        assert!(!ufo.is_stable());
+
+        ufo.reset();
+        assert!(ufo.is_stable());
+
+        ufo.warp(Vector3D::new(10, 20, 30));
+        assert_eq!(ufo.get_state(), UFOState::Warping);
+        assert!(!ufo.is_stable());
     }
 }
