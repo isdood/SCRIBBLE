@@ -1,47 +1,50 @@
 // lib/unstable_matter/examples/mesh_clock_demo.rs
-/// Last Updated: 2025-01-14 05:16:42 UTC
+/// Last Updated: 2025-01-14 05:19:56 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use unstable_matter::{
-    mesh_clock::{MeshClock, MeshCell},
+    mesh_clock::MeshClock,
     Vector3D,
 };
 
 fn main() {
     println!("MeshClock Quantum State Demo");
-    println!("Timestamp: 2025-01-14 05:16:42 UTC");
+    println!("Timestamp: 2025-01-14 05:19:56 UTC");
     println!("Current User: isdood\n");
 
-    // Initialize mesh with origin point
-    let origin = Vector3D::new(0, 0, 0);
-    let mut mesh = MeshClock::new();
+    // Initialize mesh with origin point and quantum distance
+    let origin = Vector3D::new(0.0, 0.0, 0.0);
+    let quantum_distance = 1.0;
+    let mut mesh = MeshClock::new(origin, quantum_distance);
 
     println!("Initializing quantum mesh at origin: {:?}", origin);
 
-    // Create some test cells
+    // Create some test positions
     let test_positions = [
-        (0, 0, 0),
-        (1, 0, 0),
-        (0, 1, 0),
-        (1, 1, 0),
+        (0.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+        (1.0, 1.0, 0.0),
     ];
 
-    println!("\nCreating test cells...");
+    println!("\nTesting quantum positions...");
     for (x, y, z) in test_positions.iter() {
         let position = Vector3D::new(*x, *y, *z);
-        let new_cell = mesh.create_cell(position);
 
-        println!("\nCell at position {:?}:", position);
-        println!("  - State: {:?}", new_cell.get_state());
-        println!("  - Cell ID: {}", new_cell.get_id());
+        println!("\nQuantum state at position {:?}:", position);
+        match mesh.get_pattern_coherence() {
+            Ok(coherence) => println!("  - Pattern coherence: {:.2}", coherence),
+            Err(e) => println!("  - Coherence error: {}", e),
+        }
 
-        // Update cell state
-        mesh.update_cell(&new_cell);
+        println!("  - Quantum state: {:?}", mesh.get_quantum_state());
     }
 
     println!("\nMesh statistics:");
-    println!("  - Active cells: {}", mesh.get_active_cells());
-    println!("  - Total updates: {}", mesh.get_update_count());
-    println!("  - Quantum coherence: {:.2}", mesh.get_coherence());
+    match mesh.get_pattern_coherence() {
+        Ok(coherence) => println!("  - Pattern coherence: {:.2}", coherence),
+        Err(e) => println!("  - Coherence error: {}", e),
+    }
+    println!("  - Quantum state: {:?}", mesh.get_quantum_state());
 }
