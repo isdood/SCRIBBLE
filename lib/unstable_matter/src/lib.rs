@@ -1,5 +1,5 @@
 /// Quantum SpaceTime Root Module
-/// Last Updated: 2025-01-14 23:28:28 UTC
+/// Last Updated: 2025-01-14 23:58:11 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -25,9 +25,12 @@ pub use helium::{Helium, HeliumOrdering};
 pub use grav::{GravityField, GravityFieldRef};
 pub use blackhole::BlackHole;
 pub use wormhole::{Wormhole, WormholeError};
-pub use unstable::UnstableDescriptor;
 pub use zeronaut::Zeronaut;
 pub use scribe::{Scribe, ScribePrecision, QuantumString};
+
+// UnstableDescriptor implementation
+mod unstable;
+pub use unstable::{UnstableDescriptor, QuantumState};
 
 #[derive(Debug)]
 pub struct SpaceTimeMemory<T> {
@@ -35,6 +38,7 @@ pub struct SpaceTimeMemory<T> {
     ufo: UFO<T>,
     dimensions: MeshDimensions,
     timestamp: Helium<usize>,
+    quantum_descriptor: UnstableDescriptor, // Added 3D quantum descriptor
 }
 
 impl<T: Copy> SpaceTimeMemory<T> {
@@ -44,15 +48,20 @@ impl<T: Copy> SpaceTimeMemory<T> {
             ufo: UFO::new(),
             dimensions,
             timestamp: Helium::new(CURRENT_TIMESTAMP),
+            quantum_descriptor: UnstableDescriptor::new(),
         }
     }
 
     pub fn is_protected(&self) -> bool {
-        self.ufo.is_protected()
+        self.ufo.is_protected() && self.quantum_descriptor.is_stable()
     }
 
     pub fn track(&mut self) {
         self.ufo.track();
+    }
+
+    pub fn get_quantum_state(&self) -> QuantumState {
+        *self.quantum_descriptor.state.get()
     }
 }
 
@@ -63,7 +72,6 @@ pub struct SpaceTime<T> {
     black_holes: Vec<BlackHole>,
     dimensions: Vector3D<usize>,
     timestamp: Helium<usize>,
-    quantum_state: Helium<bool>,
 }
 
 impl<T: Copy> SpaceTime<T> {
@@ -80,7 +88,6 @@ impl<T: Copy> SpaceTime<T> {
             black_holes: Vec::new(),
             dimensions,
             timestamp: Helium::new(CURRENT_TIMESTAMP),
-            quantum_state: Helium::new(true),
         }
     }
 
@@ -93,11 +100,12 @@ impl<T: Copy> SpaceTime<T> {
     }
 
     pub fn get_position(&self) -> Vector3D<f64> {
-        self.memory.phantom_space.get_position()
+        *self.memory.quantum_descriptor.position()
     }
 
     pub fn set_position(&mut self, position: Vector3D<f64>) {
-        self.memory.phantom_space.set_position(position);
+        self.memory.quantum_descriptor.set_position(position);
+        self.memory.phantom_space.set_position(position.x(), position.y(), position.z());
     }
 
     pub fn get_dimensions(&self) -> &Vector3D<usize> {
@@ -117,11 +125,7 @@ impl<T: Copy> SpaceTime<T> {
     }
 
     pub fn get_coherence(&self) -> f64 {
-        self.memory.phantom_space.get_coherence()
-    }
-
-    pub fn get_quantum_state(&self) -> Result<bool, &'static str> {
-        self.quantum_state.load(&HeliumOrdering::Quantum)
+        self.memory.quantum_descriptor.coherence()
     }
 
     pub fn calculate_index(&self, x: usize, y: usize, z: usize) -> Option<usize> {
@@ -130,33 +134,49 @@ impl<T: Copy> SpaceTime<T> {
         }
         Some(x + y * self.dimensions.x() + z * self.dimensions.x() * self.dimensions.y())
     }
+
+    pub fn get_uncertainty(&self) -> &Vector3D<f64> {
+        self.memory.quantum_descriptor.uncertainty()
+    }
 }
 
 impl<T: Copy> Quantum for SpaceTime<T> {
     fn is_quantum_stable(&self) -> bool {
         self.memory.phantom_space.is_quantum_stable() &&
+        self.memory.quantum_descriptor.is_stable() &&
         self.is_protected() &&
-        self.timestamp.is_quantum_stable() &&
-        self.quantum_state.is_quantum_stable()
+        self.timestamp.is_quantum_stable()
     }
 
     fn get_coherence(&self) -> f64 {
         let space_coherence = self.memory.phantom_space.get_coherence();
+        let quantum_coherence = self.memory.quantum_descriptor.coherence();
         let time_coherence = self.timestamp.get_coherence();
-        let quantum_coherence = self.quantum_state.get_coherence();
-        (space_coherence + time_coherence + quantum_coherence) / 3.0
+        (space_coherence + quantum_coherence + time_coherence) / 3.0
     }
 
     fn decay_coherence(&self) {
         self.memory.phantom_space.decay_coherence();
         self.timestamp.decay_coherence();
-        self.quantum_state.decay_coherence();
+        // Quantum descriptor handles its own decay
     }
 
     fn reset_coherence(&self) {
         self.memory.phantom_space.reset_coherence();
         self.timestamp.reset_coherence();
-        self.quantum_state.reset_coherence();
+        // Reset quantum descriptor state
+        self.memory.quantum_descriptor.reset();
+    }
+}
+
+impl<T: Copy> Scribe for SpaceTime<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("SpaceTime[");
+        output.push_str("pos=");
+        self.memory.quantum_descriptor.scribe(precision, output);
+        output.push_str(", c=");
+        output.push_f64(self.get_coherence(), 6);
+        output.push_char(']');
     }
 }
 
@@ -195,19 +215,17 @@ mod tests {
     }
 
     #[test]
-    fn test_spacetime_timestamp() {
+    fn test_uncertainty() {
         let spacetime = SpaceTime::<f64>::new(Vector3D::new(5, 5, 5));
-        assert!(spacetime.get_timestamp().is_ok());
-        assert!(spacetime.update_timestamp().is_ok());
+        let uncertainty = spacetime.get_uncertainty();
+        assert!(uncertainty.magnitude() >= PLANCK_LENGTH);
     }
 
     #[test]
-    fn test_spacetime_coherence() {
+    fn test_quantum_scribing() {
         let spacetime = SpaceTime::<f64>::new(Vector3D::new(5, 5, 5));
-        assert!(spacetime.get_coherence() <= 1.0);
-        spacetime.decay_coherence();
-        assert!(spacetime.get_coherence() < 1.0);
-        spacetime.reset_coherence();
-        assert!(spacetime.get_coherence() > 0.9);
+        let mut output = QuantumString::new();
+        spacetime.scribe(ScribePrecision::Standard, &mut output);
+        assert!(output.as_str().starts_with("SpaceTime["));
     }
 }
