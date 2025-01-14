@@ -1,14 +1,21 @@
-// lib/unstable_matter/src/grav.rs
-/// Quantum Gravity Field Implementation
-/// Last Updated: 2025-01-14 22:36:10 UTC
+/// Quantum Gravity Implementation
+/// Last Updated: 2025-01-14 23:28:28 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
+    constants::*,
+    phantom::QuantumCell,
     Vector3D,
-    constants::GRAVITATIONAL_CONSTANT,
 };
-use std::sync::Arc;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum GravityState {
+    Stable,
+    Warped,
+    Entangled,
+    Decoherent,
+}
 
 #[derive(Debug, Clone)]
 pub struct GravityFieldData {

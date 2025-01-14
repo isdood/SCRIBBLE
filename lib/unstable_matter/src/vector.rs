@@ -1,62 +1,68 @@
 /// Quantum Vector Implementation with Gravitational Awareness
-/// Last Updated: 2025-01-14 22:41:17 UTC
+/// Last Updated: 2025-01-14 23:34:03 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use std::ops::{Add, Sub, Mul};
+
 use crate::{
-    constants::{CURRENT_TIMESTAMP, PLANCK_LENGTH},
-    align::Alignment,
+    constants::*,
+    phantom::QuantumCell,
     helium::{Helium, HeliumOrdering},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Vector3D<T> {
     x: T,
     y: T,
     z: T,
-    timestamp: Helium<usize>,
-    alignment: Alignment,
 }
 
-impl<T> Vector3D<T>
-where
-T: PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy + Default,
-{
+impl<T> Vector3D<T> {
     pub fn new(x: T, y: T, z: T) -> Self {
-        Self {
-            x,
-            y,
-            z,
-            timestamp: Helium::new(CURRENT_TIMESTAMP),
-            alignment: Alignment::new(16),
-        }
+        Self { x, y, z }
     }
+}
 
+impl<T: Copy> Vector3D<T> {
     pub fn x(&self) -> T { self.x }
     pub fn y(&self) -> T { self.y }
     pub fn z(&self) -> T { self.z }
+}
 
-    pub fn set_x(&mut self, x: T) {
-        self.x = x;
-        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
+impl<T: Add<Output = T>> Add for Vector3D<T> {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+        }
     }
+}
 
-    pub fn set_y(&mut self, y: T) {
-        self.y = y;
-        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
+impl<T: Sub<Output = T>> Sub for Vector3D<T> {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+        }
     }
+}
 
-    pub fn set_z(&mut self, z: T) {
-        self.z = z;
-        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
-    }
+impl<T: Mul<f64, Output = T>> Mul<f64> for Vector3D<T> {
+    type Output = Self;
 
-    pub fn quantum_store(&mut self, x: T, y: T, z: T) {
-        self.x = x;
-        self.y = y;
-        self.z = z;
-        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
+    fn mul(self, scalar: f64) -> Self {
+        Self {
+            x: self.x * scalar,
+            y: self.y * scalar,
+            z: self.z * scalar,
+        }
     }
 }
 
@@ -85,61 +91,31 @@ impl Vector3D<f64> {
     }
 }
 
-impl<T: Copy> Add for Vector3D<T>
-where
-T: Add<Output = T>,
-{
-    type Output = Self;
+impl Vector3D<isize> {
+    pub fn quantum_distance(&self, other: &Self) -> f64 {
+        let dx = (self.x - other.x) as f64;
+        let dy = (self.y - other.y) as f64;
+        let dz = (self.z - other.z) as f64;
+        libm::sqrt(dx * dx + dy * dy + dz * dz)
+    }
 
-    fn add(self, other: Self) -> Self {
-        Self {
-            x: self.x + other.x,
-            y: self.y + other.y,
-            z: self.z + other.z,
-            timestamp: Helium::new(CURRENT_TIMESTAMP),
-            alignment: self.alignment,
-        }
+    pub fn to_f64(&self) -> Vector3D<f64> {
+        Vector3D::new(
+            self.x as f64,
+            self.y as f64,
+            self.z as f64,
+        )
     }
 }
 
-impl<T: Copy> Sub for Vector3D<T>
-where
-T: Sub<Output = T>,
-{
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self {
-        Self {
-            x: self.x - other.x,
-            y: self.y - other.y,
-            z: self.z - other.z,
-            timestamp: Helium::new(CURRENT_TIMESTAMP),
-            alignment: self.alignment,
-        }
-    }
-}
-
-impl Mul<f64> for Vector3D<f64> {
-    type Output = Self;
-
-    fn mul(self, scalar: f64) -> Self {
-        Self {
-            x: self.x * scalar,
-            y: self.y * scalar,
-            z: self.z * scalar,
-            timestamp: Helium::new(CURRENT_TIMESTAMP),
-            alignment: self.alignment,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Vector4D<T> {
     pub t: T,
     pub x: T,
     pub y: T,
     pub z: T,
-    aligned_space: Box<AlignedSpace>,
+    coherence: QuantumCell<f64>,
+    timestamp: Helium<usize>,
 }
 
 impl<T> Vector4D<T>
@@ -147,14 +123,14 @@ where
 T: PartialEq + Add<Output = T> + Mul<Output = T> + Copy + Default,
 {
     pub fn new(t: T, x: T, y: T, z: T) -> Self {
-        let alignment = vector_align();
-        let aligned_space = Box::new(AlignedSpace::new(
-            MESH_TIMESTAMP,
-            core::mem::size_of::<T>() * 4,
-                                                       alignment,
-        ));
-
-        Self { t, x, y, z, aligned_space }
+        Self {
+            t,
+            x,
+            y,
+            z,
+            coherence: QuantumCell::new(1.0),
+            timestamp: Helium::new(CURRENT_TIMESTAMP),
+        }
     }
 
     pub fn inner_product(&mut self, other: &Self) -> T
@@ -162,9 +138,8 @@ T: PartialEq + Add<Output = T> + Mul<Output = T> + Copy + Default,
     T: Sub<Output = T>,
     {
         self.aligned_space.decay_coherence();
-
         let spatial = self.x * other.x + self.y * other.y + self.z * other.z;
-        spatial - (self.t * other.t) // Note the minus sign for time component
+        spatial - (self.t * other.t)
     }
 
     pub fn interval_squared(&mut self) -> T
@@ -172,12 +147,23 @@ T: PartialEq + Add<Output = T> + Mul<Output = T> + Copy + Default,
     T: Sub<Output = T>,
     {
         self.aligned_space.decay_coherence();
-        let copy = *self; // Create a copy since T implements Copy
+        let copy = *self;
         self.inner_product(&copy)
     }
 }
 
-/// Specialized implementation for f64 vectors
+impl Clone for Vector4D<f64> {
+    fn clone(&self) -> Self {
+        Self {
+            t: self.t,
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            aligned_space: self.aligned_space.clone(),
+        }
+    }
+}
+
 impl Vector4D<f64> {
     pub fn proper_time(&mut self) -> f64 {
         self.aligned_space.decay_coherence();
@@ -193,19 +179,12 @@ impl Vector4D<f64> {
         assert!(beta.abs() < 1.0, "Speed must be less than light speed");
         let gamma = 1.0 / libm::sqrt(1.0 - beta * beta);
 
-        let alignment = vector_align();
-        let aligned_space = Box::new(AlignedSpace::new(
-            MESH_TIMESTAMP,
-            core::mem::size_of::<f64>() * 4,
-                                                       alignment,
-        ));
-
         let mut result = Self {
             t: gamma * (self.t - beta * self.x / LIGHT_SPEED),
             x: gamma * (self.x - beta * self.t * LIGHT_SPEED),
             y: self.y,
             z: self.z,
-            aligned_space,
+            aligned_space: self.aligned_space.clone(),
         };
         result.aligned_space.reset_coherence();
         result
@@ -258,32 +237,22 @@ impl Vector4D<f64> {
             return self.clone();
         }
 
-        let alignment = vector_align();
-        let aligned_space = Box::new(AlignedSpace::new(
-            MESH_TIMESTAMP,
-            core::mem::size_of::<f64>() * 4,
-                                                       alignment,
-        ));
-
         let mut result = Self {
             t: libm::floor(self.t / PLANCK_LENGTH + 0.5) * PLANCK_LENGTH,
             x: libm::floor(self.x / PLANCK_LENGTH + 0.5) * PLANCK_LENGTH,
             y: libm::floor(self.y / PLANCK_LENGTH + 0.5) * PLANCK_LENGTH,
             z: libm::floor(self.z / PLANCK_LENGTH + 0.5) * PLANCK_LENGTH,
-            aligned_space,
+            aligned_space: self.aligned_space.clone(),
         };
         result.aligned_space.reset_coherence();
         result
     }
 
     pub fn quantum_coherence(&self, other: &Self) -> f64 {
-        (self.aligned_space.get_coherence()
-        + other.aligned_space.get_coherence())
-        / 2.0
+        (self.aligned_space.get_coherence() + other.aligned_space.get_coherence()) / 2.0
     }
 }
 
-/// Standard arithmetic operations
 impl<T: PartialEq + Add<Output = T>> Add for Vector4D<T> {
     type Output = Self;
 

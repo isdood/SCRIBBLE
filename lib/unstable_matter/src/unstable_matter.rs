@@ -1,5 +1,5 @@
 //! UnstableMatter Memory Management Module
-//! Last Updated: 2025-01-14 21:22:27 UTC
+//! Last Updated: 2025-01-14 23:24:49 UTC
 //! Current User: isdood
 //!
 //! This module provides quantum-safe volatile memory operations with coherence tracking
@@ -10,12 +10,16 @@
 //! - Zeronaut pointers provide quantum-safe memory access
 //! - Helium operations maintain quantum state consistency
 //! - UFO protection verifies quantum memory boundaries
+//! - Unstable descriptors monitor quantum state fluctuations
 
-use crate::helium::{Helium, HeliumOrdering};
-use crate::zeronaut::Zeronaut;
-use crate::ufo::UFO;
-use crate::phantom::QuantumCell;
-use crate::constants::CURRENT_TIMESTAMP;
+use crate::{
+    helium::{Helium, HeliumOrdering},
+    zeronaut::Zeronaut,
+    ufo::UFO,
+    phantom::QuantumCell,
+    constants::CURRENT_TIMESTAMP,
+    unstable::UnstableDescriptor,
+};
 
 const MEMORY_COHERENCE_THRESHOLD: f64 = 0.5;
 const QUANTUM_FENCE_DECAY: f64 = 0.99;
@@ -27,6 +31,7 @@ pub struct UnstableMatter<T: Copy + 'static> {
     _ufo: UFO<T>,
     timestamp: Helium<usize>,
     coherence: QuantumCell<f64>,
+    quantum_state: UnstableDescriptor,
 }
 
 pub trait QuantumAlign {
@@ -42,6 +47,7 @@ impl<T: Copy + 'static> UnstableMatter<T> {
     /// - Quantum-safe memory alignment
     /// - Valid quantum coherence state
     /// - No quantum entanglement conflicts
+    /// - Stable quantum descriptor state
     pub fn new(addr: usize) -> Option<Self> {
         let ptr = unsafe { addr as *mut T };
         Zeronaut::new(ptr).map(|zeronaut| Self {
@@ -49,6 +55,7 @@ impl<T: Copy + 'static> UnstableMatter<T> {
             _ufo: UFO::new(),
                                timestamp: Helium::new(CURRENT_TIMESTAMP),
                                coherence: QuantumCell::new(1.0),
+                               quantum_state: UnstableDescriptor::new(),
         })
     }
 
@@ -69,6 +76,9 @@ impl<T: Copy + 'static> UnstableMatter<T> {
     /// # Safety
     /// Caller must maintain quantum state consistency
     pub unsafe fn write(&mut self, value: T) {
+        if !self.quantum_state.is_stable() {
+            self.reset_coherence();
+        }
         self.quantum_fence(HeliumOrdering::Acquire);
         core::ptr::write_volatile(self.ptr.as_ptr(), value);
         self.timestamp.store(CURRENT_TIMESTAMP, HeliumOrdering::Release);
@@ -109,7 +119,7 @@ impl<T: Copy + 'static> UnstableMatter<T> {
     /// # Safety
     /// Caller must maintain quantum boundary consistency
     pub fn ptr_add(&self, offset: usize) -> Option<*mut T> {
-        if self.is_quantum_stable() {
+        if self.is_quantum_stable() && self.quantum_state.is_stable() {
             Some(unsafe { self.ptr.as_ptr().add(offset) })
         } else {
             None
@@ -123,7 +133,7 @@ impl<T: Copy + 'static> UnstableMatter<T> {
 
     /// Checks quantum stability
     pub fn is_quantum_stable(&self) -> bool {
-        self.get_coherence() > MEMORY_COHERENCE_THRESHOLD
+        self.get_coherence() > MEMORY_COHERENCE_THRESHOLD && self.quantum_state.is_stable()
     }
 
     /// Decays quantum coherence
@@ -135,6 +145,7 @@ impl<T: Copy + 'static> UnstableMatter<T> {
     pub fn reset_coherence(&mut self) {
         self.coherence.set(1.0);
         self.timestamp.store(CURRENT_TIMESTAMP, HeliumOrdering::Quantum);
+        self.quantum_state = UnstableDescriptor::new();
     }
 }
 
@@ -160,6 +171,12 @@ mod tests {
 
         unsafe { matter.read() };
         assert!(matter.get_coherence() < 1.0);
+    }
+
+    #[test]
+    fn test_unstable_state() {
+        let matter = UnstableMatter::<u32>::new(0x1000).unwrap();
+        assert!(matter.quantum_state.is_stable());
     }
 
     #[test]
