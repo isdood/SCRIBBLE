@@ -1,5 +1,5 @@
-/// Quantum Mesh System Module
-/// Last Updated: 2025-01-14 21:26:28 UTC
+/// Quantum Mesh System Module with Gravitational Effects
+/// Last Updated: 2025-01-14 22:28:46 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -9,6 +9,8 @@ use crate::{
     helium::{Helium, HeliumOrdering},
     phantom::QuantumCell,
     constants::CURRENT_TIMESTAMP,
+    grav::GravityField,
+    constants::GRAVITATIONAL_CONSTANT,
 };
 
 use core::f64::consts::PI;
@@ -209,13 +211,17 @@ impl ProtectedQuantumState {
 pub struct MeshClock {
     alpha_cell: MeshCell,
     omega_cell: MeshCell,
-    signal_vector: Helium<Vector3D<f64>>,
+    signal_vector: QuantumCell<Vector3D<f64>>,
+    gravity_field: Option<GravityField>,
+    spacetime_curvature: QuantumCell<f64>,
+    gravitational_coherence: Helium<f64>,
     last_ping: Helium<usize>,
-    oscillation_count: HeliumSize,
-    measured_interval: HeliumSize,
-    quantum_state: QuantumState,
-    entanglement_strength: Helium<usize>,
-    pattern_buffer: Option<QuantumDataPattern>,
+    oscillation_count: Helium<usize>,
+    measured_interval: Helium<usize>,
+    quantum_state: QuantumCell<QuantumState>,
+    entanglement_strength: Helium<f64>,
+    pattern_buffer: QuantumCell<Option<QuantumDataPattern>>,
+    coherence: Helium<f64>,
     alignment: Alignment,
 }
 
@@ -255,29 +261,86 @@ impl MeshClock {
             pattern_buffer: QuantumCell::new(None),
             coherence: Helium::new(1.0),
             alignment,
+            gravity_field: None,
+            spacetime_curvature: QuantumCell::new(1.0),
+            gravitational_coherence: Helium::new(1.0),
         }
+    }
+
+    pub fn set_gravity_field(&mut self, field: GravityField) {
+        self.gravity_field = Some(field);
+        self.update_gravitational_effects();
+    }
+
+    fn update_gravitational_effects(&mut self) {
+        if let Some(field) = &self.gravity_field {
+            let alpha_force = field.calculate_force_at(
+                self.alpha_cell.get_position(),
+                                                       1.0
+            );
+            let omega_force = field.calculate_force_at(
+                self.omega_cell.get_position(),
+                                                       1.0
+            );
+
+            // Update spacetime curvature
+            let curvature = self.calculate_spacetime_curvature(
+                alpha_force.magnitude(),
+                                                               omega_force.magnitude()
+            );
+            self.spacetime_curvature.set(curvature);
+
+            // Update gravitational coherence
+            let grav_coherence = self.calculate_gravitational_coherence(
+                alpha_force,
+                omega_force
+            );
+            self.gravitational_coherence.quantum_store(grav_coherence);
+        }
+    }
+
+    fn calculate_spacetime_curvature(&self, alpha_force: f64, omega_force: f64) -> f64 {
+        let avg_force = (alpha_force + omega_force) * 0.5;
+        1.0 + (avg_force * GRAVITATIONAL_CONSTANT * 1e-10)
+    }
+
+    fn calculate_gravitational_coherence(&self,
+                                         alpha_force: Vector3D<f64>,
+                                         omega_force: Vector3D<f64>
+    ) -> f64 {
+        let force_diff = (alpha_force - omega_force).magnitude();
+        let base_coherence = self.coherence.quantum_load();
+        base_coherence * (1.0 - (force_diff * GRAVITATIONAL_CONSTANT * 1e-10))
     }
 
     pub fn calculate_time_dilation(&self) -> f64 {
         let c = 299_792_458.0; // speed of light m/s
         let distance_vector = *self.signal_vector.get();
         let distance = distance_vector.magnitude();
-        let classical_dilation = 1.0 / libm::sqrt(1.0 - (distance * distance) / (c * c));
-        let coherence = self.coherence.load(HeliumOrdering::Acquire);
 
-        match *self.quantum_state.get() {
+        // Calculate classical time dilation
+        let velocity_dilation = 1.0 / libm::sqrt(1.0 - (distance * distance) / (c * c));
+
+        // Get gravitational effects
+        let curvature = *self.spacetime_curvature.get();
+        let grav_coherence = self.gravitational_coherence.quantum_load();
+
+        // Combined dilation with quantum effects
+        let quantum_dilation = match *self.quantum_state.get() {
             QuantumState::Entangled => {
-                let entanglement_factor = self.entanglement_strength.load(HeliumOrdering::Relaxed);
-                classical_dilation * (1.0 - 1e-10 * entanglement_factor * coherence)
+                let entanglement_factor = self.entanglement_strength.quantum_load();
+                1.0 - 1e-10 * entanglement_factor * grav_coherence
             },
             QuantumState::Superposition(phase) => {
-                classical_dilation * (1.0 + libm::sin(phase) * coherence * 1e-10)
+                1.0 + libm::sin(phase) * grav_coherence * 1e-10
             },
             QuantumState::Decoherent => {
-                classical_dilation * (1.0 + (1.0 - coherence))
+                1.0 + (1.0 - grav_coherence)
             },
-            _ => classical_dilation
-        }
+            _ => 1.0
+        };
+
+        velocity_dilation * curvature * quantum_dilation
     }
 
     pub fn entangle_cells(&mut self) -> Result<(), &'static str> {
@@ -389,7 +452,7 @@ impl MeshClock {
         Ok(signal_time)
     }
 
-    fn propagate_signal(&self) -> Result<usize, &'static str> {
+    pub fn propagate_signal(&self) -> Result<usize, &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
@@ -398,10 +461,20 @@ impl MeshClock {
         let distance = distance_vector.magnitude();
         let c = 299_792_458.0; // speed of light m/s
 
+        // Get full time dilation including gravity
         let time_dilation = self.calculate_time_dilation();
-        let propagation_time = (distance / c * time_dilation) * 1_000_000_000.0; // Convert to ns
+
+        // Calculate propagation time with gravitational effects
+        let propagation_time = (distance / c * time_dilation) * 1_000_000_000.0;
 
         Ok(propagation_time as usize)
+    }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        let quantum_coherence = self.coherence.quantum_load();
+        let grav_coherence = self.gravitational_coherence.quantum_load();
+
+        quantum_coherence * grav_coherence > QUANTUM_COHERENCE_THRESHOLD
     }
 
     pub fn get_frequency(&self) -> Result<f64, &'static str> {
