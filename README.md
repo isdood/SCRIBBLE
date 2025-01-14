@@ -1,115 +1,89 @@
-# Unstable Matter Storage System
-Last Updated: 2025-01-14 05:53:53 UTC
+# Scribble
+Last Updated: 2025-01-14 14:23:58 UTC
 Current Maintainer: isdood
 
 ## Overview
-Advanced quantum-synchronized storage system utilizing gravitational waves, 4D spacetime manipulation, and UFO-controlled blackhole storage for high-density data compression and near-instantaneous retrieval.
+Scribble is a custom kernel and operating system written in Rust, featuring an advanced storage system that simulates quantum and relativistic principles on standard hardware. The project combines traditional OS functionality with innovative storage mechanisms for efficient data management and retrieval.
 
-## Key Features
+## Project Components
 
-### 4D Spacetime Operations
-- Full 4D vector implementation (Vector4D)
-- Minkowski metric support
-- Proper time calculations
-- Lorentz transformations
-- Causal structure preservation
-- Event horizon management
-- Frame-dragging effects
+### Boot System
+- `spinUP`: Primary bootloader (no_std)
+- `spINIT`: System initialization
+- `spun`: Boot sequence manager
 
-### Quantum Integration
-- Quantum-synchronized timestamps
-- Wave function coherence protection
-- Entanglement-based data transfer
-- Quantum tunneling support
-- UFO-controlled retrieval system
-- Quantum state verification
+### Core Libraries
+- `scribble`: Core kernel and OS functionality
+- `unstable_matter`: Advanced storage system implementation
 
-### Gravitational Systems
-- Dynamic gravitational field simulation
-- Gravitational wave detection
-- Real-time wave pattern analysis
-- Compression ratio optimization
-- Post-Newtonian corrections
-- Schwarzschild radius monitoring
+## Storage System Features
 
-### Memory Management
-- 4D memory mapping
-- Quantum coherence protection
-- Temporal cache system
-- Causality violation prevention
-- UFO verification layer
-- Blackhole storage integration
+### Vector Operations
+- `Vector3D`: Efficient 3D spatial operations
+- `Vector4D`: Spacetime-inspired 4D vector implementation
+- Custom metric calculations for optimal data placement
+- Advanced spatial indexing
+
+### Data Management
+- Multi-dimensional memory mapping
+- Advanced caching system with temporal optimization
+- Data integrity verification
+- Compression optimization
+- Parallel access pathways
+
+### Storage Architecture
+- Simulated quantum-inspired state management
+- High-density data compression
+- Near-instantaneous retrieval system
+- Pattern-based data organization
+- Integrity monitoring and verification
 
 ## Core Components
 
 ### Vector System (`vector.rs`)
-- `Vector3D`: Classical 3D vector operations
-- `Vector4D`: Spacetime 4-vector implementation
-- `MetricTensor`: Spacetime metric calculations
-- Quantum-aware vector operations
-- Lorentz transformation support
+- Spatial and temporal vector operations
+- Custom metric calculations
+- Optimization for standard hardware
+- Multi-dimensional mapping support
 
-### Gravitational System (`grav.rs`)
-- Gravitational field simulation
-- Wave detection and analysis
-- Frame-dragging calculations
-- Event horizon monitoring
-- 4D potential calculations
-- Relativistic corrections
+### UFO System (`ufo.rs`)
+- Unified File Operations
+- Asynchronous I/O handling
+- Advanced pattern matching for file operations
+- Stream-based data processing
+- Custom file descriptor management
+- Parallel operation coordination
 
-### Tunneling System (`tunnel.rs`)
-- Quantum tunneling implementation
-- State coherence protection
-- Probability calculations
-- Wave state management
-- Distance verification
+### Mesh Clock (`mesh_clock.rs`)
+- Distributed timing system
+- Network time synchronization
+- Event ordering and scheduling
+- Temporal dependency tracking
+- Clock drift compensation
+- Multi-node time coordination
 
-### Wormhole System (`wormhole.rs`)
-- Einstein-Rosen bridge simulation
-- UFO-controlled retrieval
-- Quantum entanglement pairs
-- Hawking radiation monitoring
-- Entropy management
-- Causality preservation
-
-## Recent Additions
-
-### 4D Spacetime Integration (2025-01-14)
-- Replaced tensor operations with Vector4D
-- Enhanced spacetime calculations
-- Improved metric handling
-- Added proper time support
-- Updated gravitational calculations
-
-### UFO Control System (2025-01-14)
-- Added UFO verification layer
-- Enhanced protection mechanisms
-- Implemented quantum coherence checks
-- Added blackhole storage integration
-- Improved retrieval safety
-
-### Quantum Features (2025-01-14)
-- Enhanced quantum tunneling
-- Added entanglement protection
-- Improved state verification
-- Enhanced coherence monitoring
-- Added quantum signature system
+## Recent Updates (2025-01-14)
+- Implemented Vector4D operations
+- Enhanced UFO system reliability
+- Improved mesh clock synchronization
+- Added verification layer
+- Updated cache management
 
 ## Usage
 
 ### Basic Implementation
 ```rust
-use unstable_matter::{Vector4D, GravitationalField, Wormhole};
+use unstable_matter::{Vector4D, UFOSystem, MeshClock};
 
-// Initialize 4D spacetime system
-let spacetime_pos = Vector4D::new(t, x, y, z);
-let grav_field = GravitationalField::new();
-let wormhole = Wormhole::new(space_map, grav_field);
+// Initialize core systems
+let ufo = UFOSystem::new();
+let clock = MeshClock::new();
 
-// Add mass to gravitational field
-grav_field.add_mass(spacetime_pos, mass)?;
+// Configure UFO parameters
+let ufo_config = UFOConfig::new()
+    .with_async(true)
+    .with_verification(true);
 
-// Retrieve item through wormhole
-let protected_wormhole = ProtectedWormhole::new(space_map, grav_field);
-protected_wormhole.protect();
-let item = protected_wormhole.protected_retrieve("item_id")?;
+// Handle file operations
+let file_id = ufo.process_file(data, ufo_config)?;
+let timestamp = clock.get_synchronized_time();
