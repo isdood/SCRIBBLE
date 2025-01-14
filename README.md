@@ -1,120 +1,140 @@
-# Scribble
-Last Updated: 2025-01-14 16:18:39 UTC
+# Scribble OS
+*A Quantum-Aware Operating System*
+Last Updated: 2025-01-14 21:58:55 UTC
 Current Maintainer: isdood
 
 ## Overview
-Scribble is a custom kernel and operating system written in Rust, featuring an advanced storage system that simulates quantum and relativistic principles on standard hardware. The project combines traditional OS functionality with innovative storage mechanisms for efficient data management and retrieval.
+Scribble OS is an experimental operating system written in Rust that implements quantum mechanical principles for memory management and data operations. It features a custom bootloader, a quantum-aware kernel, and an advanced storage system that simulates quantum effects on conventional hardware.
 
-## Project Components
+## System Architecture
 
-### Boot System
-- `spinUP`: Primary bootloader (no_std)
-- `spINIT`: System initialization
-- `spun`: Boot sequence manager
+### SpinUP Bootloader
+Advanced quantum-aware bootloader implementing early system initialization and quantum state preparation.
 
-### Core Libraries
-- `scribble`: Core kernel and OS functionality
-- `unstable_matter`: Advanced storage system implementation
+#### Key Features
+- No-std quantum initialization
+- Early quantum state preparation
+- Hardware quantum coherence detection
+- Memory quantum pattern verification
+- Protected boot sequence
 
-## Storage System Features
+#### Recent Updates (2025-01-14)
+- Added quantum signature verification
+- Implemented protected boot sequences
+- Enhanced memory pattern detection
+- Added coherence monitoring
+- Improved quantum state initialization
 
-### Vector Operations
-- `Vector3D`: Efficient 3D spatial operations
-- `Vector4D`: Spacetime-inspired 4D vector implementation
-- Custom metric calculations for optimal data placement
-- Advanced spatial indexing
-- Quantum-aware vector alignment
+### Scribble Core Library
+Core kernel and operating system functionality with quantum awareness.
 
-### Data Management
-- Multi-dimensional memory mapping
-- Advanced caching system with temporal optimization
-- Data integrity verification
-- Compression optimization
-- Parallel access pathways
-- Quantum pattern recognition
-
-### Storage Architecture
-- Simulated quantum-inspired state management
-- High-density data compression
-- Near-instantaneous retrieval system
-- Pattern-based data organization
-- Integrity monitoring and verification
-- Quantum entanglement simulation
-
-## Core Components
-
-### Vector System (`vector.rs`)
-- Spatial and temporal vector operations
-- Custom metric calculations
-- Optimization for standard hardware
-- Multi-dimensional mapping support
-- Helium-based atomic operations
-
-### UFO System (`ufo.rs`)
-- Unified File Operations
-- Asynchronous I/O handling
-- Advanced pattern matching for file operations
-- Stream-based data processing
-- Custom file descriptor management
-- Parallel operation coordination
-- Quantum trace monitoring
-
-### Mesh Clock (`mesh_clock.rs`)
-- Distributed timing system
-- Network time synchronization
-- Event ordering and scheduling
-- Temporal dependency tracking
-- Clock drift compensation
-- Multi-node time coordination
+#### Features
+- Quantum-aware process scheduling
+- Protected memory operations
 - Quantum state management
-- Pattern coherence tracking
-- Entanglement simulation
-- Superposition states
+- Hardware abstraction layer
+- Quantum I/O operations
+- Parallel quantum processing
 
-## Recent Updates (2025-01-14)
-### Morning Update (14:23:58 UTC)
-- Implemented Vector4D operations
-- Enhanced UFO system reliability
-- Improved mesh clock synchronization
-- Added verification layer
-- Updated cache management
+#### Recent Updates (2025-01-14)
+- Enhanced quantum scheduler
+- Added process state protection
+- Improved quantum I/O handling
+- Implemented quantum HAL
+- Enhanced parallel processing
 
-### Afternoon Update (16:18:39 UTC)
-- Added quantum state management to MeshClock
-- Implemented pattern coherence tracking
-- Added entanglement simulation
-- Enhanced superposition state handling
-- Improved quantum signature generation
-- Added Helium-based atomic operations
-- Implemented quantum-aware vector alignment
-- Enhanced pattern replication functionality
+### Unstable Matter Library
+Advanced quantum storage system implementing theoretical physics principles.
 
-## Usage
+#### Components
 
-### Basic Implementation
+##### Quantum Mesh System
+- Space-time fabric simulation
+- Gravitational field interactions
+- Dynamic coherence tracking
+- Pattern recognition
+- Quantum state protection
+
+##### UFO (Unified Field Operations)
+- Protected memory regions
+- Quantum coherence monitoring
+- Warp capabilities
+- Pattern verification
+- State preservation
+
+##### Black Hole Storage
+- Event horizon management
+- Information preservation
+- Hawking radiation monitoring
+- Gravitational effects
+- Quantum teleportation
+
+##### Wormhole Transport
+- Einstein-Rosen bridges
+- Protected quantum transport
+- Causality enforcement
+- Temporal consistency
+- Entropy management
+
+#### Recent Updates (2025-01-14)
+- Implemented mesh-fabric interactions
+- Added gravitational storage effects
+- Enhanced quantum coherence tracking
+- Improved wormhole stability
+- Added black hole storage system
+
+## Implementation Examples
+
+### Basic System Initialization
 ```rust
-use unstable_matter::{Vector4D, UFOSystem, MeshClock};
+use scribble_os::{
+    bootloader::SpinUP,
+    core::Kernel,
+    unstable_matter::{
+        QuantumMesh,
+        UFOSystem,
+        BlackHole,
+        Wormhole
+    }
+};
 
-// Initialize core systems
+// Initialize quantum bootloader
+let bootloader = SpinUP::new()
+    .with_quantum_verification(true)
+    .with_coherence_monitoring(true);
+
+// Start kernel with quantum features
+let kernel = Kernel::new()
+    .with_quantum_scheduler(true)
+    .with_protected_memory(true);
+
+// Initialize quantum storage
+let mesh = QuantumMesh::new(1024, 1024, 1024);
 let ufo = UFOSystem::new();
-let clock = MeshClock::new(
-    Vector3D::new(0.0, 0.0, 0.0),
-    1.0
-);
 
-// Configure UFO parameters
-let ufo_config = UFOConfig::new()
-    .with_async(true)
-    .with_verification(true)
-    .with_quantum_trace(true);
+// Quantum Storage Operations
+use unstable_matter::{
+    quantum::Protected,
+    storage::QuantumState
+};
 
-// Handle file operations with quantum awareness
-let file_id = ufo.process_file(data, ufo_config)?;
-let quantum_state = clock.get_quantum_state();
-let coherence = clock.get_pattern_coherence()?;
+// Create protected storage region
+let protected_region = ufo.create_protected_region()?;
 
-// Quantum pattern transfer
-if let Ok(()) = clock.transfer_quantum_pattern() {
-    println!("Pattern coherence: {:.2}", coherence);
-    println!("Quantum state: {:?}", quantum_state);
-}
+// Initialize quantum state
+let quantum_state = QuantumState::new()
+    .with_coherence(0.99)
+    .with_entanglement(true);
+
+// Store data with quantum protection
+protected_region.store_quantum(data, quantum_state)?;
+
+// Build Commands
+# Build bootloader
+cargo build --package spinup --release
+
+# Build core system
+cargo build --package scribble --release
+
+# Build storage system
+cargo build --package unstable_matter --release
