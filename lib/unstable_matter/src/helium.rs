@@ -1,21 +1,31 @@
-// lib/unstable_matter/src/helium.rs
-/// Last Updated: 2025-01-14 15:41:51 UTC
+/// Quantum Helium Module - Atomic operations with quantum coherence
+/// Last Updated: 2025-01-14 21:13:09 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use core::{
-    cell::UnsafeCell,
-    sync::atomic::{AtomicUsize, AtomicBool, Ordering},
-    fmt,
-};
-use crate::ufo::{UFO, Protected};
+use crate::phantom::QuantumCell;
+use crate::UFO;
+use crate::constants::CURRENT_TIMESTAMP;
 
+/// Native quantum memory ordering
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeliumOrdering {
+    /// No ordering or coherence guarantees
+    Relaxed,
+    /// Acquire quantum state
+    Acquire,
+    /// Release quantum state
+    Release,
+    /// Acquire and Release combined
+    AcquireRelease,
+    /// Full quantum consistency
+    Quantum,
+}
+
+#[derive(Debug)]
 pub struct Helium<T> {
-    inner: UnsafeCell<T>,
-    coherence: UnsafeCell<f64>,
-    timestamp: AtomicUsize,
-    active: AtomicBool,
-    ufo: UFO<T>,
+    inner: QuantumCell<T>,
+    timestamp: QuantumCell<usize>,
 }
 
 unsafe impl<T: Send> Send for Helium<T> {}
@@ -24,160 +34,122 @@ unsafe impl<T: Send> Sync for Helium<T> {}
 impl<T: Copy> Helium<T> {
     pub fn new(value: T) -> Self {
         Self {
-            inner: UnsafeCell::new(value),
-            coherence: UnsafeCell::new(1.0),
-            timestamp: AtomicUsize::new(1705243776), // 2025-01-14 15:49:36 UTC
-            active: AtomicBool::new(true),
-            ufo: UFO::new(),
+            inner: QuantumCell::new(value),
+            timestamp: QuantumCell::new(CURRENT_TIMESTAMP),
         }
     }
 
-    pub const fn const_new(value: T) -> Self {
-        Self {
-            inner: UnsafeCell::new(value),
-            coherence: UnsafeCell::new(1.0),
-            timestamp: AtomicUsize::new(1705243311), // 2025-01-14 15:41:51 UTC
-            active: AtomicBool::new(true),
-            ufo: UFO::const_default(),
+    pub fn load(&self, order: HeliumOrdering) -> T {
+        match order {
+            HeliumOrdering::Quantum => {
+                self.inner.decay_coherence();
+                self.timestamp.set(CURRENT_TIMESTAMP);
+            }
+            HeliumOrdering::AcquireRelease | HeliumOrdering::Acquire => {
+                self.inner.decay_coherence();
+            }
+            _ => {}
+        }
+        *self.inner.get()
+    }
+
+    pub fn store(&self, value: T, order: HeliumOrdering) {
+        self.inner.set(value);
+        match order {
+            HeliumOrdering::Quantum => {
+                self.timestamp.set(CURRENT_TIMESTAMP);
+            }
+            HeliumOrdering::AcquireRelease | HeliumOrdering::Release => {
+                self.inner.decay_coherence();
+                self.timestamp.set(CURRENT_TIMESTAMP);
+            }
+            _ => {}
         }
     }
 
-    pub fn load(&self, _order: Ordering) -> T {
-        unsafe {
-            let value = *self.inner.get();
-            *self.coherence.get() *= 0.99; // Observation affects coherence
-            self.timestamp.store(1705243311, Ordering::SeqCst);
-            self.ufo.protect();
-            value
-        }
+    pub fn fetch_add(&self, value: T, order: HeliumOrdering) -> T
+    where T: std::ops::Add<Output = T> {
+        let old = *self.inner.get();
+        let new = old + value;
+        self.store(new, order);
+        old
     }
 
-    pub fn store(&self, value: T, _order: Ordering) {
-        unsafe {
-            *self.inner.get() = value;
-            self.timestamp.store(1705243311, Ordering::SeqCst);
-            self.ufo.protect();
-        }
-    }
-
-    pub fn quantum_load(&self, _order: Ordering) -> (T, f64) {
-        unsafe {
-            let value = *self.inner.get();
-            let coherence = *self.coherence.get();
-            *self.coherence.get() *= 0.99;
-            self.timestamp.store(1705243311, Ordering::SeqCst);
-            self.ufo.protect();
-            (value, coherence)
-        }
+    pub fn fetch_sub(&self, value: T, order: HeliumOrdering) -> T
+    where T: std::ops::Sub<Output = T> {
+        let old = *self.inner.get();
+        let new = old - value;
+        self.store(new, order);
+        old
     }
 
     pub fn get_coherence(&self) -> f64 {
-        unsafe { *self.coherence.get() }
+        self.inner.get_coherence()
     }
 
     pub fn reset_coherence(&self) {
-        unsafe { *self.coherence.get() = 1.0; }
-        self.timestamp.store(1705243311, Ordering::SeqCst);
-        self.ufo.protect();
+        self.inner.set(*self.inner.get());
+        self.timestamp.set(CURRENT_TIMESTAMP);
+    }
+
+    pub fn decay_coherence(&self) {
+        self.inner.decay_coherence();
+        self.timestamp.set(CURRENT_TIMESTAMP);
+    }
+
+    pub fn get_timestamp(&self) -> usize {
+        *self.timestamp.get()
     }
 }
 
-impl<T> Protected for Helium<T> {
-    fn protect(&self) {
-        self.ufo.protect();
-    }
-
-    fn unprotect(&self) {
-        self.ufo.unprotect();
-    }
-
-    fn is_protected(&self) -> bool {
-        self.ufo.is_protected()
-    }
-}
-
-impl<T: fmt::Debug> fmt::Debug for Helium<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Helium")
-        .field("timestamp", &self.timestamp.load(Ordering::SeqCst))
-        .field("active", &self.active.load(Ordering::SeqCst))
-        .field("coherence", unsafe { &*self.coherence.get() })
-        .field("protected", &self.is_protected())
-        .finish()
-    }
-}
-
-/// HeliumSize - Specialized atomic size type with quantum coherence
+/// Specialized size type with quantum coherence
+#[derive(Debug)]
 pub struct HeliumSize {
-    value: AtomicUsize,
-    coherence: UnsafeCell<f64>,
-    timestamp: AtomicUsize,
+    value: Helium<usize>,
     ufo: UFO<usize>,
 }
 
 impl HeliumSize {
     pub fn new(value: usize) -> Self {
         Self {
-            value: AtomicUsize::new(value),
-            coherence: UnsafeCell::new(1.0),
-            timestamp: AtomicUsize::new(1705243776), // 2025-01-14 15:49:36 UTC
+            value: Helium::new(value),
             ufo: UFO::new(),
         }
     }
 
     pub const fn const_new(value: usize) -> Self {
         Self {
-            value: AtomicUsize::new(value),
-            coherence: UnsafeCell::new(1.0),
-            timestamp: AtomicUsize::new(1705243311), // 2025-01-14 15:41:51 UTC
+            value: Helium::new(value),
             ufo: UFO::const_default(),
         }
     }
 
-    pub fn load(&self, order: Ordering) -> usize {
-        unsafe { *self.coherence.get() *= 0.99; }
-        self.timestamp.store(1705243311, Ordering::SeqCst);
+    pub fn load(&self, order: HeliumOrdering) -> usize {
         self.ufo.protect();
         self.value.load(order)
     }
 
-    pub fn store(&self, value: usize, order: Ordering) {
+    pub fn store(&self, value: usize, order: HeliumOrdering) {
         self.value.store(value, order);
-        self.timestamp.store(1705243311, Ordering::SeqCst);
         self.ufo.protect();
     }
 
-    pub fn fetch_add(&self, value: usize, order: Ordering) -> usize {
-        unsafe { *self.coherence.get() *= 0.995; }
-        self.timestamp.store(1705243311, Ordering::SeqCst);
+    pub fn fetch_add(&self, value: usize, order: HeliumOrdering) -> usize {
         self.ufo.protect();
         self.value.fetch_add(value, order)
     }
 
-    pub fn fetch_sub(&self, value: usize, order: Ordering) -> usize {
-        unsafe { *self.coherence.get() *= 0.995; }
-        self.timestamp.store(1705243311, Ordering::SeqCst);
+    pub fn fetch_sub(&self, value: usize, order: HeliumOrdering) -> usize {
         self.ufo.protect();
         self.value.fetch_sub(value, order)
     }
 
     pub fn get_coherence(&self) -> f64 {
-        unsafe { *self.coherence.get() }
+        self.value.get_coherence()
     }
 
     pub fn is_protected(&self) -> bool {
         self.ufo.is_protected()
-    }
-}
-
-impl fmt::Debug for HeliumSize {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("HeliumSize")
-        .field("value", &self.value.load(Ordering::SeqCst))
-        .field("coherence", unsafe { &*self.coherence.get() })
-        .field("timestamp", &self.timestamp.load(Ordering::SeqCst))
-        .field("protected", &self.is_protected())
-        .finish()
     }
 }
 
@@ -186,38 +158,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_helium_coherence() {
-        let h = Helium::new(42u32);
-        assert_eq!(h.get_coherence(), 1.0);
-        assert!(!h.is_protected()); // Initially unprotected
+    fn test_helium_operations() {
+        let h = Helium::new(42usize);
 
-        let (value, coherence) = h.quantum_load(Ordering::SeqCst);
-        assert_eq!(value, 42);
-        assert!(coherence < 1.0);
-        assert!(h.is_protected()); // Protected after quantum_load
+        assert_eq!(h.load(HeliumOrdering::Relaxed), 42);
+        assert_eq!(h.load(HeliumOrdering::Quantum), 42);
+
+        h.store(100, HeliumOrdering::Quantum);
+        assert_eq!(h.load(HeliumOrdering::Quantum), 100);
+
+        let old = h.fetch_add(50, HeliumOrdering::Quantum);
+        assert_eq!(old, 100);
+        assert_eq!(h.load(HeliumOrdering::Quantum), 150);
     }
 
     #[test]
-    fn test_helium_size_operations() {
+    fn test_helium_coherence() {
+        let h = Helium::new(1usize);
+        assert_eq!(h.get_coherence(), 1.0);
+
+        h.load(HeliumOrdering::Quantum);
+        assert!(h.get_coherence() < 1.0);
+
+        h.reset_coherence();
+        assert_eq!(h.get_coherence(), 1.0);
+    }
+
+    #[test]
+    fn test_helium_size() {
         let hs = HeliumSize::new(100);
-        assert_eq!(hs.load(Ordering::SeqCst), 100);
+        assert_eq!(hs.load(HeliumOrdering::Quantum), 100);
         assert!(hs.is_protected());
 
-        hs.fetch_add(50, Ordering::SeqCst);
-        assert_eq!(hs.load(Ordering::SeqCst), 150);
+        let old = hs.fetch_add(50, HeliumOrdering::Quantum);
+        assert_eq!(old, 100);
+        assert_eq!(hs.load(HeliumOrdering::Quantum), 150);
         assert!(hs.get_coherence() < 1.0);
-    }
-
-    #[test]
-    fn test_coherence_decay() {
-        let h = Helium::new(1u32);
-        let initial = h.get_coherence();
-
-        for _ in 0..5 {
-            h.quantum_load(Ordering::SeqCst);
-        }
-
-        assert!(h.get_coherence() < initial);
-        assert!(h.is_protected());
     }
 }

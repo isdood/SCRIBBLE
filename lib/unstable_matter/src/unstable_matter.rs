@@ -1,120 +1,144 @@
 //! UnstableMatter Memory Management Module
-//! Last Updated: 2025-01-13 02:56:58 UTC
+//! Last Updated: 2025-01-14 21:22:27 UTC
 //! Current User: isdood
 //!
-//! This module defines the `UnstableMatter` struct, which provides volatile read and write operations
-//! for handling memory-mapped I/O and other hardware-related operations.
+//! This module provides quantum-safe volatile memory operations with coherence tracking
+//! for handling memory-mapped I/O and hardware interactions.
 //!
-//! ## Purpose
-//! The `UnstableMatter` struct is used to perform volatile memory operations, which are essential
-//! for interacting with hardware where memory values can change independently of the program flow.
-//! Examples include writing to video buffers, interacting with device registers, and more.
-//!
-//! ## Why It Is Inherently Unsafe
-//! - Volatile operations bypass compiler optimizations, ensuring that every read and write operation
-//!   happens exactly as specified. This is critical for hardware interactions but also means that
-//!   the compiler cannot guarantee the safety of these operations.
-//! - Using raw pointers (`*mut T`) means there's no automatic memory management, leading to potential
-//!   issues like dangling pointers, data races, and undefined behavior if not handled correctly.
-//! - The `unsafe` block is required because we are directly manipulating memory, which can lead to
-//!   crashes or security vulnerabilities if used improperly.
-//!
-//! ## Memory Safety Guarantees
-//! - All operations are protected by UFO (Unidentified Flying Object) memory verification
-//! - Atomic operations ensure thread safety
-//! - Memory fences maintain proper ordering of operations
-//!
-//! ## Recommendations for Stability and Robustness
-//! - **Encapsulation**: Hide unsafe operations behind safe abstractions to minimize the usage of `unsafe`
-//! - **Testing**: Thoroughly test all hardware interaction code
-//! - **Documentation**: Clearly document all unsafe code and the reasons for its use
-//! - **Concurrency**: Carefully handle concurrent access to volatile memory
+//! ## Quantum Memory Safety
+//! - Quantum coherence tracking ensures memory stability
+//! - Zeronaut pointers provide quantum-safe memory access
+//! - Helium operations maintain quantum state consistency
+//! - UFO protection verifies quantum memory boundaries
 
-use core::sync::atomic::{AtomicUsize, Ordering, fence};
+use crate::helium::{Helium, HeliumOrdering};
+use crate::zeronaut::Zeronaut;
 use crate::ufo::UFO;
-use crate::MemoryAddress;
+use crate::phantom::QuantumCell;
+use crate::constants::CURRENT_TIMESTAMP;
 
-/// A type that provides volatile access to memory at a specific address.
+const MEMORY_COHERENCE_THRESHOLD: f64 = 0.5;
+const QUANTUM_FENCE_DECAY: f64 = 0.99;
+
+/// A type that provides quantum-safe volatile access to memory
 #[derive(Debug)]
 pub struct UnstableMatter<T: Copy + 'static> {
-    ptr: *mut T,
+    ptr: Zeronaut<T>,
     _ufo: UFO<T>,
-    timestamp: AtomicUsize,
+    timestamp: Helium<usize>,
+    coherence: QuantumCell<f64>,
 }
 
-pub trait Align {
-    fn align(&self) -> f64;
+pub trait QuantumAlign {
+    fn quantum_align(&self) -> f64;
+    fn is_quantum_aligned(&self) -> bool;
 }
 
 impl<T: Copy + 'static> UnstableMatter<T> {
-    /// Creates a new UnstableMatter instance at the specified address.
+    /// Creates a new UnstableMatter instance at the specified address
     ///
     /// # Safety
-    /// The caller must ensure that:
-    /// - The address is valid for the type T
-    /// - The memory at the address is properly aligned for T
-    /// - No other references to this memory exist while this UnstableMatter is in use
-    pub const fn new(addr: usize) -> Self {
-        Self {
-            ptr: addr as *mut T,
+    /// The caller must ensure:
+    /// - Quantum-safe memory alignment
+    /// - Valid quantum coherence state
+    /// - No quantum entanglement conflicts
+    pub fn new(addr: usize) -> Option<Self> {
+        let ptr = unsafe { addr as *mut T };
+        Zeronaut::new(ptr).map(|zeronaut| Self {
+            ptr: zeronaut,
             _ufo: UFO::new(),
-            timestamp: AtomicUsize::new(1705110618), // 2025-01-13 02:56:58 UTC
-        }
+                               timestamp: Helium::new(CURRENT_TIMESTAMP),
+                               coherence: QuantumCell::new(1.0),
+        })
     }
 
-    /// Performs a volatile read of the value.
+    /// Performs a quantum-safe volatile read
     ///
     /// # Safety
-    /// The caller must ensure that:
-    /// - The memory is valid for reading
-    /// - No concurrent writes are happening to this memory location
+    /// Caller must ensure quantum coherence stability
     pub unsafe fn read(&self) -> T {
-        fence(Ordering::SeqCst);
-        let value = core::ptr::read_volatile(self.ptr);
-        fence(Ordering::SeqCst);
+        self.quantum_fence(HeliumOrdering::Acquire);
+        let value = core::ptr::read_volatile(self.ptr.as_ptr());
+        self.quantum_fence(HeliumOrdering::Release);
+        self.decay_coherence();
         value
     }
 
-    /// Performs a volatile write of the value.
+    /// Performs a quantum-safe volatile write
     ///
     /// # Safety
-    /// The caller must ensure that:
-    /// - The memory is valid for writing
-    /// - No concurrent reads or writes are happening to this memory location
+    /// Caller must maintain quantum state consistency
     pub unsafe fn write(&mut self, value: T) {
-        fence(Ordering::SeqCst);
-        core::ptr::write_volatile(self.ptr, value);
-        self.timestamp.store(1705110618, Ordering::SeqCst); // 2025-01-13 02:56:58 UTC
-        fence(Ordering::SeqCst);
+        self.quantum_fence(HeliumOrdering::Acquire);
+        core::ptr::write_volatile(self.ptr.as_ptr(), value);
+        self.timestamp.store(CURRENT_TIMESTAMP, HeliumOrdering::Release);
+        self.quantum_fence(HeliumOrdering::Release);
+        self.decay_coherence();
     }
 
-    /// Returns the raw address as a usize.
-    pub const fn addr(&self) -> usize {
-        self.ptr as usize
+    /// Quantum memory fence operation
+    fn quantum_fence(&self, order: HeliumOrdering) {
+        match order {
+            HeliumOrdering::Acquire | HeliumOrdering::Release => {
+                self.coherence.set(*self.coherence.get() * QUANTUM_FENCE_DECAY);
+            }
+            HeliumOrdering::Quantum => {
+                self.coherence.set(*self.coherence.get() * QUANTUM_FENCE_DECAY * QUANTUM_FENCE_DECAY);
+            }
+            _ => {}
+        }
     }
 
-    /// Returns the timestamp of the last write operation.
+    /// Returns the quantum-safe memory address
+    pub fn addr(&self) -> usize {
+        self.ptr.as_ptr() as usize
+    }
+
+    /// Returns the last operation timestamp
     pub fn timestamp(&self) -> usize {
-        self.timestamp.load(Ordering::SeqCst)
+        self.timestamp.load(HeliumOrdering::Relaxed)
     }
 
-    /// Returns the raw pointer to the memory location.
-    pub const fn ptr(&self) -> *mut T {
-        self.ptr
+    /// Returns the quantum-safe pointer
+    pub fn ptr(&self) -> *mut T {
+        self.ptr.as_ptr()
     }
 
-    /// Returns a pointer offset by the specified number of elements.
+    /// Returns a quantum-safe pointer offset
     ///
     /// # Safety
-    /// The caller must ensure that:
-    /// - The offset does not cause the pointer to wrap around the address space
-    /// - The resulting pointer remains within the same allocated object
-    pub fn ptr_add(&self, offset: usize) -> *mut T {
-        unsafe { self.ptr.add(offset) }
+    /// Caller must maintain quantum boundary consistency
+    pub fn ptr_add(&self, offset: usize) -> Option<*mut T> {
+        if self.is_quantum_stable() {
+            Some(unsafe { self.ptr.as_ptr().add(offset) })
+        } else {
+            None
+        }
+    }
+
+    /// Gets current quantum coherence
+    pub fn get_coherence(&self) -> f64 {
+        *self.coherence.get()
+    }
+
+    /// Checks quantum stability
+    pub fn is_quantum_stable(&self) -> bool {
+        self.get_coherence() > MEMORY_COHERENCE_THRESHOLD
+    }
+
+    /// Decays quantum coherence
+    fn decay_coherence(&self) {
+        self.coherence.set(*self.coherence.get() * QUANTUM_FENCE_DECAY);
+    }
+
+    /// Resets quantum coherence
+    pub fn reset_coherence(&mut self) {
+        self.coherence.set(1.0);
+        self.timestamp.store(CURRENT_TIMESTAMP, HeliumOrdering::Quantum);
     }
 }
 
-// Implement Send and Sync for thread safety
+// Implement Send and Sync for quantum-safe thread operations
 unsafe impl<T: Copy + 'static> Send for UnstableMatter<T> {}
 unsafe impl<T: Copy + 'static> Sync for UnstableMatter<T> {}
 
@@ -124,13 +148,46 @@ mod tests {
 
     #[test]
     fn test_unstable_matter_creation() {
-        let matter = UnstableMatter::<u32>::new(0x1000);
+        let matter = UnstableMatter::<u32>::new(0x1000).unwrap();
         assert_eq!(matter.addr(), 0x1000);
+        assert!(matter.is_quantum_stable());
+    }
+
+    #[test]
+    fn test_quantum_coherence() {
+        let matter = UnstableMatter::<u32>::new(0x1000).unwrap();
+        assert_eq!(matter.get_coherence(), 1.0);
+
+        unsafe { matter.read() };
+        assert!(matter.get_coherence() < 1.0);
     }
 
     #[test]
     fn test_timestamp() {
-        let matter = UnstableMatter::<u32>::new(0x1000);
-        assert!(matter.timestamp() > 0);
+        let matter = UnstableMatter::<u32>::new(0x1000).unwrap();
+        assert_eq!(matter.timestamp(), CURRENT_TIMESTAMP);
+    }
+
+    #[test]
+    fn test_quantum_fence() {
+        let matter = UnstableMatter::<u32>::new(0x1000).unwrap();
+        let initial_coherence = matter.get_coherence();
+
+        matter.quantum_fence(HeliumOrdering::Quantum);
+        assert!(matter.get_coherence() < initial_coherence);
+    }
+
+    #[test]
+    fn test_ptr_operations() {
+        let matter = UnstableMatter::<u32>::new(0x1000).unwrap();
+        assert!(matter.ptr_add(1).is_some());
+
+        // Force coherence decay
+        for _ in 0..100 {
+            matter.quantum_fence(HeliumOrdering::Quantum);
+        }
+
+        // Should return None when quantum unstable
+        assert!(matter.ptr_add(1).is_none());
     }
 }

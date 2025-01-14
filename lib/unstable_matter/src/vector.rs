@@ -1,76 +1,91 @@
+// lib/unstable_matter/src/vector.rs
+/// Last Updated: 2025-01-14 20:42:13 UTC
+/// Author: isdood
+/// Current User: isdood
+
+// lib/unstable_matter/src/vector.rs
+
 use core::cell::UnsafeCell;
 use core::ops::{Add, Sub, Mul};
-use crate::align::{AlignedSpace, vector_align};
-use crate::Helium;
-use crate::cube::Box; // Import custom Box
-use crate::constants::{MESH_TIMESTAMP, PLANCK_LENGTH, VECTOR_QUANTUM_STATE, QUANTUM_THRESHOLD, LIGHT_SPEED};
 
-/// Vector3D for 3-dimensional vectors
+use crate::{
+    align::Alignment,
+    constants::{
+        CURRENT_TIMESTAMP,
+        PLANCK_LENGTH,
+        QUANTUM_THRESHOLD,
+        LIGHT_SPEED,
+    },
+};
+
 #[derive(Debug)]
 pub struct Vector3D<T> {
-    pub x: T,
-    pub y: T,
-    pub z: T,
+    x: T,
+    y: T,
+    z: T,
     timestamp: UnsafeCell<usize>,
-    aligned_space: Box<AlignedSpace>, // Use Box to break the recursive type
-}
-
-// Manual implementation for Clone
-impl<T: Clone> Clone for Vector3D<T> {
-    fn clone(&self) -> Self {
-        Self {
-            x: self.x.clone(),
-            y: self.y.clone(),
-            z: self.z.clone(),
-            timestamp: UnsafeCell::new(unsafe { *self.timestamp.get() }),
-            aligned_space: self.aligned_space.clone(),
-        }
-    }
-}
-
-// Manual implementation for PartialEq
-impl<T: PartialEq> PartialEq for Vector3D<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x
-        && self.y == other.y
-        && self.z == other.z
-        && unsafe { *self.timestamp.get() } == unsafe { *other.timestamp.get() }
-        && self.aligned_space == other.aligned_space
-    }
+    alignment: Alignment,
 }
 
 impl<T> Vector3D<T>
 where
-T: PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy + Default,
+T: PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy + Default
 {
     pub fn new(x: T, y: T, z: T) -> Self {
-        let alignment = vector_align();
-        let aligned_space = Box::new(AlignedSpace::new(
-            MESH_TIMESTAMP,
-            core::mem::size_of::<T>() * 3,
-                                                       alignment,
-        ));
-
         Self {
             x,
             y,
             z,
-            timestamp: UnsafeCell::new(MESH_TIMESTAMP),
-            aligned_space,
+            timestamp: UnsafeCell::new(CURRENT_TIMESTAMP),
+            alignment: Alignment::new(8),
         }
     }
 
-    pub fn get_timestamp(&self) -> usize {
-        unsafe { *self.timestamp.get() }
+    pub fn x(&self) -> T { self.x }
+    pub fn y(&self) -> T { self.y }
+    pub fn z(&self) -> T { self.z }
+
+    pub fn set_x(&mut self, x: T) {
+        self.x = x;
+        unsafe { *self.timestamp.get() = CURRENT_TIMESTAMP; }
     }
 
-    pub fn update_timestamp(&mut self) {
-        unsafe { *self.timestamp.get() = MESH_TIMESTAMP; }
-        self.aligned_space.reset_coherence();
+    pub fn set_y(&mut self, y: T) {
+        self.y = y;
+        unsafe { *self.timestamp.get() = CURRENT_TIMESTAMP; }
     }
 
-    pub fn get_coherence(&self) -> f64 {
-        self.aligned_space.get_coherence()
+    pub fn set_z(&mut self, z: T) {
+        self.z = z;
+        unsafe { *self.timestamp.get() = CURRENT_TIMESTAMP; }
+    }
+
+    pub fn quantum_coherence(&self) -> f64 {
+        self.alignment.get_coherence()
+    }
+
+    pub fn magnitude(&self) -> T
+    where T: Mul<Output = T> + Add<Output = T> {
+        self.x * self.x + self.y * self.y + self.z * self.z
+    }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        self.quantum_coherence() > QUANTUM_THRESHOLD
+    }
+}
+
+impl<T: Clone> Clone for Vector3D<T>
+where T: PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy + Default {
+    fn clone(&self) -> Self {
+        Self::new(self.x.clone(), self.y.clone(), self.z.clone())
+    }
+}
+
+impl<T: PartialEq> PartialEq for Vector3D<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x &&
+        self.y == other.y &&
+        self.z == other.z
     }
 }
 
@@ -219,14 +234,13 @@ impl<T: Copy + Sub<Output = T>> Sub for Vector3D<T> {
     }
 }
 
-/// Standard operations for Vector4D
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Vector4D<T> {
     pub t: T,
     pub x: T,
     pub y: T,
     pub z: T,
-    aligned_space: Box<AlignedSpace>, // Use Box to break the recursive type
+    aligned_space: Box<AlignedSpace>,
 }
 
 impl<T> Vector4D<T>
@@ -244,12 +258,11 @@ T: PartialEq + Add<Output = T> + Mul<Output = T> + Copy + Default,
         Self { t, x, y, z, aligned_space }
     }
 
-    pub fn inner_product(&mut self, other: &mut Self) -> T
+    pub fn inner_product(&mut self, other: &Self) -> T
     where
     T: Sub<Output = T>,
     {
         self.aligned_space.decay_coherence();
-        other.aligned_space.decay_coherence();
 
         let spatial = self.x * other.x + self.y * other.y + self.z * other.z;
         spatial - (self.t * other.t) // Note the minus sign for time component
@@ -260,15 +273,8 @@ T: PartialEq + Add<Output = T> + Mul<Output = T> + Copy + Default,
     T: Sub<Output = T>,
     {
         self.aligned_space.decay_coherence();
-        self.inner_product(self)
-    }
-
-    pub fn get_coherence(&self) -> f64 {
-        self.aligned_space.get_coherence()
-    }
-
-    pub fn is_quantum_stable(&self) -> bool {
-        self.aligned_space.is_quantum_stable()
+        let copy = *self; // Create a copy since T implements Copy
+        self.inner_product(&copy)
     }
 }
 
@@ -449,8 +455,54 @@ mod tests {
     }
 
     #[test]
+    fn test_vector3d_normalize() {
+        let mut v = Vector3D::new(3.0, 4.0, 0.0);
+        let normalized = v.normalize();
+        assert!((normalized.x - 0.6).abs() < 1e-6);
+        assert!((normalized.y - 0.8).abs() < 1e-6);
+        assert!((normalized.z - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_vector3d_dot() {
+        let mut v1 = Vector3D::new(1.0, 2.0, 3.0);
+        let mut v2 = Vector3D::new(4.0, -5.0, 6.0);
+        assert_eq!(v1.dot(&mut v2), 12.0);
+    }
+
+    #[test]
+    fn test_vector3d_cross() {
+        let mut v1 = Vector3D::new(1.0, 2.0, 3.0);
+        let mut v2 = Vector3D::new(4.0, 5.0, 6.0);
+        let v3 = v1.cross(&mut v2);
+        assert_eq!(v3.x, -3.0);
+        assert_eq!(v3.y, 6.0);
+        assert_eq!(v3.z, -3.0);
+    }
+
+    #[test]
     fn test_vector4d_proper_time() {
         let mut v = Vector4D::new(1.0, 2.0, 2.0, 2.0);
         assert!(v.proper_time() > 0.0);
+    }
+
+    #[test]
+    fn test_vector4d_boost_x() {
+        let mut v = Vector4D::new(1.0, 0.5, 0.0, 0.0);
+        let boosted = v.boost_x(0.5);
+        assert!(boosted.is_timelike());
+        assert_eq!(
+            v.interval_squared(),
+                   boosted.interval_squared(),
+                   "Lorentz invariance violation"
+        );
+    }
+
+    #[test]
+    fn test_vector4d_quantum_coherence() {
+        let v1 = Vector4D::new(1.0, 0.0, 0.0, 0.0);
+        let v2 = Vector4D::new(0.0, 1.0, 0.0, 0.0);
+        let coherence = v1.quantum_coherence(&v2);
+        assert!(coherence > 0.0);
     }
 }

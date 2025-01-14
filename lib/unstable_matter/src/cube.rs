@@ -1,31 +1,74 @@
-use core::sync::atomic::Ordering;
-use core::ptr::NonNull;
-use core::alloc::Layout;
-use crate::align::{AlignedSpace, vector_align};
-use crate::Helium;
-use crate::vector::Vector4D;
-use crate::constants::{MESH_TIMESTAMP, PLANCK_LENGTH, VECTOR_QUANTUM_STATE, QUANTUM_THRESHOLD};
+// lib/unstable_matter/src/cube.rs
+/// Last Updated: 2025-01-14 21:18:57 UTC
+/// Author: isdood
+/// Current User: isdood
+
+use crate::zeronaut::Zeronaut;
+use crate::align::{Alignment, AlignedSpace};
+use crate::phantom::QuantumCell;
+use crate::constants::CURRENT_TIMESTAMP;
+
+const CUBE_TIMESTAMP: usize = 1705264737; // 2025-01-14 21:18:57 UTC
+const QUANTUM_THRESHOLD: f64 = 0.5;
+const PLANCK_LENGTH: f64 = 1.616255e-35;
 
 #[derive(Debug)]
 pub struct Box<T> {
-    ptr: NonNull<T>,
-    layout: Layout,
+    ptr: Zeronaut<T>,
+    alignment: Alignment,
+    space: AlignedSpace,
+    coherence: QuantumCell<f64>,
 }
 
 impl<T> Box<T> {
     pub fn new(value: T) -> Self {
-        let layout = Layout::new::<T>();
+        let alignment = Alignment::new(core::mem::align_of::<T>());
+        let space = AlignedSpace::new(core::mem::size_of::<T>(), alignment.clone());
+
         unsafe {
-            let ptr = AlignedSpace::alloc(layout) as *mut T;
-            if ptr.is_null() {
-                panic!("Allocation failed");
-            }
-            ptr.write(value);
-            Box {
-                ptr: NonNull::new(ptr).unwrap(),
-                layout,
+            let raw_ptr = space.get_ptr().cast::<T>();
+            raw_ptr.as_ptr().write(value);
+
+            Self {
+                ptr: Zeronaut::new(raw_ptr.as_ptr()).unwrap(),
+                alignment,
+                space,
+                coherence: QuantumCell::new(1.0),
             }
         }
+    }
+
+    pub fn as_ref(&self) -> &T {
+        unsafe { &*self.ptr.as_ptr() }
+    }
+
+    pub fn as_mut(&mut self) -> &mut T {
+        unsafe { &mut *self.ptr.as_ptr() }
+    }
+
+    pub fn get_alignment(&self) -> &Alignment {
+        &self.alignment
+    }
+
+    pub fn get_coherence(&self) -> f64 {
+        (self.ptr.get_coherence() +
+        *self.coherence.get() +
+        self.space.get_coherence()) / 3.0
+    }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        self.get_coherence() > QUANTUM_THRESHOLD &&
+        self.ptr.is_quantum_stable()
+    }
+
+    pub fn decay_coherence(&mut self) {
+        self.coherence.set(*self.coherence.get() * 0.99);
+        self.space.decay_coherence();
+    }
+
+    pub fn reset_coherence(&mut self) {
+        self.coherence.set(1.0);
+        self.space.reset_coherence();
     }
 }
 
@@ -33,47 +76,36 @@ impl<T> Drop for Box<T> {
     fn drop(&mut self) {
         unsafe {
             core::ptr::drop_in_place(self.ptr.as_ptr());
-            AlignedSpace::dealloc(self.ptr.as_ptr() as *mut u8, self.layout);
         }
     }
 }
 
-impl<T> core::ops::Deref for Box<T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        unsafe { self.ptr.as_ref() }
+impl<T: PartialEq> PartialEq for Box<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref() &&
+        self.ptr.is_entangled_with(&other.ptr)
     }
 }
 
-impl<T> core::ops::DerefMut for Box<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe { self.ptr.as_mut() }
-    }
-}
-
-impl<T> Clone for Box<T>
-where
-T: Clone,
-{
+impl<T: Clone> Clone for Box<T> {
     fn clone(&self) -> Self {
-        Box::new((**self).clone())
+        Box::new(self.as_ref().clone())
     }
 }
 
 /// Metric tensor for spacetime calculations
 #[derive(Debug)]
 pub struct MetricTensor {
-    components: [[f64; 4]; 4],
-    timestamp: Helium<usize>,
-    aligned_space: Box<AlignedSpace>, // Use Box to break the recursive type
+    components: QuantumCell<[[f64; 4]; 4]>,
+    timestamp: QuantumCell<usize>,
+    aligned_space: Box<AlignedSpace>,
 }
 
 impl Clone for MetricTensor {
     fn clone(&self) -> Self {
         Self {
-            components: self.components,
-            timestamp: Helium::new(self.timestamp.quantum_load(Ordering::SeqCst).0),
+            components: QuantumCell::new(*self.components.get()),
+            timestamp: QuantumCell::new(*self.timestamp.get()),
             aligned_space: self.aligned_space.clone(),
         }
     }
@@ -87,30 +119,28 @@ impl MetricTensor {
         components[2][2] = 1.0;
         components[3][3] = 1.0;
 
-        let alignment = vector_align();
-        let aligned_space = Box::new(AlignedSpace::new(
-            MESH_TIMESTAMP,
-            core::mem::size_of::<f64>() * 16, // 4x4 matrix
-                                                       alignment,
-        ));
-
         Self {
-            components,
-            timestamp: Helium::new(MESH_TIMESTAMP),
-            aligned_space,
+            components: QuantumCell::new(components),
+            timestamp: QuantumCell::new(CUBE_TIMESTAMP),
+            aligned_space: Box::new(AlignedSpace::new(
+                core::mem::size_of::<f64>() * 16,
+                                                      Alignment::new(16)
+            )),
         }
     }
 
     pub fn contract(&mut self, v1: &Vector4D<f64>, v2: &Vector4D<f64>) -> f64 {
-        self.timestamp.store(MESH_TIMESTAMP, Ordering::SeqCst);
+        self.timestamp.store(MESH_TIMESTAMP);
         self.aligned_space.decay_coherence();
 
-        // Consider coherence of input vectors
+        let components = self.components.load();
+
         let spatial_coherence = (
             v1.get_coherence() +
             v2.get_coherence() +
+            self.components.get_coherence() +
             self.aligned_space.get_coherence()
-        ) / 3.0;
+        ) / 4.0;
 
         let v1_components = [v1.t, v1.x, v1.y, v1.z];
         let v2_components = [v2.t, v2.x, v2.y, v2.z];
@@ -118,7 +148,7 @@ impl MetricTensor {
         let mut result = 0.0;
         for i in 0..4 {
             for j in 0..4 {
-                result += self.components[i][j] * v1_components[i] * v2_components[j];
+                result += components[i][j] * v1_components[i] * v2_components[j];
             }
         }
 
@@ -130,34 +160,39 @@ impl MetricTensor {
     }
 
     pub fn get_timestamp(&self) -> usize {
-        self.timestamp.quantum_load(Ordering::SeqCst).0
+        self.timestamp.load()
     }
 
     pub fn get_coherence(&self) -> f64 {
-        self.aligned_space.get_coherence()
+        (self.components.get_coherence() +
+        self.aligned_space.get_coherence()) / 2.0
     }
 
     pub fn reset_coherence(&mut self) {
+        self.components.reset_coherence();
         self.aligned_space.reset_coherence();
     }
 
     pub fn is_quantum_stable(&self) -> bool {
-        self.aligned_space.is_quantum_stable()
+        self.get_coherence() > QUANTUM_THRESHOLD
     }
 
     pub fn quantum_coherence(&self, other: &Self) -> f64 {
-        let spatial_coherence = (
+        let space_coherence = (
+            self.components.get_coherence() +
+            other.components.get_coherence() +
             self.aligned_space.get_coherence() +
             other.aligned_space.get_coherence()
-        ) / 2.0;
+        ) / 4.0;
 
-        let (t1, _) = self.timestamp.quantum_load(Ordering::SeqCst);
-        let (t2, _) = other.timestamp.quantum_load(Ordering::SeqCst);
+        let t1 = self.timestamp.load();
+        let t2 = other.timestamp.load();
         let time_diff = if t1 > t2 { t1 - t2 } else { t2 - t1 } as f64;
+
         let temporal_coherence = (VECTOR_QUANTUM_STATE as f64) /
         (time_diff + VECTOR_QUANTUM_STATE as f64);
 
-        (spatial_coherence + temporal_coherence) / 2.0
+        (space_coherence + temporal_coherence) / 2.0
     }
 
     pub fn quantize(&mut self) {
@@ -165,20 +200,19 @@ impl MetricTensor {
             return;
         }
 
+        let mut components = self.components.load();
+
         for i in 0..4 {
             for j in 0..4 {
-                self.components[i][j] = libm::floor(
-                    self.components[i][j] / PLANCK_LENGTH + 0.5
+                components[i][j] = libm::floor(
+                    components[i][j] / PLANCK_LENGTH + 0.5
                 ) * PLANCK_LENGTH;
             }
         }
 
+        self.components.store(components);
         self.reset_coherence();
-        self.timestamp.store(MESH_TIMESTAMP, Ordering::SeqCst);
-    }
-
-    pub fn realign(&mut self) {
-        self.aligned_space.realign();
+        self.timestamp.store(MESH_TIMESTAMP);
     }
 }
 

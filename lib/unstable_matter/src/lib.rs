@@ -1,35 +1,54 @@
-#![no_std]
-
-/// UnstableMatter Core Library
-/// Last Updated: 2025-01-14 16:26:27 UTC
-/// Author: isdood
-/// Current User: isdood
-
-mod vector;
-mod align;
-mod helium;
-pub mod valence;
-pub mod mesh_clock;
-pub mod ufo;
-mod phantom;
-mod cube;
-mod constants;
+// lib/unstable_matter/src/lib.rs
+// Last Updated: 2025-01-14 20:49:12 UTC
+// Author: isdood
+// Current User: isdood
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
-// Re-exports
-pub use {
-    vector::Vector3D,
-    align::{Alignment, AlignedSpace},
-    helium::{Helium, HeliumSize},
-    valence::{ValenceOrder, compare_vectors},
-    mesh_clock::{MeshClock, MeshCell, CellState},
-    ufo::{UFO, Protected, MemoryTrace},
-    phantom::PhantomSpace,
-};
+pub mod constants {
+    pub const CURRENT_TIMESTAMP: usize = 1705263274; // 2025-01-14 20:54:34 UTC
+    pub const QUANTUM_TIMESTAMP: usize = CURRENT_TIMESTAMP;
+    pub const MESH_TIMESTAMP: usize = CURRENT_TIMESTAMP;
+    pub const LIGHT_SPEED: f64 = 299_792_458.0;
+    pub const PLANCK_LENGTH: f64 = 1.616255e-35;
+    pub const QUANTUM_THRESHOLD: f64 = 1e-10;
+    pub const VECTOR_QUANTUM_STATE: usize = 1000;
+    pub const VECTOR_ALIGN: usize = 8;
+    pub const CACHE_LINE: usize = 64;
+    pub const MESH_CACHE_LINE: usize = CACHE_LINE;
+}
 
-// System Constants
-pub const QUANTUM_TIMESTAMP: usize = 1705245987; // 2025-01-14 16:26:27 UTC
+pub trait Protected {
+    fn protect(&self);
+    fn is_protected(&self) -> bool;
+}
+
+mod align;
+mod cube;
+mod helium;
+mod phantom;
+mod ufo;
+mod vector;
+
+pub use align::{Alignment, AlignedSpace};
+pub use cube::Box;
+pub use helium::Helium;
+pub use phantom::PhantomSpace;
+pub use ufo::UFO;
+pub use vector::{Vector3D, Vector4D};
+
+// Common constants
+pub mod prelude {
+    pub use core::{
+        cell::UnsafeCell,
+        ptr::NonNull,
+        ops::{Add, Sub, Mul},
+        fmt,
+    };
+}
+
+pub const CURRENT_TIMESTAMP: usize = 1705262952; // 2025-01-14 20:49:12 UTC
+
 pub const VECTOR_ALIGN: usize = 16;
 pub const CACHE_LINE: usize = 64;
 

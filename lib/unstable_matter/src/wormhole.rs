@@ -1,213 +1,192 @@
 //! Quantum Wormhole Implementation for UFO-Controlled Blackhole Storage Retrieval
-//! Last Updated: 2025-01-14 05:01:56 UTC
+//! Last Updated: 2025-01-14 21:46:10 UTC
 //! Current User: isdood
 //!
-//! ## Features
-//! - UFO-controlled retrieval
-//! - Einstein-Rosen bridge simulation
-//! - Quantum entanglement pairs
-//! - Hawking radiation monitoring
-//! - Event horizon manipulation
-//! - Protected quantum teleportation
-//! - Singularity bypass system
-//!
-//! ## Safety
-//! - UFO verification
-//! - Quantum state protection
-//! - Causality enforcement
-//! - Entropy management
-//! - Gravitational shielding
+//! Implements Einstein-Rosen bridge with quantum fabric integration
 
-use core::sync::atomic::{AtomicF64, AtomicUsize, Ordering, fence};
-use crate::vector::Vector3D;
-use crate::spacemap::SpaceMap;
-use crate::grav::GravitationalField;
-use crate::tunnel::Tunnel;
-use crate::mesh_clock::{QuantumTimestamp, MeshClock};
-use crate::sunrise::Sunrise;
-use crate::ufo::{UFO, Protected};
+use crate::{
+    helium::{Helium, HeliumOrdering},
+    phantom::QuantumCell,
+    unstable::UnstableDescriptor,
+    zeronaut::Zeronaut,
+    Vector3D,
+    blackhole::BlackHole,
+    grav::GravityField,
+    mesh::MeshCell,
+};
 
-pub const WORMHOLE_TIMESTAMP: usize = 1705206116; // 2025-01-14 05:01:56 UTC
+const PLANCK_LENGTH: f64 = 1.616255e-35;
+const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
+const WORMHOLE_STABILITY_THRESHOLD: f64 = 0.8;
 
-sunrise! {
-    static WORMHOLE_CONSTANTS: WormholeConstants = WormholeConstants {
-        schwarzschild_radius: AtomicF64::new(2.95),  // Normalized units
-        hawking_temperature: AtomicF64::new(1e-8),   // Kelvin
-        entropy_threshold: AtomicF64::new(0.99),     // Maximum allowed entropy
-        quantum_coupling: AtomicF64::new(0.85),      // Entanglement strength
-        temporal_stability: AtomicF64::new(0.95),    // Time dilation compensation
-        ufo_coherence: AtomicF64::new(0.99),        // Required UFO quantum coherence
-    };
+#[derive(Debug, Clone, Copy)]
+pub enum WormholeState {
+    Stable,
+    Fluctuating,
+    Entangled,
+    Decoherent,
+    Collapsed,
 }
 
-/// UFO-protected wormhole operations
-pub struct ProtectedWormhole<T: Copy + 'static> {
-    wormhole: Wormhole<T>,
-    ufo: UFO<T>,
-    quantum_lock: AtomicUsize,
-    protection_state: ProtectionState,
+pub struct Wormhole {
+    throat_radius: Helium<f64>,
+    length: Helium<f64>,
+    entry_position: QuantumCell<Vector3D<f64>>,
+    exit_position: QuantumCell<Vector3D<f64>>,
+    entry_blackhole: QuantumCell<BlackHole>,
+    exit_blackhole: QuantumCell<BlackHole>,
+    coherence: Helium<f64>,
+    stability: Helium<f64>,
+    quantum_state: QuantumCell<WormholeState>,
+    affected_cells: QuantumCell<Vec<MeshCell>>,
+    state: UnstableDescriptor,
 }
 
-impl<T: Copy + 'static> ProtectedWormhole<T> {
-    pub fn new(space_map: SpaceMap<T>, grav_field: GravitationalField) -> Self {
+impl Wormhole {
+    pub fn new(entry_pos: Vector3D<f64>, exit_pos: Vector3D<f64>, mass: f64) -> Self {
+        let entry_bh = BlackHole::new(mass, entry_pos);
+        let exit_bh = BlackHole::new(mass, exit_pos);
+
         Self {
-            wormhole: Wormhole::new(space_map.clone(), grav_field),
-            ufo: UFO::new(),
-            quantum_lock: AtomicUsize::new(0),
-            protection_state: ProtectionState::new(),
+            throat_radius: Helium::new(mass * 2.0 * 6.67430e-11),
+            length: Helium::new((exit_pos - entry_pos).magnitude()),
+            entry_position: QuantumCell::new(entry_pos),
+            exit_position: QuantumCell::new(exit_pos),
+            entry_blackhole: QuantumCell::new(entry_bh),
+            exit_blackhole: QuantumCell::new(exit_bh),
+            coherence: Helium::new(1.0),
+            stability: Helium::new(1.0),
+            quantum_state: QuantumCell::new(WormholeState::Stable),
+            affected_cells: QuantumCell::new(Vec::new()),
+            state: UnstableDescriptor::new(),
         }
     }
 
-    /// Retrieves item under UFO protection
-    pub fn protected_retrieve(&mut self, storage_id: &str) -> Result<T, WormholeError> {
-        fence(Ordering::SeqCst);
-
-        // Verify UFO protection
-        if !self.ufo.is_protected() {
-            return Err(WormholeError::UfoProtectionRequired);
+    pub fn transport(&mut self, cell: MeshCell) -> Result<MeshCell, &'static str> {
+        if !self.is_quantum_stable() {
+            return Err("Quantum state unstable");
         }
 
-        // Initialize quantum protection
-        self.protection_state.initialize()?;
+        if !self.is_traversable()? {
+            return Err("Wormhole not traversable");
+        }
 
-        // Acquire quantum lock
-        self.acquire_quantum_lock()?;
+        let entry_pos = *self.entry_position.get();
+        let exit_pos = *self.exit_position.get();
+        let mut transported_cell = cell;
 
-        // Perform protected retrieval
-        let result = self.protected_retrieval(storage_id);
+        // Calculate quantum tunneling
+        let tunnel_probability = self.calculate_tunnel_probability(&cell);
+        if tunnel_probability < QUANTUM_COHERENCE_THRESHOLD {
+            return Err("Quantum tunneling failed");
+        }
 
-        // Release quantum lock
-        self.release_quantum_lock();
+        // Apply spacetime curvature
+        self.apply_curvature_effects(&mut transported_cell)?;
 
-        fence(Ordering::SeqCst);
-        result
+        // Update position
+        let displacement = exit_pos - entry_pos;
+        transported_cell.update_position(cell.get_position() + displacement)?;
+
+        self.decay_coherence();
+        Ok(transported_cell)
     }
 
-    /// Performs UFO-protected retrieval operation
-    fn protected_retrieval(&mut self, storage_id: &str) -> Result<T, WormholeError> {
-        // Verify UFO coherence
-        if !self.verify_ufo_coherence() {
-            return Err(WormholeError::UfoCoherenceLoss);
-        }
+    fn calculate_tunnel_probability(&self, cell: &MeshCell) -> f64 {
+        let distance = (*self.entry_position.get() - cell.get_position()).magnitude();
+        let coherence = self.get_coherence();
+        let stability = self.stability.quantum_load();
 
-        // Create UFO-entangled quantum bridge
-        let bridge = self.create_ufo_bridge()?;
-
-        // Retrieve through protected bridge
-        let item = self.wormhole.retrieve_through_bridge(storage_id, &bridge)?;
-
-        // Verify quantum state under UFO protection
-        if !self.verify_quantum_state(&item) {
-            return Err(WormholeError::QuantumStateCompromised);
-        }
-
-        Ok(item)
+        ((-distance / PLANCK_LENGTH).exp() * coherence * stability)
+        .min(1.0)
+        .max(0.0)
     }
 
-    /// Creates UFO-protected quantum bridge
-    fn create_ufo_bridge(&self) -> Result<QuantumBridge, WormholeError> {
-        let mut bridge = QuantumBridge::new();
-
-        // Apply UFO protection to bridge
-        bridge.apply_ufo_protection(&self.ufo)?;
-
-        // Verify bridge stability under UFO
-        if !bridge.verify_ufo_stability() {
-            return Err(WormholeError::UfoBridgeUnstable);
+    fn apply_curvature_effects(&self, cell: &mut MeshCell) -> Result<(), &'static str> {
+        if !self.is_quantum_stable() {
+            return Err("Quantum state unstable");
         }
 
-        Ok(bridge)
-    }
+        let entry_bh = self.entry_blackhole.get();
+        let exit_bh = self.exit_blackhole.get();
 
-    /// Verifies UFO quantum coherence
-    fn verify_ufo_coherence(&self) -> bool {
-        let coherence = self.ufo.quantum_coherence();
-        coherence >= WORMHOLE_CONSTANTS.ufo_coherence.load(Ordering::Relaxed)
-    }
+        // Apply gravitational effects from both mouths
+        entry_bh.affect_mesh_cell(cell.clone())?;
+        exit_bh.affect_mesh_cell(cell.clone())?;
 
-    /// Acquires quantum lock for protected operations
-    fn acquire_quantum_lock(&self) -> Result<(), WormholeError> {
-        let current = self.quantum_lock.load(Ordering::Relaxed);
-        if current != 0 {
-            return Err(WormholeError::QuantumLockFailed);
-        }
-
-        self.quantum_lock.store(1, Ordering::SeqCst);
         Ok(())
     }
 
-    /// Releases quantum lock
-    fn release_quantum_lock(&self) {
-        self.quantum_lock.store(0, Ordering::SeqCst);
-    }
-
-    /// Verifies quantum state of retrieved item
-    fn verify_quantum_state(&self, item: &T) -> bool {
-        self.protection_state.verify_quantum_integrity(item)
-    }
-}
-
-/// Protection state for quantum operations
-struct ProtectionState {
-    coherence: AtomicF64,
-    entanglement_verified: bool,
-    last_verification: QuantumTimestamp,
-}
-
-impl ProtectionState {
-    fn new() -> Self {
-        Self {
-            coherence: AtomicF64::new(1.0),
-            entanglement_verified: false,
-            last_verification: QuantumTimestamp::now(),
+    pub fn is_traversable(&self) -> Result<bool, &'static str> {
+        if !self.is_quantum_stable() {
+            return Err("Quantum state unstable");
         }
+
+        let stability = self.stability.quantum_load();
+        let throat_radius = self.throat_radius.quantum_load();
+
+        Ok(stability > WORMHOLE_STABILITY_THRESHOLD && throat_radius > PLANCK_LENGTH)
     }
 
-    fn initialize(&mut self) -> Result<(), WormholeError> {
-        self.coherence.store(1.0, Ordering::SeqCst);
-        self.entanglement_verified = false;
-        self.last_verification = QuantumTimestamp::now();
+    pub fn get_coherence(&self) -> f64 {
+        self.coherence.quantum_load()
+    }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
+    }
+
+    fn decay_coherence(&self) {
+        let current = self.coherence.quantum_load();
+        let new_coherence = current * 0.99;
+        self.coherence.quantum_store(new_coherence);
+
+        // Update stability based on coherence
+        let current_stability = self.stability.quantum_load();
+        self.stability.quantum_store(current_stability * 0.995);
+
+        // Update quantum state
+        let new_state = match (new_coherence, current_stability) {
+            (c, s) if c < QUANTUM_COHERENCE_THRESHOLD => WormholeState::Decoherent,
+            (c, s) if s < WORMHOLE_STABILITY_THRESHOLD => WormholeState::Collapsed,
+            (c, s) if c > 0.9 && s > 0.9 => WormholeState::Stable,
+            (c, s) if c > 0.7 => WormholeState::Entangled,
+            _ => WormholeState::Fluctuating,
+        };
+
+        self.quantum_state.set(new_state);
+    }
+
+    pub fn stabilize(&mut self) -> Result<(), &'static str> {
+        if !self.is_quantum_stable() {
+            return Err("Cannot stabilize - quantum state too degraded");
+        }
+
+        self.coherence.quantum_store(1.0);
+        self.stability.quantum_store(1.0);
+        self.quantum_state.set(WormholeState::Stable);
         Ok(())
     }
 
-    fn verify_quantum_integrity<T>(&self, _item: &T) -> bool {
-        self.coherence.load(Ordering::Relaxed) >=
-        WORMHOLE_CONSTANTS.ufo_coherence.load(Ordering::Relaxed)
-    }
-}
+    pub fn entangle_with(&mut self, other: &mut Wormhole) -> Result<(), &'static str> {
+        if !self.is_quantum_stable() || !other.is_quantum_stable() {
+            return Err("One or both wormholes are quantum unstable");
+        }
 
-/// Extended wormhole errors
-#[derive(Debug)]
-pub enum WormholeError {
-    UfoProtectionRequired,
-    UfoCoherenceLoss,
-    UfoBridgeUnstable,
-    QuantumLockFailed,
-    QuantumStateCompromised,
-    ThroatCollapse,
-    CausalityViolation,
-    ExcessiveHawkingRadiation,
-    EntanglementFailure,
-    EntropyViolation,
-    InformationLoss,
-    QuantumDecoherence,
-    StorageLocationError,
-    StabilityFailure,
-}
+        let combined_coherence = (self.get_coherence() + other.get_coherence()) / 2.0;
+        let combined_stability = (self.stability.quantum_load() +
+        other.stability.quantum_load()) / 2.0;
 
-impl<T: Copy + 'static> Protected for ProtectedWormhole<T> {
-    fn protect(&self) {
-        self.ufo.protect();
-        fence(Ordering::SeqCst);
-    }
+        self.coherence.quantum_store(combined_coherence);
+        other.coherence.quantum_store(combined_coherence);
 
-    fn unprotect(&self) {
-        fence(Ordering::SeqCst);
-        self.ufo.unprotect();
-    }
+        self.stability.quantum_store(combined_stability);
+        other.stability.quantum_store(combined_stability);
 
-    fn is_protected(&self) -> bool {
-        self.ufo.is_protected()
+        self.quantum_state.set(WormholeState::Entangled);
+        other.quantum_state.set(WormholeState::Entangled);
+
+        Ok(())
     }
 }
 
@@ -216,76 +195,69 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_protected_wormhole_creation() {
-        let space_map = SpaceMap::new();
-        let grav_field = GravitationalField::new();
-        let wormhole = ProtectedWormhole::new(space_map, grav_field);
+    fn test_wormhole_creation() {
+        let wormhole = Wormhole::new(
+            Vector3D::new(0.0, 0.0, 0.0),
+                                     Vector3D::new(1.0, 0.0, 0.0),
+                                     1.0e30
+        );
 
-        assert!(!wormhole.is_protected(), "Should start unprotected");
-        assert_eq!(wormhole.quantum_lock.load(Ordering::Relaxed), 0,
-                   "Quantum lock should be initially released");
+        assert!(wormhole.is_quantum_stable());
+        assert!(wormhole.is_traversable().unwrap());
     }
 
     #[test]
-    fn test_ufo_protection_requirement() {
-        let space_map = SpaceMap::new();
-        let grav_field = GravitationalField::new();
-        let mut wormhole = ProtectedWormhole::new(space_map, grav_field);
+    fn test_quantum_stability() {
+        let mut wormhole = Wormhole::new(
+            Vector3D::new(0.0, 0.0, 0.0),
+                                         Vector3D::new(1.0, 0.0, 0.0),
+                                         1.0e30
+        );
 
-        let result = wormhole.protected_retrieve("test_id");
-        assert!(matches!(result, Err(WormholeError::UfoProtectionRequired)));
+        // Force decoherence
+        for _ in 0..100 {
+            let cell = MeshCell::new(Vector3D::new(0.0, 0.0, 0.0));
+            let _ = wormhole.transport(cell);
+        }
+
+        assert!(!wormhole.is_quantum_stable());
+        assert!(matches!(*wormhole.quantum_state.get(), WormholeState::Decoherent));
     }
 
     #[test]
-    fn test_quantum_lock_management() {
-        let space_map = SpaceMap::new();
-        let grav_field = GravitationalField::new();
-        let wormhole = ProtectedWormhole::new(space_map, grav_field);
+    fn test_wormhole_entanglement() {
+        let mut wh1 = Wormhole::new(
+            Vector3D::new(0.0, 0.0, 0.0),
+                                    Vector3D::new(1.0, 0.0, 0.0),
+                                    1.0e30
+        );
 
-        // Acquire lock
-        assert!(wormhole.acquire_quantum_lock().is_ok());
+        let mut wh2 = Wormhole::new(
+            Vector3D::new(0.0, 1.0, 0.0),
+                                    Vector3D::new(1.0, 1.0, 0.0),
+                                    1.0e30
+        );
 
-        // Try to acquire again
-        assert!(matches!(wormhole.acquire_quantum_lock(),
-                         Err(WormholeError::QuantumLockFailed)));
-
-        // Release and verify
-        wormhole.release_quantum_lock();
-        assert_eq!(wormhole.quantum_lock.load(Ordering::Relaxed), 0);
+        assert!(wh1.entangle_with(&mut wh2).is_ok());
+        assert_eq!(wh1.get_coherence(), wh2.get_coherence());
+        assert!(matches!(*wh1.quantum_state.get(), WormholeState::Entangled));
     }
 
     #[test]
-    fn test_ufo_coherence_verification() {
-        let space_map = SpaceMap::new();
-        let grav_field = GravitationalField::new();
-        let wormhole = ProtectedWormhole::new(space_map, grav_field);
+    fn test_stabilization() {
+        let mut wormhole = Wormhole::new(
+            Vector3D::new(0.0, 0.0, 0.0),
+                                         Vector3D::new(1.0, 0.0, 0.0),
+                                         1.0e30
+        );
 
-        wormhole.protect();
-        assert!(wormhole.verify_ufo_coherence(),
-                "UFO coherence should be valid after protection");
-    }
+        // Cause some decoherence
+        for _ in 0..50 {
+            wormhole.decay_coherence();
+        }
 
-    #[test]
-    fn test_protection_state_management() {
-        let protection_state = ProtectionState::new();
-
-        assert!(protection_state.coherence.load(Ordering::Relaxed) >=
-        WORMHOLE_CONSTANTS.ufo_coherence.load(Ordering::Relaxed),
-                "Initial coherence should meet minimum threshold");
-    }
-
-    #[test]
-    fn test_protected_retrieval_flow() {
-        let space_map = SpaceMap::new();
-        let grav_field = GravitationalField::new();
-        let mut wormhole = ProtectedWormhole::new(space_map, grav_field);
-
-        wormhole.protect();
-
-        let result = wormhole.protected_retrieve("test_id");
-        assert!(result.is_err(), "Should fail safely if storage is empty");
-
-        wormhole.unprotect();
-        assert!(!wormhole.is_protected(), "Should be unprotected after operation");
+        assert!(wormhole.stabilize().is_ok());
+        assert!(wormhole.is_quantum_stable());
+        assert!(matches!(*wormhole.quantum_state.get(), WormholeState::Stable));
     }
 }

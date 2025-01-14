@@ -1,76 +1,172 @@
 /// UnstableMatter: Low-Level Memory Access Wrapper
-/// Last Updated: 2025-01-12 21:18:27 UTC
+/// Last Updated: 2025-01-14 21:23:53 UTC
 /// Author: Caleb J.D. Terkovics (isdood)
+/// Current User: isdood
 ///
-/// This module provides direct volatile memory access with safety guarantees.
-/// It serves as the foundational layer for SpaceTime's memory operations.
+/// This module provides quantum-safe volatile memory access with coherence tracking.
+/// It serves as the foundational layer for SpaceTime's quantum memory operations.
 ///
-/// Safety:
-/// - All operations are marked unsafe as they involve raw pointer manipulation
-/// - Send and Sync are implemented to allow safe concurrent access
-/// - PhantomData ensures proper type tracking without runtime overhead
+/// Quantum Safety:
+/// - All operations maintain quantum coherence
+/// - PhantomSpace ensures proper quantum state tracking
+/// - Zeronaut provides quantum-safe pointer management
+/// - Memory operations respect quantum uncertainty principles
 
-use core::marker::PhantomData;
+use crate::phantom::PhantomSpace;
+use crate::zeronaut::Zeronaut;
+use crate::constants::CURRENT_TIMESTAMP;
+use crate::helium::HeliumOrdering;
 
 #[derive(Debug)]
 pub struct UnstableMatter<T> {
-    addr: usize,
-    _phantom: PhantomData<T>,
+    ptr: Zeronaut<T>,
+    space: PhantomSpace<T>,
 }
 
-impl<T> UnstableMatter<T> {
+impl<T: Copy> UnstableMatter<T> {
     /// Creates a new UnstableMatter instance at compile time
     ///
     /// # Safety
-    /// - Caller must ensure addr points to valid memory of type T
-    /// - Addr must be properly aligned for T
-    /// - Memory region must remain valid for the lifetime of the instance
-    pub const fn const_at(addr: usize) -> Self {
-        Self {
-            addr,
-            _phantom: PhantomData,
+    /// - Quantum coherence must be maintained
+    /// - Address must respect quantum alignment
+    /// - Memory region must maintain quantum stability
+    pub fn const_at(addr: usize) -> Option<Self> {
+        unsafe {
+            let ptr = addr as *mut T;
+            Zeronaut::new(ptr).map(|zeronaut| Self {
+                ptr: zeronaut,
+                space: PhantomSpace::const_new(),
+            })
         }
     }
 
     /// Creates a new UnstableMatter instance at runtime
     ///
     /// # Safety
-    /// Same safety requirements as const_at
-    pub unsafe fn at(addr: usize) -> Self {
+    /// Same quantum safety requirements as const_at
+    pub unsafe fn at(addr: usize) -> Option<Self> {
         Self::const_at(addr)
     }
 
-    /// Performs a volatile read from the underlying memory
+    /// Performs a quantum-safe volatile read
     ///
     /// # Safety
-    /// - Memory must contain a valid value of type T
-    /// - No other mutable references to this memory may exist
+    /// - Quantum state must be stable
+    /// - No quantum entanglement conflicts
     pub unsafe fn read(&self) -> T
     where
     T: Copy,
     {
-        core::ptr::read_volatile(self.addr as *const T)
+        self.space.decay_coherence();
+        let value = core::ptr::read_volatile(self.ptr.as_ptr());
+        value
     }
 
-    /// Performs a volatile write to the underlying memory
+    /// Performs a quantum-safe volatile write
     ///
     /// # Safety
-    /// - Memory must be writable
-    /// - No other references to this memory may exist
+    /// - Quantum coherence must be maintained
+    /// - No quantum state conflicts
     pub unsafe fn write(&mut self, value: T) {
-        core::ptr::write_volatile(self.addr as *mut T, value)
+        core::ptr::write_volatile(self.ptr.as_ptr(), value);
+        self.space.decay_coherence();
     }
 
-    /// Returns the raw address being managed
-    ///
-    /// This method is const and can be used in constant contexts
-    pub const fn addr(&self) -> usize {
-        self.addr
+    /// Returns the quantum-aligned address
+    pub fn addr(&self) -> usize {
+        self.ptr.as_ptr() as usize
+    }
+
+    /// Gets current quantum coherence
+    pub fn get_coherence(&self) -> f64 {
+        self.space.get_coherence()
+    }
+
+    /// Checks if memory is quantum stable
+    pub fn is_quantum_stable(&self) -> bool {
+        self.space.is_quantum_stable()
+    }
+
+    /// Gets the last quantum operation timestamp
+    pub fn get_timestamp(&self) -> usize {
+        self.space.get_last_update()
+    }
+
+    /// Resets quantum coherence
+    pub fn reset_coherence(&mut self) {
+        self.space.reset_coherence();
+    }
+
+    /// Attempts quantum tunneling to new address
+    pub fn tunnel_to(&mut self, new_addr: usize) -> bool {
+        unsafe {
+            let new_ptr = new_addr as *mut T;
+            if let Some(new_zeronaut) = Zeronaut::new(new_ptr) {
+                if new_zeronaut.is_quantum_stable() {
+                    self.ptr = new_zeronaut;
+                    self.space.decay_coherence();
+                    return true;
+                }
+            }
+            false
+        }
     }
 }
 
-// Safety: UnstableMatter can be safely sent between threads
-unsafe impl<T> Send for UnstableMatter<T> {}
+// Safety: UnstableMatter maintains quantum thread safety
+unsafe impl<T: Send> Send for UnstableMatter<T> {}
+unsafe impl<T: Send> Sync for UnstableMatter<T> {}
 
-// Safety: UnstableMatter can be safely shared between threads
-unsafe impl<T> Sync for UnstableMatter<T> {}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_creation() {
+        let matter = UnstableMatter::<u32>::const_at(0x1000).unwrap();
+        assert_eq!(matter.addr(), 0x1000);
+        assert!(matter.is_quantum_stable());
+        assert_eq!(matter.get_coherence(), 1.0);
+    }
+
+    #[test]
+    fn test_quantum_operations() {
+        let mut matter = UnstableMatter::<u32>::const_at(0x1000).unwrap();
+
+        unsafe {
+            matter.write(42);
+            assert!(matter.get_coherence() < 1.0);
+
+            let value = matter.read();
+            assert_eq!(value, 42);
+            assert!(matter.get_coherence() < 0.99);
+        }
+    }
+
+    #[test]
+    fn test_quantum_tunneling() {
+        let mut matter = UnstableMatter::<u32>::const_at(0x1000).unwrap();
+        assert!(matter.tunnel_to(0x2000));
+        assert_eq!(matter.addr(), 0x2000);
+        assert!(matter.get_coherence() < 1.0);
+    }
+
+    #[test]
+    fn test_coherence_management() {
+        let mut matter = UnstableMatter::<u32>::const_at(0x1000).unwrap();
+        assert!(matter.is_quantum_stable());
+
+        unsafe { matter.read(); }
+        let decayed_coherence = matter.get_coherence();
+        assert!(decayed_coherence < 1.0);
+
+        matter.reset_coherence();
+        assert!(matter.get_coherence() > decayed_coherence);
+    }
+
+    #[test]
+    fn test_timestamp() {
+        let matter = UnstableMatter::<u32>::const_at(0x1000).unwrap();
+        assert_eq!(matter.get_timestamp(), CURRENT_TIMESTAMP);
+    }
+}
