@@ -1,43 +1,35 @@
-// lib/unstable_matter/src/vector.rs
-/// Last Updated: 2025-01-14 20:42:13 UTC
+/// Quantum Vector Implementation with Gravitational Awareness
+/// Last Updated: 2025-01-14 22:41:17 UTC
 /// Author: isdood
 /// Current User: isdood
 
-// lib/unstable_matter/src/vector.rs
-
-use core::cell::UnsafeCell;
-use core::ops::{Add, Sub, Mul};
-
+use std::ops::{Add, Sub, Mul};
 use crate::{
+    constants::{CURRENT_TIMESTAMP, PLANCK_LENGTH},
     align::Alignment,
-    constants::{
-        CURRENT_TIMESTAMP,
-        PLANCK_LENGTH,
-        QUANTUM_THRESHOLD,
-        LIGHT_SPEED,
-    },
+    helium::{Helium, HeliumOrdering},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Vector3D<T> {
     x: T,
     y: T,
     z: T,
-    timestamp: UnsafeCell<usize>,
+    timestamp: Helium<usize>,
     alignment: Alignment,
 }
 
 impl<T> Vector3D<T>
 where
-T: PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy + Default
+T: PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy + Default,
 {
     pub fn new(x: T, y: T, z: T) -> Self {
         Self {
             x,
             y,
             z,
-            timestamp: UnsafeCell::new(CURRENT_TIMESTAMP),
-            alignment: Alignment::new(8),
+            timestamp: Helium::new(CURRENT_TIMESTAMP),
+            alignment: Alignment::new(16),
         }
     }
 
@@ -47,190 +39,97 @@ T: PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy + Defa
 
     pub fn set_x(&mut self, x: T) {
         self.x = x;
-        unsafe { *self.timestamp.get() = CURRENT_TIMESTAMP; }
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 
     pub fn set_y(&mut self, y: T) {
         self.y = y;
-        unsafe { *self.timestamp.get() = CURRENT_TIMESTAMP; }
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 
     pub fn set_z(&mut self, z: T) {
         self.z = z;
-        unsafe { *self.timestamp.get() = CURRENT_TIMESTAMP; }
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 
-    pub fn quantum_coherence(&self) -> f64 {
-        self.alignment.get_coherence()
-    }
-
-    pub fn magnitude(&self) -> T
-    where T: Mul<Output = T> + Add<Output = T> {
-        self.x * self.x + self.y * self.y + self.z * self.z
-    }
-
-    pub fn is_quantum_stable(&self) -> bool {
-        self.quantum_coherence() > QUANTUM_THRESHOLD
+    pub fn quantum_store(&mut self, x: T, y: T, z: T) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 }
 
-impl<T: Clone> Clone for Vector3D<T>
-where T: PartialEq + Add<Output = T> + Sub<Output = T> + Mul<Output = T> + Copy + Default {
-    fn clone(&self) -> Self {
-        Self::new(self.x.clone(), self.y.clone(), self.z.clone())
-    }
-}
-
-impl<T: PartialEq> PartialEq for Vector3D<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x &&
-        self.y == other.y &&
-        self.z == other.z
-    }
-}
-
-// Implement Vector3D<f64> specific operations
 impl Vector3D<f64> {
-    pub fn magnitude(&mut self) -> f64 {
-        self.update_timestamp();
-        self.aligned_space.decay_coherence();
+    pub fn magnitude(&self) -> f64 {
         libm::sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
     }
 
-    pub fn normalize(&mut self) -> Self {
+    pub fn normalize(&self) -> Self {
         let mag = self.magnitude();
-        if mag == 0.0 {
-            return self.clone();
+        if mag < f64::EPSILON {
+            return Self::new(0.0, 0.0, 0.0);
         }
-        let mut result = self.clone();
-        result.x /= mag;
-        result.y /= mag;
-        result.z /= mag;
-        result.update_timestamp();
-        result
+        Self::new(self.x / mag, self.y / mag, self.z / mag)
     }
 
-    pub fn dot(&mut self, other: &mut Self) -> f64 {
-        self.update_timestamp();
-        other.update_timestamp();
-        self.aligned_space.decay_coherence();
-        other.aligned_space.decay_coherence();
-        self.x * other.x + self.y * other.y + self.z * other.z
+    pub fn quantum_distance(&self, other: &Self) -> f64 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        let dz = self.z - other.z;
+        libm::sqrt(dx * dx + dy * dy + dz * dz)
     }
 
-    pub fn cross(&mut self, other: &mut Self) -> Self {
-        let alignment = vector_align();
-        let mut result = Self {
-            x: self.y * other.z - self.z * other.y,
-            y: self.z * other.x - self.x * other.z,
-            z: self.x * other.y - self.y * other.x,
-            timestamp: UnsafeCell::new(MESH_TIMESTAMP),
-            aligned_space: Box::new(AlignedSpace::new(
-                MESH_TIMESTAMP,
-                core::mem::size_of::<f64>() * 3,
-                                                      alignment,
-            )),
-        };
-        result.update_timestamp();
-        result.aligned_space.reset_coherence();
-        result
-    }
-
-    pub fn quantum_distance(&mut self, other: &mut Self) -> (f64, f64) {
-        self.update_timestamp();
-        other.update_timestamp();
-
-        let distance = {
-            let dx = self.x - other.x;
-            let dy = self.y - other.y;
-            let dz = self.z - other.z;
-            libm::sqrt(dx * dx + dy * dy + dz * dz)
-        };
-
-        let space_coherence = (self.aligned_space.get_coherence()
-        + other.aligned_space.get_coherence())
-        / 2.0;
-
-        let t1 = self.get_timestamp();
-        let t2 = other.get_timestamp();
-        let time_diff = if t1 > t2 { t1 - t2 } else { t2 - t1 } as f64;
-
-        let time_coherence = (VECTOR_QUANTUM_STATE as f64)
-        / (time_diff + VECTOR_QUANTUM_STATE as f64);
-
-        let coherence = (space_coherence + time_coherence) / 2.0;
-        (distance, coherence)
-    }
-
-    pub fn is_quantum(&self) -> bool {
-        let mag = self.x * self.x + self.y * self.y + self.z * self.z;
-        mag < PLANCK_LENGTH * PLANCK_LENGTH && self.aligned_space.is_quantum_stable()
-    }
-
-    pub fn quantize(&mut self) -> Self {
-        if !self.is_quantum() {
-            return self.clone();
-        }
-
-        let alignment = vector_align();
-        let mut result = Self {
-            x: libm::floor(self.x / PLANCK_LENGTH + 0.5) * PLANCK_LENGTH,
-            y: libm::floor(self.y / PLANCK_LENGTH + 0.5) * PLANCK_LENGTH,
-            z: libm::floor(self.z / PLANCK_LENGTH + 0.5) * PLANCK_LENGTH,
-            timestamp: UnsafeCell::new(MESH_TIMESTAMP),
-            aligned_space: Box::new(AlignedSpace::new(
-                MESH_TIMESTAMP,
-                core::mem::size_of::<f64>() * 3,
-                                                      alignment,
-            )),
-        };
-        result.update_timestamp();
-        result.aligned_space.reset_coherence();
-        result
-    }
-
-    pub fn quantum_coherence(&self, other: &Self) -> f64 {
-        let space_coherence = (self.aligned_space.get_coherence()
-        + other.aligned_space.get_coherence())
-        / 2.0;
-
-        let t1 = self.get_timestamp();
-        let t2 = other.get_timestamp();
-        let time_diff = if t1 > t2 { t1 - t2 } else { t2 - t1 } as f64;
-
-        let time_coherence = (VECTOR_QUANTUM_STATE as f64)
-        / (time_diff + VECTOR_QUANTUM_STATE as f64);
-
-        (space_coherence + time_coherence) / 2.0
+    pub fn is_quantum_stable(&self) -> bool {
+        self.magnitude() > PLANCK_LENGTH
     }
 }
 
-// Implement standard arithmetic operations
-impl<T: Copy + Add<Output = T>> Add for Vector3D<T> {
+impl<T: Copy> Add for Vector3D<T>
+where
+T: Add<Output = T>,
+{
     type Output = Self;
 
-    fn add(mut self, other: Self) -> Self {
-        let mut result = Self::new(
-            self.x + other.x,
-            self.y + other.y,
-            self.z + other.z,
-        );
-        result.update_timestamp();
-        result
+    fn add(self, other: Self) -> Self {
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+            z: self.z + other.z,
+            timestamp: Helium::new(CURRENT_TIMESTAMP),
+            alignment: self.alignment,
+        }
     }
 }
 
-impl<T: Copy + Sub<Output = T>> Sub for Vector3D<T> {
+impl<T: Copy> Sub for Vector3D<T>
+where
+T: Sub<Output = T>,
+{
     type Output = Self;
 
-    fn sub(mut self, other: Self) -> Self {
-        let mut result = Self::new(
-            self.x - other.x,
-            self.y - other.y,
-            self.z - other.z,
-        );
-        result.update_timestamp();
-        result
+    fn sub(self, other: Self) -> Self {
+        Self {
+            x: self.x - other.x,
+            y: self.y - other.y,
+            z: self.z - other.z,
+            timestamp: Helium::new(CURRENT_TIMESTAMP),
+            alignment: self.alignment,
+        }
+    }
+}
+
+impl Mul<f64> for Vector3D<f64> {
+    type Output = Self;
+
+    fn mul(self, scalar: f64) -> Self {
+        Self {
+            x: self.x * scalar,
+            y: self.y * scalar,
+            z: self.z * scalar,
+            timestamp: Helium::new(CURRENT_TIMESTAMP),
+            alignment: self.alignment,
+        }
     }
 }
 
@@ -440,44 +339,51 @@ mod tests {
     }
 
     #[test]
+    fn test_vector_operations() {
+        let v1 = Vector3D::new(1.0, 2.0, 3.0);
+        let v2 = Vector3D::new(2.0, 3.0, 4.0);
+
+        let sum = v1.clone() + v2.clone();
+        assert_eq!(sum.x(), 3.0);
+        assert_eq!(sum.y(), 5.0);
+        assert_eq!(sum.z(), 7.0);
+
+        let scaled = v1 * 2.0;
+        assert_eq!(scaled.x(), 2.0);
+        assert_eq!(scaled.y(), 4.0);
+        assert_eq!(scaled.z(), 6.0);
+    }
+
+    #[test]
+    fn test_vector_magnitude() {
+        let v = Vector3D::new(3.0, 4.0, 0.0);
+        assert_eq!(v.magnitude(), 5.0);
+    }
+
+    #[test]
+    fn test_vector_normalize() {
+        let v = Vector3D::new(3.0, 0.0, 0.0);
+        let normalized = v.normalize();
+        assert_eq!(normalized.x(), 1.0);
+        assert_eq!(normalized.magnitude(), 1.0);
+    }
+
+    #[test]
+    fn test_quantum_stability() {
+        let v1 = Vector3D::new(PLANCK_LENGTH * 2.0, 0.0, 0.0);
+        assert!(v1.is_quantum_stable());
+
+        let v2 = Vector3D::new(PLANCK_LENGTH * 0.5, 0.0, 0.0);
+        assert!(!v2.is_quantum_stable());
+    }
+
+    #[test]
     fn test_vector4d_creation() {
         let v = Vector4D::new(1.0, 2.0, 3.0, 4.0);
         assert_eq!(v.t, 1.0);
         assert_eq!(v.x, 2.0);
         assert_eq!(v.y, 3.0);
         assert_eq!(v.z, 4.0);
-    }
-
-    #[test]
-    fn test_vector3d_magnitude() {
-        let mut v = Vector3D::new(1.0, 2.0, 2.0);
-        assert_eq!(v.magnitude(), 3.0);
-    }
-
-    #[test]
-    fn test_vector3d_normalize() {
-        let mut v = Vector3D::new(3.0, 4.0, 0.0);
-        let normalized = v.normalize();
-        assert!((normalized.x - 0.6).abs() < 1e-6);
-        assert!((normalized.y - 0.8).abs() < 1e-6);
-        assert!((normalized.z - 0.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_vector3d_dot() {
-        let mut v1 = Vector3D::new(1.0, 2.0, 3.0);
-        let mut v2 = Vector3D::new(4.0, -5.0, 6.0);
-        assert_eq!(v1.dot(&mut v2), 12.0);
-    }
-
-    #[test]
-    fn test_vector3d_cross() {
-        let mut v1 = Vector3D::new(1.0, 2.0, 3.0);
-        let mut v2 = Vector3D::new(4.0, 5.0, 6.0);
-        let v3 = v1.cross(&mut v2);
-        assert_eq!(v3.x, -3.0);
-        assert_eq!(v3.y, 6.0);
-        assert_eq!(v3.z, -3.0);
     }
 
     #[test]

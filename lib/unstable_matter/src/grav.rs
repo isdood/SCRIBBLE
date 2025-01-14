@@ -1,83 +1,88 @@
-/// Quantum Gravitational Effects Module
-/// Last Updated: 2025-01-14 21:42:45 UTC
+// lib/unstable_matter/src/grav.rs
+/// Quantum Gravity Field Implementation
+/// Last Updated: 2025-01-14 22:36:10 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
-    helium::{Helium, HeliumOrdering},
-    phantom::QuantumCell,
-    unstable::UnstableDescriptor,
-    zeronaut::Zeronaut,
     Vector3D,
-    mesh::MeshCell,
+    constants::GRAVITATIONAL_CONSTANT,
 };
+use std::sync::Arc;
 
-const GRAVITATIONAL_CONSTANT: f64 = 6.67430e-11;
-const PLANCK_LENGTH: f64 = 1.616255e-35;
-const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
+#[derive(Debug, Clone)]
+pub struct GravityFieldData {
+    force_vector: Vector3D<f64>,
+        field_strength: f64,
+        quantum_coherence: f64,
+}
 
+#[derive(Debug, Clone)]
 pub struct GravityField {
-    strength: Helium<f64>,
-    direction: QuantumCell<Vector3D<f64>>,
-    warp_factor: Helium<f64>,
-    coherence: Helium<f64>,
-    state: UnstableDescriptor,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum GravityState {
-    Stable,
-    Warped,
-    Entangled,
-    Decoherent,
-}
-
-pub struct MeshGravity {
-    field: GravityField,
-    affected_cells: QuantumCell<Vec<MeshCell>>,
-    quantum_state: QuantumCell<GravityState>,
-    timestamp: Helium<usize>,
+    data: Arc<GravityFieldData>,
 }
 
 impl GravityField {
-    pub fn new(strength: f64, direction: Vector3D<f64>) -> Self {
+    pub fn new(force_vector: Vector3D<f64>) -> Self {
         Self {
-            strength: Helium::new(strength),
-            direction: QuantumCell::new(direction.normalize()),
-            warp_factor: Helium::new(1.0),
-            coherence: Helium::new(1.0),
-            state: UnstableDescriptor::new(),
+            data: Arc::new(GravityFieldData {
+                force_vector,
+                    field_strength: force_vector.magnitude(),
+                           quantum_coherence: 1.0,
+            }),
         }
     }
 
-    pub fn apply_quantum_warp(&self, factor: f64) -> Result<(), &'static str> {
-        if !self.is_quantum_stable() {
-            return Err("Quantum state unstable");
+    pub fn calculate_force_at(&self, position: Vector3D<f64>, mass: f64) -> Vector3D<f64> {
+        let distance = position.magnitude();
+        if distance < f64::EPSILON {
+            return Vector3D::new(0.0, 0.0, 0.0);
         }
 
-        let current_warp = self.warp_factor.quantum_load();
-        self.warp_factor.quantum_store(current_warp * factor);
-        self.decay_coherence();
-        Ok(())
+        let force_magnitude = GRAVITATIONAL_CONSTANT * mass * self.data.field_strength
+        / (distance * distance);
+        let direction = position.normalize();
+        direction * force_magnitude
     }
 
-    pub fn get_warped_strength(&self) -> f64 {
-        let base_strength = self.strength.quantum_load();
-        let warp = self.warp_factor.quantum_load();
-        base_strength * warp * self.get_coherence()
+    pub fn get_field_strength(&self) -> f64 {
+        self.data.field_strength
     }
 
-    pub fn get_coherence(&self) -> f64 {
-        self.coherence.quantum_load()
+    pub fn get_quantum_coherence(&self) -> f64 {
+        self.data.quantum_coherence
     }
 
-    pub fn is_quantum_stable(&self) -> bool {
-        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
+    pub fn get_force_vector(&self) -> Vector3D<f64> {
+        self.data.force_vector.clone()
     }
+}
 
-    fn decay_coherence(&self) {
-        let current = self.coherence.quantum_load();
-        self.coherence.quantum_store(current * 0.99);
+// Now create a reference type for use in Helium
+#[derive(Debug, Clone)]
+pub struct GravityFieldRef {
+    field: Arc<GravityFieldData>,
+}
+
+impl From<GravityField> for GravityFieldRef {
+    fn from(field: GravityField) -> Self {
+        Self {
+            field: field.data.clone(),
+        }
+    }
+}
+
+impl GravityFieldRef {
+    pub fn calculate_force_at(&self, position: Vector3D<f64>, mass: f64) -> Vector3D<f64> {
+        let distance = position.magnitude();
+        if distance < f64::EPSILON {
+            return Vector3D::new(0.0, 0.0, 0.0);
+        }
+
+        let force_magnitude = GRAVITATIONAL_CONSTANT * mass * self.field.field_strength
+        / (distance * distance);
+        let direction = position.normalize();
+        direction * force_magnitude
     }
 }
 
