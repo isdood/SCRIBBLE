@@ -1,14 +1,13 @@
-/// Quantum Helium Implementation
-/// Last Updated: 2025-01-14 23:09:52 UTC
+/// Quantum-Safe Memory Management
+/// Last Updated: 2025-01-14 23:35:26 UTC
 /// Author: isdood
 /// Current User: isdood
 
+use std::pin::Pin;
 use crate::{
-    constants::{CURRENT_TIMESTAMP, QUANTUM_COHERENCE_THRESHOLD},
-    phantom::{QuantumCell, Quantum},
+    constants::*,
+    phantom::QuantumCell,
     Vector3D,
-    grav::GravityFieldRef,
-    ufo::{UFO, Protected},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -16,102 +15,44 @@ pub enum HeliumOrdering {
     Relaxed,
     Acquire,
     Release,
-    AcquireRelease,
     Quantum,
 }
 
 #[derive(Debug)]
-pub struct Helium<T> {
+pub struct Helium<T: 'static> {
     inner: QuantumCell<T>,
     timestamp: QuantumCell<usize>,
-    position: QuantumCell<Vector3D<f64>>,
-    gravity_ref: Option<GravityFieldRef>,
-    gravitational_coherence: QuantumCell<f64>,
-    ufo: UFO<T>,
+    coherence: QuantumCell<f64>,
+    position: Option<QuantumCell<Vector3D<f64>>>,
 }
 
-unsafe impl<T: Send> Send for Helium<T> {}
-unsafe impl<T: Send> Sync for Helium<T> {}
-
-impl<T: Copy> Helium<T> {
+impl<T: 'static + Copy> Helium<T> {
     pub fn new(value: T) -> Self {
         Self {
             inner: QuantumCell::new(value),
             timestamp: QuantumCell::new(CURRENT_TIMESTAMP),
-            position: QuantumCell::new(Vector3D::new(0.0, 0.0, 0.0)),
-            gravity_ref: None,
-            gravitational_coherence: QuantumCell::new(1.0),
-            ufo: UFO::new(),
+            coherence: QuantumCell::new(1.0),
+            position: None,
         }
     }
 
-    pub fn quantum_load(&self) -> T {
-        if let Some(field) = &self.gravity_ref {
-            let position = self.position.get().clone();
-            let force = field.calculate_force_at(position, 1.0);
-            let coherence = *self.gravitational_coherence.get();
-            self.gravitational_coherence.set(coherence * 0.99);
-        }
-        *self.inner.get()
+    pub fn load(&self, _ordering: &HeliumOrdering) -> Result<T, &'static str> {
+        Ok(*self.inner.get())
     }
 
-    pub fn quantum_store(&self, value: T) -> Result<(), &'static str> {
-        if !self.ufo.is_protected() {
-            self.ufo.protect()?;
-        }
+    pub fn store(&self, value: T, _ordering: &HeliumOrdering) -> Result<(), &'static str> {
         self.inner.set(value);
         self.timestamp.set(CURRENT_TIMESTAMP);
-        self.decay_coherence();
+        self.coherence.set(*self.coherence.get() * QUANTUM_FENCE_DECAY);
         Ok(())
     }
 
-    pub fn load(&self, order: &HeliumOrdering) -> Result<T, &'static str> {
-        match order {
-            HeliumOrdering::Quantum => Ok(self.quantum_load()),
-            HeliumOrdering::AcquireRelease | HeliumOrdering::Acquire => {
-                Ok(*self.inner.get())
-            }
-            _ => Ok(*self.inner.get())
-        }
+    pub fn get_coherence(&self) -> f64 {
+        *self.coherence.get()
     }
 
-    pub fn store(&self, value: T, order: &HeliumOrdering) -> Result<(), &'static str> {
-        match order {
-            HeliumOrdering::Quantum => self.quantum_store(value),
-            HeliumOrdering::AcquireRelease | HeliumOrdering::Release => {
-                self.inner.set(value);
-                self.decay_coherence();
-                Ok(())
-            }
-            _ => {
-                self.inner.set(value);
-                Ok(())
-            }
-        }
-    }
-
-    pub fn set_gravity_field(&mut self, field: GravityFieldRef) {
-        self.gravity_ref = Some(field);
-    }
-}
-
-impl<T> Quantum for Helium<T> {
-    fn is_quantum_stable(&self) -> bool {
-        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD && self.ufo.is_protected()
-    }
-
-    fn get_coherence(&self) -> f64 {
-        let quantum_coherence = *self.gravitational_coherence.get();
-        quantum_coherence * if self.ufo.is_protected() { 1.0 } else { 0.5 }
-    }
-
-    fn decay_coherence(&self) {
-        let current = *self.gravitational_coherence.get();
-        self.gravitational_coherence.set(current * 0.99);
-    }
-
-    fn reset_coherence(&self) {
-        self.gravitational_coherence.set(1.0);
+    pub fn is_quantum_stable(&self) -> bool {
+        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
     }
 }
 

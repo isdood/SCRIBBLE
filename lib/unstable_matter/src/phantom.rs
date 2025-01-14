@@ -1,18 +1,21 @@
 /// Quantum PhantomSpace Module
-/// Last Updated: 2025-01-14 23:05:42 UTC
+/// Last Updated: 2025-01-14 23:40:45 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::cell::UnsafeCell;
-use crate::vector::Vector3D;
+use crate::{
+    vector::Vector3D,
+    scribe::{Scribe, ScribePrecision, QuantumString},
+};
 
-const CURRENT_TIMESTAMP: usize = 1705265142; // 2025-01-14 23:05:42 UTC
+const CURRENT_TIMESTAMP: usize = 1705272045; // 2025-01-14 23:40:45 UTC
 const COHERENCE_DECAY_FACTOR: f64 = 0.99;
 const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
 
 /// Quantum state trait for shared behavior
-pub trait Quantum {
+pub trait Quantum: Scribe {
     fn get_coherence(&self) -> f64;
     fn is_quantum_stable(&self) -> bool;
     fn decay_coherence(&self);
@@ -40,6 +43,12 @@ impl<T> AtomicRef<T> {
 
     pub fn set(&self, value: T) {
         unsafe { *self.inner.get() = value; }
+    }
+}
+
+impl<T: Scribe> Scribe for AtomicRef<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        self.get().scribe(precision, output)
     }
 }
 
@@ -102,6 +111,16 @@ impl<T> QuantumCell<T> {
     }
 }
 
+impl<T: Scribe> Scribe for QuantumCell<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("Quantum(");
+        self.value.scribe(precision, output);
+        output.push_str(", coherence=");
+        output.push_f64(self.get_coherence(), 6);
+        output.push_char(')');
+    }
+}
+
 /// PhantomSpace implementation
 pub struct PhantomSpace {
     position: QuantumCell<Vector3D<f64>>,
@@ -154,6 +173,16 @@ impl Quantum for PhantomSpace {
     }
 }
 
+impl Scribe for PhantomSpace {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("Phantom[pos=");
+        self.position.scribe(precision, output);
+        output.push_str(", coherence=");
+        output.push_f64(self.get_coherence(), 6);
+        output.push_char(']');
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +224,27 @@ mod tests {
         }
 
         assert!(!space.is_quantum_stable());
+    }
+
+    #[test]
+    fn test_scribe() {
+        let space = PhantomSpace::new();
+        let mut output = QuantumString::new();
+        space.scribe(ScribePrecision::Standard, &mut output);
+        assert_eq!(
+            output.as_str(),
+                   "Phantom[pos=Quantum(⟨0.000000, 0.000000, 0.000000⟩, coherence=1.000000), coherence=1.000000]"
+        );
+    }
+
+    #[test]
+    fn test_quantum_cell_scribe() {
+        let cell = QuantumCell::new(Vector3D::new(1.0, 2.0, 3.0));
+        let mut output = QuantumString::new();
+        cell.scribe(ScribePrecision::Standard, &mut output);
+        assert_eq!(
+            output.as_str(),
+                   "Quantum(⟨1.000000, 2.000000, 3.000000⟩, coherence=1.000000)"
+        );
     }
 }
