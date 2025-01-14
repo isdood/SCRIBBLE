@@ -14,19 +14,26 @@ pub mod blackhole;
 pub mod wormhole;
 pub mod unstable;
 pub mod zeronaut;
+pub mod scribe;
+
+pub mod unstable_matter {
+    mod unstable;
+    pub use self::unstable::UnstableDescriptor;
+}
 
 // Re-exports
 pub use constants::*;
 pub use vector::Vector3D;
 pub use phantom::{PhantomSpace, Quantum, QuantumCell};
-pub use mesh::MeshDimensions;
+pub use mesh::MeshCell;
 pub use ufo::{UFO, Protected};
 pub use helium::{Helium, HeliumOrdering};
-pub use grav::{GravityField, GravityFieldRef, GravityState};
+pub use grav::{GravityField, GravityFieldRef};
 pub use blackhole::BlackHole;
-pub use wormhole::{ProtectedWormhole, WormholeError};
+pub use wormhole::{Wormhole, WormholeError};
 pub use unstable::UnstableDescriptor;
 pub use zeronaut::Zeronaut;
+pub use scribe::{Scribe, ScribePrecision, QuantumString};
 
 #[derive(Debug)]
 pub struct SpaceTimeMemory<T> {

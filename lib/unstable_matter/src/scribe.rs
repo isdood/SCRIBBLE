@@ -1,5 +1,5 @@
 /// Quantum Space-Time Scribing Module
-/// Last Updated: 2025-01-14 23:39:11 UTC
+/// Last Updated: 2025-01-14 23:47:10 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -124,66 +124,6 @@ impl Scribe for f64 {
     }
 }
 
-/// Quantum-aware scribe with coherence tracking
-pub struct QuantumScribe<T> {
-    value: T,
-    coherence: f64,
-}
-
-impl<T> QuantumScribe<T> {
-    pub fn new(value: T, coherence: f64) -> Self {
-        Self { value, coherence }
-    }
-
-    pub fn get_precision(&self) -> ScribePrecision {
-        if self.coherence > 0.99 {
-            ScribePrecision::Planck
-        } else if self.coherence > 0.5 {
-            ScribePrecision::Quantum
-        } else {
-            ScribePrecision::Standard
-        }
-    }
-}
-
-impl<T: Scribe> Scribe for QuantumScribe<T> {
-    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        self.value.scribe(self.get_precision(), output);
-    }
-}
-
-/// Space-time coordinate scribe
-pub struct SpaceTimeScribe {
-    position: Vector3D<f64>,
-    time: f64,
-    coherence: f64,
-}
-
-impl SpaceTimeScribe {
-    pub fn new(position: Vector3D<f64>, time: f64, coherence: f64) -> Self {
-        Self { position, time, coherence }
-    }
-}
-
-impl Scribe for SpaceTimeScribe {
-    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        let precision = if self.coherence > 0.99 {
-            ScribePrecision::Planck
-        } else if self.coherence > 0.5 {
-            ScribePrecision::Quantum
-        } else {
-            ScribePrecision::Standard
-        };
-
-        output.push_char('[');
-        output.push_str("t=");
-        self.time.scribe(precision, output);
-        output.push_str(", pos=");
-        self.position.scribe(precision, output);
-        output.push_char(']');
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,7 +137,7 @@ mod tests {
     }
 
     #[test]
-    fn test_vector3d_scribe() {
+    fn test_vector_scribe() {
         let v = Vector3D::new(1.0, 2.0, 3.0);
         let mut qs = QuantumString::new();
         v.scribe(ScribePrecision::Standard, &mut qs);
@@ -205,20 +145,10 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_precision() {
+    fn test_small_values() {
         let v = Vector3D::new(1e-36, 1e-11, 1.0);
-        let qs = QuantumScribe::new(&v, 1.0);
-        let mut output = QuantumString::new();
-        qs.scribe(ScribePrecision::Standard, &mut output);
-        assert_eq!(output.as_str(), "⟨0.000000, 0.000000, 1.000000⟩");
-    }
-
-    #[test]
-    fn test_spacetime_scribe() {
-        let pos = Vector3D::new(1.0, 2.0, 3.0);
-        let st = SpaceTimeScribe::new(pos, 0.0, 0.99);
-        let mut output = QuantumString::new();
-        st.scribe(ScribePrecision::Standard, &mut output);
-        assert_eq!(output.as_str(), "[t=0.000000, pos=⟨1.000000, 2.000000, 3.000000⟩]");
+        let mut qs = QuantumString::new();
+        v.scribe(ScribePrecision::Standard, &mut qs);
+        assert_eq!(qs.as_str(), "⟨0.000000, 0.000000, 1.000000⟩");
     }
 }
