@@ -3,6 +3,7 @@
 /// Author: isdood
 /// Current User: isdood
 
+use crate::quantum::Quantum;
 use crate::{
     constants::*,
     helium::Helium,

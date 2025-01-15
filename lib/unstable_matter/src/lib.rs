@@ -1,36 +1,39 @@
 /// Quantum Matter Library
-/// Last Updated: 2025-01-15 05:03:16 UTC
+/// Last Updated: 2025-01-15 05:19:18 UTC
 /// Author: isdood
 /// Current User: isdood
 
+// Core modules
 pub mod constants;
-pub mod glitch;
+pub mod quantum;
+pub mod scribe;
+pub mod helium;
+
+// Implementation modules
+pub mod vector;
 pub mod phantom;
 pub mod mesh;
 pub mod ufo;
-pub mod vector;
-pub mod helium;
 pub mod grav;
 pub mod blackhole;
 pub mod wormhole;
 pub mod zeronaut;
-pub mod scribe;
 pub mod unstable;
 pub mod horizon;
 
 // Re-exports
 pub use constants::*;
-pub use glitch::WormholeGlitch;
-pub use vector::Vector3D;
-pub use phantom::{PhantomSpace, Quantum, QuantumCell};
-pub use mesh::{MeshCell, MeshDimensions};  // Added MeshDimensions
-pub use ufo::{UFO, Protected};
+pub use quantum::Quantum;
+pub use scribe::{Scribe, ScribePrecision, QuantumString};
 pub use helium::{Helium, HeliumOrdering};
+pub use vector::{Vector3D, Vector4D};
+pub use phantom::{PhantomSpace, QuantumCell};
+pub use mesh::{MeshCell, MeshDimensions};
+pub use ufo::{UFO, Protected};
 pub use grav::{GravityField, GravityFieldRef};
 pub use blackhole::BlackHole;
 pub use wormhole::Wormhole;
 pub use zeronaut::Zeronaut;
-pub use scribe::{Scribe, ScribePrecision, QuantumString};
 pub use unstable::{UnstableDescriptor, QuantumState};
 pub use horizon::Horizon;
 

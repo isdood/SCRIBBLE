@@ -3,6 +3,7 @@
 /// Author: isdood
 /// Current User: isdood
 
+use crate::quantum::Quantum;
 use std::ops::{Add, Sub, Mul};
 use crate::{
     scribe::{Scribe, ScribePrecision, QuantumString},

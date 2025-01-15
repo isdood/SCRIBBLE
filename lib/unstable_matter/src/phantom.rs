@@ -3,6 +3,7 @@
 /// Author: isdood
 /// Current User: isdood
 
+use crate::quantum::Quantum;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 use crate::{
     constants::*,

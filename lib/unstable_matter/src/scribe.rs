@@ -102,18 +102,6 @@ pub trait Scribe {
     }
 }
 
-impl<T: Copy> Scribe for Vector3D<T> where T: Into<f64> {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_char('⟨');
-        output.push_f64(self.x().into(), precision.decimal_places());
-        output.push_str(", ");
-        output.push_f64(self.y().into(), precision.decimal_places());
-        output.push_str(", ");
-        output.push_f64(self.z().into(), precision.decimal_places());
-        output.push_char('⟩');
-    }
-}
-
 impl Scribe for f64 {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         if self.abs() < precision.epsilon() {
