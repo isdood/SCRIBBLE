@@ -108,7 +108,7 @@ impl Vector3D<isize> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Vector4D<T> {
     pub t: T,
     pub x: T,

@@ -1,9 +1,10 @@
-/// Quantum SpaceTime Root Module
-/// Last Updated: 2025-01-15 01:28:17 UTC
+/// Unstable Matter Library
+/// Last Updated: 2025-01-15 01:49:27 UTC
 /// Author: isdood
 /// Current User: isdood
 
 pub mod constants;
+pub mod glitch;
 pub mod phantom;
 pub mod mesh;
 pub mod ufo;
@@ -14,21 +15,22 @@ pub mod blackhole;
 pub mod wormhole;
 pub mod zeronaut;
 pub mod scribe;
-pub mod unstable;  // Changed from unstable_matter to unstable
+pub mod unstable;
 
 // Re-exports
 pub use constants::*;
+pub use glitch::WormholeGlitch;  // Changed from WormholeError to WormholeGlitch
 pub use vector::Vector3D;
-pub use phantom::{PhantomSpace, Quantum, QuantumCell};
-pub use mesh::{MeshCell, MeshDimensions};
+pub use phantom::{PhantomSpace, Quantum, QuantumCell, Horizon};
+pub use mesh::MeshCell;
 pub use ufo::{UFO, Protected};
 pub use helium::{Helium, HeliumOrdering};
 pub use grav::{GravityField, GravityFieldRef};
 pub use blackhole::BlackHole;
-pub use wormhole::{Wormhole, WormholeError};
-pub use unstable::{UnstableDescriptor, QuantumState};  // Changed from unstable_matter to unstable
+pub use wormhole::Wormhole;
 pub use zeronaut::Zeronaut;
 pub use scribe::{Scribe, ScribePrecision, QuantumString};
+pub use unstable::{UnstableDescriptor, QuantumState};
 
 #[derive(Debug)]
 pub struct SpaceTimeMemory<T> {

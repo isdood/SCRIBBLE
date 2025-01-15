@@ -10,6 +10,8 @@ use crate::{
     scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
+use crate::constants::*;
+
 const CURRENT_TIMESTAMP: usize = 1705272045; // 2025-01-14 23:40:45 UTC
 const COHERENCE_DECAY_FACTOR: f64 = 0.99;
 const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
@@ -180,6 +182,29 @@ impl Scribe for PhantomSpace {
         output.push_str(", coherence=");
         output.push_f64(self.get_coherence(), 6);
         output.push_char(']');
+    }
+}
+
+#[derive(Debug)]
+pub struct Horizon {
+    radius: f64,
+    stability: f64,
+}
+
+impl Horizon {
+    pub fn new(radius: f64) -> Self {
+        Self {
+            radius,
+            stability: 1.0,
+        }
+    }
+
+    pub fn radius(&self) -> f64 {
+        self.radius
+    }
+
+    pub fn is_stable(&self) -> bool {
+        self.stability > QUANTUM_STABILITY_THRESHOLD
     }
 }
 

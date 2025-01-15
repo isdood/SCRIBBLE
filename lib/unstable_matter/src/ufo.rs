@@ -3,15 +3,16 @@
 /// Author: isdood
 /// Current User: isdood
 
-use core::marker::PhantomData;
 use crate::{
     helium::{Helium, HeliumOrdering},
     phantom::QuantumCell,
     vector::Vector3D,
     unstable::UnstableDescriptor,
     zeronaut::Zeronaut,
-    mesh::MeshCell,
+    scribe::{Scribe, ScribePrecision, QuantumString},
 };
+
+use crate::constants::*;
 
 const CURRENT_UFO_TIMESTAMP: usize = 1705271485; // 2025-01-14 21:51:25 UTC
 const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
@@ -30,9 +31,32 @@ pub enum UFOState {
 pub trait Protected {
     fn protect(&self) -> Result<(), &'static str>;
     fn unprotect(&self) -> Result<(), &'static str>;
-    fn is_protected(&self) -> bool;
     fn get_coherence(&self) -> f64;
     fn is_quantum_stable(&self) -> bool;
+}
+
+impl<T> Protected for UFO<T> {
+    fn protect(&self) -> Result<(), &'static str> {
+        if !self.is_quantum_stable() {
+            return Err("Quantum state unstable");
+        }
+        Ok(())
+    }
+
+    fn unprotect(&self) -> Result<(), &'static str> {
+        if !self.is_quantum_stable() {
+            return Err("Quantum state unstable");
+        }
+        Ok(())
+    }
+
+    fn get_coherence(&self) -> f64 {
+        self.coherence.quantum_load()
+    }
+
+    fn is_quantum_stable(&self) -> bool {
+        self.get_coherence() > QUANTUM_STABILITY_THRESHOLD
+    }
 }
 
 /// Quantum memory trace for UFO tracking
@@ -310,20 +334,6 @@ impl<T> TrackedUFO<T> {
         if self.contains(&pos) {
             self.base.set_position(x, y, z);
         }
-    }
-}
-
-impl<T> Protected for TrackedUFO<T> {
-    fn protect(&self) {
-        self.base.protect();
-    }
-
-    fn unprotect(&self) {
-        self.base.unprotect();
-    }
-
-    fn is_protected(&self) -> bool {
-        self.base.is_protected()
     }
 }
 

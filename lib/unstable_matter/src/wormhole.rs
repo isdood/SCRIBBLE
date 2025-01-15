@@ -62,8 +62,8 @@ impl Wormhole {
         }
     }
 
-    pub fn transport(&mut self, cell: MeshCell) -> Result<MeshCell, &'static str> {
-        if !self.is_quantum_stable() {
+    pub fn transport<T>(&mut self, cell: MeshCell<T>) -> Result<MeshCell<T>, WormholeError>
+    if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
 

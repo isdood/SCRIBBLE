@@ -55,7 +55,7 @@ impl BlackHole {
             temperature: Helium::new(temperature),
             coherence: Helium::new(1.0),
             gravity_field: QuantumCell::new(gravity),
-            affected_cells: QuantumCell::new(Vec::new()),
+            affected_cells: QuantumCell<Vec<MeshCell<f64>>>,
             quantum_state: QuantumCell::new(BlackHoleState::Stable),
             state: UnstableDescriptor::new(),
         }

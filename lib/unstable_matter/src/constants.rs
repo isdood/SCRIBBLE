@@ -19,6 +19,28 @@ pub const CURRENT_TIMESTAMP: usize = 1705279391; // 2025-01-15 01:23:11 UTC
 pub const QUANTUM_TIMESTAMP: usize = CURRENT_TIMESTAMP;
 pub const MESH_TIMESTAMP: usize = CURRENT_TIMESTAMP;
 
+/// Constants for the Unstable Matter System
+/// Last Updated: 2025-01-15 01:39:34 UTC
+/// Current User: isdood
+
+// Quantum Constants
+pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
+pub const COHERENCE_DECAY_FACTOR: f64 = 0.99;
+pub const QUANTUM_FENCE_DECAY: f64 = 0.95;
+pub const GRAVITATIONAL_THRESHOLD: f64 = 9.81;
+pub const WORMHOLE_STABILITY_THRESHOLD: f64 = 0.95;
+
+// Physical Constants
+pub const PLANCK_LENGTH: f64 = 1.616255e-35;
+pub const LIGHT_SPEED: f64 = 299_792_458.0;
+pub const GRAVITATIONAL_CONSTANT: f64 = 6.67430e-11;
+pub const SCHWARZSCHILD_CONSTANT: f64 = 2.95325008e-36;
+pub const HAWKING_TEMPERATURE_CONSTANT: f64 = 1.227e23;
+
+// System Constants
+pub const MAX_QUANTUM_OPERATIONS: usize = 1000;
+pub const MAX_ENTANGLED_PAIRS: usize = 100;
+
 // Physical Constants
 pub const LIGHT_SPEED: f64 = 299_792_458.0;  // meters per second
 pub const PLANCK_LENGTH: f64 = 1.616255e-35; // meters

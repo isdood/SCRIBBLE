@@ -174,8 +174,8 @@ impl<T: 'static> MeshCell<T> {
         Ok(())
     }
 
-    pub fn connect_wormhole(&mut self, wormhole: ProtectedWormhole<T>) -> Result<(), WormholeError> {
-        if !self.is_quantum_stable() {
+    pub fn connect_wormhole<T>(&mut self, wormhole: ProtectedWormhole<T>) -> Result<(), WormholeError>
+    if !self.is_quantum_stable() {
             return Err(WormholeError::QuantumStateCompromised);
         }
 
