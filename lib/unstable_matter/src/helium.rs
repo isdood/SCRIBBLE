@@ -1,5 +1,5 @@
 /// Quantum Helium Module
-/// Last Updated: 2025-01-15 04:31:39 UTC
+/// Last Updated: 2025-01-15 05:08:39 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -18,6 +18,19 @@ pub enum HeliumOrdering {
     AcqRel,
     SeqCst,
     Quantum,
+}
+
+impl From<HeliumOrdering> for Ordering {
+    fn from(order: HeliumOrdering) -> Self {
+        match order {
+            HeliumOrdering::Relaxed => Ordering::Relaxed,
+            HeliumOrdering::Acquire => Ordering::Acquire,
+            HeliumOrdering::Release => Ordering::Release,
+            HeliumOrdering::AcqRel => Ordering::AcqRel,
+            HeliumOrdering::SeqCst => Ordering::SeqCst,
+            HeliumOrdering::Quantum => Ordering::SeqCst,
+        }
+    }
 }
 
 /// Core quantum-safe memory type
@@ -50,6 +63,15 @@ impl<T: 'static> Helium<T> {
         unsafe {
             drop(Box::from_raw(old_ptr));
         }
+        self.timestamp.store(CURRENT_TIMESTAMP, Ordering::Release);
+    }
+
+    pub fn quantum_load(&self) -> T where T: Copy {
+        self.load()
+    }
+
+    pub fn quantum_store(&self, value: T) {
+        self.store(value)
     }
 
     pub fn get_coherence(&self) -> f64 {
@@ -62,6 +84,14 @@ impl<T: 'static> Helium<T> {
 
     pub fn is_quantum_stable(&self) -> bool {
         self.get_coherence() > QUANTUM_STABILITY_THRESHOLD
+    }
+}
+
+impl<T: 'static> Drop for Helium<T> {
+    fn drop(&mut self) {
+        unsafe {
+            drop(Box::from_raw(self.value.load(Ordering::Acquire)));
+        }
     }
 }
 
@@ -100,21 +130,21 @@ pub struct HeliumSize {
 }
 
 impl HeliumSize {
-    fn new(value: usize) -> Self {
+    pub fn new(value: usize) -> Self {
         Self {
             value: Helium::new(value),
             coherence: QuantumCell::new(1.0),
         }
     }
 
-    fn quantum_load(&self) -> Result<usize, &'static str> {
+    pub fn quantum_load(&self) -> Result<usize, &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
         Ok(self.value.load())
     }
 
-    fn quantum_store(&self, value: usize) -> Result<(), &'static str> {
+    pub fn quantum_store(&self, value: usize) -> Result<(), &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
@@ -122,7 +152,7 @@ impl HeliumSize {
         Ok(())
     }
 
-    fn fetch_add(&self, value: usize, _order: &HeliumOrdering) -> Result<usize, &'static str> {
+    pub fn fetch_add(&self, value: usize, order: &HeliumOrdering) -> Result<usize, &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
@@ -131,7 +161,7 @@ impl HeliumSize {
         Ok(current)
     }
 
-    fn fetch_sub(&self, value: usize, _order: &HeliumOrdering) -> Result<usize, &'static str> {
+    pub fn fetch_sub(&self, value: usize, order: &HeliumOrdering) -> Result<usize, &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
@@ -170,6 +200,7 @@ impl Scribe for HeliumSize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
 
     #[test]
     fn test_helium_creation() {
@@ -194,9 +225,41 @@ mod tests {
     }
 
     #[test]
+    fn test_helium_thread_safety() {
+        let h = Helium::new(0);
+        let h = std::sync::Arc::new(h);
+        let mut handles = vec![];
+
+        for _ in 0..10 {
+            let h = h.clone();
+            handles.push(thread::spawn(move || {
+                for _ in 0..1000 {
+                    let current = h.load();
+                    h.store(current + 1);
+                }
+            }));
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        assert_eq!(h.load(), 10000);
+    }
+
+    #[test]
     fn test_helium_size() {
         let hs = HeliumSize::new(42);
         assert!(hs.quantum_load().is_ok());
         assert!(hs.quantum_store(84).is_ok());
+    }
+
+    #[test]
+    fn test_helium_size_arithmetic() {
+        let hs = HeliumSize::new(42);
+        assert_eq!(hs.fetch_add(10, &HeliumOrdering::Quantum).unwrap(), 42);
+        assert_eq!(hs.quantum_load().unwrap(), 52);
+        assert_eq!(hs.fetch_sub(20, &HeliumOrdering::Quantum).unwrap(), 52);
+        assert_eq!(hs.quantum_load().unwrap(), 32);
     }
 }
