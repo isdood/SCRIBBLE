@@ -17,6 +17,8 @@ pub mod zeronaut;
 pub mod scribe;
 pub mod unstable;
 
+use crate::mesh::MeshDimensions;
+
 // Re-exports
 pub use constants::*;
 pub use glitch::WormholeGlitch;  // Changed from WormholeError to WormholeGlitch
@@ -38,7 +40,7 @@ pub struct SpaceTimeMemory<T> {
     ufo: UFO<T>,
     dimensions: MeshDimensions,
     timestamp: Helium<usize>,
-    quantum_descriptor: UnstableDescriptor, // Added 3D quantum descriptor
+    quantum_descriptor: UnstableDescriptor,
 }
 
 impl<T: Copy> SpaceTimeMemory<T> {

@@ -198,14 +198,6 @@ impl Horizon {
             stability: 1.0,
         }
     }
-
-    pub fn radius(&self) -> f64 {
-        self.radius
-    }
-
-    pub fn is_stable(&self) -> bool {
-        self.stability > QUANTUM_STABILITY_THRESHOLD
-    }
 }
 
 #[cfg(test)]

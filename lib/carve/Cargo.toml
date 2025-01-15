@@ -1,0 +1,16 @@
+[package]
+name = "carve"
+version = "0.1.0"
+edition = "2021"
+authors = ["Caleb J.D. Terkovics"]
+description = "Translation layer for the Scribble kernel"
+
+[dependencies]
+unstable_matter = { path = "../unstable_matter" }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "translation_benchmarks"
+harness = false

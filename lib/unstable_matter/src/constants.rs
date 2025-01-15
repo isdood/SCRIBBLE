@@ -1,5 +1,5 @@
 /// Quantum System Constants
-/// Last Updated: 2025-01-15 01:23:11 UTC
+/// Last Updated: 2025-01-15 02:38:30 UTC
 /// Author: isdood
 /// Current User: isdood
 ///
@@ -15,49 +15,33 @@
 /// - Mesh Configuration: Space-time fabric parameters
 
 // System Timestamps
-pub const CURRENT_TIMESTAMP: usize = 1705279391; // 2025-01-15 01:23:11 UTC
+pub const CURRENT_TIMESTAMP: usize = 1705275510; // 2025-01-15 02:38:30 UTC
 pub const QUANTUM_TIMESTAMP: usize = CURRENT_TIMESTAMP;
 pub const MESH_TIMESTAMP: usize = CURRENT_TIMESTAMP;
 
-/// Constants for the Unstable Matter System
-/// Last Updated: 2025-01-15 01:39:34 UTC
-/// Current User: isdood
-
-// Quantum Constants
-pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
-pub const COHERENCE_DECAY_FACTOR: f64 = 0.99;
-pub const QUANTUM_FENCE_DECAY: f64 = 0.95;
-pub const GRAVITATIONAL_THRESHOLD: f64 = 9.81;
-pub const WORMHOLE_STABILITY_THRESHOLD: f64 = 0.95;
-
 // Physical Constants
-pub const PLANCK_LENGTH: f64 = 1.616255e-35;
-pub const LIGHT_SPEED: f64 = 299_792_458.0;
-pub const GRAVITATIONAL_CONSTANT: f64 = 6.67430e-11;
+pub const LIGHT_SPEED: f64 = 299_792_458.0;         // meters per second
+pub const PLANCK_LENGTH: f64 = 1.616255e-35;        // meters
+pub const GRAVITATIONAL_CONSTANT: f64 = 6.67430e-11; // m³ kg⁻¹ s⁻²
+pub const PLANCK_MASS: f64 = 2.176434e-8;          // kilograms
+pub const PLANCK_TIME: f64 = 5.391247e-44;         // seconds
+pub const REDUCED_PLANCK_CONSTANT: f64 = 1.054571817e-34; // J⋅s
+pub const BOLTZMANN_CONSTANT: f64 = 1.380649e-23;   // J/K
 pub const SCHWARZSCHILD_CONSTANT: f64 = 2.95325008e-36;
 pub const HAWKING_TEMPERATURE_CONSTANT: f64 = 1.227e23;
 
-// System Constants
-pub const MAX_QUANTUM_OPERATIONS: usize = 1000;
-pub const MAX_ENTANGLED_PAIRS: usize = 100;
-
-// Physical Constants
-pub const LIGHT_SPEED: f64 = 299_792_458.0;  // meters per second
-pub const PLANCK_LENGTH: f64 = 1.616255e-35; // meters
-pub const GRAVITATIONAL_CONSTANT: f64 = 6.67430e-11; // m³ kg⁻¹ s⁻²
-pub const PLANCK_MASS: f64 = 2.176434e-8;    // kilograms
-pub const PLANCK_TIME: f64 = 5.391247e-44;   // seconds
-pub const REDUCED_PLANCK_CONSTANT: f64 = 1.054571817e-34; // J⋅s
-pub const BOLTZMANN_CONSTANT: f64 = 1.380649e-23; // J/K
-
 // Quantum Thresholds
+pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
 pub const QUANTUM_THRESHOLD: f64 = 1e-10;
 pub const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
+pub const COHERENCE_DECAY_FACTOR: f64 = 0.99;
+pub const QUANTUM_FENCE_DECAY: f64 = 0.95;
 pub const ENTANGLEMENT_THRESHOLD: f64 = 0.85;
 pub const WORMHOLE_STABILITY_THRESHOLD: f64 = 0.95;
 pub const BLACK_HOLE_EVENT_HORIZON_COHERENCE: f64 = 0.99;
 pub const QUANTUM_TUNNELING_PROBABILITY: f64 = 0.01;
 pub const QUANTUM_DECOHERENCE_RATE: f64 = 0.001;
+pub const GRAVITATIONAL_THRESHOLD: f64 = 9.81;
 
 // Vector States
 pub const VECTOR_QUANTUM_STATE: usize = 1000;

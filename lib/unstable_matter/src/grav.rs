@@ -26,7 +26,7 @@ pub struct GravityFieldData {
 
 #[derive(Debug, Clone)]
 pub struct GravityField {
-    data: Horizon<GravityFieldData>,
+    data: Horizon,
 }
 
 impl GravityField {
@@ -69,7 +69,7 @@ impl GravityField {
 // Now create a reference type for use in Helium
 #[derive(Debug, Clone)]
 pub struct GravityFieldRef {
-    field: Horizon<GravityFieldData>,
+    field: Horizon,
 }
 
 impl From<GravityField> for GravityFieldRef {

@@ -37,6 +37,7 @@ pub struct BlackHole {
     affected_cells: QuantumCell<Vec<MeshCell>>,
     quantum_state: QuantumCell<BlackHoleState>,
     state: UnstableDescriptor,
+    affected_cells: QuantumCell<Vec<MeshCell<f64>>>,
 }
 
 impl BlackHole {
@@ -61,7 +62,7 @@ impl BlackHole {
         }
     }
 
-    pub fn affect_mesh_cell(&mut self, cell: MeshCell) -> Result<(), &'static str> {
+    pub fn affect_mesh_cell<T: 'static>(&mut self, cell: MeshCell<T>) -> Result<(), &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
@@ -102,7 +103,7 @@ impl BlackHole {
         Ok(())
     }
 
-    fn absorb_cell(&mut self, cell: &MeshCell) -> Result<(), &'static str> {
+    fn absorb_cell<T: 'static>(&mut self, cell: &MeshCell<T>) -> Result<(), &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }

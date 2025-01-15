@@ -4,15 +4,15 @@
 /// Current User: isdood
 
 use crate::{
-    constants::{CURRENT_TIMESTAMP, MESH_COHERENCE_THRESHOLD, GRAVITATIONAL_THRESHOLD},
-    grav::{GravityField, GravityFieldRef},
-    helium::{Helium, HeliumOrdering},
+    constants::*,
+    vector::Vector3D,
     phantom::QuantumCell,
-    ufo::UFO,
-    Vector3D,
-    wormhole::{ProtectedWormhole, WormholeError},
-    blackhole::BlackHole,
+    grav::GravityField,
+    helium::Helium,
+    wormhole::Wormhole,
+    glitch::WormholeGlitch,
     scribe::{Scribe, ScribePrecision, QuantumString},
+    blackhole::BlackHole,
 };
 
 #[derive(Debug, Clone)]
@@ -56,69 +56,35 @@ impl Scribe for MeshDimensions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum CellState {
     Free,
-    Absorbed,
-    WormholeConnected,
+    Entangled,
     QuantumUncertain,
+    WormholeConnected,
+    Absorbed,
 }
 
+#[derive(Debug)]
 pub struct MeshCell<T: 'static> {
-    state: QuantumCell<CellState>,
     position: QuantumCell<Vector3D<f64>>,
     mass: Helium<f64>,
+    state: QuantumCell<CellState>,
+    coherence: Helium<f64>,
     timestamp: Helium<usize>,
-    coherence: QuantumCell<f64>,
-    gravity_influence: QuantumCell<Vector3D<f64>>,
     wormhole_connection: Option<ProtectedWormhole<T>>,
-    _ufo: UFO<T>,
 }
 
-impl<T: 'static> MeshCell<T> {
+impl<T> MeshCell<T> {
     pub fn new(position: Vector3D<f64>) -> Self {
         Self {
-            state: QuantumCell::new(CellState::Free),
             position: QuantumCell::new(position),
             mass: Helium::new(1.0),
+            state: QuantumCell::new(CellState::Free),
+            coherence: Helium::new(1.0),
             timestamp: Helium::new(CURRENT_TIMESTAMP),
-            coherence: QuantumCell::new(1.0),
-            gravity_influence: QuantumCell::new(Vector3D::new(0.0, 0.0, 0.0)),
             wormhole_connection: None,
-            _ufo: UFO::new(),
         }
-    }
-
-    pub fn get_state(&self) -> CellState {
-        self.state.get().clone()
-    }
-
-    pub fn set_state(&self, new_state: CellState) {
-        self.state.set(new_state);
-        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
-        self.decay_coherence();
-    }
-
-    pub fn get_timestamp(&self) -> usize {
-        self.timestamp.quantum_load()
-    }
-
-    pub fn get_coherence(&self) -> f64 {
-        *self.coherence.get()
-    }
-
-    pub fn is_quantum_stable(&self) -> bool {
-        self.get_coherence() > MESH_COHERENCE_THRESHOLD
-    }
-
-    fn decay_coherence(&self) {
-        let current = *self.coherence.get();
-        self.coherence.set(current * 0.99);
-    }
-
-    pub fn reset_coherence(&self) {
-        self.coherence.set(1.0);
-        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 
     pub fn apply_force(&mut self, force: Vector3D<f64>) -> Result<(), &'static str> {
@@ -126,12 +92,9 @@ impl<T: 'static> MeshCell<T> {
             return Err("Cell quantum state unstable");
         }
 
-        let current_pos = self.position.get().clone();
-        self.position.set(current_pos + force.clone());
-
-        let current_influence = self.gravity_influence.get().clone();
-        self.gravity_influence.set(current_influence + force);
-
+        let position = self.position.get().clone();
+        let new_position = position + force;
+        self.position.set(new_position);
         self.decay_coherence();
         self.timestamp.quantum_store(CURRENT_TIMESTAMP);
         Ok(())
@@ -174,13 +137,13 @@ impl<T: 'static> MeshCell<T> {
         Ok(())
     }
 
-    pub fn connect_wormhole<T>(&mut self, wormhole: ProtectedWormhole<T>) -> Result<(), WormholeError>
-    if !self.is_quantum_stable() {
-            return Err(WormholeError::QuantumStateCompromised);
+    pub fn connect_wormhole(&mut self, wormhole: ProtectedWormhole<T>) -> Result<(), WormholeGlitch> {
+        if !self.is_quantum_stable() {
+            return Err(WormholeGlitch::QuantumStateCompromised);
         }
 
         if self.get_coherence() < WORMHOLE_STABILITY_THRESHOLD {
-            return Err(WormholeError::StabilityFailure);
+            return Err(WormholeGlitch::StabilityFailure);
         }
 
         self.wormhole_connection = Some(wormhole);
@@ -196,7 +159,26 @@ impl<T: 'static> MeshCell<T> {
     pub fn get_mass(&self) -> f64 {
         self.mass.quantum_load()
     }
+
+    pub fn get_state(&self) -> CellState {
+        self.state.get().clone()
+    }
+
+    pub fn get_coherence(&self) -> f64 {
+        self.coherence.quantum_load()
+    }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        self.get_coherence() > QUANTUM_STABILITY_THRESHOLD
+    }
+
+    fn decay_coherence(&self) {
+        let current = self.coherence.quantum_load();
+        let new_coherence = current * COHERENCE_DECAY_FACTOR;
+        self.coherence.quantum_store(new_coherence);
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
