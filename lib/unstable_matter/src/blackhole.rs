@@ -1,16 +1,14 @@
-/// Quantum Black Hole Implementation
-/// Last Updated: 2025-01-14 21:44:15 UTC
+/// Quantum Black Hole Module
+/// Last Updated: 2025-01-15 04:32:42 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
-    helium::{Helium, HeliumOrdering},
+    constants::*,  // This includes CURRENT_TIMESTAMP
+    helium::Helium,
     phantom::QuantumCell,
-    unstable::UnstableDescriptor,
-    zeronaut::Zeronaut,
-    Vector3D,
+    vector::Vector3D,
     mesh::MeshCell,
-    grav::GravityField,
 };
 
 const SCHWARZSCHILD_CONSTANT: f64 = 2.0 * 6.67430e-11; // 2G/c^2

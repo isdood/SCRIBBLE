@@ -1,5 +1,5 @@
-/// Quantum UFO Protection System
-/// Last Updated: 2025-01-15 02:47:12 UTC
+/// UFO Protection Module
+/// Last Updated: 2025-01-15 04:32:42 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -259,24 +259,6 @@ impl TrackedUFO {
         pos.x() >= self.origin.x() && pos.x() < self.boundary.x() &&
         pos.y() >= self.origin.y() && pos.y() < self.boundary.y() &&
         pos.z() >= self.origin.z() && pos.z() < self.boundary.z()
-    }
-}
-
-impl Protected for TrackedUFO {
-    fn protect(&self) -> Result<(), &'static str> {
-        self.base.protect()
-    }
-
-    fn unprotect(&self) -> Result<(), &'static str> {
-        self.base.unprotect()
-    }
-
-    fn get_coherence(&self) -> f64 {
-        self.base.get_coherence()
-    }
-
-    fn is_quantum_stable(&self) -> bool {
-        self.base.is_quantum_stable()
     }
 }
 

@@ -1,14 +1,13 @@
-/// Quantum Vector Implementation with Gravitational Awareness
-/// Last Updated: 2025-01-14 23:34:03 UTC
+/// Vector Space Module
+/// Last Updated: 2025-01-15 04:32:42 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use std::ops::{Add, Sub, Mul};
-
 use crate::{
     constants::*,
-    phantom::QuantumCell,
-    helium::{Helium, HeliumOrdering},
+    phantom::{Quantum, QuantumCell},
+    helium::Helium,
+    scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
 #[derive(Debug, Clone, Copy)]

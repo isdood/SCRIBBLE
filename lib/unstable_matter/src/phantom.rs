@@ -1,18 +1,17 @@
 /// Quantum PhantomSpace Module
-/// Last Updated: 2025-01-14 23:40:45 UTC
+/// Last Updated: 2025-01-15 04:40:27 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::cell::UnsafeCell;
 use crate::{
     vector::Vector3D,
     scribe::{Scribe, ScribePrecision, QuantumString},
+    helium::{Helium, HeliumOrdering}, // Updated import
 };
 
 use crate::constants::*;
 
-const CURRENT_TIMESTAMP: usize = 1705272045; // 2025-01-14 23:40:45 UTC
+const CURRENT_TIMESTAMP: usize = 1705287627; // 2025-01-15 04:40:27 UTC
 const COHERENCE_DECAY_FACTOR: f64 = 0.99;
 const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
 
@@ -57,22 +56,21 @@ impl<T: Scribe> Scribe for AtomicRef<T> {
 /// Quantum cell implementation
 pub struct QuantumCell<T> {
     value: AtomicRef<T>,
-    coherence: AtomicU64,
-    timestamp: AtomicUsize,
+    coherence: Helium<f64>, // Changed from AtomicU64
+    timestamp: Helium<usize>, // Changed from AtomicUsize
 }
 
 impl<T> QuantumCell<T> {
     pub fn new(value: T) -> Self {
         Self {
             value: AtomicRef::new(value),
-            coherence: AtomicU64::new(f64::to_bits(1.0)),
-            timestamp: AtomicUsize::new(CURRENT_TIMESTAMP),
+            coherence: Helium::new(1.0),
+            timestamp: Helium::new(CURRENT_TIMESTAMP),
         }
     }
 
     pub fn get_mut(&mut self) -> &mut T {
         self.decay_coherence();
-        // Safety: we have exclusive access through &mut self
         unsafe { &mut *self.value.inner.get() }
     }
 
@@ -95,18 +93,18 @@ impl<T> QuantumCell<T> {
     }
 
     fn decay_coherence(&self) {
-        let current = f64::from_bits(self.coherence.load(Ordering::Relaxed));
+        let current = self.coherence.quantum_load();
         let new_coherence = current * COHERENCE_DECAY_FACTOR;
-        self.coherence.store(f64::to_bits(new_coherence), Ordering::Relaxed);
-        self.timestamp.store(CURRENT_TIMESTAMP, Ordering::Relaxed);
+        self.coherence.quantum_store(new_coherence);
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 
     fn update_quantum_state(&self) {
-        self.timestamp.store(CURRENT_TIMESTAMP, Ordering::Relaxed);
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 
     pub fn get_coherence(&self) -> f64 {
-        f64::from_bits(self.coherence.load(Ordering::Relaxed))
+        self.coherence.quantum_load()
     }
 
     pub fn is_quantum_stable(&self) -> bool {
@@ -114,8 +112,8 @@ impl<T> QuantumCell<T> {
     }
 
     pub fn reset_coherence(&self) {
-        self.coherence.store(f64::to_bits(1.0), Ordering::Relaxed);
-        self.timestamp.store(CURRENT_TIMESTAMP, Ordering::Relaxed);
+        self.coherence.quantum_store(1.0);
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 }
 
@@ -133,7 +131,7 @@ impl<T: Scribe> Scribe for QuantumCell<T> {
 pub struct PhantomSpace {
     position: QuantumCell<Vector3D<f64>>,
     coherence: QuantumCell<f64>,
-    last_update: AtomicUsize,
+    last_update: Helium<usize>, // Changed from AtomicUsize
 }
 
 impl Default for PhantomSpace {
@@ -147,7 +145,7 @@ impl PhantomSpace {
         Self {
             position: QuantumCell::new(Vector3D::new(0.0, 0.0, 0.0)),
             coherence: QuantumCell::new(1.0),
-            last_update: AtomicUsize::new(CURRENT_TIMESTAMP),
+            last_update: Helium::new(CURRENT_TIMESTAMP),
         }
     }
 
@@ -172,12 +170,12 @@ impl Quantum for PhantomSpace {
 
     fn decay_coherence(&self) {
         self.coherence.decay_coherence();
-        self.last_update.store(CURRENT_TIMESTAMP, Ordering::Relaxed);
+        self.last_update.quantum_store(CURRENT_TIMESTAMP);
     }
 
     fn reset_coherence(&self) {
         self.coherence.reset_coherence();
-        self.last_update.store(CURRENT_TIMESTAMP, Ordering::Relaxed);
+        self.last_update.quantum_store(CURRENT_TIMESTAMP);
     }
 }
 
@@ -209,9 +207,10 @@ impl Horizon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
 
     #[test]
-    fn test_quantum_cell() {
+    fn test_quantum_cell_basic_operations() {
         let cell = QuantumCell::new(42);
         assert_eq!(*cell.get(), 42);
 
@@ -227,11 +226,44 @@ mod tests {
         let cell = QuantumCell::new(1.0f64);
         let initial = cell.get_coherence();
 
+        // Force multiple coherence decays
         for _ in 0..10 {
             let _ = cell.get();
         }
 
         assert!(cell.get_coherence() < initial);
+        assert!(cell.get_coherence() > QUANTUM_STABILITY_THRESHOLD);
+    }
+
+    #[test]
+    fn test_quantum_stability_threshold() {
+        let cell = QuantumCell::new(1.0f64);
+
+        // Force many operations to decay coherence
+        for _ in 0..100 {
+            let _ = cell.get();
+        }
+
+        // Should be below stability threshold after many operations
+        assert!(cell.get_coherence() < QUANTUM_STABILITY_THRESHOLD);
+        assert!(!cell.is_quantum_stable());
+    }
+
+    #[test]
+    fn test_coherence_reset() {
+        let cell = QuantumCell::new(1.0f64);
+
+        // Force decay
+        for _ in 0..10 {
+            let _ = cell.get();
+        }
+
+        let decayed_coherence = cell.get_coherence();
+        assert!(decayed_coherence < 1.0);
+
+        // Reset coherence
+        cell.reset_coherence();
+        assert_eq!(cell.get_coherence(), 1.0);
     }
 
     #[test]
@@ -242,6 +274,7 @@ mod tests {
         space.set_position(1.0, 2.0, 3.0);
         assert_eq!(*space.get_position(), Vector3D::new(1.0, 2.0, 3.0));
 
+        // Force coherence decay
         for _ in 0..100 {
             space.decay_coherence();
         }
@@ -250,7 +283,47 @@ mod tests {
     }
 
     #[test]
-    fn test_scribe() {
+    fn test_phantom_space_reset() {
+        let space = PhantomSpace::new();
+
+        // Decay coherence
+        for _ in 0..50 {
+            space.decay_coherence();
+        }
+
+        assert!(space.get_coherence() < 1.0);
+
+        // Reset coherence
+        space.reset_coherence();
+        assert!(space.is_quantum_stable());
+        assert_eq!(space.get_coherence(), 1.0);
+    }
+
+    #[test]
+    fn test_thread_safety() {
+        let cell = std::sync::Arc::new(QuantumCell::new(0));
+        let mut handles = vec![];
+
+        // Spawn multiple threads to test concurrent access
+        for _ in 0..10 {
+            let cell_clone = cell.clone();
+            handles.push(thread::spawn(move || {
+                for _ in 0..100 {
+                    let _ = cell_clone.get();
+                }
+            }));
+        }
+
+        // Wait for all threads to complete
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        assert!(cell.get_coherence() < 1.0);
+    }
+
+    #[test]
+    fn test_scribe_output() {
         let space = PhantomSpace::new();
         let mut output = QuantumString::new();
         space.scribe(ScribePrecision::Standard, &mut output);
@@ -269,5 +342,33 @@ mod tests {
             output.as_str(),
                    "Quantum(⟨1.000000, 2.000000, 3.000000⟩, coherence=1.000000)"
         );
+    }
+
+    #[test]
+    fn test_atomic_ref_operations() {
+        let aref = AtomicRef::new(42);
+        assert_eq!(*aref.get(), 42);
+
+        aref.set(84);
+        assert_eq!(*aref.get(), 84);
+    }
+
+    #[test]
+    fn test_timestamp_updates() {
+        let cell = QuantumCell::new(1.0f64);
+        let initial_timestamp = CURRENT_TIMESTAMP;
+
+        // Force a state update
+        cell.set(2.0);
+
+        // Verify timestamp was updated
+        assert_eq!(cell.timestamp.quantum_load(), initial_timestamp);
+    }
+
+    #[test]
+    fn test_horizon_creation() {
+        let horizon = Horizon::new(1.0);
+        assert_eq!(horizon.radius, 1.0);
+        assert_eq!(horizon.stability, 1.0);
     }
 }

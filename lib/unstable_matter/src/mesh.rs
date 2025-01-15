@@ -1,20 +1,18 @@
-/// Quantum Mesh Cell Implementation
-/// Last Updated: 2025-01-15 01:21:42 UTC
+/// Quantum Mesh Module
+/// Last Updated: 2025-01-15 04:32:42 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
     constants::*,
-    vector::Vector3D,
-    phantom::QuantumCell,
-    grav::GravityField,
-    helium::Helium,
-    wormhole::Wormhole,
     glitch::WormholeGlitch,
-    scribe::{Scribe, ScribePrecision, QuantumString},
-    blackhole::BlackHole,
+    helium::Helium,
+    phantom::{PhantomSpace, Quantum, QuantumCell},
+    vector::Vector3D,
     wormhole::Wormhole,
+    scribe::{Scribe, ScribePrecision, QuantumString},
 };
+
 
 #[derive(Debug, Clone)]
 pub struct MeshDimensions {
@@ -66,13 +64,14 @@ pub enum CellState {
     Absorbed,
 }
 
-pub struct MeshCell<T: 'static> {
+#[derive(Debug, Clone)]
+pub struct MeshCell {
     position: QuantumCell<Vector3D<f64>>,
     mass: Helium<f64>,
     state: QuantumCell<CellState>,
     coherence: Helium<f64>,
     timestamp: Helium<usize>,
-    wormhole_connection: Option<Wormhole>,  // Changed from ProtectedWormhole to Wormhole
+    wormhole_connection: Option<Wormhole>,
 }
 
 impl<T> MeshCell<T> {
