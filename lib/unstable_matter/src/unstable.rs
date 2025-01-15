@@ -1,5 +1,5 @@
 /// Quantum State Descriptor for 3D Space
-/// Last Updated: 2025-01-15 01:28:17 UTC
+/// Last Updated: 2025-01-15 21:59:40 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -71,32 +71,32 @@ impl UnstableDescriptor {
 
     /// Update momentum with quantum effects
     pub fn apply_momentum(&self, force: Vector3D<f64>) {
-        let current = *self.momentum.get();
+        let current = self.momentum.get().clone();
         self.momentum.set(current + force);
         self.increase_uncertainty();
     }
 
     /// Get current quantum phase
     pub fn phase(&self) -> f64 {
-        *self.phase.get()
+        self.phase.get()
     }
 
     /// Rotate quantum phase
     pub fn rotate_phase(&self, angle: f64) {
-        let current = *self.phase.get();
+        let current = self.phase.get();
         self.phase.set(current + angle);
         self.decay_coherence();
     }
 
     /// Get current coherence value
     pub fn coherence(&self) -> f64 {
-        *self.coherence.get()
+        self.coherence.get()
     }
 
     /// Check if quantum state is stable
     pub fn is_stable(&self) -> bool {
         self.coherence() > QUANTUM_STABILITY_THRESHOLD &&
-        *self.state.get() == QuantumState::Stable
+        self.state.get() == QuantumState::Stable
     }
 
     /// Get current uncertainty vector
@@ -106,14 +106,14 @@ impl UnstableDescriptor {
 
     /// Increase spatial uncertainty
     fn increase_uncertainty(&self) {
-        let current = *self.uncertainty.get();
+        let current = self.uncertainty.get().clone();
         let factor = 1.0 + (1.0 - self.coherence());
         self.uncertainty.set(current * factor);
     }
 
     /// Decay quantum coherence
     fn decay_coherence(&self) {
-        let current = *self.coherence.get();
+        let current = self.coherence.get();
         let new_coherence = current * COHERENCE_DECAY_FACTOR;
         self.coherence.set(new_coherence);
 
@@ -128,7 +128,7 @@ impl UnstableDescriptor {
         self.state.set(new_state);
     }
 
-    /// Reset quantum state
+    /// Reset quantum state to initial conditions
     pub fn reset(&mut self) {
         self.position.set(Vector3D::new(0.0, 0.0, 0.0));
         self.momentum.set(Vector3D::new(0.0, 0.0, 0.0));
@@ -136,6 +136,11 @@ impl UnstableDescriptor {
         self.coherence.set(1.0);
         self.state.set(QuantumState::Stable);
         self.uncertainty.set(Vector3D::new(PLANCK_LENGTH, PLANCK_LENGTH, PLANCK_LENGTH));
+    }
+
+    /// Get current state type
+    pub fn get_state(&self) -> QuantumState {
+        self.state.get()
     }
 }
 
@@ -149,6 +154,13 @@ impl Scribe for UnstableDescriptor {
         output.push_f64(self.phase(), precision.decimal_places());
         output.push_str(", c=");
         output.push_f64(self.coherence(), 6);
+        output.push_str(", s=");
+        match self.get_state() {
+            QuantumState::Stable => output.push_str("stable"),
+            QuantumState::Entangled => output.push_str("entangled"),
+            QuantumState::Decoherent => output.push_str("decoherent"),
+            QuantumState::Superposed => output.push_str("superposed"),
+        }
         output.push_str(", Δx=");
         self.uncertainty.get().scribe(precision, output);
         output.push_char(']');
@@ -164,6 +176,7 @@ mod tests {
         let desc = UnstableDescriptor::new();
         assert!(desc.is_stable());
         assert_eq!(desc.coherence(), 1.0);
+        assert_eq!(desc.get_state(), QuantumState::Stable);
     }
 
     #[test]
@@ -186,7 +199,7 @@ mod tests {
     #[test]
     fn test_uncertainty_growth() {
         let desc = UnstableDescriptor::new();
-        let initial = *desc.uncertainty();
+        let initial = desc.uncertainty().clone();
 
         // Force multiple updates
         for _ in 0..10 {
@@ -197,10 +210,24 @@ mod tests {
     }
 
     #[test]
+    fn test_state_transitions() {
+        let desc = UnstableDescriptor::new();
+        assert_eq!(desc.get_state(), QuantumState::Stable);
+
+        // Force state changes through multiple position updates
+        for _ in 0..20 {
+            desc.set_position(Vector3D::new(1.0, 1.0, 1.0));
+        }
+
+        assert_ne!(desc.get_state(), QuantumState::Stable);
+    }
+
+    #[test]
     fn test_quantum_scribing() {
         let desc = UnstableDescriptor::new();
         let mut output = QuantumString::new();
         desc.scribe(ScribePrecision::Standard, &mut output);
         assert!(output.as_str().starts_with("Quantum[pos="));
+        assert!(output.as_str().contains("s=stable"));
     }
 }

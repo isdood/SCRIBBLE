@@ -1,83 +1,120 @@
-// src/service.rs
-use tokio::net::UnixListener;
 use std::path::Path;
-use crate::brain::WandaBrain;
-use crate::types::{WandaMessage, WandaResponse, ResponseStatus};
+use tokio::net::{UnixListener, UnixStream};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use serde_json;
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use crate::types::{WandaMessage, WandaResponse};
 
 pub struct WandaService {
-    brain: WandaBrain,
-    socket_path: PathBuf,
+    config: crate::WandaConfig,
+    listener: Option<UnixListener>,
 }
 
 impl WandaService {
-    pub async fn new(config: WandaConfig) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(config: crate::WandaConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        // Remove existing socket file if it exists
+        if Path::new(&config.socket_path).exists() {
+            fs::remove_file(&config.socket_path)?;
+        }
+
+        // Ensure parent directory exists
+        if let Some(parent) = config.socket_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        // Create and bind the listener
+        let listener = UnixListener::bind(&config.socket_path)?;
+        println!("Listening on {:?}", config.socket_path);
+
+        // Set socket permissions to be readable/writable by user
+        let perms = fs::Permissions::from_mode(0o666);
+        fs::set_permissions(&config.socket_path, perms)?;
+
         Ok(Self {
-            brain: WandaBrain::new(),
-           socket_path: config.socket_path,
+            config,
+            listener: Some(listener),
         })
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if Path::new(&self.socket_path).exists() {
-            std::fs::remove_file(&self.socket_path)?;
-        }
+        let listener = self.listener.take().unwrap();
 
-        let listener = UnixListener::bind(&self.socket_path)?;
-
-        while let Ok((mut stream, _)) = listener.accept().await {
-            let mut buffer = Vec::new();
-            stream.read_to_end(&mut buffer).await?;
-
-            let message: WandaMessage = serde_json::from_slice(&buffer)?;
-            let response = self.handle_message(message).await?;
-
-            let response_json = serde_json::to_vec(&response)?;
-            stream.write_all(&response_json).await?;
-        }
-
-        Ok(())
-    }
-
-    async fn handle_message(&mut self, message: WandaMessage) -> Result<WandaResponse, Box<dyn std::error::Error>> {
-        match message {
-            WandaMessage::Analyze { path } => {
-                let suggestions = self.brain.analyze_code(&std::fs::read_to_string(path)?)?;
-                Ok(WandaResponse {
-                    status: ResponseStatus::Success,
-                    message: "Analysis complete".to_string(),
-                   suggestions,
-                })
-            },
-            WandaMessage::Suggest { context } => {
-                let suggestions = self.brain.analyze_code(&context)?;
-                Ok(WandaResponse {
-                    status: ResponseStatus::Success,
-                    message: "Suggestions generated".to_string(),
-                   suggestions,
-                })
-            },
-            WandaMessage::Status => {
-                Ok(WandaResponse {
-                    status: ResponseStatus::Success,
-                    message: format!("Quantum coherence: {:.2}", self.brain.get_coherence()),
-                   suggestions: vec![],
-                })
-            },
-            WandaMessage::Configure { config } => {
-                // Apply configuration changes
-                self.reconfigure(config).await?;
-                Ok(WandaResponse {
-                    status: ResponseStatus::Success,
-                    message: "Configuration updated".to_string(),
-                   suggestions: vec![],
-                })
+        loop {
+            match listener.accept().await {
+                Ok((mut stream, _addr)) => {
+                    println!("Client connected");
+                    if let Err(e) = self.handle_client(&mut stream).await {
+                        eprintln!("Error handling client: {}", e);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Accept error: {}", e);
+                }
             }
         }
     }
 
-    async fn reconfigure(&mut self, config: WandaConfig) -> Result<(), Box<dyn std::error::Error>> {
-        // Update service configuration
-        self.socket_path = config.socket_path;
+    async fn handle_client(&self, stream: &mut UnixStream) -> Result<(), Box<dyn std::error::Error>> {
+        // Use a buffer with a reasonable size limit
+        let mut buffer = Vec::with_capacity(1024);
+        let mut temp_buf = [0u8; 1024];
+
+        // Read until we get a complete message or hit EOF
+        loop {
+            match stream.read(&mut temp_buf).await {
+                Ok(0) => break, // EOF
+                Ok(n) => {
+                    buffer.extend_from_slice(&temp_buf[..n]);
+                    if buffer.len() > 1024 * 1024 { // 1MB limit
+                        return Err("Message too large".into());
+                    }
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+
+        if buffer.is_empty() {
+            return Ok(());
+        }
+
+        let message: WandaMessage = match serde_json::from_slice(&buffer) {
+            Ok(msg) => msg,
+            Err(e) => {
+                let error_response = WandaResponse::error(format!("Invalid message format: {}", e));
+                stream.write_all(&serde_json::to_vec(&error_response)?).await?;
+                stream.flush().await?;
+                return Ok(());
+            }
+        };
+
+        let response = match message {
+            WandaMessage::Status => {
+                WandaResponse::status(
+                    env!("CARGO_PKG_VERSION").to_string(),
+                                      std::time::SystemTime::now()
+                                      .duration_since(std::time::UNIX_EPOCH)
+                                      .unwrap_or_default()
+                                      .as_secs()
+                )
+            }
+            WandaMessage::Configure { config } => {
+                println!("Received new configuration for watch dir: {:?}", config.watch_dir);
+                WandaResponse::status(
+                    env!("CARGO_PKG_VERSION").to_string(),
+                                      std::time::SystemTime::now()
+                                      .duration_since(std::time::UNIX_EPOCH)
+                                      .unwrap_or_default()
+                                      .as_secs()
+                )
+            }
+            _ => WandaResponse::error("Unsupported operation".to_string())
+        };
+
+        // Send response and ensure it's flushed
+        stream.write_all(&serde_json::to_vec(&response)?).await?;
+        stream.flush().await?;
+
         Ok(())
     }
 }

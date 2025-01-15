@@ -8,9 +8,31 @@ use crate::{
     vector::Vector3D,
     phantom::QuantumCell,
     helium::Helium,
-    mesh::MeshCell,
     glitch::WormholeGlitch,
+    scribe::{Scribe, ScribePrecision, QuantumString},
 };
+
+#[derive(Debug, Clone)]
+pub struct WormholeError {
+    pub message: String,
+    pub glitch: Option<WormholeGlitch>,
+}
+
+impl WormholeError {
+    pub fn new(message: &str) -> Self {
+        Self {
+            message: message.to_string(),
+            glitch: None,
+        }
+    }
+
+    pub fn with_glitch(message: &str, glitch: WormholeGlitch) -> Self {
+        Self {
+            message: message.to_string(),
+            glitch: Some(glitch),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WormholeState {
@@ -21,7 +43,7 @@ pub enum WormholeState {
     Entangled,
 }
 
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct Wormhole {
     entrance: QuantumCell<Vector3D<f64>>,
     exit: QuantumCell<Vector3D<f64>>,

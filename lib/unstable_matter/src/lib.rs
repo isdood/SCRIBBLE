@@ -18,6 +18,8 @@ pub mod zeronaut;
 pub mod horizon;
 pub mod phantom;
 pub mod grav;
+pub mod helium;
+pub mod glitch;
 
 // Constants
 pub mod constants;
@@ -35,7 +37,9 @@ pub use zeronaut::Zeronaut;
 pub use horizon::Horizon;
 pub use phantom::{PhantomSpace, QuantumCell};
 pub use grav::{GravityField, GravityFieldRef};
+pub use helium::{Helium, HeliumOrdering};
 pub use constants::*;
+pub use glitch::WormholeGlitch;
 
 impl UnstableDescriptor {
     pub fn get_position(&self) -> Vector3D<f64> {
