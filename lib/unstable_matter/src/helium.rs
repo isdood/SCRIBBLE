@@ -1,98 +1,86 @@
 /// Quantum Vector Module
-/// Last Updated: 2025-01-15 05:17:55 UTC
+/// Last Updated: 2025-01-15 05:29:18 UTC
 /// Author: isdood
 /// Current User: isdood
 
+use std::ops::{Add, Sub, Mul};
 use crate::{
     quantum::Quantum,
-    helium::Helium,
     scribe::{Scribe, ScribePrecision, QuantumString},
+    constants::QUANTUM_STABILITY_THRESHOLD,
 };
-use std::ops::{Add, Sub, Mul};
 
-#[derive(Debug)]
-pub struct Vector3D<T: 'static> {
-    x: Helium<T>,
-    y: Helium<T>,
-    z: Helium<T>,
+#[derive(Debug, Clone, PartialEq)]
+pub struct Vector3D<T> {
+    x: T,
+    y: T,
+    z: T,
+    coherence: f64,
 }
 
-#[derive(Debug)]
-pub struct Vector4D<T: 'static> {
-    x: Helium<T>,
-    y: Helium<T>,
-    z: Helium<T>,
-    w: Helium<T>,
+#[derive(Debug, Clone, PartialEq)]
+pub struct Vector4D<T> {
+    x: T,
+    y: T,
+    z: T,
+    w: T,
+    coherence: f64,
 }
 
-impl<T: 'static> Vector3D<T> {
+impl<T> Vector3D<T> {
     pub fn new(x: T, y: T, z: T) -> Self {
         Self {
-            x: Helium::new(x),
-            y: Helium::new(y),
-            z: Helium::new(z),
+            x,
+            y,
+            z,
+            coherence: 1.0,
         }
     }
 
-    pub fn x(&self) -> T where T: Copy { self.x.quantum_load() }
-    pub fn y(&self) -> T where T: Copy { self.y.quantum_load() }
-    pub fn z(&self) -> T where T: Copy { self.z.quantum_load() }
+    pub fn x(&self) -> &T { &self.x }
+    pub fn y(&self) -> &T { &self.y }
+    pub fn z(&self) -> &T { &self.z }
 }
 
-impl<T: Add<Output = T> + Copy + 'static> Add for Vector3D<T> {
+impl<T: Add<Output = T> + Clone> Add for Vector3D<T> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
         Self::new(
-            self.x() + rhs.x(),
-                  self.y() + rhs.y(),
-                  self.z() + rhs.z(),
+            self.x + rhs.x,
+            self.y + rhs.y,
+            self.z + rhs.z,
         )
     }
 }
 
-impl<T: Sub<Output = T> + Copy + 'static> Sub for Vector3D<T> {
+impl<T: Sub<Output = T> + Clone> Sub for Vector3D<T> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self::new(
-            self.x() - rhs.x(),
-                  self.y() - rhs.y(),
-                  self.z() - rhs.z(),
+            self.x - rhs.x,
+            self.y - rhs.y,
+            self.z - rhs.z,
         )
     }
 }
 
-impl<T: Mul<f64, Output = T> + Copy + 'static> Mul<f64> for Vector3D<T> {
+impl<T: Mul<f64, Output = T> + Clone> Mul<f64> for Vector3D<T> {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
         Self::new(
-            self.x() * rhs,
-                  self.y() * rhs,
-                  self.z() * rhs,
+            self.x * rhs,
+            self.y * rhs,
+            self.z * rhs,
         )
-    }
-}
-
-impl<T: Scribe + Copy + 'static> Scribe for Vector3D<T> {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("⟨");
-        output.push_f64(self.x().into(), precision.decimal_places());
-        output.push_str(", ");
-        output.push_f64(self.y().into(), precision.decimal_places());
-        output.push_str(", ");
-        output.push_f64(self.z().into(), precision.decimal_places());
-        output.push_str("⟩");
     }
 }
 
 impl Vector3D<f64> {
     pub fn magnitude(&self) -> f64 {
-        let x = self.x();
-        let y = self.y();
-        let z = self.z();
-        (x * x + y * y + z * z).sqrt()
+        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
 
     pub fn normalize(&self) -> Self {
@@ -103,64 +91,94 @@ impl Vector3D<f64> {
             self.clone()
         }
     }
+
+    pub fn dot(&self, other: &Self) -> f64 {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
+
+    pub fn cross(&self, other: &Self) -> Self {
+        Self::new(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x,
+        )
+    }
+
+    pub fn quantum_distance(&self, other: &Self) -> f64 {
+        let diff = self.clone() - other.clone();
+        diff.magnitude() * (self.coherence.min(other.coherence))
+    }
 }
 
-impl<T: 'static> Vector4D<T> {
+impl<T> Vector4D<T> {
     pub fn new(x: T, y: T, z: T, w: T) -> Self {
         Self {
-            x: Helium::new(x),
-            y: Helium::new(y),
-            z: Helium::new(z),
-            w: Helium::new(w),
+            x,
+            y,
+            z,
+            w,
+            coherence: 1.0,
         }
     }
 
-    pub fn x(&self) -> T where T: Copy { self.x.quantum_load() }
-    pub fn y(&self) -> T where T: Copy { self.y.quantum_load() }
-    pub fn z(&self) -> T where T: Copy { self.z.quantum_load() }
-    pub fn w(&self) -> T where T: Copy { self.w.quantum_load() }
+    pub fn x(&self) -> &T { &self.x }
+    pub fn y(&self) -> &T { &self.y }
+    pub fn z(&self) -> &T { &self.z }
+    pub fn w(&self) -> &T { &self.w }
 }
 
-impl<T: Add<Output = T> + Copy + 'static> Add for Vector4D<T> {
+impl<T: Add<Output = T> + Clone> Add for Vector4D<T> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
         Self::new(
-            self.x() + rhs.x(),
-                  self.y() + rhs.y(),
-                  self.z() + rhs.z(),
-                  self.w() + rhs.w(),
+            self.x + rhs.x,
+            self.y + rhs.y,
+            self.z + rhs.z,
+            self.w + rhs.w,
         )
     }
 }
 
-impl<T: Sub<Output = T> + Copy + 'static> Sub for Vector4D<T> {
+impl<T: Sub<Output = T> + Clone> Sub for Vector4D<T> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self::new(
-            self.x() - rhs.x(),
-                  self.y() - rhs.y(),
-                  self.z() - rhs.z(),
-                  self.w() - rhs.w(),
+            self.x - rhs.x,
+            self.y - rhs.y,
+            self.z - rhs.z,
+            self.w - rhs.w,
         )
     }
 }
 
-impl<T: Mul<Output = T> + Copy + 'static> Mul<T> for Vector4D<T> {
+impl<T: Mul<Output = T> + Clone> Mul<T> for Vector4D<T> {
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self::Output {
         Self::new(
-            self.x() * rhs,
-                  self.y() * rhs,
-                  self.z() * rhs,
-                  self.w() * rhs,
+            self.x * rhs.clone(),
+                  self.y * rhs.clone(),
+                  self.z * rhs.clone(),
+                  self.w * rhs,
         )
     }
 }
 
-impl<T: Scribe + Copy + 'static> Scribe for Vector4D<T> {
+impl<T: Scribe> Scribe for Vector3D<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("⟨");
+        self.x.scribe(precision, output);
+        output.push_str(", ");
+        self.y.scribe(precision, output);
+        output.push_str(", ");
+        self.z.scribe(precision, output);
+        output.push_str("⟩");
+    }
+}
+
+impl<T: Scribe> Scribe for Vector4D<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("⟨");
         self.x.scribe(precision, output);
@@ -174,45 +192,53 @@ impl<T: Scribe + Copy + 'static> Scribe for Vector4D<T> {
     }
 }
 
-impl<T: Scribe + Copy + 'static> Quantum for Vector4D<T> {
+impl<T> Quantum for Vector3D<T> {
     fn get_coherence(&self) -> f64 {
-        (self.x.get_coherence() +
-        self.y.get_coherence() +
-        self.z.get_coherence() +
-        self.w.get_coherence()) / 4.0
+        self.coherence
     }
 
     fn is_quantum_stable(&self) -> bool {
-        self.x.is_quantum_stable() &&
-        self.y.is_quantum_stable() &&
-        self.z.is_quantum_stable() &&
-        self.w.is_quantum_stable()
+        self.coherence > QUANTUM_STABILITY_THRESHOLD
     }
 
     fn decay_coherence(&self) {
-        self.x.decay_coherence();
-        self.y.decay_coherence();
-        self.z.decay_coherence();
-        self.w.decay_coherence();
+        // Note: In a fully immutable implementation, this would return a new vector
+        // For this example, we'll use interior mutability
+        unsafe {
+            let coherence_ptr = &self.coherence as *const f64 as *mut f64;
+            *coherence_ptr *= 0.9;
+        }
     }
 
     fn reset_coherence(&self) {
-        self.x.reset_coherence();
-        self.y.reset_coherence();
-        self.z.reset_coherence();
-        self.w.reset_coherence();
+        unsafe {
+            let coherence_ptr = &self.coherence as *const f64 as *mut f64;
+            *coherence_ptr = 1.0;
+        }
     }
 }
 
-impl<T: Copy + 'static> Clone for Vector3D<T> {
-    fn clone(&self) -> Self {
-        Self::new(self.x(), self.y(), self.z())
+impl<T> Quantum for Vector4D<T> {
+    fn get_coherence(&self) -> f64 {
+        self.coherence
     }
-}
 
-impl<T: Copy + 'static> Clone for Vector4D<T> {
-    fn clone(&self) -> Self {
-        Self::new(self.x(), self.y(), self.z(), self.w())
+    fn is_quantum_stable(&self) -> bool {
+        self.coherence > QUANTUM_STABILITY_THRESHOLD
+    }
+
+    fn decay_coherence(&self) {
+        unsafe {
+            let coherence_ptr = &self.coherence as *const f64 as *mut f64;
+            *coherence_ptr *= 0.9;
+        }
+    }
+
+    fn reset_coherence(&self) {
+        unsafe {
+            let coherence_ptr = &self.coherence as *const f64 as *mut f64;
+            *coherence_ptr = 1.0;
+        }
     }
 }
 
@@ -224,9 +250,9 @@ mod tests {
     #[test]
     fn test_vector3d_creation() {
         let v = Vector3D::new(1.0, 2.0, 3.0);
-        assert!((v.x() - 1.0).abs() < EPSILON);
-        assert!((v.y() - 2.0).abs() < EPSILON);
-        assert!((v.z() - 3.0).abs() < EPSILON);
+        assert_eq!(*v.x(), 1.0);
+        assert_eq!(*v.y(), 2.0);
+        assert_eq!(*v.z(), 3.0);
     }
 
     #[test]
@@ -236,13 +262,13 @@ mod tests {
         let sum = v1.clone() + v2.clone();
         let diff = v2 - v1;
 
-        assert!((sum.x() - 5.0).abs() < EPSILON);
-        assert!((sum.y() - 7.0).abs() < EPSILON);
-        assert!((sum.z() - 9.0).abs() < EPSILON);
+        assert_eq!(*sum.x(), 5.0);
+        assert_eq!(*sum.y(), 7.0);
+        assert_eq!(*sum.z(), 9.0);
 
-        assert!((diff.x() - 3.0).abs() < EPSILON);
-        assert!((diff.y() - 3.0).abs() < EPSILON);
-        assert!((diff.z() - 3.0).abs() < EPSILON);
+        assert_eq!(*diff.x(), 3.0);
+        assert_eq!(*diff.y(), 3.0);
+        assert_eq!(*diff.z(), 3.0);
     }
 
     #[test]
@@ -259,10 +285,19 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_stability() {
-        let v = Vector4D::new(1.0, 2.0, 3.0, 4.0);
+    fn test_quantum_operations() {
+        let v = Vector3D::new(1.0, 2.0, 3.0);
         assert!(v.is_quantum_stable());
         v.decay_coherence();
         assert!(v.get_coherence() < 1.0);
+        v.reset_coherence();
+        assert_eq!(v.get_coherence(), 1.0);
+    }
+
+    #[test]
+    fn test_quantum_distance() {
+        let v1 = Vector3D::new(0.0, 0.0, 0.0);
+        let v2 = Vector3D::new(3.0, 4.0, 0.0);
+        assert_eq!(v1.quantum_distance(&v2), 5.0);
     }
 }

@@ -1,13 +1,12 @@
 /// UFO Protection Module
-/// Last Updated: 2025-01-15 04:32:42 UTC
+/// Last Updated: 2025-01-15 05:35:07 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use crate::quantum::Quantum;
 use crate::{
     constants::*,
-    helium::Helium,
-    phantom::{PhantomSpace, QuantumCell, Quantum},
+    quantum::Quantum,
+    phantom::{PhantomSpace, QuantumCell},
     vector::Vector3D,
     unstable::UnstableDescriptor,
     scribe::{Scribe, ScribePrecision, QuantumString},
@@ -23,11 +22,9 @@ pub enum UFOState {
 }
 
 /// UFO Protection trait with quantum awareness
-pub trait Protected {
+pub trait Protected: Quantum {
     fn protect(&self) -> Result<(), &'static str>;
     fn unprotect(&self) -> Result<(), &'static str>;
-    fn get_coherence(&self) -> f64;
-    fn is_quantum_stable(&self) -> bool;
 }
 
 /// Quantum memory trace for UFO tracking
@@ -45,12 +42,8 @@ impl MemoryTrace {
         }
     }
 
-    pub fn is_quantum_stable(&self) -> bool {
-        self.phantom_space.is_quantum_stable()
-    }
-
     pub fn get_owner(&self) -> &'static str {
-        *self.owner.get()
+        self.owner.get()
     }
 }
 
@@ -82,13 +75,13 @@ impl Scribe for MemoryTrace {
     }
 }
 
-/// Quantum UFO Protection system
+/// Base UFO structure with quantum mechanics
 #[derive(Debug)]
 pub struct UFO {
     phantom_space: PhantomSpace,
     trace: MemoryTrace,
     state: QuantumCell<UFOState>,
-    warp_factor: Helium<f64>,
+    warp_factor: QuantumCell<f64>,
     quantum_descriptor: UnstableDescriptor,
 }
 
@@ -98,7 +91,7 @@ impl UFO {
             phantom_space: PhantomSpace::new(),
             trace: MemoryTrace::new("isdood"),
             state: QuantumCell::new(UFOState::Landed),
-            warp_factor: Helium::new(1.0),
+            warp_factor: QuantumCell::new(1.0),
             quantum_descriptor: UnstableDescriptor::new(),
         }
     }
@@ -107,9 +100,7 @@ impl UFO {
         if !self.is_quantum_stable() {
             return Err("UFO quantum state unstable");
         }
-
         self.state.set(UFOState::Hovering);
-        self.phantom_space.decay_coherence();
         Ok(())
     }
 
@@ -117,64 +108,43 @@ impl UFO {
         if !self.is_quantum_stable() {
             return Err("UFO quantum state unstable");
         }
-
         self.state.set(UFOState::Landed);
-        self.phantom_space.decay_coherence();
         Ok(())
     }
 
-    pub fn is_tracked(&self) -> bool {
-        self.is_quantum_stable()
-    }
-
-    pub fn set_position(&mut self, position: Vector3D<f64>) -> Result<(), &'static str> {
+    pub fn set_position(&mut self, pos: &Vector3D<f64>) -> Result<(), &'static str> {
         if !self.is_quantum_stable() {
             return Err("UFO quantum state unstable");
         }
-
-        self.phantom_space.set_position(position.x(), position.y(), position.z());
-        self.track()?;
+        self.phantom_space.set_position(*pos.x(), *pos.y(), *pos.z());
         Ok(())
     }
 
-    pub fn get_position(&self) -> Option<&Vector3D<f64>> {
+    pub fn get_position(&self) -> Option<Vector3D<f64>> {
         if self.is_quantum_stable() {
-            Some(self.phantom_space.get_position())
+            Some(self.phantom_space.get_position().clone())
         } else {
             None
         }
     }
 
     pub fn get_state(&self) -> UFOState {
-        *self.state.get()
+        self.state.get()
     }
 
-    pub fn warp(&mut self, target: Vector3D<f64>) -> Result<(), &'static str> {
-        if !self.is_quantum_stable() {
-            return Err("UFO quantum state unstable");
-        }
-
-        self.state.set(UFOState::Warping);
-        let warp = self.warp_factor.quantum_load();
-        let new_warp = (warp * MESH_WARP_FACTOR).min(UFO_WARP_LIMIT);
-        self.warp_factor.quantum_store(new_warp);
-
-        self.set_position(target)?;
-        Ok(())
+    pub fn get_warp_factor(&self) -> f64 {
+        self.warp_factor.get()
     }
 
-    pub fn reset(&mut self) -> Result<(), &'static str> {
-        self.untrack()?;
-        self.phantom_space.reset_coherence();
-        self.state.set(UFOState::Landed);
-        self.quantum_descriptor.reset();
-        Ok(())
+    pub fn is_stable(&self) -> bool {
+        self.quantum_descriptor.is_stable()
     }
 }
 
 impl Quantum for UFO {
     fn get_coherence(&self) -> f64 {
-        self.phantom_space.get_coherence()
+        (self.phantom_space.get_coherence() +
+        self.quantum_descriptor.get_coherence()) / 2.0
     }
 
     fn is_quantum_stable(&self) -> bool {
@@ -191,21 +161,19 @@ impl Quantum for UFO {
     }
 }
 
-impl Protected for TrackedUFO {
+impl Protected for UFO {
     fn protect(&self) -> Result<(), &'static str> {
-        Protected::protect(&self.base)
+        if !self.is_quantum_stable() {
+            return Err("Cannot protect unstable UFO");
+        }
+        Ok(())
     }
 
     fn unprotect(&self) -> Result<(), &'static str> {
-        Protected::unprotect(&self.base)
-    }
-
-    fn get_coherence(&self) -> f64 {
-        Protected::get_coherence(&self.base)
-    }
-
-    fn is_quantum_stable(&self) -> bool {
-        Protected::is_quantum_stable(&self.base)
+        if !self.is_quantum_stable() {
+            return Err("Cannot unprotect unstable UFO");
+        }
+        Ok(())
     }
 }
 
@@ -222,12 +190,11 @@ impl Scribe for UFO {
             UFOState::Decoherent => output.push_str("Decoherent"),
         }
         output.push_str(", warp=");
-        output.push_f64(self.warp_factor.quantum_load(), precision.decimal_places());
+        output.push_f64(self.get_warp_factor(), precision.decimal_places());
         output.push_char(']');
     }
 }
 
-/// Tracked UFO with enhanced protection
 #[derive(Debug)]
 pub struct TrackedUFO {
     base: UFO,
@@ -244,22 +211,10 @@ impl TrackedUFO {
         }
     }
 
-    pub fn track(&mut self) -> Result<(), &'static str> {
-        self.base.track()
-    }
-
-    pub fn untrack(&mut self) -> Result<(), &'static str> {
-        self.base.untrack()
-    }
-
-    pub fn is_tracked(&self) -> bool {
-        self.base.is_tracked()
-    }
-
     pub fn contains(&self, pos: &Vector3D<isize>) -> bool {
-        pos.x() >= self.origin.x() && pos.x() < self.boundary.x() &&
-        pos.y() >= self.origin.y() && pos.y() < self.boundary.y() &&
-        pos.z() >= self.origin.z() && pos.z() < self.boundary.z()
+        *pos.x() >= *self.origin.x() && *pos.x() < *self.boundary.x() &&
+        *pos.y() >= *self.origin.y() && *pos.y() < *self.boundary.y() &&
+        *pos.z() >= *self.origin.z() && *pos.z() < *self.boundary.z()
     }
 }
 
@@ -278,6 +233,16 @@ impl Quantum for TrackedUFO {
 
     fn reset_coherence(&self) {
         self.base.reset_coherence();
+    }
+}
+
+impl Protected for TrackedUFO {
+    fn protect(&self) -> Result<(), &'static str> {
+        self.base.protect()
+    }
+
+    fn unprotect(&self) -> Result<(), &'static str> {
+        self.base.unprotect()
     }
 }
 
@@ -313,7 +278,7 @@ mod tests {
         let mut ufo = UFO::new();
         let pos = Vector3D::new(1.0, 2.0, 3.0);
         assert!(ufo.set_position(pos).is_ok());
-        assert_eq!(ufo.get_position().unwrap(), &pos);
+        assert_eq!(ufo.get_position().unwrap(), pos);
     }
 
     #[test]
@@ -322,5 +287,12 @@ mod tests {
         let initial_coherence = ufo.get_coherence();
         ufo.decay_coherence();
         assert!(ufo.get_coherence() < initial_coherence);
+    }
+
+    #[test]
+    fn test_protected_traits() {
+        let ufo = TrackedUFO::new(0, 0, 0);
+        assert!(ufo.protect().is_ok());
+        assert!(ufo.is_quantum_stable());
     }
 }

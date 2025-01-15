@@ -1,15 +1,16 @@
 /// Quantum Space-Time Scribing Module
-/// Last Updated: 2025-01-14 23:47:10 UTC
+/// Last Updated: 2025-01-15 05:20:58 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
     constants::*,
-    Vector3D,
+    vector::Vector3D,
     phantom::QuantumCell,
 };
 
 /// Native quantum-safe string type
+#[derive(Debug)]
 pub struct QuantumString {
     buffer: Vec<u8>,
 }
@@ -50,10 +51,13 @@ impl QuantumString {
         }
 
         self.push_char('.');
+        let mut precision_digits = Vec::new();
         for _ in 0..precision {
-            let digit = frac_part % 10;
+            precision_digits.push((b'0' + (frac_part % 10) as u8) as char);
             frac_part /= 10;
-            self.push_char((b'0' + digit as u8) as char);
+        }
+        for digit in precision_digits.iter().rev() {
+            self.push_char(*digit);
         }
     }
 
@@ -63,7 +67,7 @@ impl QuantumString {
 }
 
 /// Represents formatting precision for quantum values
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum ScribePrecision {
     /// High precision (10⁻³⁵)
     Planck,
@@ -74,7 +78,7 @@ pub enum ScribePrecision {
 }
 
 impl ScribePrecision {
-    fn decimal_places(&self) -> usize {
+    pub fn decimal_places(&self) -> usize {
         match self {
             Self::Planck => 35,
             Self::Quantum => 10,
@@ -82,7 +86,7 @@ impl ScribePrecision {
         }
     }
 
-    fn epsilon(&self) -> f64 {
+    pub fn epsilon(&self) -> f64 {
         match self {
             Self::Planck => PLANCK_LENGTH,
             Self::Quantum => QUANTUM_THRESHOLD,
@@ -112,6 +116,18 @@ impl Scribe for f64 {
     }
 }
 
+impl Scribe for bool {
+    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str(if *self { "true" } else { "false" });
+    }
+}
+
+impl Scribe for usize {
+    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str(&self.to_string());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,5 +154,20 @@ mod tests {
         let mut qs = QuantumString::new();
         v.scribe(ScribePrecision::Standard, &mut qs);
         assert_eq!(qs.as_str(), "⟨0.000000, 0.000000, 1.000000⟩");
+    }
+
+    #[test]
+    fn test_float_formatting() {
+        let mut qs = QuantumString::new();
+        let x = 123.456789;
+        x.scribe(ScribePrecision::Standard, &mut qs);
+        assert_eq!(qs.as_str(), "123.456789");
+    }
+
+    #[test]
+    fn test_boolean_scribing() {
+        let mut qs = QuantumString::new();
+        true.scribe(ScribePrecision::Standard, &mut qs);
+        assert_eq!(qs.as_str(), "true");
     }
 }

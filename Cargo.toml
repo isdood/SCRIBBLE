@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "lib/wanda",
     "boot/spinUP",
     "boot/spINIT",
     "boot/spun",

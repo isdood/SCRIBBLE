@@ -1,41 +1,51 @@
 /// Quantum Matter Library
-/// Last Updated: 2025-01-15 05:19:18 UTC
+/// Last Updated: 2025-01-15 05:38:07 UTC
 /// Author: isdood
 /// Current User: isdood
 
-// Core modules
-pub mod constants;
+// Core traits and types
 pub mod quantum;
 pub mod scribe;
-pub mod helium;
 
 // Implementation modules
 pub mod vector;
-pub mod phantom;
+pub mod unstable;
 pub mod mesh;
 pub mod ufo;
-pub mod grav;
 pub mod blackhole;
 pub mod wormhole;
 pub mod zeronaut;
-pub mod unstable;
 pub mod horizon;
+pub mod phantom;
+pub mod grav;
+
+// Constants
+pub mod constants;
 
 // Re-exports
-pub use constants::*;
 pub use quantum::Quantum;
 pub use scribe::{Scribe, ScribePrecision, QuantumString};
-pub use helium::{Helium, HeliumOrdering};
 pub use vector::{Vector3D, Vector4D};
-pub use phantom::{PhantomSpace, QuantumCell};
+pub use unstable::{UnstableDescriptor, QuantumState};
 pub use mesh::{MeshCell, MeshDimensions};
 pub use ufo::{UFO, Protected};
-pub use grav::{GravityField, GravityFieldRef};
 pub use blackhole::BlackHole;
-pub use wormhole::Wormhole;
+pub use wormhole::{Wormhole, WormholeError};
 pub use zeronaut::Zeronaut;
-pub use unstable::{UnstableDescriptor, QuantumState};
 pub use horizon::Horizon;
+pub use phantom::{PhantomSpace, QuantumCell};
+pub use grav::{GravityField, GravityFieldRef};
+pub use constants::*;
+
+impl UnstableDescriptor {
+    pub fn get_position(&self) -> Vector3D<f64> {
+        self.position.clone()
+    }
+
+    pub fn is_stable(&self) -> bool {
+        self.state == QuantumState::Stable
+    }
+}
 
 /// SpaceTime Memory System
 #[derive(Debug)]
