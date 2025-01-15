@@ -1,5 +1,5 @@
 /// Quantum Wormhole Implementation
-/// Last Updated: 2025-01-15 01:58:00 UTC
+/// Last Updated: 2025-01-15 04:50:59 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -28,7 +28,7 @@ pub struct Wormhole {
     state: QuantumCell<WormholeState>,
     coherence: Helium<f64>,
     radius: Helium<f64>,
-    affected_cells: QuantumCell<Vec<MeshCell<f64>>>,
+    affected_cells: QuantumCell<Vec<MeshCell>>, // Removed generic parameter
     timestamp: Helium<usize>,
 }
 
@@ -45,12 +45,30 @@ impl Wormhole {
         }
     }
 
-    pub fn transport<T>(&mut self, cell: MeshCell<T>) -> Result<MeshCell<T>, WormholeGlitch> {
+    pub fn connect_cell(&mut self, cell: &mut MeshCell) -> Result<(), WormholeGlitch> {
         if !self.is_quantum_stable() {
             return Err(WormholeGlitch::QuantumStateCompromised);
         }
 
-        if *self.state.get() == WormholeState::Collapsed {
+        let probability = self.calculate_tunnel_probability(cell);
+        if probability < WORMHOLE_STABILITY_THRESHOLD {
+            return Err(WormholeGlitch::StabilityFailure);
+        }
+
+        let mut cells = self.affected_cells.get();
+        cells.push(cell.clone());
+        self.affected_cells.set(cells);
+        self.decay_coherence();
+
+        Ok(())
+    }
+
+    pub fn transport(&mut self, mut cell: MeshCell) -> Result<MeshCell, WormholeGlitch> {
+        if !self.is_quantum_stable() {
+            return Err(WormholeGlitch::QuantumStateCompromised);
+        }
+
+        if self.get_state() == WormholeState::Collapsed {
             return Err(WormholeGlitch::TunnellingFailed);
         }
 
@@ -59,18 +77,18 @@ impl Wormhole {
             return Err(WormholeGlitch::StabilityFailure);
         }
 
-        self.apply_curvature_effects(&cell)?;
+        self.apply_curvature_effects(&mut cell)?;
         self.decay_coherence();
 
         Ok(cell)
     }
 
     pub fn get_entrance(&self) -> Vector3D<f64> {
-        self.entrance.get().clone()
+        self.entrance.get()
     }
 
     pub fn get_exit(&self) -> Vector3D<f64> {
-        self.exit.get().clone()
+        self.exit.get()
     }
 
     pub fn get_radius(&self) -> f64 {
@@ -78,10 +96,10 @@ impl Wormhole {
     }
 
     pub fn get_state(&self) -> WormholeState {
-        self.state.get().clone()
+        self.state.get()
     }
 
-    fn calculate_tunnel_probability<T>(&self, cell: &MeshCell<T>) -> f64 {
+    fn calculate_tunnel_probability(&self, cell: &MeshCell) -> f64 {
         let pos = cell.get_position();
         let distance_to_entrance = (pos - self.get_entrance()).magnitude();
         let coherence = self.get_coherence();
@@ -90,7 +108,7 @@ impl Wormhole {
         base_probability * coherence
     }
 
-    fn apply_curvature_effects<T>(&self, cell: &mut MeshCell<T>) -> Result<(), WormholeGlitch> {
+    fn apply_curvature_effects(&self, cell: &mut MeshCell) -> Result<(), WormholeGlitch> {
         if !self.is_quantum_stable() {
             return Err(WormholeGlitch::QuantumStateCompromised);
         }
@@ -113,7 +131,7 @@ impl Wormhole {
 
     pub fn is_quantum_stable(&self) -> bool {
         self.get_coherence() > QUANTUM_STABILITY_THRESHOLD &&
-        *self.state.get() != WormholeState::Collapsed
+        self.get_state() != WormholeState::Collapsed
     }
 
     fn decay_coherence(&self) {
@@ -130,6 +148,7 @@ impl Wormhole {
         };
 
         self.state.set(new_state);
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 }
 
@@ -175,5 +194,37 @@ mod tests {
         }
 
         assert_eq!(wormhole.get_state(), WormholeState::Collapsed);
+    }
+
+    #[test]
+    fn test_transport_stability() {
+        let mut wormhole = Wormhole::new(
+            Vector3D::new(0.0, 0.0, 0.0),
+                                         Vector3D::new(10.0, 0.0, 0.0),
+                                         5.0
+        );
+
+        let cell = MeshCell::new(Vector3D::new(1.0, 0.0, 0.0));
+        assert!(wormhole.transport(cell).is_ok());
+    }
+
+    #[test]
+    fn test_transport_failure() {
+        let mut wormhole = Wormhole::new(
+            Vector3D::new(0.0, 0.0, 0.0),
+                                         Vector3D::new(10.0, 0.0, 0.0),
+                                         1.0
+        );
+
+        // Force wormhole to collapse
+        for _ in 0..100 {
+            wormhole.decay_coherence();
+        }
+
+        let cell = MeshCell::new(Vector3D::new(1.0, 0.0, 0.0));
+        assert!(matches!(
+            wormhole.transport(cell),
+                         Err(WormholeGlitch::TunnellingFailed)
+        ));
     }
 }

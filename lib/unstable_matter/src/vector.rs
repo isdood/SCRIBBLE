@@ -236,6 +236,20 @@ impl Vector4D<f64> {
     }
 }
 
+impl<T: Scribe> Scribe for Vector4D<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("⟨");
+        self.x.scribe(precision, output);
+        output.push_str(", ");
+        self.y.scribe(precision, output);
+        output.push_str(", ");
+        self.z.scribe(precision, output);
+        output.push_str(", ");
+        self.w.scribe(precision, output);
+        output.push_str("⟩");
+    }
+}
+
 impl<T: PartialEq + Add<Output = T>> Add for Vector4D<T> {
     type Output = Self;
 

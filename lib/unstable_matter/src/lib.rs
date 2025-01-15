@@ -23,7 +23,6 @@ use crate::mesh::MeshDimensions;
 pub use constants::*;
 pub use glitch::WormholeGlitch;  // Changed from WormholeError to WormholeGlitch
 pub use vector::Vector3D;
-pub use phantom::{PhantomSpace, Quantum, QuantumCell, Horizon};
 pub use mesh::MeshCell;
 pub use ufo::{UFO, Protected};
 pub use helium::{Helium, HeliumOrdering};
@@ -33,6 +32,8 @@ pub use wormhole::Wormhole;
 pub use zeronaut::Zeronaut;
 pub use scribe::{Scribe, ScribePrecision, QuantumString};
 pub use unstable::{UnstableDescriptor, QuantumState};
+pub use horizon::Horizon;
+pub use phantom::{PhantomSpace, Quantum, QuantumCell};
 
 #[derive(Debug)]
 pub struct SpaceTimeMemory {

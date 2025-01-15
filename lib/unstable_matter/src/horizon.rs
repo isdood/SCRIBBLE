@@ -1,11 +1,14 @@
 /// Quantum Horizon System
-/// Last Updated: 2025-01-14 22:54:27 UTC
+/// Last Updated: 2025-01-15 04:53:33 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use crate::constants::QUANTUM_COHERENCE_THRESHOLD;
+use crate::{
+    constants::{QUANTUM_COHERENCE_THRESHOLD, QUANTUM_STABILITY_THRESHOLD},
+    scribe::{Scribe, ScribePrecision, QuantumString},
+};
 
-const CURRENT_TIMESTAMP: usize = 1705264467; // 2025-01-14 22:54:27 UTC
+const CURRENT_TIMESTAMP: usize = 1705287213; // 2025-01-15 04:53:33 UTC
 const HORIZON_DECAY_RATE: f64 = 0.99;
 
 /// Quantum shared state management system
@@ -98,6 +101,10 @@ impl<T> Horizon<T> {
     pub fn is_coherent(&self) -> bool {
         self.coherence > QUANTUM_COHERENCE_THRESHOLD
     }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        self.coherence > QUANTUM_STABILITY_THRESHOLD
+    }
 }
 
 impl<T> Drop for Horizon<T> {
@@ -108,13 +115,15 @@ impl<T> Drop for Horizon<T> {
     }
 }
 
-impl Horizon {
-    pub fn get(&self) -> f64 {
-        self.radius
-    }
-
-    pub fn is_quantum_stable(&self) -> bool {
-        self.stability > QUANTUM_STABILITY_THRESHOLD
+impl<T: Scribe> Scribe for Horizon<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("Horizon{value=");
+        unsafe { (*self.state).scribe(precision, output); }
+        output.push_str(", coherence=");
+        output.push_f64(self.coherence, precision.decimal_places());
+        output.push_str(", observers=");
+        output.push_usize(self.observers);
+        output.push_char('}');
     }
 }
 
@@ -151,6 +160,16 @@ impl<T> HorizonCell<T> {
 
     pub fn get_coherence(&self) -> f64 {
         self.value.get_coherence()
+    }
+}
+
+impl<T: Scribe> Scribe for HorizonCell<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("HorizonCell{");
+        self.value.scribe(precision, output);
+        output.push_str(", quantum_state=");
+        self.quantum_state.scribe(precision, output);
+        output.push_char('}');
     }
 }
 
@@ -194,5 +213,13 @@ mod tests {
 
         horizon.observe();
         assert_eq!(horizon.get_observer_count(), 1);
+    }
+
+    #[test]
+    fn test_scribe() {
+        let horizon = Horizon::new(42);
+        let mut output = QuantumString::new();
+        horizon.scribe(ScribePrecision::Standard, &mut output);
+        assert!(output.as_str().contains("coherence=1.000000"));
     }
 }

@@ -4,13 +4,12 @@
 /// Current User: isdood
 
 use crate::{
-    constants::*,
-    glitch::WormholeGlitch,
-    helium::Helium,
-    phantom::{PhantomSpace, Quantum, QuantumCell},
+    GravityField,
+    BlackHole,
+    phantom::{Quantum, QuantumCell},
     vector::Vector3D,
-    wormhole::Wormhole,
-    scribe::{Scribe, ScribePrecision, QuantumString},
+    Wormhole,
+    WormholeGlitch,
 };
 
 
@@ -64,7 +63,6 @@ pub enum CellState {
     Absorbed,
 }
 
-#[derive(Debug, Clone)]
 pub struct MeshCell {
     position: QuantumCell<Vector3D<f64>>,
     mass: Helium<f64>,
@@ -74,7 +72,7 @@ pub struct MeshCell {
     wormhole_connection: Option<Wormhole>,
 }
 
-impl<T> MeshCell<T> {
+impl MeshCell {  // Remove generic parameter
     pub fn new(position: Vector3D<f64>) -> Self {
         Self {
             position: QuantumCell::new(position),

@@ -5,10 +5,12 @@
 
 use crate::{
     constants::*,
-    phantom::{QuantumCell, Horizon},
+    phantom::QuantumCell;
     Vector3D,
     mesh::MeshCell,
     helium::Helium,
+    horizon::Horizon,
+
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -29,7 +31,7 @@ pub struct GravityFieldData {
 #[derive(Debug, Clone)]
 pub struct GravityField {
     data: Horizon,
-    affected_cells: QuantumCell<Vec<MeshCell<f64>>>,
+    affected_cells: QuantumCell<Vec<MeshCell>>,
     timestamp: Helium<usize>,
 }
 
