@@ -9,7 +9,7 @@ const CURRENT_TIMESTAMP: usize = 1705264467; // 2025-01-14 22:54:27 UTC
 const HORIZON_DECAY_RATE: f64 = 0.99;
 
 /// Quantum shared state management system
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Horizon<T> {
     state: *mut T,
     coherence: f64,
@@ -105,6 +105,16 @@ impl<T> Drop for Horizon<T> {
         unsafe {
             drop(Box::from_raw(self.state));
         }
+    }
+}
+
+impl Horizon {
+    pub fn get(&self) -> f64 {
+        self.radius
+    }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        self.stability > QUANTUM_STABILITY_THRESHOLD
     }
 }
 

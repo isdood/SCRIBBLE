@@ -190,27 +190,21 @@ impl Quantum for UFO {
     }
 }
 
-impl Protected for UFO {
+impl Protected for TrackedUFO {
     fn protect(&self) -> Result<(), &'static str> {
-        if !self.is_quantum_stable() {
-            return Err("Quantum state unstable");
-        }
-        Ok(())
+        Protected::protect(&self.base)
     }
 
     fn unprotect(&self) -> Result<(), &'static str> {
-        if !self.is_quantum_stable() {
-            return Err("Quantum state unstable");
-        }
-        Ok(())
+        Protected::unprotect(&self.base)
     }
 
     fn get_coherence(&self) -> f64 {
-        self.phantom_space.get_coherence()
+        Protected::get_coherence(&self.base)
     }
 
     fn is_quantum_stable(&self) -> bool {
-        self.phantom_space.is_quantum_stable()
+        Protected::is_quantum_stable(&self.base)
     }
 }
 

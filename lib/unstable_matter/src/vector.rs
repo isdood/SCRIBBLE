@@ -109,46 +109,30 @@ impl Vector3D<isize> {
 }
 
 #[derive(Debug)]
-pub struct Vector4D<T> {
-    pub t: T,
-    pub x: T,
-    pub y: T,
-    pub z: T,
+pub struct Vector4D<T: 'static> {
+    t: T,
+    x: T,
+    y: T,
+    z: T,
     coherence: QuantumCell<f64>,
     timestamp: Helium<usize>,
 }
 
-impl<T> Vector4D<T>
-where
-T: PartialEq + Add<Output = T> + Mul<Output = T> + Copy + Default,
-{
-    pub fn new(t: T, x: T, y: T, z: T) -> Self {
-        Self {
-            t,
-            x,
-            y,
-            z,
-            coherence: QuantumCell::new(1.0),
-            timestamp: Helium::new(CURRENT_TIMESTAMP),
-        }
+impl<T: 'static> Quantum for Vector4D<T> {
+    fn get_coherence(&self) -> f64 {
+        self.coherence.get_coherence()
     }
 
-    pub fn inner_product(&mut self, other: &Self) -> T
-    where
-    T: Sub<Output = T>,
-    {
-        self.aligned_space.decay_coherence();
-        let spatial = self.x * other.x + self.y * other.y + self.z * other.z;
-        spatial - (self.t * other.t)
+    fn is_quantum_stable(&self) -> bool {
+        self.coherence.get_coherence() > QUANTUM_STABILITY_THRESHOLD
     }
 
-    pub fn interval_squared(&mut self) -> T
-    where
-    T: Sub<Output = T>,
-    {
-        self.aligned_space.decay_coherence();
-        let copy = *self;
-        self.inner_product(&copy)
+    fn decay_coherence(&self) {
+        self.coherence.decay_coherence();
+    }
+
+    fn reset_coherence(&self) {
+        self.coherence.reset_coherence();
     }
 }
 

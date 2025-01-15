@@ -16,6 +16,7 @@ use crate::{
 pub enum WormholeState {
     Opening,
     Stable,
+    Closing,
     Collapsed,
     Entangled,
 }
