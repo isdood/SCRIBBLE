@@ -3,11 +3,14 @@
 /// Author: isdood
 /// Current User: isdood
 
+// Hashbrown space hashing
+pub mod spacemap;
+
 pub mod snek;
 pub mod bash;
 pub mod fish;
 pub mod cplus;
-pub mod spacemap;
+pub mod prolog;
 
 // Re-exports
 pub use snek::SnekTranslator;

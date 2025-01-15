@@ -1,5 +1,5 @@
 /// Unstable Matter Library
-/// Last Updated: 2025-01-15 01:49:27 UTC
+/// Last Updated: 2025-01-15 03:44:13 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -37,13 +37,13 @@ pub use unstable::{UnstableDescriptor, QuantumState};
 #[derive(Debug)]
 pub struct SpaceTimeMemory {
     phantom_space: PhantomSpace,
-    ufo: UFO,  // UFO no longer takes generic parameter
+    ufo: UFO,
     dimensions: MeshDimensions,
     timestamp: Helium<usize>,
     quantum_descriptor: UnstableDescriptor,
 }
 
-impl<T: Copy> SpaceTimeMemory<T> {
+impl SpaceTimeMemory {
     pub fn new(dimensions: MeshDimensions) -> Self {
         Self {
             phantom_space: PhantomSpace::new(),
@@ -68,15 +68,15 @@ impl<T: Copy> SpaceTimeMemory<T> {
 }
 
 #[derive(Debug)]
-pub struct SpaceTime<T> {
-    memory: SpaceTimeMemory<T>,
+pub struct SpaceTime {
+    memory: SpaceTimeMemory,
     mesh: MeshDimensions,
     black_holes: Vec<BlackHole>,
     dimensions: Vector3D<usize>,
     timestamp: Helium<usize>,
 }
 
-impl<T: Copy> SpaceTime<T> {
+impl SpaceTime {
     pub fn new(dimensions: Vector3D<usize>) -> Self {
         let mesh = MeshDimensions {
             width: dimensions.x(),
@@ -142,7 +142,7 @@ impl<T: Copy> SpaceTime<T> {
     }
 }
 
-impl<T: Copy> Quantum for SpaceTime<T> {
+impl Quantum for SpaceTime {
     fn is_quantum_stable(&self) -> bool {
         self.memory.phantom_space.is_quantum_stable() &&
         self.memory.quantum_descriptor.is_stable() &&
@@ -171,7 +171,7 @@ impl<T: Copy> Quantum for SpaceTime<T> {
     }
 }
 
-impl<T: Copy> Scribe for SpaceTime<T> {
+impl Scribe for SpaceTime {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("SpaceTime[");
         output.push_str("pos=");
@@ -189,13 +189,13 @@ mod tests {
     #[test]
     fn test_spacetime_creation() {
         let dimensions = Vector3D::new(10, 10, 10);
-        let spacetime = SpaceTime::<f64>::new(dimensions);
+        let spacetime = SpaceTime::new(dimensions);
         assert_eq!(spacetime.get_dimensions(), &dimensions);
     }
 
     #[test]
     fn test_spacetime_protection() {
-        let mut spacetime = SpaceTime::<f64>::new(Vector3D::new(5, 5, 5));
+        let mut spacetime = SpaceTime::new(Vector3D::new(5, 5, 5));
         assert!(spacetime.is_protected());
         spacetime.track();
         assert!(spacetime.is_protected());
@@ -203,14 +203,14 @@ mod tests {
 
     #[test]
     fn test_spacetime_quantum_stability() {
-        let spacetime = SpaceTime::<f64>::new(Vector3D::new(5, 5, 5));
+        let spacetime = SpaceTime::new(Vector3D::new(5, 5, 5));
         assert!(spacetime.is_quantum_stable());
         assert!(spacetime.get_coherence() > 0.0);
     }
 
     #[test]
     fn test_spacetime_position() {
-        let mut spacetime = SpaceTime::<f64>::new(Vector3D::new(5, 5, 5));
+        let mut spacetime = SpaceTime::new(Vector3D::new(5, 5, 5));
         let position = Vector3D::new(1.0, 2.0, 3.0);
         spacetime.set_position(position.clone());
         assert_eq!(spacetime.get_position(), position);
@@ -218,14 +218,14 @@ mod tests {
 
     #[test]
     fn test_uncertainty() {
-        let spacetime = SpaceTime::<f64>::new(Vector3D::new(5, 5, 5));
+        let spacetime = SpaceTime::new(Vector3D::new(5, 5, 5));
         let uncertainty = spacetime.get_uncertainty();
         assert!(uncertainty.magnitude() >= PLANCK_LENGTH);
     }
 
     #[test]
     fn test_quantum_scribing() {
-        let spacetime = SpaceTime::<f64>::new(Vector3D::new(5, 5, 5));
+        let spacetime = SpaceTime::new(Vector3D::new(5, 5, 5));
         let mut output = QuantumString::new();
         spacetime.scribe(ScribePrecision::Standard, &mut output);
         assert!(output.as_str().starts_with("SpaceTime["));
