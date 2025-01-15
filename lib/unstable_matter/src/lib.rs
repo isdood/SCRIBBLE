@@ -1,4 +1,5 @@
-/// Last Updated: 2025-01-15 04:54:39 UTC
+/// Quantum Matter Library
+/// Last Updated: 2025-01-15 05:03:16 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -22,7 +23,7 @@ pub use constants::*;
 pub use glitch::WormholeGlitch;
 pub use vector::Vector3D;
 pub use phantom::{PhantomSpace, Quantum, QuantumCell};
-pub use mesh::MeshCell;
+pub use mesh::{MeshCell, MeshDimensions};  // Added MeshDimensions
 pub use ufo::{UFO, Protected};
 pub use helium::{Helium, HeliumOrdering};
 pub use grav::{GravityField, GravityFieldRef};
@@ -33,6 +34,7 @@ pub use scribe::{Scribe, ScribePrecision, QuantumString};
 pub use unstable::{UnstableDescriptor, QuantumState};
 pub use horizon::Horizon;
 
+/// SpaceTime Memory System
 #[derive(Debug)]
 pub struct SpaceTimeMemory {
     phantom_space: PhantomSpace,
@@ -66,6 +68,7 @@ impl SpaceTimeMemory {
     }
 }
 
+/// SpaceTime Quantum System
 #[derive(Debug)]
 pub struct SpaceTime {
     memory: SpaceTimeMemory,
@@ -77,11 +80,11 @@ pub struct SpaceTime {
 
 impl SpaceTime {
     pub fn new(dimensions: Vector3D<usize>) -> Self {
-        let mesh = MeshDimensions {
-            width: dimensions.x(),
-            height: dimensions.y(),
-            depth: dimensions.z(),
-        };
+        let mesh = MeshDimensions::new(
+            *dimensions.x(),
+                                       *dimensions.y(),
+                                       *dimensions.z()
+        );
 
         Self {
             memory: SpaceTimeMemory::new(mesh.clone()),
@@ -105,8 +108,12 @@ impl SpaceTime {
     }
 
     pub fn set_position(&mut self, position: Vector3D<f64>) {
-        self.memory.quantum_descriptor.set_position(position);
-        self.memory.phantom_space.set_position(position.x(), position.y(), position.z());
+        self.memory.quantum_descriptor.set_position(position.clone());
+        self.memory.phantom_space.set_position(
+            *position.x(),
+                                               *position.y(),
+                                               *position.z()
+        );
     }
 
     pub fn get_dimensions(&self) -> &Vector3D<usize> {
@@ -130,10 +137,10 @@ impl SpaceTime {
     }
 
     pub fn calculate_index(&self, x: usize, y: usize, z: usize) -> Option<usize> {
-        if x >= self.dimensions.x() || y >= self.dimensions.y() || z >= self.dimensions.z() {
+        if x >= *self.dimensions.x() || y >= *self.dimensions.y() || z >= *self.dimensions.z() {
             return None;
         }
-        Some(x + y * self.dimensions.x() + z * self.dimensions.x() * self.dimensions.y())
+        Some(x + y * *self.dimensions.x() + z * *self.dimensions.x() * *self.dimensions.y())
     }
 
     pub fn get_uncertainty(&self) -> &Vector3D<f64> {
