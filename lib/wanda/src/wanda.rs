@@ -4,34 +4,19 @@
 /// Current User: isdood
 
 use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, SubCommand};
 use tokio::net::UnixStream;
+use tokio::io::{AsyncReadExt, AsyncWriteExt}; // Add this line
 use serde_json;
 use std::path::PathBuf;
+
+mod types; // Add this line
+use types::{WandaConfig, WandaMessage, WandaResponse, print_response}; // Add this line
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = App::new("wanda")
-        .version("1.0")
-        .author("isdood")
-        .about("Wanda AI Assistant CLI")
-        .subcommand(SubCommand::with_name("analyze")
-            .about("Analyze a file or directory")
-            .arg(Arg::with_name("path")
-                .required(true)
-                .help("Path to analyze")))
-        .subcommand(SubCommand::with_name("suggest")
-            .about("Get suggestions")
-            .arg(Arg::with_name("context")
-                .required(true)
-                .help("Context for suggestions")))
-        .subcommand(SubCommand::with_name("status")
-            .about("Get Wanda's status"))
-        .subcommand(SubCommand::with_name("config")
-            .about("Configure Wanda")
-            .arg(Arg::with_name("watch-dir")
-                .long("watch-dir")
-                .takes_value(true)
-                .help("Directory to watch")));
+    // ... (keep existing app configuration)
 
     let matches = app.get_matches();
 
@@ -39,25 +24,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stream = UnixStream::connect("/var/run/wanda.sock").await?;
 
     match matches.subcommand() {
-        ("analyze", Some(args)) => {
+        Some(("analyze", args)) => {
             let path = args.value_of("path").unwrap();
             let message = WandaMessage::Analyze {
                 path: PathBuf::from(path),
             };
             send_message(&mut stream, &message).await?;
         }
-        ("suggest", Some(args)) => {
+        Some(("suggest", args)) => {
             let context = args.value_of("context").unwrap();
             let message = WandaMessage::Suggest {
                 context: context.to_string(),
             };
             send_message(&mut stream, &message).await?;
         }
-        ("status", _) => {
+        Some(("status", _)) => {
             let message = WandaMessage::Status;
             send_message(&mut stream, &message).await?;
         }
-        ("config", Some(args)) => {
+        Some(("config", args)) => {
             if let Some(watch_dir) = args.value_of("watch-dir") {
                 let config = WandaConfig {
                     watch_dir: PathBuf::from(watch_dir),
@@ -82,9 +67,9 @@ async fn send_message(stream: &mut UnixStream, message: &WandaMessage) -> Result
 
     let mut response = Vec::new();
     stream.read_to_end(&mut response).await?;
-    
+
     let wanda_response: WandaResponse = serde_json::from_slice(&response)?;
     print_response(wanda_response);
-    
+
     Ok(())
 }
