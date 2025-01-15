@@ -1,5 +1,5 @@
 /// UnstableMatter: Low-Level Memory Access Wrapper
-/// Last Updated: 2025-01-14 21:23:53 UTC
+/// Last Updated: 2025-01-15 01:37:33 UTC
 /// Author: Caleb J.D. Terkovics (isdood)
 /// Current User: isdood
 ///
@@ -16,11 +16,14 @@ use crate::phantom::PhantomSpace;
 use crate::zeronaut::Zeronaut;
 use crate::constants::CURRENT_TIMESTAMP;
 use crate::helium::HeliumOrdering;
+use crate::unstable::{UnstableDescriptor, QuantumState};
+use crate::vector::Vector3D;
 
 #[derive(Debug)]
 pub struct UnstableMatter<T> {
     ptr: Zeronaut<T>,
     space: PhantomSpace<T>,
+    state_descriptor: UnstableDescriptor,
 }
 
 impl<T: Copy> UnstableMatter<T> {
@@ -36,6 +39,7 @@ impl<T: Copy> UnstableMatter<T> {
             Zeronaut::new(ptr).map(|zeronaut| Self {
                 ptr: zeronaut,
                 space: PhantomSpace::const_new(),
+                                   state_descriptor: UnstableDescriptor::new(),
             })
         }
     }
@@ -57,8 +61,9 @@ impl<T: Copy> UnstableMatter<T> {
     where
     T: Copy,
     {
-        self.space.decay_coherence();
+        self.state_descriptor.decay_coherence();
         let value = core::ptr::read_volatile(self.ptr.as_ptr());
+        self.space.decay_coherence();
         value
     }
 
@@ -69,6 +74,7 @@ impl<T: Copy> UnstableMatter<T> {
     /// - No quantum state conflicts
     pub unsafe fn write(&mut self, value: T) {
         core::ptr::write_volatile(self.ptr.as_ptr(), value);
+        self.state_descriptor.decay_coherence();
         self.space.decay_coherence();
     }
 
@@ -79,12 +85,17 @@ impl<T: Copy> UnstableMatter<T> {
 
     /// Gets current quantum coherence
     pub fn get_coherence(&self) -> f64 {
-        self.space.get_coherence()
+        self.state_descriptor.coherence()
+    }
+
+    /// Gets current quantum state
+    pub fn get_quantum_state(&self) -> QuantumState {
+        *self.state_descriptor.state.get()
     }
 
     /// Checks if memory is quantum stable
     pub fn is_quantum_stable(&self) -> bool {
-        self.space.is_quantum_stable()
+        self.state_descriptor.is_stable()
     }
 
     /// Gets the last quantum operation timestamp
@@ -92,8 +103,14 @@ impl<T: Copy> UnstableMatter<T> {
         self.space.get_last_update()
     }
 
-    /// Resets quantum coherence
+    /// Gets current uncertainty vector
+    pub fn get_uncertainty(&self) -> &Vector3D<f64> {
+        self.state_descriptor.uncertainty()
+    }
+
+    /// Resets quantum coherence and state
     pub fn reset_coherence(&mut self) {
+        self.state_descriptor.reset();
         self.space.reset_coherence();
     }
 
@@ -104,6 +121,7 @@ impl<T: Copy> UnstableMatter<T> {
             if let Some(new_zeronaut) = Zeronaut::new(new_ptr) {
                 if new_zeronaut.is_quantum_stable() {
                     self.ptr = new_zeronaut;
+                    self.state_descriptor.decay_coherence();
                     self.space.decay_coherence();
                     return true;
                 }
@@ -127,6 +145,7 @@ mod tests {
         assert_eq!(matter.addr(), 0x1000);
         assert!(matter.is_quantum_stable());
         assert_eq!(matter.get_coherence(), 1.0);
+        assert_eq!(matter.get_quantum_state(), QuantumState::Stable);
     }
 
     #[test]
@@ -140,6 +159,7 @@ mod tests {
             let value = matter.read();
             assert_eq!(value, 42);
             assert!(matter.get_coherence() < 0.99);
+            assert!(matter.get_uncertainty().magnitude() > matter.state_descriptor.uncertainty().magnitude());
         }
     }
 
@@ -149,6 +169,7 @@ mod tests {
         assert!(matter.tunnel_to(0x2000));
         assert_eq!(matter.addr(), 0x2000);
         assert!(matter.get_coherence() < 1.0);
+        assert!(matter.get_uncertainty().magnitude() > matter.state_descriptor.uncertainty().magnitude());
     }
 
     #[test]
@@ -162,11 +183,27 @@ mod tests {
 
         matter.reset_coherence();
         assert!(matter.get_coherence() > decayed_coherence);
+        assert_eq!(matter.get_quantum_state(), QuantumState::Stable);
     }
 
     #[test]
     fn test_timestamp() {
         let matter = UnstableMatter::<u32>::const_at(0x1000).unwrap();
         assert_eq!(matter.get_timestamp(), CURRENT_TIMESTAMP);
+    }
+
+    #[test]
+    fn test_uncertainty_tracking() {
+        let mut matter = UnstableMatter::<u32>::const_at(0x1000).unwrap();
+        let initial_uncertainty = matter.get_uncertainty().clone();
+
+        unsafe {
+            for _ in 0..5 {
+                matter.write(42);
+                matter.read();
+            }
+        }
+
+        assert!(matter.get_uncertainty().magnitude() > initial_uncertainty.magnitude());
     }
 }
