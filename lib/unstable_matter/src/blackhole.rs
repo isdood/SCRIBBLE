@@ -27,39 +27,35 @@ pub enum BlackHoleState {
     Singularity,
 }
 
+#[derive(Debug)]
 pub struct BlackHole {
-    mass: Helium<f64>,
     position: QuantumCell<Vector3D<f64>>,
+    mass: Helium<f64>,
     radius: Helium<f64>,
-    temperature: Helium<f64>,
     coherence: Helium<f64>,
-    gravity_field: QuantumCell<GravityField>,
-    affected_cells: QuantumCell<Vec<MeshCell>>,
-    quantum_state: QuantumCell<BlackHoleState>,
-    state: UnstableDescriptor,
     affected_cells: QuantumCell<Vec<MeshCell<f64>>>,
+    state: QuantumCell<BlackHoleState>,
+    timestamp: Helium<usize>,
 }
 
 impl BlackHole {
-    pub fn new(mass: f64, position: Vector3D<f64>) -> Self {
-        let radius = SCHWARZSCHILD_CONSTANT * mass;
-        let temperature = HAWKING_TEMPERATURE_CONSTANT / mass;
-        let gravity = GravityField::new(
-            mass * 6.67430e-11,
-            position.normalize()
-        );
-
-        Self {
+    pub fn new(mass: f64) -> Self {
+        let mut bh = Self {
+            position: QuantumCell::new(Vector3D::new(0.0, 0.0, 0.0)),
             mass: Helium::new(mass),
-            position: QuantumCell::new(position),
-            radius: Helium::new(radius),
-            temperature: Helium::new(temperature),
+            radius: Helium::new(SCHWARZSCHILD_CONSTANT * mass),
             coherence: Helium::new(1.0),
-            gravity_field: QuantumCell::new(gravity),
-            affected_cells: QuantumCell<Vec<MeshCell<f64>>>,
-            quantum_state: QuantumCell::new(BlackHoleState::Stable),
-            state: UnstableDescriptor::new(),
-        }
+            affected_cells: QuantumCell::new(Vec::new()),
+            state: QuantumCell::new(BlackHoleState::Stable),
+            timestamp: Helium::new(CURRENT_TIMESTAMP),
+        };
+        bh.update_event_horizon();
+        bh
+    }
+
+    fn update_event_horizon(&mut self) {
+        let mass = self.mass.quantum_load();
+        self.radius.quantum_store(SCHWARZSCHILD_CONSTANT * mass);
     }
 
     pub fn affect_mesh_cell<T: 'static>(&mut self, cell: MeshCell<T>) -> Result<(), &'static str> {

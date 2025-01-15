@@ -13,6 +13,7 @@ use crate::{
     glitch::WormholeGlitch,
     scribe::{Scribe, ScribePrecision, QuantumString},
     blackhole::BlackHole,
+    wormhole::Wormhole,
 };
 
 #[derive(Debug, Clone)]
@@ -65,14 +66,13 @@ pub enum CellState {
     Absorbed,
 }
 
-#[derive(Debug)]
 pub struct MeshCell<T: 'static> {
     position: QuantumCell<Vector3D<f64>>,
     mass: Helium<f64>,
     state: QuantumCell<CellState>,
     coherence: Helium<f64>,
     timestamp: Helium<usize>,
-    wormhole_connection: Option<ProtectedWormhole<T>>,
+    wormhole_connection: Option<Wormhole>,  // Changed from ProtectedWormhole to Wormhole
 }
 
 impl<T> MeshCell<T> {
@@ -137,7 +137,7 @@ impl<T> MeshCell<T> {
         Ok(())
     }
 
-    pub fn connect_wormhole(&mut self, wormhole: ProtectedWormhole<T>) -> Result<(), WormholeGlitch> {
+    pub fn connect_wormhole(&mut self, wormhole: Wormhole) -> Result<(), WormholeGlitch> {
         if !self.is_quantum_stable() {
             return Err(WormholeGlitch::QuantumStateCompromised);
         }
@@ -148,7 +148,6 @@ impl<T> MeshCell<T> {
 
         self.wormhole_connection = Some(wormhole);
         self.state.set(CellState::WormholeConnected);
-        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
         Ok(())
     }
 

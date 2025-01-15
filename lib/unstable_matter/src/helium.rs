@@ -8,6 +8,7 @@ use crate::{
     constants::*,
     phantom::QuantumCell,
     Vector3D,
+    phantom::Quantum,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -19,40 +20,32 @@ pub enum HeliumOrdering {
 }
 
 #[derive(Debug)]
-pub struct Helium<T: 'static> {
-    inner: QuantumCell<T>,
-    timestamp: QuantumCell<usize>,
-    coherence: QuantumCell<f64>,
-    position: Option<QuantumCell<Vector3D<f64>>>,
+impl<T: 'static> Helium<T> {
+    pub fn quantum_load(&self) -> T where T: Copy {
+        self.load()
+    }
+
+    pub fn quantum_store(&self, value: T) {
+        self.store(value);
+    }
 }
 
-impl<T: 'static + Copy> Helium<T> {
-    pub fn new(value: T) -> Self {
-        Self {
-            inner: QuantumCell::new(value),
-            timestamp: QuantumCell::new(CURRENT_TIMESTAMP),
-            coherence: QuantumCell::new(1.0),
-            position: None,
-        }
+impl<T: 'static> Quantum for Helium<T> {
+    fn get_coherence(&self) -> f64 {
+        self.coherence()
     }
 
-    pub fn load(&self, _ordering: &HeliumOrdering) -> Result<T, &'static str> {
-        Ok(*self.inner.get())
+    fn is_quantum_stable(&self) -> bool {
+        self.get_coherence() > QUANTUM_STABILITY_THRESHOLD
     }
 
-    pub fn store(&self, value: T, _ordering: &HeliumOrdering) -> Result<(), &'static str> {
-        self.inner.set(value);
-        self.timestamp.set(CURRENT_TIMESTAMP);
-        self.coherence.set(*self.coherence.get() * QUANTUM_FENCE_DECAY);
-        Ok(())
+    fn decay_coherence(&self) {
+        let current = self.get_coherence();
+        self.set_coherence(current * COHERENCE_DECAY_FACTOR);
     }
 
-    pub fn get_coherence(&self) -> f64 {
-        *self.coherence.get()
-    }
-
-    pub fn is_quantum_stable(&self) -> bool {
-        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
+    fn reset_coherence(&self) {
+        self.set_coherence(1.0);
     }
 }
 
@@ -64,7 +57,7 @@ pub struct HeliumSize {
     position: QuantumCell<Vector3D<f64>>,
 }
 
-impl HeliumSize {
+impl Quantum for HeliumSize {
     pub fn new(value: usize) -> Self {
         Self {
             value: Helium::new(value),

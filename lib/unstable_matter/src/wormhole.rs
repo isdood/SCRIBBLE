@@ -12,12 +12,12 @@ use crate::{
     glitch::WormholeGlitch,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WormholeState {
     Opening,
     Stable,
-    Closing,
     Collapsed,
+    Entangled,
 }
 
 #[derive(Debug)]

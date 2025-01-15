@@ -70,6 +70,12 @@ impl<T> QuantumCell<T> {
         }
     }
 
+    pub fn get_mut(&mut self) -> &mut T {
+        self.decay_coherence();
+        // Safety: we have exclusive access through &mut self
+        unsafe { &mut *self.value.inner.get() }
+    }
+
     pub fn get(&self) -> &T {
         self.decay_coherence();
         self.value.get()

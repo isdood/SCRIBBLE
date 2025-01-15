@@ -35,9 +35,9 @@ pub use scribe::{Scribe, ScribePrecision, QuantumString};
 pub use unstable::{UnstableDescriptor, QuantumState};
 
 #[derive(Debug)]
-pub struct SpaceTimeMemory<T> {
+pub struct SpaceTimeMemory {
     phantom_space: PhantomSpace,
-    ufo: UFO<T>,
+    ufo: UFO,  // UFO no longer takes generic parameter
     dimensions: MeshDimensions,
     timestamp: Helium<usize>,
     quantum_descriptor: UnstableDescriptor,

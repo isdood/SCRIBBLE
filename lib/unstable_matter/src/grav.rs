@@ -7,6 +7,8 @@ use crate::{
     constants::*,
     phantom::{QuantumCell, Horizon},
     Vector3D,
+    mesh::MeshCell,
+    helium::Helium,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -27,6 +29,8 @@ pub struct GravityFieldData {
 #[derive(Debug, Clone)]
 pub struct GravityField {
     data: Horizon,
+    affected_cells: QuantumCell<Vec<MeshCell<f64>>>,
+    timestamp: Helium<usize>,
 }
 
 impl GravityField {
