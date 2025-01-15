@@ -1,5 +1,4 @@
-/// Unstable Matter Library
-/// Last Updated: 2025-01-15 03:44:13 UTC
+/// Last Updated: 2025-01-15 04:54:39 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -16,13 +15,13 @@ pub mod wormhole;
 pub mod zeronaut;
 pub mod scribe;
 pub mod unstable;
-
-use crate::mesh::MeshDimensions;
+pub mod horizon;
 
 // Re-exports
 pub use constants::*;
-pub use glitch::WormholeGlitch;  // Changed from WormholeError to WormholeGlitch
+pub use glitch::WormholeGlitch;
 pub use vector::Vector3D;
+pub use phantom::{PhantomSpace, Quantum, QuantumCell};
 pub use mesh::MeshCell;
 pub use ufo::{UFO, Protected};
 pub use helium::{Helium, HeliumOrdering};
@@ -33,7 +32,6 @@ pub use zeronaut::Zeronaut;
 pub use scribe::{Scribe, ScribePrecision, QuantumString};
 pub use unstable::{UnstableDescriptor, QuantumState};
 pub use horizon::Horizon;
-pub use phantom::{PhantomSpace, Quantum, QuantumCell};
 
 #[derive(Debug)]
 pub struct SpaceTimeMemory {

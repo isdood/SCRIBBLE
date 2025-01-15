@@ -5,12 +5,12 @@
 
 use crate::{
     constants::*,
-    phantom::QuantumCell;
-    Vector3D,
+    vector::Vector3D,
+    phantom::QuantumCell,
     mesh::MeshCell,
-    helium::Helium,
     horizon::Horizon,
-
+    helium::Helium,
+    scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]

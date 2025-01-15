@@ -18,6 +18,9 @@ use crate::{
     Vector3D,
 };
 
+use std::ops::{Add, Sub, Mul};
+use crate::scribe::{Scribe, ScribePrecision, QuantumString};
+
 const CURRENT_TIMESTAMP: usize = 1705271710; // 2025-01-14 22:01:50 UTC
 const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
 

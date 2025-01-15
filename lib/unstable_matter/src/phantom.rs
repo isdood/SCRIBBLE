@@ -1,17 +1,16 @@
 /// Quantum PhantomSpace Module
-/// Last Updated: 2025-01-15 04:43:31 UTC
+/// Last Updated: 2025-01-15 04:59:16 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
+    constants::*,
     vector::Vector3D,
     scribe::{Scribe, ScribePrecision, QuantumString},
-    helium::{Helium, HeliumOrdering},
+    helium::Helium,
 };
 
-use crate::constants::*;
-
-const CURRENT_TIMESTAMP: usize = 1705287811; // 2025-01-15 04:43:31 UTC
+const CURRENT_TIMESTAMP: usize = 1705287556; // 2025-01-15 04:59:16 UTC
 const COHERENCE_DECAY_FACTOR: f64 = 0.99;
 const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
 
@@ -24,13 +23,13 @@ pub trait Quantum: Scribe {
 }
 
 /// Thread-safe quantum cell implementation
-pub struct QuantumCell<T> {
+pub struct QuantumCell<T: 'static> {
     value: Helium<T>,
     coherence: Helium<f64>,
     timestamp: Helium<usize>,
 }
 
-impl<T: Clone> QuantumCell<T> {
+impl<T: Clone + 'static> QuantumCell<T> {
     pub fn new(value: T) -> Self {
         Self {
             value: Helium::new(value),
@@ -82,7 +81,7 @@ impl<T: Clone> QuantumCell<T> {
     }
 }
 
-impl<T: Scribe + Clone> Scribe for QuantumCell<T> {
+impl<T: Scribe + Clone + 'static> Scribe for QuantumCell<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("Quantum(");
         self.value.quantum_load().scribe(precision, output);
@@ -93,6 +92,7 @@ impl<T: Scribe + Clone> Scribe for QuantumCell<T> {
 }
 
 /// PhantomSpace implementation
+#[derive(Clone)]
 pub struct PhantomSpace {
     position: QuantumCell<Vector3D<f64>>,
     coherence: QuantumCell<f64>,

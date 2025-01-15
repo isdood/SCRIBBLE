@@ -1,17 +1,19 @@
 /// Quantum Mesh Module
-/// Last Updated: 2025-01-15 04:32:42 UTC
+/// Last Updated: 2025-01-15 04:56:15 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
+    constants::*,
+    scribe::{Scribe, ScribePrecision, QuantumString},
     GravityField,
     BlackHole,
     phantom::{Quantum, QuantumCell},
     vector::Vector3D,
     Wormhole,
     WormholeGlitch,
+    helium::Helium,
 };
-
 
 #[derive(Debug, Clone)]
 pub struct MeshDimensions {
@@ -54,7 +56,7 @@ impl Scribe for MeshDimensions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]  // Added Clone
 pub enum CellState {
     Free,
     Entangled,
@@ -63,6 +65,7 @@ pub enum CellState {
     Absorbed,
 }
 
+#[derive(Clone)]  // Added Clone implementation
 pub struct MeshCell {
     position: QuantumCell<Vector3D<f64>>,
     mass: Helium<f64>,
@@ -72,7 +75,7 @@ pub struct MeshCell {
     wormhole_connection: Option<Wormhole>,
 }
 
-impl MeshCell {  // Remove generic parameter
+impl MeshCell {
     pub fn new(position: Vector3D<f64>) -> Self {
         Self {
             position: QuantumCell::new(position),
@@ -89,7 +92,7 @@ impl MeshCell {  // Remove generic parameter
             return Err("Cell quantum state unstable");
         }
 
-        let position = self.position.get().clone();
+        let position = self.position.get();
         let new_position = position + force;
         self.position.set(new_position);
         self.decay_coherence();
@@ -102,7 +105,7 @@ impl MeshCell {  // Remove generic parameter
             return Err("Cell quantum state unstable");
         }
 
-        let position = self.position.get().clone();
+        let position = self.position.get();
         let mass = self.mass.quantum_load();
         let force = field.calculate_force_at(position, mass);
         self.apply_force(force)?;
@@ -119,7 +122,7 @@ impl MeshCell {  // Remove generic parameter
             return Err("Cell quantum state unstable");
         }
 
-        let position = self.position.get().clone();
+        let position = self.position.get();
         let blackhole_pos = blackhole.get_position();
         let distance = (position - blackhole_pos).magnitude();
 
@@ -149,7 +152,7 @@ impl MeshCell {  // Remove generic parameter
     }
 
     pub fn get_position(&self) -> Vector3D<f64> {
-        self.position.get().clone()
+        self.position.get()
     }
 
     pub fn get_mass(&self) -> f64 {
@@ -157,7 +160,7 @@ impl MeshCell {  // Remove generic parameter
     }
 
     pub fn get_state(&self) -> CellState {
-        self.state.get().clone()
+        self.state.get()
     }
 
     pub fn get_coherence(&self) -> f64 {
@@ -175,6 +178,17 @@ impl MeshCell {  // Remove generic parameter
     }
 }
 
+impl Scribe for MeshCell {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("MeshCell{pos=");
+        self.position.scribe(precision, output);
+        output.push_str(", mass=");
+        output.push_f64(self.get_mass(), precision.decimal_places());
+        output.push_str(", coherence=");
+        output.push_f64(self.get_coherence(), precision.decimal_places());
+        output.push_char('}');
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -183,7 +197,7 @@ mod tests {
     #[test]
     fn test_mesh_cell_creation() {
         let position = Vector3D::new(1.0, 2.0, 3.0);
-        let cell = MeshCell::<()>::new(position.clone());
+        let cell = MeshCell::new(position.clone());
 
         assert_eq!(cell.get_state(), CellState::Free);
         assert_eq!(cell.get_position(), position);
@@ -192,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_force_application() {
-        let mut cell = MeshCell::<()>::new(Vector3D::new(0.0, 0.0, 0.0));
+        let mut cell = MeshCell::new(Vector3D::new(0.0, 0.0, 0.0));
         let force = Vector3D::new(1.0, 0.0, 0.0);
 
         assert!(cell.apply_force(force).is_ok());
@@ -201,7 +215,7 @@ mod tests {
 
     #[test]
     fn test_quantum_stability() {
-        let cell = MeshCell::<()>::new(Vector3D::new(0.0, 0.0, 0.0));
+        let cell = MeshCell::new(Vector3D::new(0.0, 0.0, 0.0));
 
         // Force decoherence
         for _ in 0..100 {
@@ -209,5 +223,14 @@ mod tests {
         }
 
         assert!(!cell.is_quantum_stable());
+    }
+
+    #[test]
+    fn test_scribe_output() {
+        let cell = MeshCell::new(Vector3D::new(1.0, 2.0, 3.0));
+        let mut output = QuantumString::new();
+        cell.scribe(ScribePrecision::Standard, &mut output);
+        assert!(output.as_str().contains("MeshCell{pos="));
+        assert!(output.as_str().contains("mass=1.000000"));
     }
 }
