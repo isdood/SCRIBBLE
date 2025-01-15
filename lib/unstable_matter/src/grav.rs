@@ -1,5 +1,5 @@
 /// Quantum Gravity Implementation
-/// Last Updated: 2025-01-14 23:53:31 UTC
+/// Last Updated: 2025-01-15 05:04:15 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -30,7 +30,7 @@ pub struct GravityFieldData {
 
 #[derive(Debug, Clone)]
 pub struct GravityField {
-    data: Horizon,
+    data: Horizon<GravityFieldData>,
     affected_cells: QuantumCell<Vec<MeshCell>>,
     timestamp: Helium<usize>,
 }
@@ -43,6 +43,8 @@ impl GravityField {
                     field_strength: force_vector.magnitude(),
                                quantum_coherence: 1.0,
             }),
+            affected_cells: QuantumCell::new(Vec::new()),
+            timestamp: Helium::new(CURRENT_TIMESTAMP),
         }
     }
 
@@ -52,7 +54,7 @@ impl GravityField {
             return Vector3D::new(0.0, 0.0, 0.0);
         }
 
-        let data = self.data.get();
+        let data = self.data.observe();
         let force_magnitude = GRAVITATIONAL_CONSTANT * mass * data.field_strength
         / (distance * distance);
         let direction = position.normalize();
@@ -60,28 +62,27 @@ impl GravityField {
     }
 
     pub fn get_field_strength(&self) -> f64 {
-        self.data.get().field_strength
+        self.data.observe().field_strength
     }
 
     pub fn get_quantum_coherence(&self) -> f64 {
-        self.data.get().quantum_coherence
+        self.data.observe().quantum_coherence
     }
 
     pub fn get_force_vector(&self) -> Vector3D<f64> {
-        self.data.get().force_vector.clone()
+        self.data.observe().force_vector.clone()
     }
 }
 
-// Now create a reference type for use in Helium
 #[derive(Debug, Clone)]
 pub struct GravityFieldRef {
-    field: Horizon,
+    field: Horizon<GravityFieldData>,
 }
 
 impl From<GravityField> for GravityFieldRef {
     fn from(field: GravityField) -> Self {
         Self {
-            field: field.data.clone(),
+            field: field.data,
         }
     }
 }
@@ -93,7 +94,7 @@ impl GravityFieldRef {
             return Vector3D::new(0.0, 0.0, 0.0);
         }
 
-        let data = self.field.get();
+        let data = self.field.observe();
         let force_magnitude = GRAVITATIONAL_CONSTANT * mass * data.field_strength
         / (distance * distance);
         let direction = position.normalize();
@@ -103,7 +104,7 @@ impl GravityFieldRef {
 
 pub struct MeshGravity {
     field: GravityField,
-    affected_cells: QuantumCell<Vec<MeshCell<f64>>>,
+    affected_cells: QuantumCell<Vec<MeshCell>>,
     quantum_state: QuantumCell<GravityState>,
     timestamp: Helium<usize>,
 }
@@ -114,17 +115,18 @@ impl MeshGravity {
             field: GravityField::new(Vector3D::new(0.0, -1.0, 0.0)),
             affected_cells: QuantumCell::new(Vec::new()),
             quantum_state: QuantumCell::new(GravityState::Stable),
-            timestamp: Helium::new(1705272811), // 2025-01-14 23:53:31 UTC
+            timestamp: Helium::new(CURRENT_TIMESTAMP),
         }
     }
 
-    pub fn affect_cell(&mut self, cell: MeshCell<f64>) -> Result<(), &'static str> {
+    pub fn affect_cell(&mut self, cell: MeshCell) -> Result<(), &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
 
-        let mut cells = self.affected_cells.get_mut();
+        let mut cells = self.affected_cells.get();
         cells.push(cell);
+        self.affected_cells.set(cells);
         self.apply_gravitational_effects()?;
         Ok(())
     }
@@ -134,7 +136,7 @@ impl MeshGravity {
             return Err("Quantum state unstable");
         }
 
-        let cells = self.affected_cells.get_mut();
+        let mut cells = self.affected_cells.get();
         let field_strength = self.field.get_field_strength();
 
         for cell in cells.iter_mut() {
@@ -146,7 +148,7 @@ impl MeshGravity {
                 return Err("Quantum warp detected");
             }
 
-            let force = self.field.calculate_force_at(*position, cell.get_mass());
+            let force = self.field.calculate_force_at(position, cell.get_mass());
             cell.apply_force(force)?;
         }
 
@@ -166,7 +168,6 @@ impl MeshGravity {
         let current = self.field.get_quantum_coherence();
         let new_coherence = current * COHERENCE_DECAY_FACTOR;
 
-        // Update quantum state based on coherence
         let new_state = match new_coherence {
             c if c > 0.9 => GravityState::Stable,
             c if c > 0.7 => GravityState::Warped,
@@ -175,6 +176,7 @@ impl MeshGravity {
         };
 
         self.quantum_state.set(new_state);
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
     }
 
     pub fn entangle_with(&mut self, other: &mut MeshGravity) -> Result<(), &'static str> {
@@ -184,11 +186,22 @@ impl MeshGravity {
 
         let combined_coherence = (self.get_coherence() + other.get_coherence()) / 2.0;
 
-        // Update quantum states
         self.quantum_state.set(GravityState::Entangled);
         other.quantum_state.set(GravityState::Entangled);
 
         Ok(())
+    }
+}
+
+impl Scribe for GravityField {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("GravityField{force=");
+        self.get_force_vector().scribe(precision, output);
+        output.push_str(", strength=");
+        output.push_f64(self.get_field_strength(), precision.decimal_places());
+        output.push_str(", coherence=");
+        output.push_f64(self.get_quantum_coherence(), precision.decimal_places());
+        output.push_char('}');
     }
 }
 
@@ -206,7 +219,6 @@ mod tests {
     fn test_mesh_gravity_stability() {
         let mut gravity = MeshGravity::new();
 
-        // Force decoherence
         for _ in 0..100 {
             let _ = gravity.apply_gravitational_effects();
         }
