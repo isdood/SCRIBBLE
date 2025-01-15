@@ -1,10 +1,10 @@
 /// Quantum Black Hole Module
-/// Last Updated: 2025-01-15 04:32:42 UTC
+/// Last Updated: 2025-01-15 05:05:20 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
-    constants::*,  // This includes CURRENT_TIMESTAMP
+    constants::*,
     helium::Helium,
     phantom::QuantumCell,
     vector::Vector3D,
@@ -31,20 +31,22 @@ pub struct BlackHole {
     mass: Helium<f64>,
     radius: Helium<f64>,
     coherence: Helium<f64>,
-    affected_cells: QuantumCell<Vec<MeshCell<f64>>>,
-    state: QuantumCell<BlackHoleState>,
+    temperature: Helium<f64>,
+    affected_cells: QuantumCell<Vec<MeshCell>>,
+    quantum_state: QuantumCell<BlackHoleState>,
     timestamp: Helium<usize>,
 }
 
 impl BlackHole {
-    pub fn new(mass: f64) -> Self {
+    pub fn new(mass: f64, position: Vector3D<f64>) -> Self {
         let mut bh = Self {
-            position: QuantumCell::new(Vector3D::new(0.0, 0.0, 0.0)),
+            position: QuantumCell::new(position),
             mass: Helium::new(mass),
             radius: Helium::new(SCHWARZSCHILD_CONSTANT * mass),
             coherence: Helium::new(1.0),
+            temperature: Helium::new(HAWKING_TEMPERATURE_CONSTANT / mass),
             affected_cells: QuantumCell::new(Vec::new()),
-            state: QuantumCell::new(BlackHoleState::Stable),
+            quantum_state: QuantumCell::new(BlackHoleState::Stable),
             timestamp: Helium::new(CURRENT_TIMESTAMP),
         };
         bh.update_event_horizon();
@@ -56,13 +58,14 @@ impl BlackHole {
         self.radius.quantum_store(SCHWARZSCHILD_CONSTANT * mass);
     }
 
-    pub fn affect_mesh_cell<T: 'static>(&mut self, cell: MeshCell<T>) -> Result<(), &'static str> {
+    pub fn affect_mesh_cell(&mut self, cell: MeshCell) -> Result<(), &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
 
-        let mut cells = self.affected_cells.get_mut();
+        let mut cells = self.affected_cells.get();
         cells.push(cell);
+        self.affected_cells.set(cells);
         self.apply_gravitational_effects()?;
         Ok(())
     }
@@ -72,8 +75,8 @@ impl BlackHole {
             return Err("Quantum state unstable");
         }
 
-        let cells = self.affected_cells.get_mut();
-        let position = *self.position.get();
+        let mut cells = self.affected_cells.get();
+        let position = self.position.get();
         let mass = self.mass.quantum_load();
 
         for cell in cells.iter_mut() {
@@ -97,7 +100,7 @@ impl BlackHole {
         Ok(())
     }
 
-    fn absorb_cell<T: 'static>(&mut self, cell: &MeshCell<T>) -> Result<(), &'static str> {
+    fn absorb_cell(&mut self, cell: &MeshCell) -> Result<(), &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state unstable");
         }
@@ -154,8 +157,8 @@ impl BlackHole {
         let current = self.coherence.quantum_load();
         let new_coherence = current * 0.99;
         self.coherence.quantum_store(new_coherence);
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
 
-        // Update quantum state based on coherence and properties
         let new_state = match (new_coherence, self.radius.quantum_load()) {
             (c, _) if c < QUANTUM_COHERENCE_THRESHOLD => BlackHoleState::Decoherent,
             (c, r) if c > EVENT_HORIZON_COHERENCE && r > 0.0 => BlackHoleState::Stable,
@@ -200,6 +203,10 @@ impl BlackHole {
 
     pub fn get_mass(&self) -> f64 {
         self.mass.quantum_load()
+    }
+
+    pub fn get_position(&self) -> Vector3D<f64> {
+        self.position.get()
     }
 }
 
