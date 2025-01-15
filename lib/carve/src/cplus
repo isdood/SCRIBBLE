@@ -1,5 +1,5 @@
-/// Python (Snek) Translation Module
-/// Last Updated: 2025-01-15 03:02:30 UTC
+/// C++ Translation Module
+/// Last Updated: 2025-01-15 03:06:30 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -11,15 +11,15 @@ use unstable_matter::{
 };
 
 #[derive(Debug, PartialEq)]
-pub enum SnekBlockState {
-    Outside,    // Not in a Snek block
-    Starting,   // Found opening !snek!
-    Inside,     // Processing Snek code
-    Ending,     // Found closing !snek!
+pub enum CPlusBlockState {
+    Outside,    // Not in a C++ block
+    Starting,   // Found opening !cplus!
+    Inside,     // Processing C++ code
+    Ending,     // Found closing !cplus!
 }
 
 #[derive(Debug)]
-pub enum SnekState {
+pub enum CPlusState {
     Parsing,
     Translating,
     Optimizing,
@@ -28,89 +28,89 @@ pub enum SnekState {
     Failed,
 }
 
-/// Main translator for Python code
+/// Main translator for C++ code
 #[derive(Debug)]
-pub struct SnekTranslator {
+pub struct CPlusTranslator {
     state: TranslationState,
-    snek_state: SnekState,
-    block_state: SnekBlockState,
+    cplus_state: CPlusState,
+    block_state: CPlusBlockState,
     indentation_level: usize,
     quantum_stability: f64,
     current_block: Vec<String>,
 }
 
-impl SnekTranslator {
+impl CPlusTranslator {
     pub fn new() -> Self {
         Self {
             state: TranslationState::new(),
-            snek_state: SnekState::Parsing,
-            block_state: SnekBlockState::Outside,
+            cplus_state: CPlusState::Parsing,
+            block_state: CPlusBlockState::Outside,
             indentation_level: 0,
             quantum_stability: 1.0,
             current_block: Vec::new(),
         }
     }
 
-    /// Translate Python code to the target format
+    /// Translate C++ code to the target format
     pub fn translate(&mut self, source: &str) -> Result<String, &'static str> {
         if !self.is_quantum_stable() {
             return Err("Quantum state too unstable for translation");
         }
 
-        self.snek_state = SnekState::Translating;
+        self.cplus_state = CPlusState::Translating;
         self.process_code(source)
     }
 
-    /// Process and transform Python code
+    /// Process and transform C++ code
     fn process_code(&mut self, source: &str) -> Result<String, &'static str> {
         let mut result = String::new();
 
         for line in source.lines() {
             match self.block_state {
-                SnekBlockState::Outside => {
-                    if line.trim() == "!snek!" {
-                        self.block_state = SnekBlockState::Starting;
-                        result.push_str("// Begin Snek Translation Block\n");
+                CPlusBlockState::Outside => {
+                    if line.trim() == "!cplus!" {
+                        self.block_state = CPlusBlockState::Starting;
+                        result.push_str("// Begin C++ Translation Block\n");
                     } else {
-                        // Pass through non-Snek code unchanged
+                        // Pass through non-C++ code unchanged
                         result.push_str(line);
                         result.push('\n');
                     }
                 },
-                SnekBlockState::Starting => {
-                    self.block_state = SnekBlockState::Inside;
+                CPlusBlockState::Starting => {
+                    self.block_state = CPlusBlockState::Inside;
                     self.current_block.clear();
                     self.current_block.push(line.to_string());
                 },
-                SnekBlockState::Inside => {
-                    if line.trim() == "!snek!" {
-                        self.block_state = SnekBlockState::Ending;
+                CPlusBlockState::Inside => {
+                    if line.trim() == "!cplus!" {
+                        self.block_state = CPlusBlockState::Ending;
                         // Process the collected block
-                        let translated = self.process_snek_block()?;
+                        let translated = self.process_cplus_block()?;
                         result.push_str(&translated);
-                        result.push_str("// End Snek Translation Block\n");
-                        self.block_state = SnekBlockState::Outside;
+                        result.push_str("// End C++ Translation Block\n");
+                        self.block_state = CPlusBlockState::Outside;
                         self.current_block.clear();
                     } else {
                         self.current_block.push(line.to_string());
                     }
                 },
-                SnekBlockState::Ending => {
-                    self.block_state = SnekBlockState::Outside;
+                CPlusBlockState::Ending => {
+                    self.block_state = CPlusBlockState::Outside;
                 }
             }
         }
 
-        if self.block_state != SnekBlockState::Outside {
-            return Err("Unclosed Snek block - missing !snek! terminator");
+        if self.block_state != CPlusBlockState::Outside {
+            return Err("Unclosed C++ block - missing !cplus! terminator");
         }
 
-        self.snek_state = SnekState::Complete;
+        self.cplus_state = CPlusState::Complete;
         Ok(result)
     }
 
-    /// Process a complete Snek block
-    fn process_snek_block(&mut self) -> Result<String, &'static str> {
+    /// Process a complete C++ block
+    fn process_cplus_block(&mut self) -> Result<String, &'static str> {
         let mut result = String::new();
         let mut base_indent = None;
 
@@ -139,24 +139,23 @@ impl SnekTranslator {
         Ok(result)
     }
 
-    /// Process a single line of Python code
+    /// Process a single line of C++ code
     fn process_line(&mut self, line: &str) -> Result<String, &'static str> {
-        // Skip empty lines and the !snek! markers
+        // Skip empty lines and the !cplus! markers
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed == "!snek!" {
+        if trimmed.is_empty() || trimmed == "!cplus!" {
             return Ok(String::new());
         }
 
         // Basic translation rules
         let translated = match trimmed {
-            s if s.starts_with("def ") => self.translate_function(s),
-            s if s.starts_with("class ") => self.translate_class(s),
-            s if s.contains("=") => self.translate_assignment(s),
+            s if s.starts_with("int ") => self.translate_int_declaration(s),
+            s if s.starts_with("double ") => self.translate_double_declaration(s),
+            s if s.starts_with("std::cout << ") => self.translate_print(s),
             s if s.starts_with("if ") => self.translate_if_statement(s),
             s if s.starts_with("for ") => self.translate_for_loop(s),
             s if s.starts_with("while ") => self.translate_while_loop(s),
-            s if s.starts_with("return ") => self.translate_return(s),
-            s if s.starts_with("#") => self.translate_comment(s),
+            s if s.starts_with("//") => self.translate_comment(s),
             _ => Ok(String::from(trimmed)),
         }?;
 
@@ -165,30 +164,25 @@ impl SnekTranslator {
     }
 
     // Translation helper methods
-    fn translate_function(&self, line: &str) -> Result<String, &'static str> {
-        let without_def = line.strip_prefix("def ").unwrap();
-        let (name, params) = without_def.split_once('(').unwrap_or((without_def, ""));
-        let params = params.trim_end_matches("):").trim();
-        Ok(format!("pub fn {}({}) {{", name, params))
+    fn translate_int_declaration(&self, line: &str) -> Result<String, &'static str> {
+        let without_int = line.strip_prefix("int ").unwrap();
+        Ok(format!("let {};", without_int))
     }
 
-    fn translate_class(&self, line: &str) -> Result<String, &'static str> {
-        let without_class = line.strip_prefix("class ").unwrap();
-        let name = without_class.trim_end_matches(':');
-        Ok(format!("#[derive(Debug)]\npub struct {} {{", name))
+    fn translate_double_declaration(&self, line: &str) -> Result<String, &'static str> {
+        let without_double = line.strip_prefix("double ").unwrap();
+        Ok(format!("let {};", without_double))
     }
 
-    fn translate_assignment(&self, line: &str) -> Result<String, &'static str> {
-        if line.contains("+=") || line.contains("-=") || line.contains("*=") || line.contains("/=") {
-            Ok(line.to_string())
-        } else {
-            Ok(format!("let {}", line))
-        }
+    fn translate_print(&self, line: &str) -> Result<String, &'static str> {
+        let without_cout = line.strip_prefix("std::cout << ").unwrap();
+        let content = without_cout.trim_end_matches(";").replace(" << ", " + ");
+        Ok(format!("println!({});", content))
     }
 
     fn translate_if_statement(&self, line: &str) -> Result<String, &'static str> {
         let without_if = line.strip_prefix("if ").unwrap();
-        let condition = without_if.trim_end_matches(':');
+        let condition = without_if.trim_end_matches(';').trim();
         Ok(format!("if {} {{", condition))
     }
 
@@ -202,17 +196,12 @@ impl SnekTranslator {
         Ok(format!("while {} {{", without_while))
     }
 
-    fn translate_return(&self, line: &str) -> Result<String, &'static str> {
-        let without_return = line.strip_prefix("return ").unwrap();
-        Ok(format!("return {};", without_return))
-    }
-
     fn translate_comment(&self, line: &str) -> Result<String, &'static str> {
-        Ok(format!("// {}", line.trim_start_matches('#').trim()))
+        Ok(format!("// {}", line.trim_start_matches("//").trim()))
     }
 }
 
-impl Quantum for SnekTranslator {
+impl Quantum for CPlusTranslator {
     fn is_quantum_stable(&self) -> bool {
         self.state.is_quantum_stable() &&
         self.quantum_stability > QUANTUM_COHERENCE_THRESHOLD
@@ -233,9 +222,9 @@ impl Quantum for SnekTranslator {
     }
 }
 
-impl Scribe for SnekTranslator {
+impl Scribe for CPlusTranslator {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("SnekTranslator[");
+        output.push_str("CPlusTranslator[");
         self.state.scribe(precision, output);
         output.push_str(", stability=");
         output.push_f64(self.quantum_stability, precision.decimal_places());
@@ -249,31 +238,31 @@ mod tests {
 
     #[test]
     fn test_basic_translation() {
-        let mut translator = SnekTranslator::new();
-        let source = "!snek! def hello_world():\n    print('Hello, World!') !snek!";
+        let mut translator = CPlusTranslator::new();
+        let source = "!cplus! int x = 42; !cplus!";
         let result = translator.translate(source).unwrap();
-        assert!(result.contains("pub fn hello_world() {"));
+        assert!(result.contains("let x = 42;"));
     }
 
     #[test]
     fn test_quantum_stability() {
-        let translator = SnekTranslator::new();
+        let translator = CPlusTranslator::new();
         assert!(translator.is_quantum_stable());
         assert!(translator.get_coherence() > QUANTUM_COHERENCE_THRESHOLD);
     }
 
     #[test]
     fn test_translation_state() {
-        let mut translator = SnekTranslator::new();
-        assert!(matches!(translator.snek_state, SnekState::Parsing));
-        let _ = translator.translate("!snek! x = 1 !snek!");
-        assert!(matches!(translator.snek_state, SnekState::Complete));
+        let mut translator = CPlusTranslator::new();
+        assert!(matches!(translator.cplus_state, CPlusState::Parsing));
+        let _ = translator.translate("!cplus! int x = 42; !cplus!");
+        assert!(matches!(translator.cplus_state, CPlusState::Complete));
     }
 
     #[test]
-    fn test_unclosed_snek_block() {
-        let mut translator = SnekTranslator::new();
-        let source = "!snek! def hello_world():\n    print('Hello, World!')";
+    fn test_unclosed_cplus_block() {
+        let mut translator = CPlusTranslator::new();
+        let source = "!cplus! int x = 42;";
         let result = translator.translate(source);
         assert!(result.is_err());
     }

@@ -1,21 +1,25 @@
 /// Carve Translation Library
-/// Last Updated: 2025-01-15 02:52:50 UTC
+/// Last Updated: 2025-01-15 03:08:03 UTC
 /// Author: isdood
 /// Current User: isdood
 
 pub mod snek;
 pub mod bash;
+pub mod fish;
+pub mod cplus;
+pub mod spacemap;
 
 // Re-exports
 pub use snek::SnekTranslator;
 pub use bash::BashTranslator;
+pub use fish::FishTranslator;
+pub use cplus::CPlusTranslator;
+pub use spacemap::SpaceMap;
 
 use unstable_matter::{
     Quantum, ScribePrecision, Scribe, QuantumString,
     Vector3D, UnstableDescriptor, QuantumState
 };
-
-use std::collections::HashMap;
 
 /// Represents a translation state in quantum space
 #[derive(Debug)]
@@ -78,14 +82,16 @@ impl Scribe for TranslationState {
 
 /// Unified Translator that handles different markers
 pub struct UnifiedTranslator {
-    translators: HashMap<String, Box<dyn Translator>>,
+    translators: SpaceMap<String, Box<dyn Translator>>,
 }
 
 impl UnifiedTranslator {
     pub fn new() -> Self {
-        let mut translators: HashMap<String, Box<dyn Translator>> = HashMap::new();
+        let mut translators: SpaceMap<String, Box<dyn Translator>> = SpaceMap::new();
         translators.insert("snek".to_string(), Box::new(SnekTranslator::new()));
         translators.insert("bash".to_string(), Box::new(BashTranslator::new()));
+        translators.insert("fish".to_string(), Box::new(FishTranslator::new()));
+        translators.insert("cplus".to_string(), Box::new(CPlusTranslator::new()));
 
         Self { translators }
     }
@@ -93,33 +99,30 @@ impl UnifiedTranslator {
     /// Translate code based on markers
     pub fn translate(&mut self, source: &str) -> Result<String, &'static str> {
         let mut result = String::new();
-        let mut current_translator: Option<&mut Box<dyn Translator>> = None;
+        let mut buffer = String::new();
 
-        for line in source.lines() {
-            if let Some(translator_name) = self.detect_marker(line) {
-                if let Some(translator) = self.translators.get_mut(&translator_name) {
-                    if current_translator.is_some() {
-                        // End of current translation block
-                        result.push_str("// End Translation Block\n");
-                        current_translator = None;
-                    } else {
-                        // Start of new translation block
-                        result.push_str("// Begin Translation Block\n");
-                        current_translator = Some(translator);
-                        result.push_str(line);
-                        result.push('\n');
-                    }
-                }
-            } else {
-                if let Some(translator) = &mut current_translator {
-                    let translated_line = translator.translate_line(line)?;
-                    result.push_str(&translated_line);
-                    result.push('\n');
+        let mut current_translator: Option<&mut Box<dyn Translator>> = None;
+        let parts: Vec<&str> = source.split('!').collect();
+
+        for part in parts {
+            if let Some(translator_name) = self.translators.get(part) {
+                if current_translator.is_some() {
+                    // End of current translation block
+                    result.push_str("// End Translation Block\n");
+                    let translated_content = current_translator.unwrap().translate_line(&buffer)?;
+                    result.push_str(&translated_content);
+                    buffer.clear();
+                    current_translator = None;
                 } else {
-                    // Pass through non-translated code
-                    result.push_str(line);
-                    result.push('\n');
+                    // Start of new translation block
+                    result.push_str("// Begin Translation Block\n");
+                    current_translator = Some(translator_name);
                 }
+            } else if let Some(translator) = &mut current_translator {
+                buffer.push_str(part);
+            } else {
+                // Pass through non-translated content
+                result.push_str(part);
             }
         }
 
@@ -128,18 +131,6 @@ impl UnifiedTranslator {
         }
 
         Ok(result)
-    }
-
-    /// Detect translation marker in the line
-    fn detect_marker(&self, line: &str) -> Option<String> {
-        let trimmed = line.trim();
-        if trimmed.starts_with("!!") && trimmed.ends_with("!!") {
-            let marker_name = trimmed.trim_matches('!').to_string();
-            if self.translators.contains_key(&marker_name) {
-                return Some(marker_name);
-            }
-        }
-        None
     }
 }
 
@@ -157,6 +148,20 @@ impl Translator for SnekTranslator {
 
 // Implement Translator for BashTranslator
 impl Translator for BashTranslator {
+    fn translate_line(&mut self, line: &str) -> Result<String, &'static str> {
+        self.process_line(line)
+    }
+}
+
+// Implement Translator for FishTranslator
+impl Translator for FishTranslator {
+    fn translate_line(&mut self, line: &str) -> Result<String, &'static str> {
+        self.process_line(line)
+    }
+}
+
+// Implement Translator for CPlusTranslator
+impl Translator for CPlusTranslator {
     fn translate_line(&mut self, line: &str) -> Result<String, &'static str> {
         self.process_line(line)
     }
