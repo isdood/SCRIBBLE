@@ -1,10 +1,13 @@
 /// Quantum Vector Module
-/// Last Updated: 2025-01-15 05:00:15 UTC
+/// Last Updated: 2025-01-15 05:06:34 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use std::ops::{Add, Sub, Mul};
-use crate::scribe::{Scribe, ScribePrecision, QuantumString};
+use crate::{
+    scribe::{Scribe, ScribePrecision, QuantumString},
+    phantom::Quantum,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Vector3D<T> {
@@ -67,6 +70,7 @@ impl<T: Mul<f64, Output = T>> Mul<f64> for Vector3D<T> {
     }
 }
 
+// Single Scribe implementation for Vector3D
 impl<T: Scribe> Scribe for Vector3D<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("⟨");
@@ -79,11 +83,18 @@ impl<T: Scribe> Scribe for Vector3D<T> {
     }
 }
 
-impl<T: Clone + Scribe> Vector3D<T> {
+impl Vector3D<f64> {
     pub fn magnitude(&self) -> f64 {
-        // Implementation for magnitude calculation
-        // This is a placeholder - implement actual calculation based on type T
-        0.0
+        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+    }
+
+    pub fn normalize(&self) -> Self {
+        let mag = self.magnitude();
+        if mag > 0.0 {
+            self.clone() * (1.0 / mag)
+        } else {
+            self.clone()
+        }
     }
 }
 
@@ -182,11 +193,27 @@ mod tests {
     }
 
     #[test]
-    fn test_vector3d_addition() {
+    fn test_vector3d_operations() {
         let v1 = Vector3D::new(1.0, 2.0, 3.0);
         let v2 = Vector3D::new(4.0, 5.0, 6.0);
-        let result = v1 + v2;
-        assert_eq!(result, Vector3D::new(5.0, 7.0, 9.0));
+        let sum = v1.clone() + v2.clone();
+        let diff = v2 - v1;
+
+        assert_eq!(sum, Vector3D::new(5.0, 7.0, 9.0));
+        assert_eq!(diff, Vector3D::new(3.0, 3.0, 3.0));
+    }
+
+    #[test]
+    fn test_vector3d_magnitude() {
+        let v = Vector3D::new(3.0, 4.0, 0.0);
+        assert_eq!(v.magnitude(), 5.0);
+    }
+
+    #[test]
+    fn test_vector3d_normalize() {
+        let v = Vector3D::new(3.0, 0.0, 0.0);
+        let normalized = v.normalize();
+        assert_eq!(normalized.magnitude(), 1.0);
     }
 
     #[test]
@@ -194,6 +221,15 @@ mod tests {
         let v1 = Vector4D::new(1.0, 2.0, 3.0, 4.0);
         let v2 = Vector4D::new(5.0, 6.0, 7.0, 8.0);
         let sum = v1 + v2;
+
         assert_eq!(sum, Vector4D::new(6.0, 8.0, 10.0, 12.0));
+    }
+
+    #[test]
+    fn test_scribe_output() {
+        let v = Vector3D::new(1.0, 2.0, 3.0);
+        let mut output = QuantumString::new();
+        v.scribe(ScribePrecision::Standard, &mut output);
+        assert_eq!(output.as_str(), "⟨1.000000, 2.000000, 3.000000⟩");
     }
 }
