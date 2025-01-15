@@ -1,22 +1,39 @@
 /// Carve Translation Library
-/// Last Updated: 2025-01-15 03:08:03 UTC
+/// Last Updated: 2025-01-15 03:57:55 UTC
 /// Author: isdood
 /// Current User: isdood
 
 // Hashbrown space hashing
 pub mod spacemap;
 
+pub mod assy;
+pub mod html;
+pub mod php;
 pub mod snek;
 pub mod bash;
 pub mod fish;
 pub mod cplus;
 pub mod prolog;
+pub mod sql;
+pub mod java;
+pub mod js;
+pub mod pwr;
+pub mod go;
 
 // Re-exports
+pub use html::HtmlTranslator;
+pub use php::PhpTranslator;
 pub use snek::SnekTranslator;
 pub use bash::BashTranslator;
 pub use fish::FishTranslator;
 pub use cplus::CPlusTranslator;
+pub use prolog::PrologTranslator;
+pub use sql::SqlTranslator;
+pub use java::JavaTranslator;
+pub use js::JsTranslator;
+pub use pwr::PwrTranslator;
+pub use assy::AssyTranslator;
+pub use go::GoTranslator;
 pub use spacemap::SpaceMap;
 
 use unstable_matter::{
@@ -95,6 +112,15 @@ impl UnifiedTranslator {
         translators.insert("bash".to_string(), Box::new(BashTranslator::new()));
         translators.insert("fish".to_string(), Box::new(FishTranslator::new()));
         translators.insert("cplus".to_string(), Box::new(CPlusTranslator::new()));
+        translators.insert("prolog".to_string(), Box::new(PrologTranslator::new()));
+        translators.insert("sql".to_string(), Box::new(SqlTranslator::new()));
+        translators.insert("java".to_string(), Box::new(JavaTranslator::new()));
+        translators.insert("js".to_string(), Box::new(JsTranslator::new()));
+        translators.insert("pwr".to_string(), Box::new(PwrTranslator::new()));
+        translators.insert("html".to_string(), Box::new(HtmlTranslator::new()));
+        translators.insert("assy".to_string(), Box::new(AssyTranslator::new()));
+        translators.insert("php".to_string(), Box::new(PhpTranslator::new()));
+        translators.insert("go".to_string(), Box::new(GoTranslator::new()));
 
         Self { translators }
     }
@@ -103,25 +129,41 @@ impl UnifiedTranslator {
     pub fn translate(&mut self, source: &str) -> Result<String, &'static str> {
         let mut result = String::new();
         let mut buffer = String::new();
+        let mut inline_mode = false;
+        let mut current_translator: Option<(&str, &mut Box<dyn Translator>)> = None;
 
-        let mut current_translator: Option<&mut Box<dyn Translator>> = None;
         let parts: Vec<&str> = source.split('!').collect();
 
-        for part in parts {
-            if let Some(translator_name) = self.translators.get(part) {
+        for (i, part) in parts.iter().enumerate() {
+            if let Some(translator_name) = self.translators.get(part.trim()) {
                 if current_translator.is_some() {
                     // End of current translation block
-                    result.push_str("// End Translation Block\n");
-                    let translated_content = current_translator.unwrap().translate_line(&buffer)?;
-                    result.push_str(&translated_content);
+                    let (lang, translator) = current_translator.take().unwrap();
+                    let translated_content = translator.translate_line(&buffer)?;
+
+                    if inline_mode {
+                        // Verify spaces around markers for inline mode
+                        if !buffer.starts_with(' ') || !buffer.ends_with(' ') {
+                            return Err("Inline translation blocks must have spaces before and after the content");
+                        }
+                        let trimmed_content = buffer.trim();
+                        result.push_str(&format!("inline_{}!({});", lang, trimmed_content));
+                    } else {
+                        result.push_str("// End Translation Block\n");
+                        result.push_str(&translated_content);
+                    }
+
                     buffer.clear();
-                    current_translator = None;
                 } else {
                     // Start of new translation block
-                    result.push_str("// Begin Translation Block\n");
-                    current_translator = Some(translator_name);
+                    // Check if we're in inline mode (part of a larger line)
+                    inline_mode = i > 0 && !parts[i-1].trim().is_empty();
+                    if !inline_mode {
+                        result.push_str("// Begin Translation Block\n");
+                    }
+                    current_translator = Some((part.trim(), translator_name));
                 }
-            } else if let Some(translator) = &mut current_translator {
+            } else if let Some((_, translator)) = &mut current_translator {
                 buffer.push_str(part);
             } else {
                 // Pass through non-translated content
@@ -142,30 +184,80 @@ pub trait Translator {
     fn translate_line(&mut self, line: &str) -> Result<String, &'static str>;
 }
 
-// Implement Translator for SnekTranslator
-impl Translator for SnekTranslator {
-    fn translate_line(&mut self, line: &str) -> Result<String, &'static str> {
-        self.process_line(line)
-    }
+// Macro to implement Translator trait
+macro_rules! impl_translator {
+    ($($t:ty),*) => {
+        $(
+            impl Translator for $t {
+                fn translate_line(&mut self, line: &str) -> Result<String, &'static str> {
+                    self.process_line(line)
+                }
+            }
+        )*
+    };
 }
 
-// Implement Translator for BashTranslator
-impl Translator for BashTranslator {
-    fn translate_line(&mut self, line: &str) -> Result<String, &'static str> {
-        self.process_line(line)
-    }
-}
+// Implement Translator for all translators
+impl_translator!(
+    SnekTranslator,
+    BashTranslator,
+    FishTranslator,
+    CPlusTranslator,
+    PrologTranslator,
+    SqlTranslator,
+    JavaTranslator,
+    JsTranslator,
+    PwrTranslator,
+    HtmlTranslator,
+    PhpTranslator,
+    AssyTranslator
+    GoTranslator
+);
 
-// Implement Translator for FishTranslator
-impl Translator for FishTranslator {
-    fn translate_line(&mut self, line: &str) -> Result<String, &'static str> {
-        self.process_line(line)
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-// Implement Translator for CPlusTranslator
-impl Translator for CPlusTranslator {
-    fn translate_line(&mut self, line: &str) -> Result<String, &'static str> {
-        self.process_line(line)
+    #[test]
+    fn test_inline_translation_with_spaces() {
+        let mut translator = UnifiedTranslator::new();
+        let source = "Let's run !sql! SELECT * FROM users !sql! and then !bash! echo 'Done' !bash!";
+        let result = translator.translate(source).unwrap();
+        assert!(result.contains("inline_sql!(SELECT * FROM users);"));
+        assert!(result.contains("inline_bash!(echo 'Done');"));
+    }
+
+    #[test]
+    fn test_inline_translation_without_spaces() {
+        let mut translator = UnifiedTranslator::new();
+        let source = "Let's run !sql!SELECT * FROM users!sql! and continue...";
+        let result = translator.translate(source);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_block_translation() {
+        let mut translator = UnifiedTranslator::new();
+        let source = "!sql!\nSELECT * FROM users;\n!sql!";
+        let result = translator.translate(source).unwrap();
+        assert!(result.contains("// Begin Translation Block"));
+        assert!(result.contains("// End Translation Block"));
+    }
+
+    #[test]
+    fn test_mixed_translations() {
+        let mut translator = UnifiedTranslator::new();
+        let source = "First !bash! echo 'hello' !bash!\n!sql!\nSELECT * FROM users;\n!sql!";
+        let result = translator.translate(source).unwrap();
+        assert!(result.contains("inline_bash!"));
+        assert!(result.contains("// Begin Translation Block"));
+    }
+
+    #[test]
+    fn test_unclosed_block() {
+        let mut translator = UnifiedTranslator::new();
+        let source = "!sql! SELECT * FROM users";
+        let result = translator.translate(source);
+        assert!(result.is_err());
     }
 }
