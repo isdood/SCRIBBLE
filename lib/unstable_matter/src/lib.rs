@@ -1,5 +1,5 @@
 /// Quantum SpaceTime Root Module
-/// Last Updated: 2025-01-14 23:58:11 UTC
+/// Last Updated: 2025-01-15 01:28:17 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -14,23 +14,21 @@ pub mod blackhole;
 pub mod wormhole;
 pub mod zeronaut;
 pub mod scribe;
+pub mod unstable;  // Changed from unstable_matter to unstable
 
 // Re-exports
 pub use constants::*;
 pub use vector::Vector3D;
 pub use phantom::{PhantomSpace, Quantum, QuantumCell};
-pub use mesh::MeshCell;
+pub use mesh::{MeshCell, MeshDimensions};
 pub use ufo::{UFO, Protected};
 pub use helium::{Helium, HeliumOrdering};
 pub use grav::{GravityField, GravityFieldRef};
 pub use blackhole::BlackHole;
 pub use wormhole::{Wormhole, WormholeError};
+pub use unstable::{UnstableDescriptor, QuantumState};  // Changed from unstable_matter to unstable
 pub use zeronaut::Zeronaut;
 pub use scribe::{Scribe, ScribePrecision, QuantumString};
-
-// UnstableDescriptor implementation
-mod unstable;
-pub use unstable::{UnstableDescriptor, QuantumState};
 
 #[derive(Debug)]
 pub struct SpaceTimeMemory<T> {

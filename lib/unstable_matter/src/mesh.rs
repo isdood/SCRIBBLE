@@ -1,5 +1,5 @@
 /// Quantum Mesh Cell Implementation
-/// Last Updated: 2025-01-14 22:39:54 UTC
+/// Last Updated: 2025-01-15 01:21:42 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -12,7 +12,49 @@ use crate::{
     Vector3D,
     wormhole::{ProtectedWormhole, WormholeError},
     blackhole::BlackHole,
+    scribe::{Scribe, ScribePrecision, QuantumString},
 };
+
+#[derive(Debug, Clone)]
+pub struct MeshDimensions {
+    pub width: usize,
+    pub height: usize,
+    pub depth: usize,
+}
+
+impl MeshDimensions {
+    pub fn new(width: usize, height: usize, depth: usize) -> Self {
+        Self {
+            width,
+            height,
+            depth,
+        }
+    }
+
+    pub fn from_vector(vec: Vector3D<usize>) -> Self {
+        Self {
+            width: vec.x(),
+            height: vec.y(),
+            depth: vec.z(),
+        }
+    }
+
+    pub fn to_vector(&self) -> Vector3D<usize> {
+        Vector3D::new(self.width, self.height, self.depth)
+    }
+
+    pub fn volume(&self) -> usize {
+        self.width * self.height * self.depth
+    }
+}
+
+impl Scribe for MeshDimensions {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("Mesh[");
+        output.push_str(&format!("{}x{}x{}", self.width, self.height, self.depth));
+        output.push_char(']');
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CellState {
