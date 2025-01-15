@@ -4,11 +4,27 @@ set -e
 # Clear the screen
 clear
 
-echo "Installation started at 2025-01-15 22:48:34 by isdood"
+# ASCII Art for Wanda
+cat << "EOF"
+ _       __                 __
+| |     / /___ _____  ____/ /___
+| | /| / / __ `/ __ \/ __  / __ \
+| |/ |/ / /_/ / / / / /_/ / /_/ /
+|__/|__/\__,_/_/ /_/\__,_/\____/
+
+    Your AI Assistant Friend
+EOF
+
+echo -e "\nInstallation started at 2025-01-15 22:56:39 by isdood"
+
+# Prompt user to continue
+echo -e "\nThis will install Wanda AI Assistant on your system."
+read -p "Press Enter to continue or Ctrl+C to cancel..."
 
 echo "Cleaning previous build..."
 cargo clean
 
+# Rest of the script remains the same...
 echo "Building Wanda..."
 cargo build --release
 
@@ -65,7 +81,7 @@ done
 echo "Testing connection..."
 ~/.local/bin/wanda status
 
-echo "Installation completed at 2025-01-15 22:48:34"
+echo "Installation completed at 2025-01-15 22:56:39"
 echo "Service is running and responding to commands"
 echo "You can check the service status with: systemctl --user status wanda"
 
