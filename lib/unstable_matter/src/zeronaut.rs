@@ -1,5 +1,5 @@
 /// Quantum-Safe Zero-Based Memory Navigation Module
-/// Last Updated: 2025-01-16 23:44:56 UTC
+/// Last Updated: 2025-01-16 23:50:00 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -8,7 +8,7 @@ use crate::phantom::QuantumCell;
 use crate::constants::CURRENT_TIMESTAMP;
 use crate::scribe::{Scribe, ScribePrecision, QuantumString};
 use crate::quantum::Quantum;
-use std::fmt::{self, Write};
+use std::fmt;
 
 /// Error margin for quantum position calculations
 const QUANTUM_EPSILON: f64 = 1e-10;
@@ -16,13 +16,13 @@ const QUANTUM_EPSILON: f64 = 1e-10;
 const TUNNEL_THRESHOLD: f64 = 0.01;
 
 /// Represents a quantum-safe non-null pointer with spatial coordinates
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Zeronaut<T> {
     ptr: *mut T,
     position: Vector3D<isize>,
-    quantum_state: bool,
-    coherence: f64,
-    last_tunnel: usize,
+    quantum_state: QuantumCell<bool>,
+    coherence: QuantumCell<f64>,
+    last_tunnel: QuantumCell<usize>,
 }
 
 // Safety implementations
@@ -40,9 +40,9 @@ impl<T> Zeronaut<T> {
             Some(Self {
                 ptr,
                 position: Vector3D::new(0, 0, 0),
-                 quantum_state: true,
-                 coherence: 1.0,
-                 last_tunnel: CURRENT_TIMESTAMP,
+                 quantum_state: QuantumCell::new(true),
+                 coherence: QuantumCell::new(1.0),
+                 last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
             })
         }
     }
@@ -57,9 +57,9 @@ impl<T> Zeronaut<T> {
             Some(Self {
                 ptr,
                 position: Vector3D::new(x, y, z),
-                 quantum_state: true,
-                 coherence: 1.0,
-                 last_tunnel: CURRENT_TIMESTAMP,
+                 quantum_state: QuantumCell::new(true),
+                 coherence: QuantumCell::new(1.0),
+                 last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
             })
         }
     }
@@ -69,9 +69,9 @@ impl<T> Zeronaut<T> {
         Self {
             ptr: std::ptr::null_mut(),
             position: Vector3D::new(0, 0, 0),
-            quantum_state: true,
-            coherence: 1.0,
-            last_tunnel: CURRENT_TIMESTAMP,
+            quantum_state: QuantumCell::new(true),
+            coherence: QuantumCell::new(1.0),
+            last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
         }
     }
 
@@ -91,26 +91,48 @@ impl<T> Zeronaut<T> {
         self.decay_coherence();
     }
 
+    /// Attempts quantum tunneling to new coordinates
+    pub fn tunnel_to(&mut self, target: Vector3D<isize>) -> bool {
+        let distance = self.position.quantum_distance(&target);
+        if distance < TUNNEL_THRESHOLD {
+            self.position = target;
+            let current_coherence = self.coherence.get();
+            self.coherence.set(current_coherence * 0.9);
+            self.last_tunnel.set(CURRENT_TIMESTAMP);
+            self.quantum_state.set(true);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Gets the current quantum coherence
     pub fn get_coherence(&self) -> f64 {
-        self.coherence
+        self.coherence.get()
     }
 
     /// Checks if the pointer is in a stable quantum state
     pub fn is_quantum_stable(&self) -> bool {
-        self.quantum_state && self.coherence > 0.5
+        self.quantum_state.get() && self.get_coherence() > 0.5
     }
 
     /// Updates quantum coherence
     fn decay_coherence(&mut self) {
-        self.coherence *= 0.99;
-        self.quantum_state = self.coherence > 0.5;
-        self.last_tunnel = CURRENT_TIMESTAMP;
+        let current = self.coherence.get();
+        self.coherence.set(current * 0.99);
+        self.quantum_state.set(current > 0.5);
+        self.last_tunnel.set(CURRENT_TIMESTAMP);
     }
 
     /// Gets the last tunneling timestamp
     pub fn last_tunnel_time(&self) -> usize {
-        self.last_tunnel
+        self.last_tunnel.get()
+    }
+
+    /// Checks if two Zeronauts are quantum-entangled
+    pub fn is_entangled_with(&self, other: &Zeronaut<T>) -> bool {
+        self.position.quantum_distance(&other.position) < QUANTUM_EPSILON &&
+        (self.get_coherence() - other.get_coherence()).abs() < QUANTUM_EPSILON
     }
 
     /// Convert pointer value to isize
@@ -124,43 +146,38 @@ impl<T> Zeronaut<T> {
     }
 }
 
-impl<T> Scribe for Zeronaut<T> {
+impl<T: Scribe> Scribe for Zeronaut<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        // Format pointer as hexadecimal
-        write!(output, "Zeronaut{{ptr=0x{:x}", self.ptr as usize).unwrap();
+        output.push_str("Zeronaut{ptr=");
+        write!(output, "0x{:x}", self.ptr as usize).unwrap();
         output.push_str(", pos=");
         self.position.scribe(precision, output);
-        write!(output, ", coherence={:.6}", self.coherence).unwrap();
+        output.push_str(", coherence=");
+        write!(output, "{:.6}", self.get_coherence()).unwrap();
         output.push_str(", stable=");
-        output.push_str(if self.quantum_state { "true" } else { "false" });
+        output.push_str(if self.is_quantum_stable() { "true" } else { "false" });
         output.push_char('}');
     }
 }
 
-impl<T> Quantum for Zeronaut<T> {
+impl<T: Scribe> Quantum for Zeronaut<T> {
     fn get_coherence(&self) -> f64 {
-        self.coherence
+        self.get_coherence()
     }
 
     fn is_quantum_stable(&self) -> bool {
-        self.quantum_state && self.coherence > 0.5
+        self.is_quantum_stable()
     }
 
     fn decay_coherence(&self) {
-        // Using interior mutability pattern
-        unsafe {
-            let self_mut = &mut *(self as *const Self as *mut Self);
-            self_mut.coherence *= 0.99;
-            self_mut.quantum_state = self_mut.coherence > 0.5;
-        }
+        let current = self.coherence.get();
+        self.coherence.set(current * 0.99);
+        self.quantum_state.set(current > 0.5);
     }
 
     fn reset_coherence(&self) {
-        unsafe {
-            let self_mut = &mut *(self as *const Self as *mut Self);
-            self_mut.coherence = 1.0;
-            self_mut.quantum_state = true;
-        }
+        self.coherence.set(1.0);
+        self.quantum_state.set(true);
     }
 }
 
@@ -178,18 +195,18 @@ mod tests {
     }
 
     #[test]
-    fn test_zeronaut_zero() {
-        let zeronaut = Zeronaut::<i32>::zero();
-        assert!(zeronaut.as_ptr().is_null());
-        assert_eq!(zeronaut.get_position(), Vector3D::new(0, 0, 0));
-        assert!(zeronaut.is_quantum_stable());
-    }
-
-    #[test]
     fn test_zeronaut_positioning() {
         let mut zeronaut = Zeronaut::<i32>::zero();
         zeronaut.set_position(1, 2, 3);
         assert_eq!(zeronaut.get_position(), Vector3D::new(1, 2, 3));
+        assert!(zeronaut.get_coherence() < 1.0);
+    }
+
+    #[test]
+    fn test_quantum_tunneling() {
+        let mut zeronaut = Zeronaut::<i32>::zero();
+        let target = Vector3D::new(0, 0, 0);
+        assert!(zeronaut.tunnel_to(target));
         assert!(zeronaut.get_coherence() < 1.0);
     }
 }
