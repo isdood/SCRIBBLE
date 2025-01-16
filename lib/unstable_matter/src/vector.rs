@@ -1,23 +1,22 @@
 /// Quantum Vector Module
-/// Last Updated: 2025-01-16 02:56:21 UTC
+/// Last Updated: 2025-01-16 03:11:03 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use std::ops::{Add, Sub, Mul};
 use crate::{
-    constants::*,
     quantum::Quantum,
     scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vector3D<T> {
     x: T,
     y: T,
     z: T,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vector4D<T> {
     x: T,
     y: T,
@@ -25,17 +24,17 @@ pub struct Vector4D<T> {
     w: T,
 }
 
-impl<T> Vector3D<T> {
+impl<T: Copy> Vector3D<T> {
     pub fn new(x: T, y: T, z: T) -> Self {
         Self { x, y, z }
     }
 
-    pub fn x(&self) -> T where T: Copy { self.x }
-    pub fn y(&self) -> T where T: Copy { self.y }
-    pub fn z(&self) -> T where T: Copy { self.z }
+    pub fn x(&self) -> T { self.x }
+    pub fn y(&self) -> T { self.y }
+    pub fn z(&self) -> T { self.z }
 }
 
-impl<T: Add<Output = T>> Add for Vector3D<T> {
+impl<T: Copy + Add<Output = T>> Add for Vector3D<T> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -47,7 +46,7 @@ impl<T: Add<Output = T>> Add for Vector3D<T> {
     }
 }
 
-impl<T: Sub<Output = T>> Sub for Vector3D<T> {
+impl<T: Copy + Sub<Output = T>> Sub for Vector3D<T> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -59,7 +58,7 @@ impl<T: Sub<Output = T>> Sub for Vector3D<T> {
     }
 }
 
-impl<T: Mul<f64, Output = T>> Mul<f64> for Vector3D<T> {
+impl<T: Copy + Mul<f64, Output = T>> Mul<f64> for Vector3D<T> {
     type Output = Self;
 
     fn mul(self, rhs: f64) -> Self::Output {
@@ -91,9 +90,13 @@ impl Vector3D<f64> {
     pub fn normalize(&self) -> Self {
         let mag = self.magnitude();
         if mag > 0.0 {
-            self.clone() * (1.0 / mag)
+            Self::new(
+                self.x / mag,
+                self.y / mag,
+                self.z / mag,
+            )
         } else {
-            self.clone()
+            *self
         }
     }
 
@@ -114,18 +117,21 @@ impl Vector3D<isize> {
     }
 }
 
-impl<T: Copy + PartialEq + Add<Output = T>> Vector4D<T> {
-    pub fn new(x: T, y: T, z: T, w: T) -> Self {
+impl<T> Vector4D<T> {
+    pub fn new(x: T, y: T, z: T, w: T) -> Self
+    where
+    T: Copy
+    {
         Self { x, y, z, w }
     }
 
-    pub fn x(&self) -> T { self.x }
-    pub fn y(&self) -> T { self.y }
-    pub fn z(&self) -> T { self.z }
-    pub fn w(&self) -> T { self.w }
+    pub fn x(&self) -> T where T: Copy { self.x }
+    pub fn y(&self) -> T where T: Copy { self.y }
+    pub fn z(&self) -> T where T: Copy { self.z }
+    pub fn w(&self) -> T where T: Copy { self.w }
 }
 
-impl<T: Copy + PartialEq + Add<Output = T>> Add for Vector4D<T> {
+impl<T: Copy + Add<Output = T>> Add for Vector4D<T> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
@@ -138,7 +144,7 @@ impl<T: Copy + PartialEq + Add<Output = T>> Add for Vector4D<T> {
     }
 }
 
-impl<T: Copy + PartialEq + Sub<Output = T>> Sub for Vector4D<T> {
+impl<T: Copy + Sub<Output = T>> Sub for Vector4D<T> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
@@ -151,7 +157,7 @@ impl<T: Copy + PartialEq + Sub<Output = T>> Sub for Vector4D<T> {
     }
 }
 
-impl<T: Copy + PartialEq + Mul<Output = T>> Mul<T> for Vector4D<T> {
+impl<T: Copy + Mul<Output = T>> Mul<T> for Vector4D<T> {
     type Output = Self;
 
     fn mul(self, rhs: T) -> Self::Output {
@@ -190,4 +196,52 @@ impl<T: Scribe + Clone + 'static> Quantum for Vector4D<T> {
     fn decay_coherence(&self) {}
 
     fn reset_coherence(&self) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vector3d_operations() {
+        let v1 = Vector3D::new(1.0, 2.0, 3.0);
+        let v2 = Vector3D::new(4.0, 5.0, 6.0);
+
+        let sum = v1 + v2;
+        assert_eq!(sum, Vector3D::new(5.0, 7.0, 9.0));
+
+        let diff = v2 - v1;
+        assert_eq!(diff, Vector3D::new(3.0, 3.0, 3.0));
+
+        let scaled = v1 * 2.0;
+        assert_eq!(scaled, Vector3D::new(2.0, 4.0, 6.0));
+    }
+
+    #[test]
+    fn test_vector3d_magnitude() {
+        let v = Vector3D::new(3.0, 4.0, 0.0);
+        assert_eq!(v.magnitude(), 5.0);
+    }
+
+    #[test]
+    fn test_vector3d_normalize() {
+        let v = Vector3D::new(3.0, 4.0, 0.0);
+        let normalized = v.normalize();
+        assert!((normalized.magnitude() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_vector4d_operations() {
+        let v1 = Vector4D::new(1, 2, 3, 4);
+        let v2 = Vector4D::new(5, 6, 7, 8);
+
+        let sum = v1 + v2;
+        assert_eq!(sum, Vector4D::new(6, 8, 10, 12));
+
+        let diff = v2 - v1;
+        assert_eq!(diff, Vector4D::new(4, 4, 4, 4));
+
+        let scaled = v1 * 2;
+        assert_eq!(scaled, Vector4D::new(2, 4, 6, 8));
+    }
 }

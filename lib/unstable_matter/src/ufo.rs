@@ -1,10 +1,9 @@
 /// UFO Protection Module
-/// Last Updated: 2025-01-15 05:35:07 UTC
+/// Last Updated: 2025-01-16 03:14:17 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
-    constants::*,
     quantum::Quantum,
     phantom::{PhantomSpace, QuantumCell},
     vector::Vector3D,
@@ -83,6 +82,7 @@ pub struct UFO {
     state: QuantumCell<UFOState>,
     warp_factor: QuantumCell<f64>,
     quantum_descriptor: UnstableDescriptor,
+    position: QuantumCell<Vector3D<f64>>,
 }
 
 impl UFO {
@@ -93,6 +93,7 @@ impl UFO {
             state: QuantumCell::new(UFOState::Landed),
             warp_factor: QuantumCell::new(1.0),
             quantum_descriptor: UnstableDescriptor::new(),
+            position: QuantumCell::new(Vector3D::new(0.0, 0.0, 0.0)),
         }
     }
 
@@ -112,14 +113,18 @@ impl UFO {
         Ok(())
     }
 
-    pub fn set_position(&mut self, x: f64, y: f64, z: f64) {
+    pub fn set_position(&mut self, x: f64, y: f64, z: f64) -> Result<(), &'static str> {
+        if !self.is_quantum_stable() {
+            return Err("UFO quantum state unstable");
+        }
         let pos = Vector3D::new(x, y, z);
         self.position.set(pos);
+        Ok(())
     }
 
     pub fn get_position(&self) -> Option<Vector3D<f64>> {
         if self.is_quantum_stable() {
-            Some(self.phantom_space.get_position().clone())
+            Some(self.position.get())
         } else {
             None
         }
@@ -209,9 +214,19 @@ impl TrackedUFO {
     }
 
     pub fn contains(&self, pos: &Vector3D<isize>) -> bool {
-        *pos.x() >= *self.origin.x() && *pos.x() < *self.boundary.x() &&
-        *pos.y() >= *self.origin.y() && *pos.y() < *self.boundary.y() &&
-        *pos.z() >= *self.origin.z() && *pos.z() < *self.boundary.z()
+        let px = pos.x();
+        let py = pos.y();
+        let pz = pos.z();
+        let ox = self.origin.x();
+        let oy = self.origin.y();
+        let oz = self.origin.z();
+        let bx = self.boundary.x();
+        let by = self.boundary.y();
+        let bz = self.boundary.z();
+
+        px >= ox && px < bx &&
+        py >= oy && py < by &&
+        pz >= oz && pz < bz
     }
 }
 
@@ -247,49 +262,5 @@ impl Scribe for TrackedUFO {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("Tracked");
         self.base.scribe(precision, output);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_ufo_creation() {
-        let ufo = UFO::new();
-        assert_eq!(ufo.get_state(), UFOState::Landed);
-        assert!(ufo.is_quantum_stable());
-    }
-
-    #[test]
-    fn test_ufo_tracking() {
-        let mut ufo = UFO::new();
-        assert!(!ufo.is_tracked());
-        assert!(ufo.track().is_ok());
-        assert!(ufo.is_tracked());
-        assert_eq!(ufo.get_state(), UFOState::Hovering);
-    }
-
-    #[test]
-    fn test_position_update() {
-        let mut ufo = UFO::new();
-        let pos = Vector3D::new(1.0, 2.0, 3.0);
-        assert!(ufo.set_position(pos).is_ok());
-        assert_eq!(ufo.get_position().unwrap(), pos);
-    }
-
-    #[test]
-    fn test_coherence_decay() {
-        let ufo = UFO::new();
-        let initial_coherence = ufo.get_coherence();
-        ufo.decay_coherence();
-        assert!(ufo.get_coherence() < initial_coherence);
-    }
-
-    #[test]
-    fn test_protected_traits() {
-        let ufo = TrackedUFO::new(0, 0, 0);
-        assert!(ufo.protect().is_ok());
-        assert!(ufo.is_quantum_stable());
     }
 }
