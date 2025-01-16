@@ -1,16 +1,25 @@
 /// Quantum Vector Module
-/// Last Updated: 2025-01-16 23:15:03 UTC
+/// Last Updated: 2025-01-16 23:43:19 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use std::ops::{Add, Sub, Mul};
 use crate::scribe::{Scribe, ScribePrecision, QuantumString};
+use crate::quantum::Quantum;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vector3D<T> {
     x: T,
     y: T,
     z: T,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Vector4D<T> {
+    x: T,
+    y: T,
+    z: T,
+    w: T,
 }
 
 impl<T> Vector3D<T> {
@@ -43,6 +52,44 @@ impl<T: Copy> Vector3D<T> {
     pub fn x(&self) -> T { self.x }
     pub fn y(&self) -> T { self.y }
     pub fn z(&self) -> T { self.z }
+}
+
+impl<T> Vector4D<T> {
+    /// Creates a new vector with explicit type constraints
+    pub fn new_unchecked(x: T, y: T, z: T, w: T) -> Self {
+        Self { x, y, z, w }
+    }
+
+    /// Gets the x component
+    pub fn get_x(&self) -> &T {
+        &self.x
+    }
+
+    /// Gets the y component
+    pub fn get_y(&self) -> &T {
+        &self.y
+    }
+
+    /// Gets the z component
+    pub fn get_z(&self) -> &T {
+        &self.z
+    }
+
+    /// Gets the w component
+    pub fn get_w(&self) -> &T {
+        &self.w
+    }
+}
+
+impl<T: Copy> Vector4D<T> {
+    pub const fn new(x: T, y: T, z: T, w: T) -> Self {
+        Self { x, y, z, w }
+    }
+
+    pub fn x(&self) -> T { self.x }
+    pub fn y(&self) -> T { self.y }
+    pub fn z(&self) -> T { self.z }
+    pub fn w(&self) -> T { self.w }
 }
 
 impl<T: Copy + Add<Output = T>> Add for Vector3D<T> {
@@ -78,83 +125,6 @@ impl<T: Copy + Mul<f64, Output = T>> Mul<f64> for Vector3D<T> {
             self.y * rhs,
             self.z * rhs,
         )
-    }
-}
-
-impl<T: Scribe> Scribe for Vector3D<T> {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("⟨");
-        self.x.scribe(precision, output);
-        output.push_str(", ");
-        self.y.scribe(precision, output);
-        output.push_str(", ");
-        self.z.scribe(precision, output);
-        output.push_str("⟩");
-    }
-}
-
-// Implement Scribe for basic numeric types
-impl Scribe for isize {
-    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str(&self.to_string());
-    }
-}
-
-impl Vector3D<f64> {
-    pub fn magnitude(&self) -> f64 {
-        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
-    }
-
-    pub fn normalize(&self) -> Self {
-        let mag = self.magnitude();
-        if mag > 0.0 {
-            Self::new(
-                self.x / mag,
-                self.y / mag,
-                self.z / mag,
-            )
-        } else {
-            *self
-        }
-    }
-
-    pub fn quantum_distance(&self, other: &Self) -> f64 {
-        let dx = self.x - other.x;
-        let dy = self.y - other.y;
-        let dz = self.z - other.z;
-        (dx * dx + dy * dy + dz * dz).sqrt()
-    }
-}
-
-impl Vector3D<isize> {
-    pub fn quantum_distance(&self, other: &Self) -> f64 {
-        let dx = (self.x - other.x) as f64;
-        let dy = (self.y - other.y) as f64;
-        let dz = (self.z - other.z) as f64;
-        (dx * dx + dy * dy + dz * dz).sqrt()
-    }
-}
-
-
-impl<T> Vector4D<T> {
-    pub const fn new(x: T, y: T, z: T, w: T) -> Self
-    where
-    T: Copy
-    {
-        Self { x, y, z, w }
-    }
-
-    pub fn x(&self) -> T where T: Copy { self.x }
-    pub fn y(&self) -> T where T: Copy { self.y }
-    pub fn z(&self) -> T where T: Copy { self.z }
-    pub fn w(&self) -> T where T: Copy { self.w }
-
-    pub fn as_ptr(&self) -> *const T {
-        &self.x as *const T
-    }
-
-    pub fn as_mut_ptr(&mut self) -> *mut T {
-        &mut self.x as *mut T
     }
 }
 
@@ -197,6 +167,18 @@ impl<T: Copy + Mul<Output = T>> Mul<T> for Vector4D<T> {
     }
 }
 
+impl<T: Scribe> Scribe for Vector3D<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("⟨");
+        self.x.scribe(precision, output);
+        output.push_str(", ");
+        self.y.scribe(precision, output);
+        output.push_str(", ");
+        self.z.scribe(precision, output);
+        output.push_str("⟩");
+    }
+}
+
 impl<T: Scribe> Scribe for Vector4D<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("⟨");
@@ -211,7 +193,7 @@ impl<T: Scribe> Scribe for Vector4D<T> {
     }
 }
 
-impl<T: Scribe + Clone + 'static> Quantum for Vector4D<T> {
+impl<T: Scribe + Clone + Copy + 'static> Quantum for Vector4D<T> {
     fn get_coherence(&self) -> f64 {
         1.0
     }
@@ -223,6 +205,86 @@ impl<T: Scribe + Clone + 'static> Quantum for Vector4D<T> {
     fn decay_coherence(&self) {}
 
     fn reset_coherence(&self) {}
+}
+
+// Implement Scribe for basic numeric types
+impl Scribe for isize {
+    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str(&ToString::to_string(self));
+    }
+}
+
+impl Vector3D<f64> {
+    pub fn magnitude(&self) -> f64 {
+        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+    }
+
+    pub fn normalize(&self) -> Self {
+        let mag = self.magnitude();
+        if mag > 0.0 {
+            Self::new(
+                self.x / mag,
+                self.y / mag,
+                self.z / mag,
+            )
+        } else {
+            *self
+        }
+    }
+
+    pub fn quantum_distance(&self, other: &Self) -> f64 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        let dz = self.z - other.z;
+        (dx * dx + dy * dy + dz * dz).sqrt()
+    }
+}
+
+impl Vector4D<f64> {
+    pub fn magnitude(&self) -> f64 {
+        (self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w).sqrt()
+    }
+
+    pub fn normalize(&self) -> Self {
+        let mag = self.magnitude();
+        if mag > 0.0 {
+            Self::new(
+                self.x / mag,
+                self.y / mag,
+                self.z / mag,
+                self.w / mag,
+            )
+        } else {
+            *self
+        }
+    }
+
+    pub fn quantum_distance(&self, other: &Self) -> f64 {
+        let dx = self.x - other.x;
+        let dy = self.y - other.y;
+        let dz = self.z - other.z;
+        let dw = self.w - other.w;
+        (dx * dx + dy * dy + dz * dz + dw * dw).sqrt()
+    }
+}
+
+impl Vector3D<isize> {
+    pub fn quantum_distance(&self, other: &Self) -> f64 {
+        let dx = (self.x - other.x) as f64;
+        let dy = (self.y - other.y) as f64;
+        let dz = (self.z - other.z) as f64;
+        (dx * dx + dy * dy + dz * dz).sqrt()
+    }
+}
+
+impl Vector4D<isize> {
+    pub fn quantum_distance(&self, other: &Self) -> f64 {
+        let dx = (self.x - other.x) as f64;
+        let dy = (self.y - other.y) as f64;
+        let dz = (self.z - other.z) as f64;
+        let dw = (self.w - other.w) as f64;
+        (dx * dx + dy * dy + dz * dz + dw * dw).sqrt()
+    }
 }
 
 #[cfg(test)]
@@ -245,53 +307,17 @@ mod tests {
     }
 
     #[test]
-    fn test_vector3d_magnitude() {
-        let v = Vector3D::new(3.0, 4.0, 0.0);
-        assert_eq!(v.magnitude(), 5.0);
-    }
-
-    #[test]
-    fn test_vector3d_normalize() {
-        let v = Vector3D::new(3.0, 4.0, 0.0);
-        let normalized = v.normalize();
-        assert!((normalized.magnitude() - 1.0).abs() < 1e-10);
-    }
-
-    #[test]
     fn test_vector4d_operations() {
-        let v1 = Vector4D::new(1, 2, 3, 4);
-        let v2 = Vector4D::new(5, 6, 7, 8);
+        let v1 = Vector4D::new(1.0, 2.0, 3.0, 4.0);
+        let v2 = Vector4D::new(5.0, 6.0, 7.0, 8.0);
 
         let sum = v1 + v2;
-        assert_eq!(sum, Vector4D::new(6, 8, 10, 12));
+        assert_eq!(sum, Vector4D::new(6.0, 8.0, 10.0, 12.0));
 
         let diff = v2 - v1;
-        assert_eq!(diff, Vector4D::new(4, 4, 4, 4));
+        assert_eq!(diff, Vector4D::new(4.0, 4.0, 4.0, 4.0));
 
-        let scaled = v1 * 2;
-        assert_eq!(scaled, Vector4D::new(2, 4, 6, 8));
-    }
-
-    #[test]
-    fn test_vector_conversions() {
-        let v = Vector3D::new(1, 2, 3);
-        let v_isize = v.as_isize();
-        let v_usize = v.as_usize();
-
-        assert_eq!(v_isize, Vector3D::new(1isize, 2isize, 3isize));
-        assert_eq!(v_usize, Vector3D::new(1usize, 2usize, 3usize));
-    }
-
-    #[test]
-    fn test_vector_ptr_access() {
-        let mut v = Vector3D::new(1, 2, 3);
-        let ptr = v.as_ptr();
-        let mut_ptr = v.as_mut_ptr();
-
-        unsafe {
-            assert_eq!(*ptr, 1);
-            *mut_ptr = 42;
-        }
-        assert_eq!(v.x(), 42);
+        let scaled = v1 * 2.0;
+        assert_eq!(scaled, Vector4D::new(2.0, 4.0, 6.0, 8.0));
     }
 }

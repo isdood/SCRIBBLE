@@ -1,5 +1,5 @@
 /// Native 3D Mesh Alignment System
-/// Last Updated: 2025-01-16 23:13:53 UTC
+/// Last Updated: 2025-01-16 23:38:34 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -9,11 +9,11 @@ use crate::{
     zeronaut::Zeronaut,
     helium::Helium,
     helium::HeliumOrdering,
-    quantum::{QuantumBlock, Quantum},
+    quantum::QuantumBlock,
     scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
-const ALIGN_TIMESTAMP: usize = 1705446833; // 2025-01-16 23:13:53 UTC
+const ALIGN_TIMESTAMP: usize = 1705448314; // 2025-01-16 23:38:34 UTC
 const VECTOR_ALIGN: usize = 16;
 const CACHE_LINE: usize = 64;
 const QUANTUM_BLOCK_SIZE: usize = 256;
@@ -32,8 +32,8 @@ pub struct Alignment {
 struct AlignValue(usize);
 
 impl Scribe for AlignValue {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str(&ToString::to_string(&self.0));
+    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str(&self.0.to_string());
     }
 }
 
@@ -84,7 +84,7 @@ impl AlignedSpace {
         let aligned_size = alignment.align_address(size);
         let zero = Zeronaut::<u8>::zero();
         Self {
-            region: unsafe { Vector3D::new_unchecked(zero.clone(), zero.clone(), zero) },
+            region: Vector3D::new_unchecked(zero.clone(), zero.clone(), zero),
             size: aligned_size,
             alignment,
             coherence: Helium::new(1.0),
@@ -122,30 +122,23 @@ impl AlignedSpace {
     }
 
     pub fn get_position(&self) -> Vector3D<isize> {
-        Vector3D::new_unchecked(
-            self.region.get_x().as_isize(),
-                                self.region.get_y().as_isize(),
-                                self.region.get_z().as_isize(),
-        )
+        let x = self.region.get_x().as_isize();
+        let y = self.region.get_y().as_isize();
+        let z = self.region.get_z().as_isize();
+        Vector3D::new_unchecked(x, y, z)
     }
 
     pub fn realign(&mut self) {
-        let aligned_pos = unsafe {
-            Vector3D::new_unchecked(
-                self.alignment.align_address(self.region.get_x().as_usize()) as isize,
-                                    self.alignment.align_address(self.region.get_y().as_usize()) as isize,
-                                    self.alignment.align_address(self.region.get_z().as_usize()) as isize,
-            )
-        };
+        let x = self.alignment.align_address(self.region.get_x().as_usize()) as isize;
+        let y = self.alignment.align_address(self.region.get_y().as_usize()) as isize;
+        let z = self.alignment.align_address(self.region.get_z().as_usize()) as isize;
 
         let zero = Zeronaut::<u8>::zero();
-        self.region = unsafe {
-            Vector3D::new_unchecked(
-                zero.clone(),
-                                    zero.clone(),
-                                    zero,
-            )
-        };
+        self.region = Vector3D::new_unchecked(
+            Zeronaut::<u8>::new_positioned(std::ptr::null_mut(), x, y, z).unwrap_or_else(|| zero.clone()),
+                                              Zeronaut::<u8>::new_positioned(std::ptr::null_mut(), x, y, z).unwrap_or_else(|| zero.clone()),
+                                              Zeronaut::<u8>::new_positioned(std::ptr::null_mut(), x, y, z).unwrap_or_else(|| zero),
+        );
 
         self.decay_coherence();
     }
