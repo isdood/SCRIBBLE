@@ -25,4 +25,13 @@ impl Quantum for SpaceTime {
         let quantum_coherence = self.memory.quantum_descriptor.coherence();
         (space_coherence + quantum_coherence) / 2.0
     }
+
+    fn decay_coherence(&self) {
+        self.memory.phantom_space.decay_coherence();
+        // Quantum descriptor handles its own decay
+    }
+
+    fn reset_coherence(&self) {
+        self.memory.quantum_descriptor.reset_coherence()
+    }
 }

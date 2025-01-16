@@ -1,5 +1,5 @@
 /// Quantum Matter Library
-/// Last Updated: 2025-01-16 02:29:05 UTC
+/// Last Updated: 2025-01-16 04:15:39 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -20,6 +20,8 @@ pub mod phantom;
 pub mod grav;
 pub mod helium;
 pub mod glitch;
+pub mod mesh_clock;
+pub mod meshmath;  // Added meshmath module
 
 // Constants
 pub mod constants;
@@ -40,14 +42,15 @@ pub use grav::{GravityField, GravityFieldRef};
 pub use helium::{Helium, HeliumOrdering};
 pub use constants::*;
 pub use glitch::WormholeGlitch;
+pub use meshmath::MeshMath;  // Export MeshMath
 
 /// SpaceTime Memory System
 #[derive(Debug)]
 pub struct SpaceTimeMemory {
     phantom_space: PhantomSpace,
     ufo: UFO,
-    dimensions: MeshDimensions,
-    timestamp: Helium<usize>,
+    _dimensions: MeshDimensions,
+    _timestamp: Helium<usize>,
     quantum_descriptor: UnstableDescriptor,
 }
 
@@ -56,22 +59,22 @@ impl SpaceTimeMemory {
         Self {
             phantom_space: PhantomSpace::new(),
             ufo: UFO::new(),
-            dimensions,
-            timestamp: Helium::new(CURRENT_TIMESTAMP),
+            _dimensions: dimensions,
+            _timestamp: Helium::new(CURRENT_TIMESTAMP),
             quantum_descriptor: UnstableDescriptor::new(),
         }
     }
 
     pub fn is_protected(&self) -> bool {
-        self.ufo.protect().unwrap_or(false) && self.quantum_descriptor.is_stable()
+        self.ufo.protect().is_ok() && self.quantum_descriptor.is_stable()
     }
 
-    pub fn track(&mut self) {
-        self.ufo.track();
+    pub fn track(&mut self) -> Result<(), &'static str> {
+        self.ufo.track()
     }
 
     pub fn get_quantum_state(&self) -> QuantumState {
-        self.quantum_descriptor.state()
+        self.quantum_descriptor.get_state()
     }
 }
 
@@ -80,7 +83,7 @@ impl SpaceTimeMemory {
 pub struct SpaceTime {
     memory: SpaceTimeMemory,
     mesh: MeshDimensions,
-    black_holes: Vec<BlackHole>,
+    _black_holes: Vec<BlackHole>,
     dimensions: Vector3D<usize>,
     timestamp: Helium<usize>,
 }
@@ -92,14 +95,14 @@ impl SpaceTime {
         Self {
             memory: SpaceTimeMemory::new(mesh.clone()),
             mesh,
-            black_holes: Vec::new(),
+            _black_holes: Vec::new(),
             dimensions,
             timestamp: Helium::new(CURRENT_TIMESTAMP),
         }
     }
 
-    pub fn track(&mut self) {
-        self.memory.track();
+    pub fn track(&mut self) -> Result<(), &'static str> {
+        self.memory.track()
     }
 
     pub fn is_protected(&self) -> bool {
@@ -149,31 +152,9 @@ impl SpaceTime {
     pub fn get_uncertainty(&self) -> Vector3D<f64> {
         self.memory.quantum_descriptor.uncertainty()
     }
-}
 
-impl Quantum for SpaceTime {
-    fn is_quantum_stable(&self) -> bool {
-        self.memory.phantom_space.is_quantum_stable() &&
-        self.memory.quantum_descriptor.is_stable() &&
-        self.is_protected() &&
-        self.timestamp.is_quantum_stable()
-    }
-
-    fn get_coherence(&self) -> f64 {
-        let space_coherence = self.memory.phantom_space.get_coherence();
-        let quantum_coherence = self.memory.quantum_descriptor.coherence();
-        let time_coherence = self.timestamp.get_coherence();
-        (space_coherence + quantum_coherence + time_coherence) / 3.0
-    }
-
-    fn decay_coherence(&self) {
-        self.memory.phantom_space.decay_coherence();
-        self.timestamp.decay_coherence();
-        // Quantum descriptor handles its own decay
-    }
-
-    fn reset_coherence(&self) {
-        self.memory.quantum_descriptor.reset_coherence()
+    pub fn is_quantum_stable(&self) -> bool {
+        self.memory.quantum_descriptor.is_stable()
     }
 }
 
@@ -203,7 +184,7 @@ mod tests {
     fn test_spacetime_protection() {
         let mut spacetime = SpaceTime::new(Vector3D::new(5, 5, 5));
         assert!(spacetime.is_protected());
-        spacetime.track();
+        assert!(spacetime.track().is_ok());
         assert!(spacetime.is_protected());
     }
 

@@ -1,22 +1,22 @@
 /// Quantum Horizon System
-/// Last Updated: 2025-01-16 02:54:34 UTC
+/// Last Updated: 2025-01-16 03:34:40 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
 use crate::{
     constants::{QUANTUM_COHERENCE_THRESHOLD, QUANTUM_STABILITY_THRESHOLD},
     scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
-const CURRENT_TIMESTAMP: usize = 1705371274; // 2025-01-16 02:54:34 UTC
+const CURRENT_TIMESTAMP: usize = 1705374880; // 2025-01-16 03:34:40 UTC
 const HORIZON_DECAY_RATE: f64 = 0.99;
 
 /// Quantum shared state management system
 #[derive(Debug)]
 pub struct Horizon<T> {
     state: *mut T,
-    coherence: f64,
+    coherence: AtomicU64,   // Changed to AtomicU64
     timestamp: AtomicUsize,
     observers: AtomicUsize,
 }
@@ -28,7 +28,7 @@ impl<T> Horizon<T> {
     pub fn new(value: T) -> Self {
         Self {
             state: Box::into_raw(Box::new(value)),
-            coherence: 1.0,
+            coherence: AtomicU64::new(f64::to_bits(1.0)),  // Initialize using to_bits
             timestamp: AtomicUsize::new(CURRENT_TIMESTAMP),
             observers: AtomicUsize::new(0),
         }
@@ -58,18 +58,13 @@ impl<T> Horizon<T> {
     }
 
     fn decay_coherence(&self) {
-        unsafe {
-            let coherence_ptr = &self.coherence as *const f64 as *mut f64;
-            *coherence_ptr *= HORIZON_DECAY_RATE;
-        }
+        let current = f64::from_bits(self.coherence.load(Ordering::Relaxed));
+        self.coherence.store(f64::to_bits(current * HORIZON_DECAY_RATE), Ordering::Relaxed);
         self.timestamp.store(CURRENT_TIMESTAMP, Ordering::SeqCst);
     }
 
     fn reset_coherence(&self) {
-        unsafe {
-            let coherence_ptr = &self.coherence as *const f64 as *mut f64;
-            *coherence_ptr = 1.0;
-        }
+        self.coherence.store(f64::to_bits(1.0), Ordering::Relaxed);
         self.timestamp.store(CURRENT_TIMESTAMP, Ordering::SeqCst);
         self.observers.store(0, Ordering::SeqCst);
     }
@@ -79,7 +74,7 @@ impl<T> Horizon<T> {
     }
 
     pub fn get_coherence(&self) -> f64 {
-        self.coherence
+        f64::from_bits(self.coherence.load(Ordering::Relaxed))
     }
 
     pub fn get_timestamp(&self) -> usize {
@@ -91,23 +86,21 @@ impl<T> Horizon<T> {
     }
 
     pub fn is_coherent(&self) -> bool {
-        self.coherence > QUANTUM_COHERENCE_THRESHOLD
+        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
     }
 
     pub fn is_quantum_stable(&self) -> bool {
-        self.coherence > QUANTUM_STABILITY_THRESHOLD
+        self.get_coherence() > QUANTUM_STABILITY_THRESHOLD
     }
 }
 
 impl<T> Clone for Horizon<T> where T: Clone {
     fn clone(&self) -> Self {
-        unsafe {
-            Self {
-                state: Box::into_raw(Box::new((*self.state).clone())),
-                coherence: self.coherence,
-                timestamp: AtomicUsize::new(self.timestamp.load(Ordering::SeqCst)),
-                observers: AtomicUsize::new(self.observers.load(Ordering::SeqCst)),
-            }
+        Self {
+            state: Box::into_raw(Box::new(unsafe { (*self.state).clone() })),
+            coherence: AtomicU64::new(self.coherence.load(Ordering::Relaxed)),
+            timestamp: AtomicUsize::new(self.timestamp.load(Ordering::SeqCst)),
+            observers: AtomicUsize::new(self.observers.load(Ordering::SeqCst)),
         }
     }
 }
@@ -125,9 +118,9 @@ impl<T: Scribe> Scribe for Horizon<T> {
         output.push_str("Horizon{value=");
         unsafe { (*self.state).scribe(precision, output); }
         output.push_str(", coherence=");
-        output.push_f64(self.coherence, precision.decimal_places());
+        output.push_f64(self.get_coherence(), precision.decimal_places());
         output.push_str(", observers=");
-        output.push_str(&self.observers.load(Ordering::SeqCst).to_string());
+        output.push_str(&ToString::to_string(&self.observers.load(Ordering::SeqCst)));
         output.push_char('}');
     }
 }

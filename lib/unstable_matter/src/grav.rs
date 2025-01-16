@@ -31,8 +31,8 @@ pub struct GravityFieldData {
 #[derive(Debug, Clone)]
 pub struct GravityField {
     data: Horizon<GravityFieldData>,
-    affected_cells: QuantumCell<Vec<MeshCell>>,
-    timestamp: Helium<usize>,
+    _affected_cells: QuantumCell<Vec<MeshCell>>,  // Added underscore
+    _timestamp: Helium<usize>,                    // Added underscore
 }
 
 impl GravityField {
@@ -40,12 +40,12 @@ impl GravityField {
         let field_strength = force_vector.magnitude();
         Self {
             data: Horizon::new(GravityFieldData {
-                force_vector,  // Use force_vector after calculating field_strength
+                force_vector,
                     field_strength,
                     quantum_coherence: 1.0,
             }),
-            affected_cells: QuantumCell::new(Vec::new()),
-            timestamp: Helium::new(CURRENT_TIMESTAMP),
+            _affected_cells: QuantumCell::new(Vec::new()),  // Changed from affected_cells to _affected_cells
+            _timestamp: Helium::new(CURRENT_TIMESTAMP),     // Changed from timestamp to _timestamp
         }
     }
 

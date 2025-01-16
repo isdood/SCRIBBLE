@@ -78,7 +78,7 @@ impl Scribe for MemoryTrace {
 #[derive(Debug)]
 pub struct UFO {
     phantom_space: PhantomSpace,
-    trace: MemoryTrace,
+    _trace: MemoryTrace,  // Added underscore
     state: QuantumCell<UFOState>,
     warp_factor: QuantumCell<f64>,
     quantum_descriptor: UnstableDescriptor,
@@ -89,7 +89,7 @@ impl UFO {
     pub fn new() -> Self {
         Self {
             phantom_space: PhantomSpace::new(),
-            trace: MemoryTrace::new("isdood"),
+            _trace: MemoryTrace::new("isdood"),  // Changed from trace to _trace
             state: QuantumCell::new(UFOState::Landed),
             warp_factor: QuantumCell::new(1.0),
             quantum_descriptor: UnstableDescriptor::new(),

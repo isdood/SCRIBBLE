@@ -137,7 +137,7 @@ impl Wormhole {
         }
 
         let entrance_pos = self.get_entrance();
-        let exit_pos = self.get_exit();
+        let _exit_pos = self.get_exit();
         let cell_pos = cell.get_position();
 
         let distance_ratio = (cell_pos - entrance_pos).magnitude() / self.get_radius();
