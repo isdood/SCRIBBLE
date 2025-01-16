@@ -1,11 +1,13 @@
 /// Quantum-Safe Zero-Based Memory Navigation Module
-/// Last Updated: 2025-01-16 22:52:47 UTC
+/// Last Updated: 2025-01-16 23:09:48 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::vector::Vector3D;
 use crate::phantom::QuantumCell;
 use crate::constants::CURRENT_TIMESTAMP;
+use crate::scribe::{Scribe, ScribePrecision, QuantumString};
+use crate::quantum::Quantum;
 
 /// Error margin for quantum position calculations
 const QUANTUM_EPSILON: f64 = 1e-10;
@@ -44,28 +46,6 @@ impl<T> Zeronaut<T> {
         }
     }
 
-    /// Creates a zero-initialized Zeronaut
-    pub fn zero() -> Self {
-        Self {
-            ptr: std::ptr::null_mut(),
-            position: Vector3D::new(0, 0, 0),
-            quantum_state: QuantumCell::new(true),
-            coherence: QuantumCell::new(1.0),
-            last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
-        }
-    }
-
-    /// Creates a Zeronaut from an isize value
-    pub fn from_isize(value: isize) -> Self {
-        Self {
-            ptr: value as *mut T,
-            position: Vector3D::new(0, 0, 0),
-            quantum_state: QuantumCell::new(true),
-            coherence: QuantumCell::new(1.0),
-            last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
-        }
-    }
-
     /// Creates a new Zeronaut with specific spatial coordinates
     /// # Safety
     /// The pointer must be non-null and properly aligned
@@ -80,6 +60,17 @@ impl<T> Zeronaut<T> {
                  coherence: QuantumCell::new(1.0),
                  last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
             })
+        }
+    }
+
+    /// Creates a zero-initialized Zeronaut
+    pub fn zero() -> Self {
+        Self {
+            ptr: std::ptr::null_mut(),
+            position: Vector3D::new(0, 0, 0),
+            quantum_state: QuantumCell::new(true),
+            coherence: QuantumCell::new(1.0),
+            last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
         }
     }
 
@@ -143,17 +134,51 @@ impl<T> Zeronaut<T> {
         (self.get_coherence() - other.get_coherence()).abs() < QUANTUM_EPSILON
     }
 
+    /// Convert pointer value to isize
     pub fn as_isize(&self) -> isize {
         self.ptr as isize
     }
 
+    /// Convert pointer value to usize
     pub fn as_usize(&self) -> usize {
         self.ptr as usize
     }
-
 }
 
-// Note: Removed redundant Clone implementation since we now derive it
+impl<T: Scribe> Scribe for Zeronaut<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("Zeronaut{ptr=0x");
+        output.push_hex(self.ptr as usize);
+        output.push_str(", pos=");
+        self.position.scribe(precision, output);
+        output.push_str(", coherence=");
+        output.push_f64(self.get_coherence(), precision.decimal_places());
+        output.push_str(", stable=");
+        output.push_str(if self.is_quantum_stable() { "true" } else { "false" });
+        output.push_char('}');
+    }
+}
+
+impl<T: Scribe> Quantum for Zeronaut<T> {
+    fn get_coherence(&self) -> f64 {
+        self.get_coherence()
+    }
+
+    fn is_quantum_stable(&self) -> bool {
+        self.is_quantum_stable()
+    }
+
+    fn decay_coherence(&self) {
+        let current = self.coherence.get();
+        self.coherence.set(current * 0.99);
+        self.quantum_state.set(current > 0.5);
+    }
+
+    fn reset_coherence(&self) {
+        self.coherence.set(1.0);
+        self.quantum_state.set(true);
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -170,6 +195,14 @@ mod tests {
 
         // Clean up
         unsafe { Box::from_raw(ptr) };
+    }
+
+    #[test]
+    fn test_zeronaut_zero() {
+        let zeronaut = Zeronaut::<i32>::zero();
+        assert!(zeronaut.as_ptr().is_null());
+        assert_eq!(zeronaut.get_position(), Vector3D::new(0, 0, 0));
+        assert!(zeronaut.is_quantum_stable());
     }
 
     #[test]
@@ -204,13 +237,15 @@ mod tests {
     }
 
     #[test]
-    fn test_zero_and_from_isize() {
-        let zero = Zeronaut::<u32>::zero();
-        assert!(zero.as_ptr().is_null());
-        assert_eq!(zero.get_position(), Vector3D::new(0, 0, 0));
+    fn test_zeronaut_conversions() {
+        let value = Box::new(42);
+        let ptr = Box::into_raw(value);
+        let zeronaut = Zeronaut::new(ptr).unwrap();
 
-        let from_isize = Zeronaut::<u32>::from_isize(42);
-        assert_eq!(from_isize.as_ptr() as isize, 42);
-        assert_eq!(from_isize.get_position(), Vector3D::new(0, 0, 0));
+        assert_eq!(zeronaut.as_isize() as usize, ptr as usize);
+        assert_eq!(zeronaut.as_usize(), ptr as usize);
+
+        // Clean up
+        unsafe { Box::from_raw(ptr) };
     }
 }

@@ -1,27 +1,38 @@
 /// Quantum Vector Module
-/// Last Updated: 2025-01-16 22:58:59 UTC
+/// Last Updated: 2025-01-16 23:15:03 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use std::ops::{Add, Sub, Mul};
-use crate::{
-    quantum::Quantum,
-    scribe::{Scribe, ScribePrecision, QuantumString},
-};
+use crate::scribe::{Scribe, ScribePrecision, QuantumString};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Vector3D<T> {
     x: T,
     y: T,
     z: T,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vector4D<T> {
-    x: T,
-    y: T,
-    z: T,
-    w: T,
+impl<T> Vector3D<T> {
+    /// Creates a new vector with explicit type constraints
+    pub fn new_unchecked(x: T, y: T, z: T) -> Self {
+        Self { x, y, z }
+    }
+
+    /// Gets the x component
+    pub fn get_x(&self) -> &T {
+        &self.x
+    }
+
+    /// Gets the y component
+    pub fn get_y(&self) -> &T {
+        &self.y
+    }
+
+    /// Gets the z component
+    pub fn get_z(&self) -> &T {
+        &self.z
+    }
 }
 
 impl<T: Copy> Vector3D<T> {
@@ -32,32 +43,6 @@ impl<T: Copy> Vector3D<T> {
     pub fn x(&self) -> T { self.x }
     pub fn y(&self) -> T { self.y }
     pub fn z(&self) -> T { self.z }
-
-    pub fn as_ptr(&self) -> *const T {
-        &self.x as *const T
-    }
-
-    pub fn as_mut_ptr(&mut self) -> *mut T {
-        &mut self.x as *mut T
-    }
-
-    pub fn as_isize(&self) -> Vector3D<isize>
-    where T: Into<isize> + Copy {
-        Vector3D::new(
-            self.x.into(),
-                      self.y.into(),
-                      self.z.into()
-        )
-    }
-
-    pub fn as_usize(&self) -> Vector3D<usize>
-    where T: Into<usize> + Copy {
-        Vector3D::new(
-            self.x.into(),
-                      self.y.into(),
-                      self.z.into()
-        )
-    }
 }
 
 impl<T: Copy + Add<Output = T>> Add for Vector3D<T> {
@@ -108,18 +93,11 @@ impl<T: Scribe> Scribe for Vector3D<T> {
     }
 }
 
-impl<T: Scribe + Clone + 'static> Quantum for Vector3D<T> {
-    fn get_coherence(&self) -> f64 {
-        1.0
+// Implement Scribe for basic numeric types
+impl Scribe for isize {
+    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str(&self.to_string());
     }
-
-    fn is_quantum_stable(&self) -> bool {
-        true
-    }
-
-    fn decay_coherence(&self) {}
-
-    fn reset_coherence(&self) {}
 }
 
 impl Vector3D<f64> {
@@ -156,6 +134,7 @@ impl Vector3D<isize> {
         (dx * dx + dy * dy + dz * dz).sqrt()
     }
 }
+
 
 impl<T> Vector4D<T> {
     pub const fn new(x: T, y: T, z: T, w: T) -> Self

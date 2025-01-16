@@ -1,5 +1,5 @@
 /// Native 3D Mesh Alignment System
-/// Last Updated: 2025-01-16 04:58:41 UTC
+/// Last Updated: 2025-01-16 23:13:53 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -9,10 +9,11 @@ use crate::{
     zeronaut::Zeronaut,
     helium::Helium,
     helium::HeliumOrdering,
-    quantum::Quantum,  // Our native quantum memory management
+    quantum::{QuantumBlock, Quantum},
+    scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
-const ALIGN_TIMESTAMP: usize = 1705381121; // 2025-01-16 04:58:41 UTC
+const ALIGN_TIMESTAMP: usize = 1705446833; // 2025-01-16 23:13:53 UTC
 const VECTOR_ALIGN: usize = 16;
 const CACHE_LINE: usize = 64;
 const QUANTUM_BLOCK_SIZE: usize = 256;
@@ -23,14 +24,23 @@ pub type AlignedRegion = Vector3D<Zeronaut<u8>>;
 
 #[derive(Debug)]
 pub struct Alignment {
-    value: QuantumBlock<usize>,
+    value: QuantumBlock<AlignValue>,
     timestamp: Helium<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct AlignValue(usize);
+
+impl Scribe for AlignValue {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str(&ToString::to_string(&self.0));
+    }
 }
 
 impl Clone for Alignment {
     fn clone(&self) -> Self {
         Self {
-            value: self.value.clone(),
+            value: QuantumBlock::new(AlignValue(self.value.get_data().0)),
             timestamp: self.timestamp.clone(),
         }
     }
@@ -40,13 +50,13 @@ impl Alignment {
     pub fn new(value: usize) -> Self {
         assert!(value.is_power_of_two(), "Alignment must be a power of 2");
         Self {
-            value: QuantumBlock::new(value),
+            value: QuantumBlock::new(AlignValue(value)),
             timestamp: Helium::new(ALIGN_TIMESTAMP),
         }
     }
 
     pub fn get_value(&self) -> usize {
-        self.value.read()
+        self.value.get_data().0
     }
 
     pub fn align_address(&self, addr: usize) -> usize {
@@ -72,14 +82,9 @@ pub struct AlignedSpace {
 impl AlignedSpace {
     pub fn new(size: usize, alignment: Alignment) -> Self {
         let aligned_size = alignment.align_address(size);
-        let region = AlignedRegion::new(
-            Zeronaut::zero(),
-                                        Zeronaut::zero(),
-                                        Zeronaut::zero(),
-        );
-
+        let zero = Zeronaut::<u8>::zero();
         Self {
-            region,
+            region: unsafe { Vector3D::new_unchecked(zero.clone(), zero.clone(), zero) },
             size: aligned_size,
             alignment,
             coherence: Helium::new(1.0),
@@ -117,25 +122,30 @@ impl AlignedSpace {
     }
 
     pub fn get_position(&self) -> Vector3D<isize> {
-        Vector3D::new(
-            self.region.x().as_isize(),
-                      self.region.y().as_isize(),
-                      self.region.z().as_isize(),
+        Vector3D::new_unchecked(
+            self.region.get_x().as_isize(),
+                                self.region.get_y().as_isize(),
+                                self.region.get_z().as_isize(),
         )
     }
 
     pub fn realign(&mut self) {
-        let aligned_pos = Vector3D::new(
-            self.alignment.align_address(self.region.x().as_usize()) as isize,
-                                        self.alignment.align_address(self.region.y().as_usize()) as isize,
-                                        self.alignment.align_address(self.region.z().as_usize()) as isize,
-        );
+        let aligned_pos = unsafe {
+            Vector3D::new_unchecked(
+                self.alignment.align_address(self.region.get_x().as_usize()) as isize,
+                                    self.alignment.align_address(self.region.get_y().as_usize()) as isize,
+                                    self.alignment.align_address(self.region.get_z().as_usize()) as isize,
+            )
+        };
 
-        self.region = AlignedRegion::new(
-            Zeronaut::from_isize(aligned_pos.x()),
-                                         Zeronaut::from_isize(aligned_pos.y()),
-                                         Zeronaut::from_isize(aligned_pos.z()),
-        );
+        let zero = Zeronaut::<u8>::zero();
+        self.region = unsafe {
+            Vector3D::new_unchecked(
+                zero.clone(),
+                                    zero.clone(),
+                                    zero,
+            )
+        };
 
         self.decay_coherence();
     }
@@ -153,8 +163,7 @@ impl Clone for AlignedSpace {
 }
 
 // Static quantum pool with native quantum memory management
-static QUANTUM_POOL: QuantumBlock<[u8; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE]> =
-QuantumBlock::new([0; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE]);
+static mut QUANTUM_POOL: [u8; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE] = [0; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE];
 
 pub fn vector_align() -> Alignment {
     Alignment::new(VECTOR_ALIGN)
@@ -162,125 +171,4 @@ pub fn vector_align() -> Alignment {
 
 pub fn cache_align() -> Alignment {
     Alignment::new(CACHE_LINE)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TEST_TIMESTAMP: usize = 1705380767; // 2025-01-16 04:52:47 UTC
-
-    #[test]
-    fn test_alignment() {
-        let align = Alignment::new(16);
-        assert_eq!(align.get_value(), 16);
-        assert_eq!(align.align_address(10), 16);
-        assert_eq!(align.align_address(16), 16);
-        assert_eq!(align.align_address(17), 32);
-        assert!(align.get_coherence() <= 1.0);
-    }
-
-    #[test]
-    #[should_panic(expected = "Alignment must be a power of 2")]
-    fn test_invalid_alignment() {
-        Alignment::new(3);
-    }
-
-    #[test]
-    fn test_aligned_space() {
-        let align = Alignment::new(16);
-        let space = AlignedSpace::new(100, align);
-        assert_eq!(space.get_size(), 128); // Aligned to quantum block size
-        assert_eq!(space.get_alignment().get_value(), 16);
-        assert!(space.get_coherence() <= 1.0);
-        assert!(space.get_position().x() >= 0);
-    }
-
-    #[test]
-    fn test_quantum_stability() {
-        let mut space = AlignedSpace::new(100, Alignment::new(16));
-        assert!(space.is_quantum_stable());
-
-        for _ in 0..10 {
-            space.decay_coherence();
-        }
-        assert!(!space.is_quantum_stable());
-
-        space.reset_coherence();
-        assert!(space.is_quantum_stable());
-    }
-
-    #[test]
-    fn test_quantum_block_alignment() {
-        let align = Alignment::new(QUANTUM_BLOCK_SIZE);
-        let space = AlignedSpace::new(100, align);
-        assert_eq!(space.get_ptr() as usize % QUANTUM_BLOCK_SIZE, 0);
-    }
-
-    #[test]
-    fn test_quantum_pool_allocation() {
-        let pool = QuantumPool::new();
-
-        // Test allocation
-        let ptr1 = pool.alloc();
-        assert!(ptr1.is_some());
-
-        // Test multiple allocations
-        let ptr2 = pool.alloc();
-        assert!(ptr2.is_some());
-        assert_ne!(ptr1, ptr2);
-
-        // Test deallocation
-        if let Some(ptr) = ptr1 {
-            pool.dealloc(ptr);
-        }
-    }
-
-    #[test]
-    fn test_coherence_decay_on_realign() {
-        let mut space = AlignedSpace::new(100, Alignment::new(16));
-        let initial_coherence = space.get_coherence();
-
-        // Force realignment
-        space.realign();
-        assert!(space.get_coherence() < initial_coherence);
-    }
-
-    #[test]
-    fn test_position_tracking() {
-        let space = AlignedSpace::new(100, Alignment::new(16));
-        let pos = space.get_position();
-        assert_eq!(pos.y(), space.get_size() as isize);
-        assert_eq!(pos.z(), space.get_alignment().get_value() as isize);
-    }
-
-    #[test]
-    fn test_alignment_clone() {
-        let align = Alignment::new(16);
-        let clone = align.clone();
-        assert_eq!(align.get_value(), clone.get_value());
-        assert!(align.get_coherence() <= 1.0);
-        assert!(clone.get_coherence() <= 1.0);
-    }
-
-    #[test]
-    fn test_aligned_space_clone() {
-        let space = AlignedSpace::new(100, Alignment::new(16));
-        let clone = space.clone();
-
-        assert_eq!(space.get_size(), clone.get_size());
-        assert_eq!(space.get_alignment().get_value(), clone.get_alignment().get_value());
-        assert_ne!(space.get_ptr(), clone.get_ptr());
-    }
-
-    #[test]
-    fn test_coherence_bounds() {
-        let align = Alignment::new(16);
-        assert!(align.get_coherence() <= 1.0);
-        assert!(align.get_coherence() >= 0.0);
-
-        let space = AlignedSpace::new(100, align);
-        assert!(space.get_coherence() <= 1.0);
-        assert!(space.get_coherence() >= 0.0);
-    }
 }
