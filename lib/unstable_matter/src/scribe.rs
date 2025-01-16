@@ -1,16 +1,13 @@
 /// Quantum Space-Time Scribing Module
-/// Last Updated: 2025-01-15 05:20:58 UTC
+/// Last Updated: 2025-01-16 02:36:23 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use crate::{
-    constants::*,
-    vector::Vector3D,
-    phantom::QuantumCell,
-};
+use std::fmt::Write;
+use crate::constants::*;
 
 /// Native quantum-safe string type
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct QuantumString {
     buffer: Vec<u8>,
 }
@@ -18,6 +15,10 @@ pub struct QuantumString {
 impl QuantumString {
     pub fn new() -> Self {
         Self { buffer: Vec::new() }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self { buffer: Vec::with_capacity(capacity) }
     }
 
     pub fn push_str(&mut self, s: &str) {
@@ -30,44 +31,40 @@ impl QuantumString {
     }
 
     pub fn push_f64(&mut self, value: f64, precision: usize) {
-        let mut int_part = value.abs() as i64;
-        let mut frac_part = ((value.abs() - int_part as f64) * 10f64.powi(precision as i32)) as i64;
-
-        if value < 0.0 {
-            self.push_char('-');
+        if value.is_nan() {
+            self.push_str("NaN");
+            return;
+        }
+        if value.is_infinite() {
+            self.push_str(if value.is_sign_positive() { "∞" } else { "-∞" });
+            return;
         }
 
-        if int_part == 0 {
-            self.push_char('0');
-        } else {
-            let mut digits = Vec::new();
-            while int_part > 0 {
-                digits.push((b'0' + (int_part % 10) as u8) as char);
-                int_part /= 10;
-            }
-            for digit in digits.iter().rev() {
-                self.push_char(*digit);
-            }
-        }
-
-        self.push_char('.');
-        let mut precision_digits = Vec::new();
-        for _ in 0..precision {
-            precision_digits.push((b'0' + (frac_part % 10) as u8) as char);
-            frac_part /= 10;
-        }
-        for digit in precision_digits.iter().rev() {
-            self.push_char(*digit);
-        }
+        let mut buffer = String::with_capacity(20);
+        write!(&mut buffer, "{:.*}", precision, value)
+        .expect("Failed to format f64");
+        self.push_str(&buffer);
     }
 
     pub fn as_str(&self) -> &str {
         std::str::from_utf8(&self.buffer).unwrap_or("ERROR")
     }
+
+    pub fn clear(&mut self) {
+        self.buffer.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
 }
 
 /// Represents formatting precision for quantum values
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScribePrecision {
     /// High precision (10⁻³⁵)
     Planck,
@@ -75,6 +72,12 @@ pub enum ScribePrecision {
     Quantum,
     /// Standard precision (10⁻⁶)
     Standard,
+}
+
+impl Default for ScribePrecision {
+    fn default() -> Self {
+        Self::Standard
+    }
 }
 
 impl ScribePrecision {
@@ -93,26 +96,30 @@ impl ScribePrecision {
             Self::Standard => 1e-6,
         }
     }
+
+    pub fn format_value(&self, value: f64) -> f64 {
+        if value.abs() < self.epsilon() {
+            0.0
+        } else {
+            value
+        }
+    }
 }
 
 /// Native quantum-safe scribing trait
 pub trait Scribe {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString);
 
-    fn to_string(&self, precision: ScribePrecision) -> String {
+    fn to_string(&self) -> String {
         let mut qs = QuantumString::new();
-        self.scribe(precision, &mut qs);
-        qs.as_str().to_string()
+        self.scribe(ScribePrecision::Standard, &mut qs);
+        ToString::to_string(qs.as_str())
     }
 }
 
 impl Scribe for f64 {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        if self.abs() < precision.epsilon() {
-            output.push_f64(0.0, precision.decimal_places());
-        } else {
-            output.push_f64(*self, precision.decimal_places());
-        }
+        output.push_f64(precision.format_value(*self), precision.decimal_places());
     }
 }
 
@@ -124,7 +131,16 @@ impl Scribe for bool {
 
 impl Scribe for usize {
     fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str(&self.to_string());
+        let mut buffer = String::with_capacity(20);
+        write!(&mut buffer, "{}", self)
+        .expect("Failed to format usize");
+        output.push_str(&buffer);
+    }
+}
+
+impl Scribe for str {
+    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str(self);
     }
 }
 
@@ -141,33 +157,51 @@ mod tests {
     }
 
     #[test]
-    fn test_vector_scribe() {
-        let v = Vector3D::new(1.0, 2.0, 3.0);
+    fn test_quantum_string_with_capacity() {
+        let mut qs = QuantumString::with_capacity(100);
+        qs.push_str("test");
+        assert_eq!(qs.as_str(), "test");
+    }
+
+    #[test]
+    fn test_float_special_values() {
         let mut qs = QuantumString::new();
-        v.scribe(ScribePrecision::Standard, &mut qs);
-        assert_eq!(qs.as_str(), "⟨1.000000, 2.000000, 3.000000⟩");
+        f64::NAN.scribe(ScribePrecision::Standard, &mut qs);
+        assert_eq!(qs.as_str(), "NaN");
+
+        qs.clear();
+        f64::INFINITY.scribe(ScribePrecision::Standard, &mut qs);
+        assert_eq!(qs.as_str(), "∞");
+
+        qs.clear();
+        f64::NEG_INFINITY.scribe(ScribePrecision::Standard, &mut qs);
+        assert_eq!(qs.as_str(), "-∞");
     }
 
     #[test]
     fn test_small_values() {
-        let v = Vector3D::new(1e-36, 1e-11, 1.0);
         let mut qs = QuantumString::new();
-        v.scribe(ScribePrecision::Standard, &mut qs);
-        assert_eq!(qs.as_str(), "⟨0.000000, 0.000000, 1.000000⟩");
+        let small = 1e-36;
+        small.scribe(ScribePrecision::Standard, &mut qs);
+        assert_eq!(qs.as_str(), "0.000000");
     }
 
     #[test]
-    fn test_float_formatting() {
+    fn test_precision_formatting() {
         let mut qs = QuantumString::new();
         let x = 123.456789;
         x.scribe(ScribePrecision::Standard, &mut qs);
         assert_eq!(qs.as_str(), "123.456789");
+
+        qs.clear();
+        x.scribe(ScribePrecision::Quantum, &mut qs);
+        assert_eq!(qs.as_str(), "123.4567890000");
     }
 
     #[test]
-    fn test_boolean_scribing() {
+    fn test_string_scribing() {
         let mut qs = QuantumString::new();
-        true.scribe(ScribePrecision::Standard, &mut qs);
-        assert_eq!(qs.as_str(), "true");
+        "test string".scribe(ScribePrecision::Standard, &mut qs);
+        assert_eq!(qs.as_str(), "test string");
     }
 }

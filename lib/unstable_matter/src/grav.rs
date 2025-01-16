@@ -37,11 +37,12 @@ pub struct GravityField {
 
 impl GravityField {
     pub fn new(force_vector: Vector3D<f64>) -> Self {
+        let field_strength = force_vector.magnitude();
         Self {
             data: Horizon::new(GravityFieldData {
-                force_vector,
-                    field_strength: force_vector.magnitude(),
-                               quantum_coherence: 1.0,
+                force_vector,  // Use force_vector after calculating field_strength
+                    field_strength,
+                    quantum_coherence: 1.0,
             }),
             affected_cells: QuantumCell::new(Vec::new()),
             timestamp: Helium::new(CURRENT_TIMESTAMP),
@@ -137,7 +138,7 @@ impl MeshGravity {
         }
 
         let mut cells = self.affected_cells.get();
-        let field_strength = self.field.get_field_strength();
+        let _field_strength = self.field.get_field_strength();
 
         for cell in cells.iter_mut() {
             let position = cell.get_position();
@@ -184,7 +185,7 @@ impl MeshGravity {
             return Err("One or both gravity fields are quantum unstable");
         }
 
-        let combined_coherence = (self.get_coherence() + other.get_coherence()) / 2.0;
+        let _combined_coherence = (self.get_coherence() + other.get_coherence()) / 2.0;
 
         self.quantum_state.set(GravityState::Entangled);
         other.quantum_state.set(GravityState::Entangled);

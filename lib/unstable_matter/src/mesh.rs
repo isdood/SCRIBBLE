@@ -1,16 +1,15 @@
 /// Quantum Mesh Module
-/// Last Updated: 2025-01-15 04:56:15 UTC
+/// Last Updated: 2025-01-16 02:33:44 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use crate::quantum::Quantum;
 use crate::{
     constants::*,
     scribe::{Scribe, ScribePrecision, QuantumString},
+    vector::Vector3D,
+    phantom::QuantumCell,
     GravityField,
     BlackHole,
-    phantom::{Quantum, QuantumCell},
-    vector::Vector3D,
     Wormhole,
     WormholeGlitch,
     helium::Helium,
@@ -18,21 +17,13 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct MeshDimensions {
-    pub width: usize,
-    pub height: usize,
-    pub depth: usize,
+    width: usize,
+    height: usize,
+    depth: usize,
 }
 
 impl MeshDimensions {
-    pub fn new(width: usize, height: usize, depth: usize) -> Self {
-        Self {
-            width,
-            height,
-            depth,
-        }
-    }
-
-    pub fn from_vector(vec: Vector3D<usize>) -> Self {
+    pub fn new(vec: Vector3D<usize>) -> Self {
         Self {
             width: vec.x(),
             height: vec.y(),
@@ -44,20 +35,24 @@ impl MeshDimensions {
         Vector3D::new(self.width, self.height, self.depth)
     }
 
+    pub fn x(&self) -> usize { self.width }
+    pub fn y(&self) -> usize { self.height }
+    pub fn z(&self) -> usize { self.depth }
+
     pub fn volume(&self) -> usize {
         self.width * self.height * self.depth
     }
 }
 
 impl Scribe for MeshDimensions {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("Mesh[");
         output.push_str(&format!("{}x{}x{}", self.width, self.height, self.depth));
         output.push_char(']');
     }
 }
 
-#[derive(Debug, Clone)]  // Added Clone
+#[derive(Debug, Clone, PartialEq)]
 pub enum CellState {
     Free,
     Entangled,
@@ -66,7 +61,7 @@ pub enum CellState {
     Absorbed,
 }
 
-#[derive(Clone)]  // Added Clone implementation
+#[derive(Debug, Clone)]
 pub struct MeshCell {
     position: QuantumCell<Vector3D<f64>>,
     mass: Helium<f64>,
@@ -93,7 +88,7 @@ impl MeshCell {
             return Err("Cell quantum state unstable");
         }
 
-        let position = self.position.get();
+        let position = self.position.get().clone();
         let new_position = position + force;
         self.position.set(new_position);
         self.decay_coherence();
@@ -106,7 +101,7 @@ impl MeshCell {
             return Err("Cell quantum state unstable");
         }
 
-        let position = self.position.get();
+        let position = self.position.get().clone();
         let mass = self.mass.quantum_load();
         let force = field.calculate_force_at(position, mass);
         self.apply_force(force)?;
@@ -123,7 +118,7 @@ impl MeshCell {
             return Err("Cell quantum state unstable");
         }
 
-        let position = self.position.get();
+        let position = self.position.get().clone();
         let blackhole_pos = blackhole.get_position();
         let distance = (position - blackhole_pos).magnitude();
 
@@ -133,18 +128,18 @@ impl MeshCell {
             return Ok(());
         }
 
-        let force = blackhole.calculate_force_at(position);
+        let force = blackhole.calculate_force_at(&position);
         self.apply_force(force)?;
         Ok(())
     }
 
     pub fn connect_wormhole(&mut self, wormhole: Wormhole) -> Result<(), WormholeGlitch> {
         if !self.is_quantum_stable() {
-            return Err(WormholeGlitch::QuantumStateCompromised);
+            return Err(WormholeGlitch::quantum_state_compromised());
         }
 
         if self.get_coherence() < WORMHOLE_STABILITY_THRESHOLD {
-            return Err(WormholeGlitch::StabilityFailure);
+            return Err(WormholeGlitch::stability_failure());
         }
 
         self.wormhole_connection = Some(wormhole);
@@ -153,7 +148,7 @@ impl MeshCell {
     }
 
     pub fn get_position(&self) -> Vector3D<f64> {
-        self.position.get()
+        self.position.get().clone()
     }
 
     pub fn get_mass(&self) -> f64 {
@@ -182,7 +177,7 @@ impl MeshCell {
 impl Scribe for MeshCell {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("MeshCell{pos=");
-        self.position.scribe(precision, output);
+        self.get_position().scribe(precision, output);
         output.push_str(", mass=");
         output.push_f64(self.get_mass(), precision.decimal_places());
         output.push_str(", coherence=");

@@ -1,5 +1,5 @@
 /// Wanda CLI Tool
-/// Last Updated: 2025-01-15 22:39:34 UTC
+/// Last Updated: 2025-01-16 02:27:42 UTC
 /// Author: isdood
 /// Current User: isdood
 ///
@@ -13,17 +13,19 @@
 use clap::{App, Arg, SubCommand};
 use tokio::net::UnixStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use serde_json;
 use std::path::{Path, PathBuf};
 use std::io;
 use std::time::Duration;
 use std::os::linux::fs::MetadataExt;
 
 use wanda::{WandaConfig, WandaMessage, WandaResponse, get_socket_path};
+use unstable_matter::scribe::{Scribe, ScribePrecision, QuantumString};
+use unstable_matter::cereal::{Cereal, QuantumBuffer, CerealError};
 
 const MAX_RETRIES: u32 = 5;
 const RETRY_DELAY: Duration = Duration::from_millis(500);
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.75;
 
 /// Attempts to connect to the Unix socket with retries
 async fn connect_with_retry(socket_path: &Path) -> io::Result<UnixStream> {
@@ -33,15 +35,23 @@ async fn connect_with_retry(socket_path: &Path) -> io::Result<UnixStream> {
     while attempts < MAX_RETRIES {
         match UnixStream::connect(socket_path).await {
             Ok(stream) => {
-                println!("Successfully connected to Wanda service");
+                let mut output = QuantumString::new();
+                output.push_str("Successfully connected to Wanda service at coherence level ");
+                QUANTUM_COHERENCE_THRESHOLD.scribe(ScribePrecision::Standard, &mut output);
+                println!("{}", output.as_str());
                 return Ok(stream);
             },
             Err(e) => {
                 last_error = Some(e);
                 attempts += 1;
                 if attempts < MAX_RETRIES {
-                    eprintln!("Connection attempt {} failed, retrying in {:?}...",
-                              attempts, RETRY_DELAY);
+                    let mut output = QuantumString::new();
+                    output.push_str("Connection attempt ");
+                    attempts.scribe(ScribePrecision::Standard, &mut output);
+                    output.push_str(" failed, retrying in ");
+                    RETRY_DELAY.as_millis().scribe(ScribePrecision::Standard, &mut output);
+                    output.push_str("ms...");
+                    eprintln!("{}", output.as_str());
                     tokio::time::sleep(RETRY_DELAY).await;
                 }
             }
@@ -85,7 +95,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Connect to Wanda service using the standard socket path
     let socket_path = get_socket_path();
-    println!("Connecting to Wanda service at {:?}...", socket_path);
+    let mut output = QuantumString::new();
+    output.push_str("Connecting to Wanda service at ");
+    socket_path.scribe(ScribePrecision::Standard, &mut output);
+    output.push_str("...");
+    println!("{}", output.as_str());
 
     if !socket_path.exists() {
         eprintln!("Error: Socket file does not exist at {:?}", socket_path);
@@ -96,11 +110,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stream = match connect_with_retry(&socket_path).await {
         Ok(stream) => stream,
         Err(e) => {
-            eprintln!("Error: Could not connect to Wanda service at {:?}", socket_path);
+            let mut output = QuantumString::new();
+            output.push_str("Error: Could not connect to Wanda service at ");
+            socket_path.scribe(ScribePrecision::Standard, &mut output);
+            eprintln!("{}", output.as_str());
             eprintln!("Make sure the service is running: systemctl --user status wanda");
             eprintln!("Error details: {}", e);
             if let Ok(metadata) = std::fs::metadata(&socket_path) {
-                eprintln!("Socket permissions: {:o}", metadata.st_mode() & 0o777);
+                let mut perm_output = QuantumString::new();
+                perm_output.push_str("Socket permissions: ");
+                (metadata.st_mode() & 0o777).scribe(ScribePrecision::Standard, &mut perm_output);
+                eprintln!("{}", perm_output.as_str());
             }
             std::process::exit(1);
         }
@@ -132,7 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     socket_path: socket_path.clone(),
                     scan_interval: Duration::from_secs(30),
                     log_path: get_socket_path().with_extension("log"),
-                    quantum_threshold: 0.75,
+                    quantum_threshold: QUANTUM_COHERENCE_THRESHOLD,
                 };
                 let message = WandaMessage::Configure { config };
                 send_message(&mut stream, &message).await?;
@@ -149,34 +169,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn send_message(stream: &mut UnixStream, message: &WandaMessage)
 -> Result<(), Box<dyn std::error::Error>>
 {
-    // Send the message
-    let json = serde_json::to_vec(message)?;
-    stream.write_all(&json).await?;
-    stream.shutdown().await?; // Add this line to signal we're done writing
+    // Create a quantum buffer for serialization
+    let mut buffer = QuantumBuffer::new();
 
-    // Read the response
-    let mut buffer = Vec::with_capacity(1024);
+    // Serialize the message
+    message.cerealize(&mut buffer)?;
+
+    // Send the serialized data
+    stream.write_all(&buffer.data).await?;
+    stream.shutdown().await?;
+
+    // Read the response using quantum buffer
+    let mut response_buffer = QuantumBuffer::new();
     let mut temp_buf = [0u8; 1024];
 
     loop {
         match stream.read(&mut temp_buf).await {
             Ok(0) => break, // EOF
             Ok(n) => {
-                buffer.extend_from_slice(&temp_buf[..n]);
-                if buffer.len() > 1024 * 1024 { // 1MB limit
-                    return Err("Response too large".into());
+                response_buffer.data.extend_from_slice(&temp_buf[..n]);
+                if response_buffer.data.len() > 1024 * 1024 { // 1MB limit
+                    return Err(CerealError::BufferOverflow.into());
                 }
             }
             Err(e) => return Err(e.into()),
         }
     }
 
-    if buffer.is_empty() {
+    if response_buffer.data.is_empty() {
         return Err("Empty response from server".into());
     }
 
-    let wanda_response: WandaResponse = serde_json::from_slice(&buffer)?;
-    println!("{}", serde_json::to_string_pretty(&wanda_response)?);
+    // Deserialize the response
+    let mut pos = 0;
+    let wanda_response = WandaResponse::decerealize(&mut response_buffer, &mut pos)?;
+
+    // Use scribe to display the response
+    let mut output = QuantumString::new();
+    wanda_response.scribe(ScribePrecision::Standard, &mut output);
+    println!("{}", output.as_str());
 
     Ok(())
 }

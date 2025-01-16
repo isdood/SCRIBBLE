@@ -1,5 +1,5 @@
 /// Quantum Matter Library
-/// Last Updated: 2025-01-15 05:38:07 UTC
+/// Last Updated: 2025-01-16 02:29:05 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -41,16 +41,6 @@ pub use helium::{Helium, HeliumOrdering};
 pub use constants::*;
 pub use glitch::WormholeGlitch;
 
-impl UnstableDescriptor {
-    pub fn get_position(&self) -> Vector3D<f64> {
-        self.position.clone()
-    }
-
-    pub fn is_stable(&self) -> bool {
-        self.state == QuantumState::Stable
-    }
-}
-
 /// SpaceTime Memory System
 #[derive(Debug)]
 pub struct SpaceTimeMemory {
@@ -73,7 +63,7 @@ impl SpaceTimeMemory {
     }
 
     pub fn is_protected(&self) -> bool {
-        self.ufo.is_protected() && self.quantum_descriptor.is_stable()
+        self.ufo.protect().unwrap_or(false) && self.quantum_descriptor.is_stable()
     }
 
     pub fn track(&mut self) {
@@ -81,7 +71,7 @@ impl SpaceTimeMemory {
     }
 
     pub fn get_quantum_state(&self) -> QuantumState {
-        *self.quantum_descriptor.state.get()
+        self.quantum_descriptor.state()
     }
 }
 
@@ -97,11 +87,7 @@ pub struct SpaceTime {
 
 impl SpaceTime {
     pub fn new(dimensions: Vector3D<usize>) -> Self {
-        let mesh = MeshDimensions::new(
-            *dimensions.x(),
-                                       *dimensions.y(),
-                                       *dimensions.z()
-        );
+        let mesh = MeshDimensions::new(dimensions.clone());
 
         Self {
             memory: SpaceTimeMemory::new(mesh.clone()),
@@ -121,15 +107,15 @@ impl SpaceTime {
     }
 
     pub fn get_position(&self) -> Vector3D<f64> {
-        *self.memory.quantum_descriptor.position()
+        self.memory.quantum_descriptor.position()
     }
 
     pub fn set_position(&mut self, position: Vector3D<f64>) {
         self.memory.quantum_descriptor.set_position(position.clone());
         self.memory.phantom_space.set_position(
-            *position.x(),
-                                               *position.y(),
-                                               *position.z()
+            position.x(),
+                                               position.y(),
+                                               position.z()
         );
     }
 
@@ -154,13 +140,13 @@ impl SpaceTime {
     }
 
     pub fn calculate_index(&self, x: usize, y: usize, z: usize) -> Option<usize> {
-        if x >= *self.dimensions.x() || y >= *self.dimensions.y() || z >= *self.dimensions.z() {
+        if x >= self.dimensions.x() || y >= self.dimensions.y() || z >= self.dimensions.z() {
             return None;
         }
-        Some(x + y * *self.dimensions.x() + z * *self.dimensions.x() * *self.dimensions.y())
+        Some(x + y * self.dimensions.x() + z * self.dimensions.x() * self.dimensions.y())
     }
 
-    pub fn get_uncertainty(&self) -> &Vector3D<f64> {
+    pub fn get_uncertainty(&self) -> Vector3D<f64> {
         self.memory.quantum_descriptor.uncertainty()
     }
 }
@@ -187,10 +173,7 @@ impl Quantum for SpaceTime {
     }
 
     fn reset_coherence(&self) {
-        self.memory.phantom_space.reset_coherence();
-        self.timestamp.reset_coherence();
-        // Reset quantum descriptor state
-        self.memory.quantum_descriptor.reset();
+        self.memory.quantum_descriptor.reset_coherence()
     }
 }
 
@@ -212,7 +195,7 @@ mod tests {
     #[test]
     fn test_spacetime_creation() {
         let dimensions = Vector3D::new(10, 10, 10);
-        let spacetime = SpaceTime::new(dimensions);
+        let spacetime = SpaceTime::new(dimensions.clone());
         assert_eq!(spacetime.get_dimensions(), &dimensions);
     }
 

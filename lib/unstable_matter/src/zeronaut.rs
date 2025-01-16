@@ -1,5 +1,5 @@
 /// Quantum-Safe Zero-Based Memory Navigation Module
-/// Last Updated: 2025-01-14 21:17:30 UTC
+/// Last Updated: 2025-01-16 02:51:14 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -82,7 +82,8 @@ impl<T> Zeronaut<T> {
         let distance = self.position.quantum_distance(&target);
         if distance < TUNNEL_THRESHOLD {
             self.position = target;
-            self.coherence.set(*self.coherence.get() * 0.9);
+            let current_coherence = self.coherence.get();
+            self.coherence.set(current_coherence * 0.9);
             self.last_tunnel.set(CURRENT_TIMESTAMP);
             self.quantum_state.set(true);
             true
@@ -93,17 +94,17 @@ impl<T> Zeronaut<T> {
 
     /// Gets the current quantum coherence
     pub fn get_coherence(&self) -> f64 {
-        *self.coherence.get()
+        self.coherence.get()
     }
 
     /// Checks if the pointer is in a stable quantum state
     pub fn is_quantum_stable(&self) -> bool {
-        *self.quantum_state.get() && self.get_coherence() > 0.5
+        self.quantum_state.get() && self.get_coherence() > 0.5
     }
 
     /// Updates quantum coherence
     fn decay_coherence(&mut self) {
-        let current = *self.coherence.get();
+        let current = self.coherence.get();
         self.coherence.set(current * 0.99);
         self.quantum_state.set(current > 0.5);
         self.last_tunnel.set(CURRENT_TIMESTAMP);
@@ -111,7 +112,7 @@ impl<T> Zeronaut<T> {
 
     /// Gets the last tunneling timestamp
     pub fn last_tunnel_time(&self) -> usize {
-        *self.last_tunnel.get()
+        self.last_tunnel.get()
     }
 
     /// Checks if two Zeronauts are quantum-entangled
@@ -126,9 +127,9 @@ impl<T> Clone for Zeronaut<T> {
         Self {
             ptr: self.ptr,
             position: self.position.clone(),
-            quantum_state: QuantumCell::new(*self.quantum_state.get()),
-            coherence: QuantumCell::new(*self.coherence.get()),
-            last_tunnel: QuantumCell::new(*self.last_tunnel.get()),
+            quantum_state: QuantumCell::new(self.quantum_state.get()),
+            coherence: QuantumCell::new(self.coherence.get()),
+            last_tunnel: QuantumCell::new(self.last_tunnel.get()),
         }
     }
 }

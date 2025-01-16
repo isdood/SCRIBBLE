@@ -112,12 +112,9 @@ impl UFO {
         Ok(())
     }
 
-    pub fn set_position(&mut self, pos: &Vector3D<f64>) -> Result<(), &'static str> {
-        if !self.is_quantum_stable() {
-            return Err("UFO quantum state unstable");
-        }
-        self.phantom_space.set_position(*pos.x(), *pos.y(), *pos.z());
-        Ok(())
+    pub fn set_position(&mut self, x: f64, y: f64, z: f64) {
+        let pos = Vector3D::new(x, y, z);
+        self.position.set(pos);
     }
 
     pub fn get_position(&self) -> Option<Vector3D<f64>> {

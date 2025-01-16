@@ -1,5 +1,5 @@
 /// Quantum State Descriptor for 3D Space
-/// Last Updated: 2025-01-15 21:59:40 UTC
+/// Last Updated: 2025-01-16 02:22:39 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -7,6 +7,7 @@ use crate::{
     constants::*,
     vector::Vector3D,
     phantom::QuantumCell,
+    quantum::Quantum,
     scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
@@ -19,7 +20,7 @@ pub enum QuantumState {
 }
 
 /// Three-dimensional quantum state descriptor
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnstableDescriptor {
     /// Spatial position in quantum space
     position: QuantumCell<Vector3D<f64>>,
@@ -53,8 +54,8 @@ impl UnstableDescriptor {
     }
 
     /// Get current 3D position
-    pub fn position(&self) -> &Vector3D<f64> {
-        self.position.get()
+    pub fn position(&self) -> Vector3D<f64> {
+        self.position.get().clone()
     }
 
     /// Set new 3D position with quantum effects
@@ -65,8 +66,8 @@ impl UnstableDescriptor {
     }
 
     /// Get quantum momentum vector
-    pub fn momentum(&self) -> &Vector3D<f64> {
-        self.momentum.get()
+    pub fn momentum(&self) -> Vector3D<f64> {
+        self.momentum.get().clone()
     }
 
     /// Update momentum with quantum effects
@@ -100,8 +101,8 @@ impl UnstableDescriptor {
     }
 
     /// Get current uncertainty vector
-    pub fn uncertainty(&self) -> &Vector3D<f64> {
-        self.uncertainty.get()
+    pub fn uncertainty(&self) -> Vector3D<f64> {
+        self.uncertainty.get().clone()
     }
 
     /// Increase spatial uncertainty
@@ -144,6 +145,36 @@ impl UnstableDescriptor {
     }
 }
 
+impl Quantum for UnstableDescriptor {
+    fn get_coherence(&self) -> f64 {
+        self.coherence()
+    }
+
+    fn is_quantum_stable(&self) -> bool {
+        self.is_stable()
+    }
+
+    fn decay_coherence(&self) {
+        let current = self.coherence.get();
+        let new_coherence = current * COHERENCE_DECAY_FACTOR;
+        self.coherence.set(new_coherence);
+
+        let new_state = match new_coherence {
+            c if c > 0.9 => QuantumState::Stable,
+            c if c > 0.7 => QuantumState::Superposed,
+            c if c > QUANTUM_STABILITY_THRESHOLD => QuantumState::Entangled,
+            _ => QuantumState::Decoherent,
+        };
+
+        self.state.set(new_state);
+    }
+
+    fn reset_coherence(&self) {
+        self.coherence.set(1.0);
+        self.state.set(QuantumState::Stable);
+    }
+}
+
 impl Scribe for UnstableDescriptor {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("Quantum[pos=");
@@ -183,8 +214,8 @@ mod tests {
     fn test_position_update() {
         let desc = UnstableDescriptor::new();
         let pos = Vector3D::new(1.0, 2.0, 3.0);
-        desc.set_position(pos);
-        assert_eq!(*desc.position(), pos);
+        desc.set_position(pos.clone());
+        assert_eq!(desc.position(), pos);
         assert!(desc.coherence() < 1.0);
     }
 
@@ -192,14 +223,14 @@ mod tests {
     fn test_momentum() {
         let desc = UnstableDescriptor::new();
         let force = Vector3D::new(0.1, 0.2, 0.3);
-        desc.apply_momentum(force);
-        assert_eq!(*desc.momentum(), force);
+        desc.apply_momentum(force.clone());
+        assert_eq!(desc.momentum(), force);
     }
 
     #[test]
     fn test_uncertainty_growth() {
         let desc = UnstableDescriptor::new();
-        let initial = desc.uncertainty().clone();
+        let initial = desc.uncertainty();
 
         // Force multiple updates
         for _ in 0..10 {

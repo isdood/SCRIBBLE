@@ -1,5 +1,5 @@
 /// Quantum Wormhole Implementation
-/// Last Updated: 2025-01-15 04:50:59 UTC
+/// Last Updated: 2025-01-16 02:38:44 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -9,6 +9,7 @@ use crate::{
     phantom::QuantumCell,
     helium::Helium,
     glitch::WormholeGlitch,
+    mesh::MeshCell,
     scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
@@ -21,14 +22,14 @@ pub struct WormholeError {
 impl WormholeError {
     pub fn new(message: &str) -> Self {
         Self {
-            message: message.to_string(),
+            message: ToString::to_string(message),
             glitch: None,
         }
     }
 
     pub fn with_glitch(message: &str, glitch: WormholeGlitch) -> Self {
         Self {
-            message: message.to_string(),
+            message: ToString::to_string(message),
             glitch: Some(glitch),
         }
     }
@@ -43,14 +44,14 @@ pub enum WormholeState {
     Entangled,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Wormhole {
     entrance: QuantumCell<Vector3D<f64>>,
     exit: QuantumCell<Vector3D<f64>>,
     state: QuantumCell<WormholeState>,
     coherence: Helium<f64>,
     radius: Helium<f64>,
-    affected_cells: QuantumCell<Vec<MeshCell>>, // Removed generic parameter
+    affected_cells: QuantumCell<Vec<MeshCell>>,
     timestamp: Helium<usize>,
 }
 
@@ -67,18 +68,18 @@ impl Wormhole {
         }
     }
 
-    pub fn connect_cell(&mut self, cell: &mut MeshCell) -> Result<(), WormholeGlitch> {
+    pub fn connect_cell(&mut self, cell: MeshCell) -> Result<(), WormholeGlitch> {
         if !self.is_quantum_stable() {
-            return Err(WormholeGlitch::QuantumStateCompromised);
+            return Err(WormholeGlitch::quantum_state_compromised());
         }
 
-        let probability = self.calculate_tunnel_probability(cell);
+        let probability = self.calculate_tunnel_probability(&cell);
         if probability < WORMHOLE_STABILITY_THRESHOLD {
-            return Err(WormholeGlitch::StabilityFailure);
+            return Err(WormholeGlitch::stability_failure());
         }
 
-        let mut cells = self.affected_cells.get();
-        cells.push(cell.clone());
+        let mut cells = self.affected_cells.get().clone();
+        cells.push(cell);
         self.affected_cells.set(cells);
         self.decay_coherence();
 
@@ -87,16 +88,16 @@ impl Wormhole {
 
     pub fn transport(&mut self, mut cell: MeshCell) -> Result<MeshCell, WormholeGlitch> {
         if !self.is_quantum_stable() {
-            return Err(WormholeGlitch::QuantumStateCompromised);
+            return Err(WormholeGlitch::quantum_state_compromised());
         }
 
         if self.get_state() == WormholeState::Collapsed {
-            return Err(WormholeGlitch::TunnellingFailed);
+            return Err(WormholeGlitch::tunnelling_failed());
         }
 
         let probability = self.calculate_tunnel_probability(&cell);
         if probability < WORMHOLE_STABILITY_THRESHOLD {
-            return Err(WormholeGlitch::StabilityFailure);
+            return Err(WormholeGlitch::stability_failure());
         }
 
         self.apply_curvature_effects(&mut cell)?;
@@ -106,11 +107,11 @@ impl Wormhole {
     }
 
     pub fn get_entrance(&self) -> Vector3D<f64> {
-        self.entrance.get()
+        self.entrance.get().clone()
     }
 
     pub fn get_exit(&self) -> Vector3D<f64> {
-        self.exit.get()
+        self.exit.get().clone()
     }
 
     pub fn get_radius(&self) -> f64 {
@@ -132,7 +133,7 @@ impl Wormhole {
 
     fn apply_curvature_effects(&self, cell: &mut MeshCell) -> Result<(), WormholeGlitch> {
         if !self.is_quantum_stable() {
-            return Err(WormholeGlitch::QuantumStateCompromised);
+            return Err(WormholeGlitch::quantum_state_compromised());
         }
 
         let entrance_pos = self.get_entrance();
@@ -141,7 +142,7 @@ impl Wormhole {
 
         let distance_ratio = (cell_pos - entrance_pos).magnitude() / self.get_radius();
         if distance_ratio > 1.0 {
-            return Err(WormholeGlitch::InvalidDestination);
+            return Err(WormholeGlitch::invalid_destination());
         }
 
         Ok(())
@@ -171,6 +172,28 @@ impl Wormhole {
 
         self.state.set(new_state);
         self.timestamp.quantum_store(CURRENT_TIMESTAMP);
+    }
+}
+
+impl Scribe for Wormhole {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("Wormhole{entrance=");
+        self.entrance.get().scribe(precision, output);
+        output.push_str(", exit=");
+        self.exit.get().scribe(precision, output);
+        output.push_str(", r=");
+        output.push_f64(self.get_radius(), precision.decimal_places());
+        output.push_str(", c=");
+        output.push_f64(self.get_coherence(), precision.decimal_places());
+        output.push_str(", state=");
+        match self.get_state() {
+            WormholeState::Opening => output.push_str("opening"),
+            WormholeState::Stable => output.push_str("stable"),
+            WormholeState::Closing => output.push_str("closing"),
+            WormholeState::Collapsed => output.push_str("collapsed"),
+            WormholeState::Entangled => output.push_str("entangled"),
+        }
+        output.push_char('}');
     }
 }
 

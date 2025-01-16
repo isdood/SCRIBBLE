@@ -208,6 +208,18 @@ impl BlackHole {
     pub fn get_position(&self) -> Vector3D<f64> {
         self.position.get()
     }
+
+    pub fn absorb_mass(&mut self, mass: f64) -> Result<(), &'static str> {
+        self.mass.quantum_store(self.mass.quantum_load() + mass);
+        Ok(())
+    }
+
+    pub fn calculate_force_at(&self, position: &Vector3D<f64>) -> Vector3D<f64> {
+        let direction = self.position.get() - position.clone();
+        let distance = direction.magnitude();
+        let force_magnitude = GRAVITATIONAL_CONSTANT * self.mass.quantum_load() / (distance * distance);
+        direction.normalize() * force_magnitude
+    }
 }
 
 #[cfg(test)]

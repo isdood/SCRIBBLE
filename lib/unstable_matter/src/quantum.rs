@@ -4,6 +4,7 @@
 /// Current User: isdood
 
 use crate::scribe::Scribe;
+use crate::SpaceTime;
 
 pub trait Quantum: Scribe {
     fn get_coherence(&self) -> f64;

@@ -1,23 +1,24 @@
 /// Quantum Horizon System
-/// Last Updated: 2025-01-15 04:53:33 UTC
+/// Last Updated: 2025-01-16 02:54:34 UTC
 /// Author: isdood
 /// Current User: isdood
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::{
     constants::{QUANTUM_COHERENCE_THRESHOLD, QUANTUM_STABILITY_THRESHOLD},
     scribe::{Scribe, ScribePrecision, QuantumString},
 };
 
-const CURRENT_TIMESTAMP: usize = 1705287213; // 2025-01-15 04:53:33 UTC
+const CURRENT_TIMESTAMP: usize = 1705371274; // 2025-01-16 02:54:34 UTC
 const HORIZON_DECAY_RATE: f64 = 0.99;
 
 /// Quantum shared state management system
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Horizon<T> {
     state: *mut T,
     coherence: f64,
-    timestamp: usize,
-    observers: usize,
+    timestamp: AtomicUsize,
+    observers: AtomicUsize,
 }
 
 unsafe impl<T: Send> Send for Horizon<T> {}
@@ -28,8 +29,8 @@ impl<T> Horizon<T> {
         Self {
             state: Box::into_raw(Box::new(value)),
             coherence: 1.0,
-            timestamp: CURRENT_TIMESTAMP,
-            observers: 0,
+            timestamp: AtomicUsize::new(CURRENT_TIMESTAMP),
+            observers: AtomicUsize::new(0),
         }
     }
 
@@ -60,30 +61,21 @@ impl<T> Horizon<T> {
         unsafe {
             let coherence_ptr = &self.coherence as *const f64 as *mut f64;
             *coherence_ptr *= HORIZON_DECAY_RATE;
-
-            let timestamp_ptr = &self.timestamp as *const usize as *mut usize;
-            *timestamp_ptr = CURRENT_TIMESTAMP;
         }
+        self.timestamp.store(CURRENT_TIMESTAMP, Ordering::SeqCst);
     }
 
     fn reset_coherence(&self) {
         unsafe {
             let coherence_ptr = &self.coherence as *const f64 as *mut f64;
             *coherence_ptr = 1.0;
-
-            let timestamp_ptr = &self.timestamp as *const usize as *mut usize;
-            *timestamp_ptr = CURRENT_TIMESTAMP;
-
-            let observers_ptr = &self.observers as *const usize as *mut usize;
-            *observers_ptr = 0;
         }
+        self.timestamp.store(CURRENT_TIMESTAMP, Ordering::SeqCst);
+        self.observers.store(0, Ordering::SeqCst);
     }
 
     fn increment_observers(&self) {
-        unsafe {
-            let observers_ptr = &self.observers as *const usize as *mut usize;
-            *observers_ptr = observers_ptr.wrapping_add(1);
-        }
+        self.observers.fetch_add(1, Ordering::SeqCst);
     }
 
     pub fn get_coherence(&self) -> f64 {
@@ -91,11 +83,11 @@ impl<T> Horizon<T> {
     }
 
     pub fn get_timestamp(&self) -> usize {
-        self.timestamp
+        self.timestamp.load(Ordering::SeqCst)
     }
 
     pub fn get_observer_count(&self) -> usize {
-        self.observers
+        self.observers.load(Ordering::SeqCst)
     }
 
     pub fn is_coherent(&self) -> bool {
@@ -104,6 +96,19 @@ impl<T> Horizon<T> {
 
     pub fn is_quantum_stable(&self) -> bool {
         self.coherence > QUANTUM_STABILITY_THRESHOLD
+    }
+}
+
+impl<T> Clone for Horizon<T> where T: Clone {
+    fn clone(&self) -> Self {
+        unsafe {
+            Self {
+                state: Box::into_raw(Box::new((*self.state).clone())),
+                coherence: self.coherence,
+                timestamp: AtomicUsize::new(self.timestamp.load(Ordering::SeqCst)),
+                observers: AtomicUsize::new(self.observers.load(Ordering::SeqCst)),
+            }
+        }
     }
 }
 
@@ -122,12 +127,13 @@ impl<T: Scribe> Scribe for Horizon<T> {
         output.push_str(", coherence=");
         output.push_f64(self.coherence, precision.decimal_places());
         output.push_str(", observers=");
-        output.push_usize(self.observers);
+        output.push_str(&self.observers.load(Ordering::SeqCst).to_string());
         output.push_char('}');
     }
 }
 
-// Integration with QuantumCell
+/// Integration with QuantumCell
+#[derive(Debug)]
 pub struct HorizonCell<T> {
     value: Horizon<T>,
     quantum_state: Horizon<bool>,
@@ -160,6 +166,15 @@ impl<T> HorizonCell<T> {
 
     pub fn get_coherence(&self) -> f64 {
         self.value.get_coherence()
+    }
+}
+
+impl<T: Clone> Clone for HorizonCell<T> {
+    fn clone(&self) -> Self {
+        Self {
+            value: self.value.clone(),
+            quantum_state: self.quantum_state.clone(),
+        }
     }
 }
 
