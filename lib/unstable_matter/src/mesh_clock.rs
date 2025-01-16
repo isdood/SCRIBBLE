@@ -3,15 +3,19 @@
 /// Author: isdood
 /// Current User: isdood
 
+use crate::align::AlignedRegion;
+
 use crate::{
-    Vector3D,
-    align::{AlignedRegion, Alignment},
+    zeronaut::Zeronaut,
+    vector::Vector3D,
+    align::Alignment,
     helium::{Helium, HeliumOrdering},
     phantom::QuantumCell,
     constants::CURRENT_TIMESTAMP,
     grav::GravityField,
     constants::GRAVITATIONAL_CONSTANT,
     meshmath::MeshMath,
+    quantum::Quantum,
 };
 
 use core::f64::consts::PI;
@@ -231,18 +235,18 @@ pub struct MeshClock {
     entanglement_strength: Helium<f64>,
     pattern_buffer: QuantumCell<Option<QuantumDataPattern>>,
     coherence: Helium<f64>,
+    region: Vector3D<Zeronaut<u8>>,
     alignment: Alignment,
 }
 
 impl MeshClock {
-    pub fn new(origin: Vector3D<f64>, distance: f64) -> Self {
-        let alignment = Alignment::new(MESH_CACHE_LINE);
-        let alpha_pos = origin.clone();
-        let omega_pos = Vector3D::new(
-            origin.x() + distance,
-                                      origin.y(),
-                                      origin.z()
-        );
+    pub fn new(alignment: Alignment) -> Self {
+        let zero = Zeronaut::zero();
+        Self {
+            region: Vector3D::new_unchecked(zero, zero, zero),
+            alignment,
+        }
+    }
 
         Self {
             alpha_cell: MeshCell::new(alpha_pos),
@@ -259,7 +263,7 @@ impl MeshClock {
             pattern_buffer: QuantumCell::new(None),
             coherence: Helium::new(1.0),
             alignment,
-        }
+
     }
 
     pub fn set_gravity_field(&mut self, field: GravityField) {

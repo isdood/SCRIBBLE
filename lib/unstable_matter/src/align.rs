@@ -33,7 +33,7 @@ struct AlignValue(usize);
 
 impl Scribe for AlignValue {
     fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str(&self.0.to_string());
+        output.push_str(&format!("{}", self.0));
     }
 }
 
