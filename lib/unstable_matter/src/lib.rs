@@ -7,7 +7,8 @@
 pub mod quantum;
 pub mod scribe;
 
-// Implementation modules
+// Core modules
+pub mod align;
 pub mod vector;
 pub mod unstable;
 pub mod mesh;

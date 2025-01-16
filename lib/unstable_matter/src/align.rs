@@ -1,45 +1,61 @@
-// lib/unstable_matter/src/align.rs
-/// Last Updated: 2025-01-14 20:38:30 UTC
+/// Native 3D Mesh Alignment System
+/// Last Updated: 2025-01-16 04:58:41 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use core::{
-    ptr::NonNull,
-    cell::UnsafeCell,
-    sync::atomic::{AtomicUsize, Ordering},
+use crate::{
+    constants::CURRENT_TIMESTAMP,
+    Vector3D,
+    zeronaut::Zeronaut,
+    helium::Helium,
+    helium::HeliumOrdering,
+    quantum::QuantumBlock,  // Our native quantum memory management
 };
 
-use crate::constants::CURRENT_TIMESTAMP;
+const ALIGN_TIMESTAMP: usize = 1705381121; // 2025-01-16 04:58:41 UTC
+const VECTOR_ALIGN: usize = 16;
+const CACHE_LINE: usize = 64;
+const QUANTUM_BLOCK_SIZE: usize = 256;
+const QUANTUM_POOL_SIZE: usize = 1024;
+const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
 
-const ALIGN_TIMESTAMP: usize = 1705263412; // 2025-01-14 20:56:52 UTC
+pub type AlignedRegion = Vector3D<Zeronaut<u8>>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Alignment {
-    value: UnsafeCell<usize>,
-    timestamp: AtomicUsize,
+    value: QuantumBlock<usize>,
+    timestamp: Helium<usize>,
+}
+
+impl Clone for Alignment {
+    fn clone(&self) -> Self {
+        Self {
+            value: self.value.clone(),
+            timestamp: self.timestamp.clone(),
+        }
+    }
 }
 
 impl Alignment {
     pub fn new(value: usize) -> Self {
         assert!(value.is_power_of_two(), "Alignment must be a power of 2");
         Self {
-            value: UnsafeCell::new(value),
-            timestamp: AtomicUsize::new(ALIGN_TIMESTAMP),
+            value: QuantumBlock::new(value),
+            timestamp: Helium::new(ALIGN_TIMESTAMP),
         }
     }
 
     pub fn get_value(&self) -> usize {
-        unsafe { *self.value.get() }
+        self.value.read()
     }
 
     pub fn align_address(&self, addr: usize) -> usize {
-        let value = self.get_value();
-        (addr + value - 1) & !(value - 1)
+        (addr + self.get_value() - 1) & !(self.get_value() - 1)
     }
 
     pub fn get_coherence(&self) -> f64 {
         let current = CURRENT_TIMESTAMP;
-        let timestamp = self.timestamp.load(Ordering::SeqCst);
+        let timestamp = self.timestamp.load(&HeliumOrdering::Quantum).unwrap_or(ALIGN_TIMESTAMP);
         let dt = (current - timestamp) as f64;
         (1.0 / (1.0 + dt * 1e-9)).max(0.0)
     }
@@ -47,33 +63,31 @@ impl Alignment {
 
 #[derive(Debug)]
 pub struct AlignedSpace {
-    ptr: NonNull<u8>,
+    region: AlignedRegion,
     size: usize,
     alignment: Alignment,
+    coherence: Helium<f64>,
 }
 
 impl AlignedSpace {
     pub fn new(size: usize, alignment: Alignment) -> Self {
         let aligned_size = alignment.align_address(size);
-        let layout = core::alloc::Layout::from_size_align(
-            aligned_size,
-            alignment.get_value()
-        ).unwrap();
+        let region = AlignedRegion::new(
+            Zeronaut::zero(),
+                                        Zeronaut::zero(),
+                                        Zeronaut::zero(),
+        );
 
-        unsafe {
-            let raw_ptr = core::alloc::alloc(layout);
-            let ptr = NonNull::new(raw_ptr).expect("allocation failed");
-
-            Self {
-                ptr,
-                size: aligned_size,
-                alignment,
-            }
+        Self {
+            region,
+            size: aligned_size,
+            alignment,
+            coherence: Helium::new(1.0),
         }
     }
 
-    pub fn get_ptr(&self) -> NonNull<u8> {
-        self.ptr
+    pub fn get_region(&self) -> &AlignedRegion {
+        &self.region
     }
 
     pub fn get_size(&self) -> usize {
@@ -85,35 +99,62 @@ impl AlignedSpace {
     }
 
     pub fn get_coherence(&self) -> f64 {
-        self.alignment.get_coherence()
+        self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(0.0)
+    }
+
+    pub fn is_quantum_stable(&self) -> bool {
+        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
+    }
+
+    pub fn decay_coherence(&mut self) {
+        if let Ok(current) = self.coherence.load(&HeliumOrdering::Quantum) {
+            let _ = self.coherence.store(current * 0.99, &HeliumOrdering::Quantum);
+        }
+    }
+
+    pub fn reset_coherence(&mut self) {
+        let _ = self.coherence.store(1.0, &HeliumOrdering::Quantum);
+    }
+
+    pub fn get_position(&self) -> Vector3D<isize> {
+        Vector3D::new(
+            self.region.x().as_isize(),
+                      self.region.y().as_isize(),
+                      self.region.z().as_isize(),
+        )
+    }
+
+    pub fn realign(&mut self) {
+        let aligned_pos = Vector3D::new(
+            self.alignment.align_address(self.region.x().as_usize()) as isize,
+                                        self.alignment.align_address(self.region.y().as_usize()) as isize,
+                                        self.alignment.align_address(self.region.z().as_usize()) as isize,
+        );
+
+        self.region = AlignedRegion::new(
+            Zeronaut::from_isize(aligned_pos.x()),
+                                         Zeronaut::from_isize(aligned_pos.y()),
+                                         Zeronaut::from_isize(aligned_pos.z()),
+        );
+
+        self.decay_coherence();
     }
 }
 
 impl Clone for AlignedSpace {
     fn clone(&self) -> Self {
-        let new_space = Self::new(self.size, self.alignment.clone());
-        unsafe {
-            core::ptr::copy_nonoverlapping(
-                self.ptr.as_ptr(),
-                                           new_space.ptr.as_ptr(),
-                                           self.size
-            );
+        Self {
+            region: self.region.clone(),
+            size: self.size,
+            alignment: self.alignment.clone(),
+            coherence: self.coherence.clone(),
         }
-        new_space
     }
 }
 
-impl Drop for AlignedSpace {
-    fn drop(&mut self) {
-        unsafe {
-            let layout = core::alloc::Layout::from_size_align(
-                self.size,
-                self.alignment.get_value()
-            ).unwrap();
-            core::alloc::dealloc(self.ptr.as_ptr(), layout);
-        }
-    }
-}
+// Static quantum pool with native quantum memory management
+static QUANTUM_POOL: QuantumBlock<[u8; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE]> =
+QuantumBlock::new([0; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE]);
 
 pub fn vector_align() -> Alignment {
     Alignment::new(VECTOR_ALIGN)
@@ -123,45 +164,11 @@ pub fn cache_align() -> Alignment {
     Alignment::new(CACHE_LINE)
 }
 
-struct QuantumPool {
-    blocks: [UnsafeCell<u8>; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE],
-    free_list: AtomicUsize,
-}
-
-impl QuantumPool {
-    const fn new() -> Self {
-        const ZERO: UnsafeCell<u8> = UnsafeCell::new(0);
-        Self {
-            blocks: [ZERO; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE],
-            free_list: AtomicUsize::new(0),
-        }
-    }
-
-    fn alloc(&self) -> Option<NonNull<u8>> {
-        let index = self.free_list.fetch_add(1, Ordering::AcqRel);
-        if index >= self.blocks.len() {
-            self.free_list.fetch_sub(1, Ordering::AcqRel);
-            None
-        } else {
-            unsafe {
-                Some(NonNull::new_unchecked(self.blocks[index].get()))
-            }
-        }
-    }
-
-    fn dealloc(&self, ptr: NonNull<u8>) {
-        let _index = self.free_list.fetch_sub(1, Ordering::AcqRel) - 1;
-        unsafe {
-            ptr.as_ptr().write_bytes(0, QUANTUM_BLOCK_SIZE);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const TEST_TIMESTAMP: usize = 1705261907; // 2025-01-14 20:31:47 UTC
+    const TEST_TIMESTAMP: usize = 1705380767; // 2025-01-16 04:52:47 UTC
 
     #[test]
     fn test_alignment() {
@@ -182,7 +189,7 @@ mod tests {
     #[test]
     fn test_aligned_space() {
         let align = Alignment::new(16);
-        let space = AlignedSpace::new(100, align).unwrap();
+        let space = AlignedSpace::new(100, align);
         assert_eq!(space.get_size(), 128); // Aligned to quantum block size
         assert_eq!(space.get_alignment().get_value(), 16);
         assert!(space.get_coherence() <= 1.0);
@@ -191,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_quantum_stability() {
-        let mut space = AlignedSpace::new(100, Alignment::new(16)).unwrap();
+        let mut space = AlignedSpace::new(100, Alignment::new(16));
         assert!(space.is_quantum_stable());
 
         for _ in 0..10 {
@@ -206,56 +213,74 @@ mod tests {
     #[test]
     fn test_quantum_block_alignment() {
         let align = Alignment::new(QUANTUM_BLOCK_SIZE);
-        let space = AlignedSpace::new(100, align).unwrap();
-        assert_eq!(space.get_ptr().as_ptr() as usize % QUANTUM_BLOCK_SIZE, 0);
+        let space = AlignedSpace::new(100, align);
+        assert_eq!(space.get_ptr() as usize % QUANTUM_BLOCK_SIZE, 0);
     }
 
     #[test]
     fn test_quantum_pool_allocation() {
-        // Test small allocation (should use quantum pool)
-        let align = Alignment::new(16);
-        let small_space = AlignedSpace::new(32, align).unwrap();
-        let small_ptr = small_space.get_ptr().as_ptr() as usize;
-        assert!(small_ptr >= QUANTUM_POOL.blocks.as_ptr() as usize &&
-        small_ptr < (QUANTUM_POOL.blocks.as_ptr() as usize +
-        QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE));
+        let pool = QuantumPool::new();
 
-        // Test large allocation (should use system allocator)
-        let large_space = AlignedSpace::new(QUANTUM_BLOCK_SIZE * 2, align).unwrap();
-        let large_ptr = large_space.get_ptr().as_ptr() as usize;
-        assert!(large_ptr < QUANTUM_POOL.blocks.as_ptr() as usize ||
-        large_ptr >= (QUANTUM_POOL.blocks.as_ptr() as usize +
-        QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE));
+        // Test allocation
+        let ptr1 = pool.alloc();
+        assert!(ptr1.is_some());
+
+        // Test multiple allocations
+        let ptr2 = pool.alloc();
+        assert!(ptr2.is_some());
+        assert_ne!(ptr1, ptr2);
+
+        // Test deallocation
+        if let Some(ptr) = ptr1 {
+            pool.dealloc(ptr);
+        }
     }
 
     #[test]
     fn test_coherence_decay_on_realign() {
-        let mut space = AlignedSpace::new(100, Alignment::new(16)).unwrap();
+        let mut space = AlignedSpace::new(100, Alignment::new(16));
         let initial_coherence = space.get_coherence();
 
         // Force realignment
-        unsafe {
-            let ptr = space.get_ptr();
-            let offset_ptr = NonNull::new_unchecked((ptr.as_ptr() as usize + 1) as *mut u8);
-            space.ptr = offset_ptr;
-        }
-
         space.realign();
         assert!(space.get_coherence() < initial_coherence);
     }
 
     #[test]
     fn test_position_tracking() {
-        let space = AlignedSpace::new(100, Alignment::new(16)).unwrap();
+        let space = AlignedSpace::new(100, Alignment::new(16));
         let pos = space.get_position();
-        assert_eq!(pos.x(), space.get_ptr().as_ptr() as isize);
         assert_eq!(pos.y(), space.get_size() as isize);
         assert_eq!(pos.z(), space.get_alignment().get_value() as isize);
     }
 
     #[test]
-    fn test_zero_size_allocation() {
+    fn test_alignment_clone() {
         let align = Alignment::new(16);
-        assert!(AlignedSpace::new(0, align).is_none());
+        let clone = align.clone();
+        assert_eq!(align.get_value(), clone.get_value());
+        assert!(align.get_coherence() <= 1.0);
+        assert!(clone.get_coherence() <= 1.0);
+    }
+
+    #[test]
+    fn test_aligned_space_clone() {
+        let space = AlignedSpace::new(100, Alignment::new(16));
+        let clone = space.clone();
+
+        assert_eq!(space.get_size(), clone.get_size());
+        assert_eq!(space.get_alignment().get_value(), clone.get_alignment().get_value());
+        assert_ne!(space.get_ptr(), clone.get_ptr());
+    }
+
+    #[test]
+    fn test_coherence_bounds() {
+        let align = Alignment::new(16);
+        assert!(align.get_coherence() <= 1.0);
+        assert!(align.get_coherence() >= 0.0);
+
+        let space = AlignedSpace::new(100, align);
+        assert!(space.get_coherence() <= 1.0);
+        assert!(space.get_coherence() >= 0.0);
     }
 }

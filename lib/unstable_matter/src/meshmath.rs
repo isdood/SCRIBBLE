@@ -8,6 +8,28 @@
 pub struct MeshMath;
 
 impl MeshMath {
+
+    /// Normalizes an angle to be within the range [-π, π]
+    pub fn normalize_angle(angle: f64) -> f64 {
+        let two_pi = 2.0 * std::f64::consts::PI;
+        let mut normalized = angle % two_pi;
+        if normalized > std::f64::consts::PI {
+            normalized -= two_pi;
+        } else if normalized < -std::f64::consts::PI {
+            normalized += two_pi;
+        }
+        normalized
+    }
+
+    /// Returns the absolute value of a number
+    pub fn abs(x: f64) -> f64 {
+        if x < 0.0 {
+            -x
+        } else {
+            x
+        }
+    }
+
     /// Custom square root implementation for mesh calculations
     pub fn sqrt(x: f64) -> f64 {
         if x < 0.0 {

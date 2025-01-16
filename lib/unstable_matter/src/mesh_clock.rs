@@ -1,11 +1,11 @@
 /// Quantum Mesh System Module with Gravitational Effects
-/// Last Updated: 2025-01-16 04:21:21 UTC
+/// Last Updated: 2025-01-16 04:53:30 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
     Vector3D,
-    quantum::align::{Alignment, AlignedSpace as AlignedRegion},  // Updated path
+    align::{Alignment, AlignedSpace},  // This should now work
     helium::{Helium, HeliumOrdering},
     phantom::QuantumCell,
     constants::CURRENT_TIMESTAMP,
@@ -352,9 +352,9 @@ impl MeshClock {
             return Err("System not quantum stable");
         }
 
-        // Calculate phase based on current oscillation count
         let oscillations = self.oscillation_count.load(&HeliumOrdering::Quantum)?;
-        let phase = MeshMath::normalize_angle((oscillations as f64 * PI) / 1000.0);
+        let phase = (oscillations as f64 * PI) / 1000.0;
+        let normalized_phase = MeshMath::normalize_angle(phase);
 
         // Set both cells to superposition state
         self.alpha_cell.set_state(CellState::Superposition);
@@ -376,8 +376,8 @@ impl MeshClock {
         // Apply anti-pattern to omega cell
         self.omega_cell.update_quantum_pattern(&anti_pattern)?;
 
-        // Update quantum state with calculated phase
-        self.quantum_state.set(QuantumState::Superposition(phase));
+        // Update quantum state with normalized phase
+        self.quantum_state.set(QuantumState::Superposition(normalized_phase));
 
         Ok(())
     }
@@ -475,40 +475,21 @@ impl MeshClock {
     }
 
     pub fn sync_with_rtc(&mut self) -> Result<(), &'static str> {
-        // Get current mesh time with quantum ordering
         let mesh_time = self.last_ping.load(&HeliumOrdering::Quantum)?;
 
-        // Calculate time drift using MeshMath to handle potential overflow
-        let current_ts = CURRENT_TIMESTAMP as f64;
-        let mesh_ts = mesh_time as f64;
-        let drift = MeshMath::abs(current_ts - mesh_ts) as usize;
+        // Safe time difference calculation
+        let current_ts = CURRENT_TIMESTAMP;
+        let drift = if current_ts >= mesh_time {
+            current_ts - mesh_time
+        } else {
+            mesh_time - current_ts
+        };
 
-        // Check if drift exceeds microsecond threshold
         if drift > 1000 { // More than 1µs drift
-            // Log the drift for debugging
-            #[cfg(debug_assertions)]
-            println!("Time drift detected: {} ns", drift);
-
-            // Attempt calibration
-            match self.calibrate() {
-                Ok(_) => {
-                    // Update last ping time after successful calibration
-                    self.last_ping.store(CURRENT_TIMESTAMP, &HeliumOrdering::Quantum)?;
-                }
-                Err(e) => {
-                    // Decay coherence and propagate error
-                    self.decay_coherence();
-                    return Err(e);
-                }
-            }
+            self.calibrate()?;
         }
 
-        // Always decay coherence slightly to model natural decoherence
         self.decay_coherence();
-
-        // Update quantum state timestamp
-        self.last_ping.store(CURRENT_TIMESTAMP, &HeliumOrdering::Quantum)?;
-
         Ok(())
     }
 
