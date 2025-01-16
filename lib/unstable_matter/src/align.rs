@@ -9,7 +9,7 @@ use crate::{
     zeronaut::Zeronaut,
     helium::Helium,
     helium::HeliumOrdering,
-    quantum::QuantumBlock,  // Our native quantum memory management
+    quantum::Quantum,  // Our native quantum memory management
 };
 
 const ALIGN_TIMESTAMP: usize = 1705381121; // 2025-01-16 04:58:41 UTC

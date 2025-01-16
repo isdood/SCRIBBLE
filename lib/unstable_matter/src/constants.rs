@@ -1,5 +1,5 @@
 /// Quantum System Constants
-/// Last Updated: 2025-01-15 02:38:30 UTC
+/// Last Updated: 2025-01-16 23:05:54 UTC
 /// Author: isdood
 /// Current User: isdood
 ///
@@ -15,7 +15,7 @@
 /// - Mesh Configuration: Space-time fabric parameters
 
 // System Timestamps
-pub const CURRENT_TIMESTAMP: usize = 1705277892; // 2025-01-15 03:18:12 UTC
+pub const CURRENT_TIMESTAMP: usize = 1705446354; // 2025-01-16 23:05:54 UTC
 pub const QUANTUM_TIMESTAMP: usize = CURRENT_TIMESTAMP;
 pub const MESH_TIMESTAMP: usize = CURRENT_TIMESTAMP;
 
@@ -58,6 +58,7 @@ pub const MESH_CACHE_LINE: usize = CACHE_LINE;
 pub const QUANTUM_MEMORY_ALIGNMENT: usize = 16;
 pub const UFO_MEMORY_ALIGNMENT: usize = 32;
 pub const QUANTUM_PAGE_SIZE: usize = 4096;
+pub const QUANTUM_BLOCK_SIZE: usize = QUANTUM_PAGE_SIZE;  // Added for compatibility
 
 // Mesh Configuration
 pub const MESH_GRANULARITY: usize = 64;
@@ -65,6 +66,7 @@ pub const MESH_COHERENCE_THRESHOLD: f64 = 0.5;
 pub const MESH_ENTANGLEMENT_LIMIT: usize = 1000;
 pub const MESH_WARP_FACTOR: f64 = 1.1;
 pub const MESH_QUANTUM_RESOLUTION: f64 = 1e-6;
+pub const MESH_VECTOR_ALIGN: usize = QUANTUM_MEMORY_ALIGNMENT;  // Added for mesh operations
 
 // UFO Constants
 pub const UFO_COHERENCE_THRESHOLD: f64 = 0.7;
@@ -108,7 +110,10 @@ pub fn verify_quantum_constants() -> bool {
     VECTOR_DECOHERENCE_RATE < 1.0 &&
     VECTOR_DECOHERENCE_RATE > 0.0 &&
     UNSTABLE_MATTER_THRESHOLD < QUANTUM_COHERENCE_THRESHOLD &&
-    UNSTABLE_DECAY_RATE < 1.0
+    UNSTABLE_DECAY_RATE < 1.0 &&
+    // Additional verifications for new constants
+    QUANTUM_BLOCK_SIZE >= CACHE_LINE &&
+    MESH_VECTOR_ALIGN >= VECTOR_ALIGN
 }
 
 #[cfg(test)]
@@ -151,5 +156,13 @@ mod tests {
         assert!(UNSTABLE_DECAY_RATE < 1.0, "Invalid unstable decay rate");
         assert!(UNSTABLE_MATTER_THRESHOLD > 0.0, "Invalid unstable threshold");
         assert!(UNSTABLE_RECOVERY_TIME > 0, "Invalid recovery time");
+    }
+
+    #[test]
+    fn test_memory_alignment_constants() {
+        assert!(QUANTUM_BLOCK_SIZE >= CACHE_LINE,
+                "Quantum block size must be at least cache line size");
+        assert!(MESH_VECTOR_ALIGN >= VECTOR_ALIGN,
+                "Mesh vector alignment must be at least vector alignment");
     }
 }

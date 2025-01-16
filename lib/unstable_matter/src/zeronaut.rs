@@ -1,5 +1,5 @@
 /// Quantum-Safe Zero-Based Memory Navigation Module
-/// Last Updated: 2025-01-16 02:51:14 UTC
+/// Last Updated: 2025-01-16 22:52:47 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -13,7 +13,7 @@ const QUANTUM_EPSILON: f64 = 1e-10;
 const TUNNEL_THRESHOLD: f64 = 0.01;
 
 /// Represents a quantum-safe non-null pointer with spatial coordinates
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Zeronaut<T> {
     ptr: *mut T,
     position: Vector3D<isize>,
@@ -41,6 +41,28 @@ impl<T> Zeronaut<T> {
                  coherence: QuantumCell::new(1.0),
                  last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
             })
+        }
+    }
+
+    /// Creates a zero-initialized Zeronaut
+    pub fn zero() -> Self {
+        Self {
+            ptr: std::ptr::null_mut(),
+            position: Vector3D::new(0, 0, 0),
+            quantum_state: QuantumCell::new(true),
+            coherence: QuantumCell::new(1.0),
+            last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
+        }
+    }
+
+    /// Creates a Zeronaut from an isize value
+    pub fn from_isize(value: isize) -> Self {
+        Self {
+            ptr: value as *mut T,
+            position: Vector3D::new(0, 0, 0),
+            quantum_state: QuantumCell::new(true),
+            coherence: QuantumCell::new(1.0),
+            last_tunnel: QuantumCell::new(CURRENT_TIMESTAMP),
         }
     }
 
@@ -120,19 +142,18 @@ impl<T> Zeronaut<T> {
         self.position.quantum_distance(&other.position) < QUANTUM_EPSILON &&
         (self.get_coherence() - other.get_coherence()).abs() < QUANTUM_EPSILON
     }
+
+    pub fn as_isize(&self) -> isize {
+        self.ptr as isize
+    }
+
+    pub fn as_usize(&self) -> usize {
+        self.ptr as usize
+    }
+
 }
 
-impl<T> Clone for Zeronaut<T> {
-    fn clone(&self) -> Self {
-        Self {
-            ptr: self.ptr,
-            position: self.position.clone(),
-            quantum_state: QuantumCell::new(self.quantum_state.get()),
-            coherence: QuantumCell::new(self.coherence.get()),
-            last_tunnel: QuantumCell::new(self.last_tunnel.get()),
-        }
-    }
-}
+// Note: Removed redundant Clone implementation since we now derive it
 
 #[cfg(test)]
 mod tests {
@@ -180,5 +201,16 @@ mod tests {
             Box::from_raw(ptr1);
             Box::from_raw(ptr2);
         }
+    }
+
+    #[test]
+    fn test_zero_and_from_isize() {
+        let zero = Zeronaut::<u32>::zero();
+        assert!(zero.as_ptr().is_null());
+        assert_eq!(zero.get_position(), Vector3D::new(0, 0, 0));
+
+        let from_isize = Zeronaut::<u32>::from_isize(42);
+        assert_eq!(from_isize.as_ptr() as isize, 42);
+        assert_eq!(from_isize.get_position(), Vector3D::new(0, 0, 0));
     }
 }

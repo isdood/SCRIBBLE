@@ -1,5 +1,5 @@
 /// Quantum Vector Module
-/// Last Updated: 2025-01-16 03:11:03 UTC
+/// Last Updated: 2025-01-16 22:58:59 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -25,13 +25,39 @@ pub struct Vector4D<T> {
 }
 
 impl<T: Copy> Vector3D<T> {
-    pub fn new(x: T, y: T, z: T) -> Self {
+    pub const fn new(x: T, y: T, z: T) -> Self {
         Self { x, y, z }
     }
 
     pub fn x(&self) -> T { self.x }
     pub fn y(&self) -> T { self.y }
     pub fn z(&self) -> T { self.z }
+
+    pub fn as_ptr(&self) -> *const T {
+        &self.x as *const T
+    }
+
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        &mut self.x as *mut T
+    }
+
+    pub fn as_isize(&self) -> Vector3D<isize>
+    where T: Into<isize> + Copy {
+        Vector3D::new(
+            self.x.into(),
+                      self.y.into(),
+                      self.z.into()
+        )
+    }
+
+    pub fn as_usize(&self) -> Vector3D<usize>
+    where T: Into<usize> + Copy {
+        Vector3D::new(
+            self.x.into(),
+                      self.y.into(),
+                      self.z.into()
+        )
+    }
 }
 
 impl<T: Copy + Add<Output = T>> Add for Vector3D<T> {
@@ -82,6 +108,20 @@ impl<T: Scribe> Scribe for Vector3D<T> {
     }
 }
 
+impl<T: Scribe + Clone + 'static> Quantum for Vector3D<T> {
+    fn get_coherence(&self) -> f64 {
+        1.0
+    }
+
+    fn is_quantum_stable(&self) -> bool {
+        true
+    }
+
+    fn decay_coherence(&self) {}
+
+    fn reset_coherence(&self) {}
+}
+
 impl Vector3D<f64> {
     pub fn magnitude(&self) -> f64 {
         (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
@@ -118,7 +158,7 @@ impl Vector3D<isize> {
 }
 
 impl<T> Vector4D<T> {
-    pub fn new(x: T, y: T, z: T, w: T) -> Self
+    pub const fn new(x: T, y: T, z: T, w: T) -> Self
     where
     T: Copy
     {
@@ -129,6 +169,14 @@ impl<T> Vector4D<T> {
     pub fn y(&self) -> T where T: Copy { self.y }
     pub fn z(&self) -> T where T: Copy { self.z }
     pub fn w(&self) -> T where T: Copy { self.w }
+
+    pub fn as_ptr(&self) -> *const T {
+        &self.x as *const T
+    }
+
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        &mut self.x as *mut T
+    }
 }
 
 impl<T: Copy + Add<Output = T>> Add for Vector4D<T> {
@@ -243,5 +291,28 @@ mod tests {
 
         let scaled = v1 * 2;
         assert_eq!(scaled, Vector4D::new(2, 4, 6, 8));
+    }
+
+    #[test]
+    fn test_vector_conversions() {
+        let v = Vector3D::new(1, 2, 3);
+        let v_isize = v.as_isize();
+        let v_usize = v.as_usize();
+
+        assert_eq!(v_isize, Vector3D::new(1isize, 2isize, 3isize));
+        assert_eq!(v_usize, Vector3D::new(1usize, 2usize, 3usize));
+    }
+
+    #[test]
+    fn test_vector_ptr_access() {
+        let mut v = Vector3D::new(1, 2, 3);
+        let ptr = v.as_ptr();
+        let mut_ptr = v.as_mut_ptr();
+
+        unsafe {
+            assert_eq!(*ptr, 1);
+            *mut_ptr = 42;
+        }
+        assert_eq!(v.x(), 42);
     }
 }

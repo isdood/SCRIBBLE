@@ -5,7 +5,7 @@
 
 use crate::{
     Vector3D,
-    align::{Alignment, AlignedSpace},  // This should now work
+    align::{AlignedRegion, Alignment},
     helium::{Helium, HeliumOrdering},
     phantom::QuantumCell,
     constants::CURRENT_TIMESTAMP,
@@ -44,8 +44,9 @@ impl MeshCell {
     pub fn new(position: Vector3D<f64>) -> Self {
         let alignment = Alignment::new(MESH_VECTOR_ALIGN);
         let region = AlignedRegion::new(
-            MESH_CACHE_LINE,
-            alignment.clone()
+            Zeronaut::zero(),
+                                        alignment.clone(),
+                                        Zeronaut::zero()
         );
 
         Self {
@@ -327,7 +328,7 @@ impl MeshClock {
         }
 
         let oscillations = self.oscillation_count.load(&HeliumOrdering::Quantum)?;
-        let phase = (oscillations as f64 * PI) / 1000.0;
+        let _phase = (oscillations as f64 * PI) / 1000.0;
 
         self.alpha_cell.set_state(CellState::Entangled);
         self.omega_cell.set_state(CellState::Entangled);
@@ -507,7 +508,7 @@ impl MeshClock {
         self.last_ping.store(CURRENT_TIMESTAMP, &HeliumOrdering::Quantum)?;
         self.coherence.store(1.0, &HeliumOrdering::Quantum)?;
 
-        let new_signature = self.generate_quantum_signature();
+        let _new_signature = self.generate_quantum_signature();
         let pattern = QuantumDataPattern::new([
             self.alpha_cell.get_position(),
                                               self.omega_cell.get_position()
