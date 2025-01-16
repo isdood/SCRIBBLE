@@ -15,6 +15,10 @@ pub enum WandaMessage {
 pub enum WandaResponse {
     Status { version: String, uptime: u64 },
     Error { message: String },
+    Analysis {
+        suggestions: Vec<String>,
+        timestamp: u64
+    },
 }
 
 impl WandaResponse {

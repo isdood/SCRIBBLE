@@ -15,6 +15,8 @@ pub mod types;
 pub use paths::*;
 pub use service::WandaService;
 pub use types::*;
+pub mod brain;
+pub use brain::WandaBrain;
 
 // Library-wide constants
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

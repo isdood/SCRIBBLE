@@ -5,6 +5,7 @@ use serde_json;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use crate::types::{WandaMessage, WandaResponse};
+use crate::brain::WandaBrain;
 
 pub struct WandaService {
     config: crate::WandaConfig,
@@ -108,7 +109,28 @@ impl WandaService {
                                       .as_secs()
                 )
             }
-            _ => WandaResponse::error("Unsupported operation".to_string())
+            WandaMessage::Analyze { path } => {
+                if !path.exists() {
+                    WandaResponse::error(format!("Path does not exist: {:?}", path))
+                } else {
+                    // Initialize brain for analysis
+                    let brain = WandaBrain::new();
+                    match brain.analyze_path(&path) {
+                        Ok(suggestions) => WandaResponse::Analysis {
+                            suggestions,
+                            timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs()
+                        },
+                        Err(e) => WandaResponse::error(format!("Analysis failed: {}", e))
+                    }
+                }
+            }
+            WandaMessage::Suggest { context } => {
+                // TODO: Implement suggestion logic
+                WandaResponse::error("Suggestion feature not yet implemented".to_string())
+            }
         };
 
         // Send response and ensure it's flushed
