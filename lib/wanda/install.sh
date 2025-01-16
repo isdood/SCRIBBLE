@@ -12,17 +12,17 @@ display_clock() {
 
     # Display current time in AM/PM format with orange square brackets
     echo ""
-    echo -e "          \033[0;33m[\033[0m$(date +"%I:%M:%S %p")\033[0;33m]\033[0m"
+    echo -e "              \033[0;33m[\033[0m$(date +"%I:%M:%S %p")\033[0;33m]\033[0m"
     echo ""
 
     # ASCII Art for Wanda in purple with yellow stars forming a ">" shape to the right
-    echo -e "\033[1;35m _       __                 __   \033[1;33m *  *\033[0m"
-    echo -e "\033[1;35m| |     / /___ _____  ____/ /___    \033[1;33m*  *\033[0m"
-    echo -e "\033[1;35m| | /| / / __ \`/ __ \/ __  / __ \\     \033[1;33m*  *\033[0m"
-    echo -e "\033[1;35m| |/ |/ / /_/ / / / / /_/ / /_/ /   \033[1;33m   *  *\033[0m"
-    echo -e "\033[1;35m|__/|__/\__,_/_/ /_/\__,_/\____/      \033[1;33m*  *\033[0m"
-    echo -e "                                  \033[1;33m  *  *\033[0m"
-    echo -e "                                  \033[1;33m*  *\033[0m"
+    echo -e "    \033[1;35m _       __                 __   \033[1;33m *  *\033[0m"
+    echo -e "    \033[1;35m| |     / /___ _____  ____/ /___    \033[1;33m*  *\033[0m"
+    echo -e "    \033[1;35m| | /| / / __ \`/ __ \/ __  / __ \\     \033[1;33m*  *\033[0m"
+    echo -e "    \033[1;35m| |/ |/ / /_/ / / / / /_/ / /_/ /   \033[1;33m   *  *\033[0m"
+    echo -e "    \033[1;35m|__/|__/\__,_/_/ /_/\__,_/\____/      \033[1;33m*  *\033[0m"
+    echo -e "                                        \033[1;33m *  *\033[0m"
+    echo -e "                                       \033[1;33m*  *\033[0m"
 
     # Install message
     echo ""
@@ -95,7 +95,7 @@ systemctl --user start wanda.service
 echo "Waiting for service to be ready..."
 for i in {1..10}; do
     echo "Waiting for socket (attempt $i/10)..."
-    if [ -S ~/.local/share/wanda/wanda.sock]; then
+    if [ -S ~/.local/share/wanda/wanda.sock ]; then
         ls -l ~/.local/share/wanda/wanda.sock
         break
     fi
