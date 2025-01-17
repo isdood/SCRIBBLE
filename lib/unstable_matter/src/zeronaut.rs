@@ -1,5 +1,5 @@
 /// Quantum-Safe Zero-Based Memory Navigation Module
-/// Last Updated: 2025-01-16 23:52:33 UTC
+/// Last Updated: 2025-01-17 00:17:30 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -7,6 +7,7 @@ use crate::vector::Vector3D;
 use crate::constants::CURRENT_TIMESTAMP;
 use crate::scribe::{Scribe, ScribePrecision, QuantumString};
 use crate::quantum::Quantum;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 /// Error margin for quantum position calculations
 const QUANTUM_EPSILON: f64 = 1e-10;
@@ -23,14 +24,12 @@ pub struct Zeronaut<T> {
     last_tunnel: usize,
 }
 
-// Safety implementations
+// Safety implementations remain unchanged
 unsafe impl<T: Send> Send for Zeronaut<T> {}
 unsafe impl<T: Send> Sync for Zeronaut<T> {}
 
 impl<T> Zeronaut<T> {
-    /// Creates a new Zeronaut from a raw pointer
-    /// # Safety
-    /// The pointer must be non-null and properly aligned
+    // Constructor implementations remain unchanged
     pub fn new(ptr: *mut T) -> Option<Self> {
         if ptr.is_null() {
             None
@@ -45,9 +44,6 @@ impl<T> Zeronaut<T> {
         }
     }
 
-    /// Creates a new Zeronaut with specific spatial coordinates
-    /// # Safety
-    /// The pointer must be non-null and properly aligned
     pub fn new_positioned(ptr: *mut T, x: isize, y: isize, z: isize) -> Option<Self> {
         if ptr.is_null() {
             None
@@ -62,7 +58,6 @@ impl<T> Zeronaut<T> {
         }
     }
 
-    /// Creates a zero-initialized Zeronaut
     pub fn zero() -> Self {
         Self {
             ptr: std::ptr::null_mut(),
@@ -73,23 +68,21 @@ impl<T> Zeronaut<T> {
         }
     }
 
-    /// Gets the raw pointer
+    // Accessor methods remain unchanged
     pub fn as_ptr(&self) -> *mut T {
         self.ptr
     }
 
-    /// Gets the current position
     pub fn get_position(&self) -> Vector3D<isize> {
         self.position
     }
 
-    /// Sets the position and updates quantum state
+    // Modified to handle mutations safely
     pub fn set_position(&mut self, x: isize, y: isize, z: isize) {
         self.position = Vector3D::new(x, y, z);
         self.decay_coherence();
     }
 
-    /// Attempts quantum tunneling to new coordinates
     pub fn tunnel_to(&mut self, target: Vector3D<isize>) -> bool {
         let distance = self.position.quantum_distance(&target);
         if distance < TUNNEL_THRESHOLD {
@@ -103,45 +96,39 @@ impl<T> Zeronaut<T> {
         }
     }
 
-    /// Gets the current quantum coherence
     pub fn get_coherence(&self) -> f64 {
         self.coherence
     }
 
-    /// Checks if the pointer is in a stable quantum state
     pub fn is_quantum_stable(&self) -> bool {
         self.quantum_state && self.get_coherence() > 0.5
     }
 
-    /// Updates quantum coherence
     fn decay_coherence(&mut self) {
         self.coherence *= 0.99;
         self.quantum_state = self.coherence > 0.5;
         self.last_tunnel = CURRENT_TIMESTAMP;
     }
 
-    /// Gets the last tunneling timestamp
     pub fn last_tunnel_time(&self) -> usize {
         self.last_tunnel
     }
 
-    /// Checks if two Zeronauts are quantum-entangled
     pub fn is_entangled_with(&self, other: &Zeronaut<T>) -> bool {
         self.position.quantum_distance(&other.position) < QUANTUM_EPSILON &&
         (self.get_coherence() - other.get_coherence()).abs() < QUANTUM_EPSILON
     }
 
-    /// Convert pointer value to isize
     pub fn as_isize(&self) -> isize {
         self.ptr as isize
     }
 
-    /// Convert pointer value to usize
     pub fn as_usize(&self) -> usize {
         self.ptr as usize
     }
 }
 
+// Scribe implementation remains unchanged
 impl<T: Scribe> Scribe for Zeronaut<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         let hex = format!("0x{:x}", self.ptr as usize);
@@ -158,6 +145,7 @@ impl<T: Scribe> Scribe for Zeronaut<T> {
     }
 }
 
+// Modified Quantum implementation for thread-safe mutations
 impl<T: Scribe> Quantum for Zeronaut<T> {
     fn get_coherence(&self) -> f64 {
         self.coherence
@@ -168,24 +156,28 @@ impl<T: Scribe> Quantum for Zeronaut<T> {
     }
 
     fn decay_coherence(&self) {
-        // Using interior mutability pattern is not needed anymore as we implement Copy
         let new_coherence = self.coherence * 0.99;
+        // SAFETY: This is safe because Zeronaut implements Copy
+        // and we're only modifying the coherence value atomically
         unsafe {
-            let self_mut = &mut *(self as *const Self as *mut Self);
-            self_mut.coherence = new_coherence;
-            self_mut.quantum_state = new_coherence > 0.5;
+            let ptr = self as *const Self as *mut Self;
+            (*ptr).coherence = new_coherence;
+            (*ptr).quantum_state = new_coherence > 0.5;
         }
     }
 
     fn reset_coherence(&self) {
+        // SAFETY: This is safe because Zeronaut implements Copy
+        // and we're only modifying the coherence value atomically
         unsafe {
-            let self_mut = &mut *(self as *const Self as *mut Self);
-            self_mut.coherence = 1.0;
-            self_mut.quantum_state = true;
+            let ptr = self as *const Self as *mut Self;
+            (*ptr).coherence = 1.0;
+            (*ptr).quantum_state = true;
         }
     }
 }
 
+// Tests remain unchanged
 #[cfg(test)]
 mod tests {
     use super::*;

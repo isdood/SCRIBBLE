@@ -1,5 +1,5 @@
 // lib/unstable_matter/examples/mesh_clock_demo.rs
-/// Last Updated: 2025-01-14 16:13:10 UTC
+/// Last Updated: 2025-01-17 00:30:59 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -10,7 +10,7 @@ use unstable_matter::{
 
 fn main() {
     println!("MeshClock Quantum State Demo");
-    println!("Timestamp: 2025-01-14 16:13:10 UTC");
+    println!("Timestamp: 2025-01-17 00:30:59 UTC");
     println!("Current User: isdood\n");
 
     // Initialize mesh with origin point and quantum distance
@@ -80,5 +80,10 @@ fn main() {
     }
     println!("  - Quantum state: {:?}", mesh.get_quantum_state());
     println!("  - Entanglement strength: {:.2}", mesh.get_entanglement_strength());
-    println!("  - Frequency: {:.2} Hz", mesh.get_frequency());
+
+    // Fixed: Properly handle the Result from get_frequency()
+    match mesh.get_frequency() {
+        Ok(freq) => println!("  - Frequency: {:.2} Hz", freq),
+        Err(e) => println!("  - Frequency: {}", e),
+    }
 }

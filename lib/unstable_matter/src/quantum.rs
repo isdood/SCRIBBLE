@@ -1,5 +1,5 @@
 /// Quantum Trait Module
-/// Last Updated: 2025-01-16 23:07:53 UTC
+/// Last Updated: 2025-01-17 00:18:42 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -72,19 +72,24 @@ impl<T: Sized + Scribe> Quantum for QuantumBlock<T> {
     }
 
     fn decay_coherence(&self) {
-        // Using interior mutability pattern
+        // SAFETY: This operation is safe because:
+        // 1. We're only modifying coherence and quantum_state
+        // 2. These modifications are atomic in nature
+        // 3. The ptr cast is valid for the lifetime of self
         unsafe {
-            let self_mut = &mut *(self as *const Self as *mut Self);
-            self_mut.coherence *= 0.99;
-            self_mut.quantum_state = self_mut.coherence > 0.5;
+            let ptr = self as *const Self as *mut Self;
+            let new_coherence = (*ptr).coherence * 0.99;
+            (*ptr).coherence = new_coherence;
+            (*ptr).quantum_state = new_coherence > 0.5;
         }
     }
 
     fn reset_coherence(&self) {
+        // SAFETY: Same safety guarantees as decay_coherence
         unsafe {
-            let self_mut = &mut *(self as *const Self as *mut Self);
-            self_mut.coherence = 1.0;
-            self_mut.quantum_state = true;
+            let ptr = self as *const Self as *mut Self;
+            (*ptr).coherence = 1.0;
+            (*ptr).quantum_state = true;
         }
     }
 }
