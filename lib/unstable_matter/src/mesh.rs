@@ -1,241 +1,143 @@
-/// Quantum Mesh Module
-/// Last Updated: 2025-01-18 17:58:31 UTC
+/// Mesh Module - Core Spatial Grid Implementation
+/// Last Updated: 2025-01-18 18:53:10 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
-    constants::*,
-    scribe::{Scribe, ScribePrecision, QuantumString},
     vector::Vector3D,
-    phantom::QuantumCell,
-    GravityField,
-    BlackHole,
-    Wormhole,
-    WormholeGlitch,
-    helium::Helium,
-    meshmath::MeshMath,
+    quantum::Quantum,
+    aether::{AetherOrdering, AetherCell},
+    meshmath::{MeshMath, MeshValue},
+    GRAVITATIONAL_CONSTANT,
+    QUANTUM_COHERENCE_THRESHOLD
 };
 
-#[derive(Debug, Clone)]
-pub struct MeshDimensions {
+#[derive(Debug)]
+pub struct Mesh {
     width: usize,
     height: usize,
     depth: usize,
+    dimensions: Vector3D<usize>,
+    position: AetherCell<Vector3D<f64>>,
+    stability: AetherCell<bool>,
+    coherence: AetherCell<f64>,
 }
 
-impl MeshDimensions {
+impl Mesh {
+    /// Create a new mesh from dimensions vector
+    #[inline]
     pub fn new(vec: Vector3D<usize>) -> Self {
         Self {
-            width: vec.get_x().clone(),
-            height: vec.get_y().clone(),
-            depth: vec.get_z().clone(),
+            width: vec.x(),
+            height: vec.y(),
+            depth: vec.z(),
+            dimensions: vec,
+            position: AetherCell::new(Vector3D::void()),
+            stability: AetherCell::new(true),
+            coherence: AetherCell::new(1.0),
         }
     }
 
-    pub fn to_vector(&self) -> Vector3D<usize> {
-        Vector3D::new(self.width, self.height, self.depth)
-    }
-
-    pub fn x(&self) -> usize { self.width }
-    pub fn y(&self) -> usize { self.height }
-    pub fn z(&self) -> usize { self.depth }
-
+    /// Get total mesh volume
+    #[inline]
     pub fn volume(&self) -> usize {
-        self.width.mesh_mul(self.height).mesh_mul(self.depth)
-    }
-}
-
-impl Scribe for MeshDimensions {
-    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("Mesh[");
-        output.push_usize(self.width);
-        output.push_char('x');
-        output.push_usize(self.height);
-        output.push_char('x');
-        output.push_usize(self.depth);
-        output.push_char(']');
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum CellState {
-    Free,
-    Entangled,
-    QuantumUncertain,
-    WormholeConnected,
-    Absorbed,
-}
-
-#[derive(Debug, Clone)]
-pub struct MeshCell {
-    position: QuantumCell<Vector3D<f64>>,
-    mass: Helium<f64>,
-    state: QuantumCell<CellState>,
-    coherence: Helium<f64>,
-    timestamp: Helium<u64>,
-    wormhole_connection: Option<Wormhole>,
-}
-
-impl MeshCell {
-    pub fn new(position: Vector3D<f64>) -> Self {
-        Self {
-            position: QuantumCell::new(position),
-            mass: Helium::new(1.0),
-            state: QuantumCell::new(CellState::Free),
-            coherence: Helium::new(1.0),
-            timestamp: Helium::new(CURRENT_TIMESTAMP.try_into().unwrap()),
-            wormhole_connection: None,
-        }
+        self.width * self.height * self.depth
     }
 
-    pub fn apply_force(&mut self, force: Vector3D<f64>) -> Result<(), &'static str> {
-        if !self.is_quantum_stable() {
-            return Err("Cell quantum state unstable");
-        }
-
-        let position = self.position.get().clone();
+    /// Update mesh position with force
+    #[inline]
+    pub fn update_position(&mut self, position: &Vector3D<f64>, force: &Vector3D<f64>) -> Result<(), &'static str> {
         let new_position = position.mesh_add(force);
-        self.position.set(new_position);
-        self.decay_coherence();
-        self.timestamp.quantum_store(CURRENT_TIMESTAMP.try_into().unwrap(), &HeliumOrdering::Quantum)?;
-        Ok(())
+        self.set_position(&new_position)
     }
 
-    pub fn interact_with_gravity(&mut self, field: &GravityField) -> Result<(), &'static str> {
-        if !self.is_quantum_stable() {
-            return Err("Cell quantum state unstable");
-        }
-
-        let position = self.position.get().clone();
-        let mass = self.mass.quantum_load(&HeliumOrdering::Quantum)?;
-        let force = field.calculate_force_at(position, mass);
-        self.apply_force(force)?;
-
-        if force.mesh_magnitude() > GRAVITATIONAL_THRESHOLD {
-            self.state.set(CellState::QuantumUncertain);
-        }
-
-        Ok(())
+    /// Set mesh position
+    #[inline]
+    pub fn set_position(&mut self, position: &Vector3D<f64>) -> Result<(), &'static str> {
+        self.position.store(position.clone(), &AetherOrdering::Quantum)
     }
 
-    pub fn interact_with_blackhole(&mut self, blackhole: &mut BlackHole) -> Result<(), &'static str> {
-        if !self.is_quantum_stable() {
-            return Err("Cell quantum state unstable");
-        }
+    /// Get current mesh position
+    #[inline]
+    pub fn get_position(&self) -> Result<Vector3D<f64>, &'static str> {
+        self.position.load(&AetherOrdering::Quantum)
+    }
 
-        let position = self.position.get().clone();
-        let blackhole_pos = blackhole.get_position();
+    /// Calculate gravitational force between mesh and black hole
+    #[inline]
+    pub fn calculate_gravity(&self, blackhole_pos: &Vector3D<f64>, mass: f64) -> Result<Vector3D<f64>, &'static str> {
+        let position = self.get_position()?;
         let distance = position.mesh_sub(blackhole_pos).mesh_magnitude();
 
-        if distance <= blackhole.get_event_horizon_radius() {
-            self.state.set(CellState::Absorbed);
-            blackhole.absorb_mass(self.mass.quantum_load(&HeliumOrdering::Quantum)?)?;
-            return Ok(());
+        if distance < 0.01 {
+            return Ok(Vector3D::void());
         }
 
-        let force = blackhole.calculate_force_at(&position);
-        self.apply_force(force)?;
-        Ok(())
+        let force = -GRAVITATIONAL_CONSTANT * mass / (distance * distance);
+        Ok(self.get_position()?.mesh_mul(force))
     }
 
-    pub fn connect_wormhole(&mut self, wormhole: Wormhole) -> Result<(), WormholeGlitch> {
-        if !self.is_quantum_stable() {
-            return Err(WormholeGlitch::quantum_state_compromised());
-        }
-
-        if self.get_coherence() < WORMHOLE_STABILITY_THRESHOLD {
-            return Err(WormholeGlitch::stability_failure());
-        }
-
-        self.wormhole_connection = Some(wormhole);
-        self.state.set(CellState::WormholeConnected);
-        Ok(())
+    /// Check if mesh is stable
+    #[inline]
+    pub fn is_stable(&self) -> Result<bool, &'static str> {
+        self.stability.load(&AetherOrdering::Quantum)
     }
 
-    pub fn get_position(&self) -> Vector3D<f64> {
-        self.position.get().clone()
+    /// Set mesh stability
+    #[inline]
+    pub fn set_stable(&mut self, stable: bool) -> Result<(), &'static str> {
+        self.stability.store(stable, &AetherOrdering::Quantum)
     }
 
-    pub fn get_mass(&self) -> f64 {
-        self.mass.quantum_load(&HeliumOrdering::Quantum)
-        .expect("Failed to load mass")
+    /// Get mesh coherence
+    #[inline]
+    pub fn get_coherence(&self) -> Result<f64, &'static str> {
+        self.coherence.load(&AetherOrdering::Quantum)
     }
 
-    pub fn get_state(&self) -> CellState {
-        self.state.get()
+    /// Set mesh coherence
+    #[inline]
+    pub fn set_coherence(&mut self, coherence: f64) -> Result<(), &'static str> {
+        self.coherence.store(coherence, &AetherOrdering::Quantum)
     }
 
-    pub fn get_coherence(&self) -> f64 {
-        self.coherence.quantum_load(&HeliumOrdering::Quantum)
-        .expect("Failed to load coherence")
+    /// Check if mesh has quantum coherence
+    #[inline]
+    pub fn has_quantum_coherence(&self) -> Result<bool, &'static str> {
+        Ok(self.get_coherence()? > QUANTUM_COHERENCE_THRESHOLD)
     }
 
-    pub fn is_quantum_stable(&self) -> bool {
-        self.get_coherence() > QUANTUM_STABILITY_THRESHOLD
+    /// Reset mesh to initial state
+    #[inline]
+    pub fn reset(&mut self) -> Result<(), &'static str> {
+        self.set_stable(true)?;
+        self.set_coherence(1.0)?;
+        self.set_position(&Vector3D::void())
+    }
+}
+
+impl Default for Mesh {
+    fn default() -> Self {
+        Self::new(Vector3D::new(64, 64, 64))
+    }
+}
+
+impl Quantum for Mesh {
+    fn get_coherence(&self) -> f64 {
+        self.coherence.load(&AetherOrdering::Quantum).unwrap_or(0.0)
+    }
+
+    fn is_quantum_stable(&self) -> bool {
+        self.stability.load(&AetherOrdering::Quantum).unwrap_or(false)
     }
 
     fn decay_coherence(&self) {
-        let current = self.coherence.quantum_load(&HeliumOrdering::Quantum)
-        .expect("Failed to load coherence");
-        let new_coherence = current.mesh_mul(COHERENCE_DECAY_FACTOR);
-        self.coherence.quantum_store(new_coherence, &HeliumOrdering::Quantum)
-        .expect("Failed to store coherence");
-    }
-}
-
-impl Scribe for MeshCell {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("MeshCell{pos=");
-        self.get_position().scribe(precision, output);
-        output.push_str(", mass=");
-        output.push_f64(self.get_mass(), precision.decimal_places());
-        output.push_str(", coherence=");
-        output.push_f64(self.get_coherence(), precision.decimal_places());
-        output.push_char('}');
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_mesh_cell_creation() {
-        let position = Vector3D::new(1.0, 2.0, 3.0);
-        let cell = MeshCell::new(position.clone());
-
-        assert_eq!(cell.get_state(), CellState::Free);
-        assert_eq!(cell.get_position(), position);
-        assert!(cell.is_quantum_stable());
-    }
-
-    #[test]
-    fn test_force_application() {
-        let mut cell = MeshCell::new(Vector3D::new(0.0, 0.0, 0.0));
-        let force = Vector3D::new(1.0, 0.0, 0.0);
-
-        assert!(cell.apply_force(force).is_ok());
-        assert_eq!(cell.get_position(), Vector3D::new(1.0, 0.0, 0.0));
-    }
-
-    #[test]
-    fn test_quantum_stability() {
-        let cell = MeshCell::new(Vector3D::new(0.0, 0.0, 0.0));
-
-        // Force decoherence
-        for _ in 0..100 {
-            cell.decay_coherence();
+        if let Ok(current) = self.coherence.load(&AetherOrdering::Quantum) {
+            let _ = self.coherence.store(current * 0.99, &AetherOrdering::Quantum);
         }
-
-        assert!(!cell.is_quantum_stable());
     }
 
-    #[test]
-    fn test_scribe_output() {
-        let cell = MeshCell::new(Vector3D::new(1.0, 2.0, 3.0));
-        let mut output = QuantumString::new();
-        cell.scribe(ScribePrecision::Standard, &mut output);
-        assert!(output.as_str().contains("MeshCell{pos="));
-        assert!(output.as_str().contains("mass=1.000000"));
+    fn reset_coherence(&self) {
+        let _ = self.coherence.store(1.0, &AetherOrdering::Quantum);
     }
 }
