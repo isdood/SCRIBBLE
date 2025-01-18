@@ -1,4 +1,3 @@
-```markdown
 # Scribble
 ## A Crystal-Powered Operating System with Dream-Space Computing
 Version: 3.1.0
