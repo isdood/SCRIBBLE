@@ -5,11 +5,12 @@
 
 use crate::{
     vector::Vector3D,
-    mesh::{MeshCell, CellState as MeshCellState},
     align::{Alignment, vector_align},
     helium::{Helium, HeliumOrdering},
     constants::{CURRENT_TIMESTAMP, GRAVITATIONAL_CONSTANT, QUANTUM_COHERENCE_THRESHOLD},
 };
+
+use crate::mesh::CellState;
 
 const MESH_VECTOR_ALIGN: usize = 16;
 const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
@@ -70,17 +71,8 @@ impl MeshCell {
         Ok(())
     }
 
-    pub fn get_coherence(&self) -> f64 {
-        self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(0.0)
-    }
-
     pub fn is_quantum_stable(&self) -> bool {
         self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
-    }
-
-    fn decay_coherence(&self) {
-        let current = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
-        self.coherence.store(current * 0.99, &HeliumOrdering::Quantum).unwrap_or(());
     }
 
     pub fn get_last_update(&self) -> usize {
@@ -112,10 +104,6 @@ impl QuantumDataPattern {
 
     pub fn get_quantum_signature(&self) -> [u8; 32] {
         self.quantum_signature.get().clone()
-    }
-
-    pub fn get_coherence(&self) -> f64 {
-        self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(0.0)
     }
 
     pub fn decay_coherence(&self) {
@@ -208,10 +196,6 @@ impl MeshClock {
         self.signal_vector.clone()
     }
 
-    pub fn get_coherence(&self) -> Result<f64, &'static str> {
-        self.coherence.load(&HeliumOrdering::Quantum)
-    }
-
     pub fn set_coherence(&mut self, value: f64) -> Result<(), &'static str> {
         self.coherence.store(value, &HeliumOrdering::Quantum)
     }
@@ -231,9 +215,9 @@ impl MeshClock {
 
     pub fn handle_drift(&mut self, current_ts: u64, mesh_time: u64) -> usize {
         let drift = if current_ts >= mesh_time {
-            (current_ts - mesh_time) as usize
+            (current_ts - mesh_time).try_into().unwrap()
         } else {
-            (mesh_time - current_ts) as usize
+            (mesh_time - current_ts).try_into().unwrap()
         };
         drift
     }
@@ -242,12 +226,17 @@ impl MeshClock {
         self.last_ping.store(CURRENT_TIMESTAMP as u64, &HeliumOrdering::Quantum)
     }
 
-    pub fn update_pattern_buffer(&mut self, pattern: Vec<f64>) {
+    pub fn store_pattern(&mut self, pattern: QuantumDataPattern) -> Result<(), &'static str> {
         self.pattern_buffer = Some(pattern);
+        Ok(())
     }
 
-    pub fn get_pattern_buffer(&self) -> Option<&Vec<f64>> {
+    pub fn get_pattern(&self) -> Option<&QuantumDataPattern> {
         self.pattern_buffer.as_ref()
+    }
+
+    pub fn update_pattern_buffer(&mut self, pattern: Vec<f64>) {
+        self.pattern_buffer = Some(pattern);
     }
 
     // Quantum state transitions
@@ -398,13 +387,6 @@ impl MeshClock {
         }
     }
 
-    pub fn is_quantum_stable(&self) -> bool {
-        let quantum_coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(0.0);
-        let grav_coherence = self.gravitational_coherence.load(&HeliumOrdering::Quantum).unwrap_or(0.0);
-
-        quantum_coherence * grav_coherence > QUANTUM_COHERENCE_THRESHOLD
-    }
-
     #[allow(dead_code)]
     fn classical_ping(&mut self) -> Result<usize, &'static str> {
         if self.alpha_cell.get_state() != CellState::Transmitting {
@@ -550,7 +532,7 @@ impl MeshClock {
             QuantumState::PatternTransfer => {
                 // Pattern transfer has overhead but benefits from coherence
                 let base_time = 2000;
-                let coherence = self.get_pattern_coherence().unwrap_or(1.0);
+                let coherence = self.get_coherence().unwrap_or(1.0);
                 let complexity_factor = 1.0 + (1.0 - coherence);
                 (base_time as f64 * complexity_factor) as usize
             },
@@ -596,7 +578,7 @@ impl MeshClock {
             },
             QuantumState::PatternTransfer => {
                 // Pattern transfer may return to coherent state
-                if self.get_pattern_coherence()? > 0.7 {
+                if self.get_coherence()? > 0.7 {
                     self.quantum_state.set(QuantumState::Coherent);
                     self.coherence.store(0.9, &HeliumOrdering::Quantum)?;
                 }
@@ -613,7 +595,7 @@ impl MeshClock {
         // Update pattern coherence based on state
         match self.quantum_state.get() {
             QuantumState::PatternTransfer => {
-                let current = self.get_pattern_coherence()?.max(0.1);
+                let current = self.get_coherence()?.max(0.1);
                 self.pattern_coherence.store(current * 0.995, &HeliumOrdering::Quantum)?;
             },
             QuantumState::Superposition(_) => {
@@ -659,7 +641,7 @@ impl MeshClock {
             QuantumState::Coherent => coherence,
             QuantumState::Entangled => coherence * (self.get_entanglement_strength() / 1000.0),
             QuantumState::Superposition(phase) => coherence * phase,
-            QuantumState::PatternTransfer => self.get_pattern_coherence().unwrap_or(0.0),
+            QuantumState::PatternTransfer => self.get_coherence().unwrap_or(0.0),
             QuantumState::Decoherent => 0.0
         }
     }
@@ -694,7 +676,7 @@ impl MeshClock {
             },
             QuantumState::PatternTransfer => {
                 // Add gradual coherence decay for pattern transfer
-                let current_coherence = self.get_pattern_coherence().unwrap_or(1.0);
+                let current_coherence = self.get_coherence().unwrap_or(1.0);
                 self.coherence.store(current_coherence * 0.997, &HeliumOrdering::Quantum)?;
             },
             QuantumState::Decoherent => {
@@ -731,7 +713,7 @@ impl MeshClock {
                 timestamp: Helium::new(CURRENT_TIMESTAMP),
                 alignment: Alignment::new(MESH_VECTOR_ALIGN),
             };
-            self.pattern_buffer.set(Some(pattern));
+            self.pattern_buffer = Some(pattern);
             Ok(())
         } else {
             Err("Cannot create superposition: quantum state not stable")
@@ -749,7 +731,7 @@ impl MeshClock {
     }
 
     pub fn transfer_quantum_pattern(&mut self) -> Result<(), &'static str> {
-        if let Some(pattern) = self.pattern_buffer.get() {
+        if let Some(pattern) = self.pattern_buffer.as_ref() {
             if pattern.get_coherence() > QUANTUM_COHERENCE_THRESHOLD {
                 self.quantum_state.set(QuantumState::PatternTransfer);
                 Ok(())

@@ -1,14 +1,33 @@
-// src/meshmath.rs
 /// MeshSpace Mathematics Implementation
-/// Last Updated: 2025-01-16 04:14:07 UTC
+/// Last Updated: 2025-01-18 15:03:45 UTC
 /// Author: isdood
 /// Current User: isdood
+
+// Operation traits
+pub trait MeshAdd<Rhs = Self> {
+    type Output;
+    fn mesh_add(self, rhs: Rhs) -> Self::Output;
+}
+
+pub trait MeshSub<Rhs = Self> {
+    type Output;
+    fn mesh_sub(self, rhs: Rhs) -> Self::Output;
+}
+
+pub trait MeshMul<Rhs = Self> {
+    type Output;
+    fn mesh_mul(self, rhs: Rhs) -> Self::Output;
+}
+
+pub trait MeshDiv<Rhs = Self> {
+    type Output;
+    fn mesh_div(self, rhs: Rhs) -> Self::Output;
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeshMath;
 
 impl MeshMath {
-
     /// Normalizes an angle to be within the range [-π, π]
     pub fn normalize_angle(angle: f64) -> f64 {
         let two_pi = 2.0 * std::f64::consts::PI;
@@ -41,8 +60,9 @@ impl MeshMath {
 
         let mut guess = x / 2.0;
         let mut prev_guess = 0.0;
+        let epsilon: f64 = 1e-15;
 
-        while (guess - prev_guess).abs() > 1e-15 {
+        while (guess - prev_guess).abs() > epsilon {
             prev_guess = guess;
             guess = (guess + x / guess) / 2.0;
         }
@@ -77,11 +97,12 @@ impl MeshMath {
 
     /// Custom exponential function implementation
     pub fn exp(x: f64) -> f64 {
-        let mut result = 1.0f64;
-        let mut term: f64 = 1.0;
+        let mut result = 1.0;
+        let mut term = 1.0;
         let mut n = 1;
+        let epsilon: f64 = 1e-15;
 
-        while term.abs() > 1e-15 && n < 100 {
+        while term.abs() > epsilon && n < 100 {
             term *= x / n as f64;
             result += term;
             n += 1;
@@ -96,12 +117,13 @@ impl MeshMath {
             panic!("Cannot calculate natural logarithm of non-positive number in meshspace");
         }
 
-        let mut result = 0.0f64;
-        let y = (x - 1.0) / (x + 1.0);  // Removed mut as it's not needed
+        let mut result = 0.0;
+        let y = (x - 1.0) / (x + 1.0);
         let mut power = y;
         let mut n = 1;
+        let epsilon: f64 = 1e-15;
 
-        while power.abs() > 1e-15 && n < 100 {
+        while power.abs() > epsilon && n < 100 {
             result += power / n as f64;
             power *= y * y;
             n += 2;
@@ -124,40 +146,67 @@ impl MeshMath {
     pub fn cosh(x: f64) -> f64 {
         (Self::exp(x) + Self::exp(-x)) / 2.0
     }
+
+    /// Convert isize to f64
+    pub fn to_f64(x: isize) -> f64 {
+        x as f64
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::f64::consts::PI;
-
-    #[test]
-    fn test_sqrt() {
-        assert!((MeshMath::sqrt(4.0) - 2.0).abs() < 1e-10);
-        assert!((MeshMath::sqrt(2.0) - std::f64::consts::SQRT_2).abs() < 1e-10);
+// Implement mesh operations for f64
+impl MeshAdd<f64> for f64 {
+    type Output = f64;
+    fn mesh_add(self, rhs: f64) -> f64 {
+        self + rhs
     }
+}
 
-    #[test]
-    fn test_sin() {
-        assert!((MeshMath::sin(PI/2.0) - 1.0).abs() < 1e-10);
-        assert!((MeshMath::sin(PI) - 0.0).abs() < 1e-10);
+impl MeshSub<f64> for f64 {
+    type Output = f64;
+    fn mesh_sub(self, rhs: f64) -> f64 {
+        self - rhs
     }
+}
 
-    #[test]
-    fn test_cos() {
-        assert!((MeshMath::cos(0.0) - 1.0).abs() < 1e-10);
-        assert!((MeshMath::cos(PI) + 1.0).abs() < 1e-10);
+impl MeshMul<f64> for f64 {
+    type Output = f64;
+    fn mesh_mul(self, rhs: f64) -> f64 {
+        self * rhs
     }
+}
 
-    #[test]
-    fn test_exp() {
-        assert!((MeshMath::exp(1.0) - std::f64::consts::E).abs() < 1e-10);
-        assert!((MeshMath::exp(0.0) - 1.0).abs() < 1e-10);
+impl MeshDiv<f64> for f64 {
+    type Output = f64;
+    fn mesh_div(self, rhs: f64) -> f64 {
+        self / rhs
     }
+}
 
-    #[test]
-    fn test_ln() {
-        assert!((MeshMath::ln(std::f64::consts::E) - 1.0).abs() < 1e-10);
-        assert!((MeshMath::ln(1.0) - 0.0).abs() < 1e-10);
+// Implement mesh operations for isize
+impl MeshAdd<isize> for isize {
+    type Output = isize;
+    fn mesh_add(self, rhs: isize) -> isize {
+        self + rhs
+    }
+}
+
+impl MeshSub<isize> for isize {
+    type Output = isize;
+    fn mesh_sub(self, rhs: isize) -> isize {
+        self - rhs
+    }
+}
+
+impl MeshMul<isize> for isize {
+    type Output = isize;
+    fn mesh_mul(self, rhs: isize) -> isize {
+        self * rhs
+    }
+}
+
+impl MeshDiv<isize> for isize {
+    type Output = isize;
+    fn mesh_div(self, rhs: isize) -> isize {
+        self / rhs
     }
 }

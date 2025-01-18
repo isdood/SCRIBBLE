@@ -14,6 +14,24 @@ pub trait Quantum: Scribe {
     fn reset_coherence(&self);
 }
 
+pub trait Quantum {
+    fn get_coherence(&self) -> Result<f64, &'static str>;
+}
+
+impl Quantum for QuantumDataPattern {
+    fn get_coherence(&self) -> Result<f64, &'static str> {
+        // Implementation here
+        unimplemented!()
+    }
+}
+
+impl Quantum for MeshClock {
+    fn get_coherence(&self) -> Result<f64, &'static str> {
+        // Implementation here
+        self.coherence.load(&HeliumOrdering::Quantum)
+    }
+}
+
 /// Represents a quantum-aligned memory block
 #[derive(Debug)]
 pub struct QuantumBlock<T: Sized + Scribe> {

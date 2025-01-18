@@ -45,6 +45,14 @@ impl<T: Clone + 'static> Helium<T> {
         }
     }
 
+    pub fn get(&self) -> T {
+        self.value.quantum_load()
+    }
+
+    pub fn set(&self, value: T) {
+        self.value.quantum_store(value, &HeliumOrdering::Quantum);
+    }
+
     /// Quantum-safe load operation
     pub fn quantum_load(&self) -> T {
         let val = self.value.get();

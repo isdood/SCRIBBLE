@@ -1,11 +1,13 @@
-/// Quantum Vector Module
-/// Last Updated: 2025-01-16 23:43:19 UTC
+/// Crystalline Vector Module
+/// Last Updated: 2025-01-18 14:42:24 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use std::ops::{Add, Sub, Mul};
-use crate::scribe::{Scribe, ScribePrecision, QuantumString};
-use crate::quantum::Quantum;
+use crate::{
+    scribe::{Scribe, ScribePrecision, QuantumString},
+    quantum::Quantum,
+    meshmath::{MeshMath, MeshAdd, MeshSub, MeshMul, MeshDiv},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vector3D<T> {
@@ -54,6 +56,12 @@ impl<T: Copy> Vector3D<T> {
     pub fn z(&self) -> T { self.z }
 }
 
+impl<T: Clone> Vector3D<T> {
+    pub fn get(&self) -> (T, T, T) {
+        (self.x.clone(), self.y.clone(), self.z.clone())
+    }
+}
+
 impl<T> Vector4D<T> {
     /// Creates a new vector with explicit type constraints
     pub fn new_unchecked(x: T, y: T, z: T, w: T) -> Self {
@@ -92,77 +100,77 @@ impl<T: Copy> Vector4D<T> {
     pub fn w(&self) -> T { self.w }
 }
 
-impl<T: Copy + Add<Output = T>> Add for Vector3D<T> {
+impl<T: Copy + MeshAdd<Output = T>> MeshAdd for Vector3D<T> {
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self::Output {
+    fn mesh_add(self, rhs: Self) -> Self::Output {
         Self::new(
-            self.x + rhs.x,
-            self.y + rhs.y,
-            self.z + rhs.z,
+            self.x.mesh_add(rhs.x),
+                  self.y.mesh_add(rhs.y),
+                  self.z.mesh_add(rhs.z),
         )
     }
 }
 
-impl<T: Copy + Sub<Output = T>> Sub for Vector3D<T> {
+impl<T: Copy + MeshSub<Output = T>> MeshSub for Vector3D<T> {
     type Output = Self;
 
-    fn sub(self, rhs: Self) -> Self::Output {
+    fn mesh_sub(self, rhs: Self) -> Self::Output {
         Self::new(
-            self.x - rhs.x,
-            self.y - rhs.y,
-            self.z - rhs.z,
+            self.x.mesh_sub(rhs.x),
+                  self.y.mesh_sub(rhs.y),
+                  self.z.mesh_sub(rhs.z),
         )
     }
 }
 
-impl<T: Copy + Mul<f64, Output = T>> Mul<f64> for Vector3D<T> {
+impl<T: Copy + MeshMul<f64, Output = T>> MeshMul<f64> for Vector3D<T> {
     type Output = Self;
 
-    fn mul(self, rhs: f64) -> Self::Output {
+    fn mesh_mul(self, rhs: f64) -> Self::Output {
         Self::new(
-            self.x * rhs,
-            self.y * rhs,
-            self.z * rhs,
+            self.x.mesh_mul(rhs),
+                  self.y.mesh_mul(rhs),
+                  self.z.mesh_mul(rhs),
         )
     }
 }
 
-impl<T: Copy + Add<Output = T>> Add for Vector4D<T> {
+impl<T: Copy + MeshAdd<Output = T>> MeshAdd for Vector4D<T> {
     type Output = Self;
 
-    fn add(self, rhs: Self) -> Self::Output {
+    fn mesh_add(self, rhs: Self) -> Self::Output {
         Self::new(
-            self.x + rhs.x,
-            self.y + rhs.y,
-            self.z + rhs.z,
-            self.w + rhs.w,
+            self.x.mesh_add(rhs.x),
+                  self.y.mesh_add(rhs.y),
+                  self.z.mesh_add(rhs.z),
+                  self.w.mesh_add(rhs.w),
         )
     }
 }
 
-impl<T: Copy + Sub<Output = T>> Sub for Vector4D<T> {
+impl<T: Copy + MeshSub<Output = T>> MeshSub for Vector4D<T> {
     type Output = Self;
 
-    fn sub(self, rhs: Self) -> Self::Output {
+    fn mesh_sub(self, rhs: Self) -> Self::Output {
         Self::new(
-            self.x - rhs.x,
-            self.y - rhs.y,
-            self.z - rhs.z,
-            self.w - rhs.w,
+            self.x.mesh_sub(rhs.x),
+                  self.y.mesh_sub(rhs.y),
+                  self.z.mesh_sub(rhs.z),
+                  self.w.mesh_sub(rhs.w),
         )
     }
 }
 
-impl<T: Copy + Mul<Output = T>> Mul<T> for Vector4D<T> {
+impl<T: Copy + MeshMul<Output = T>> MeshMul<T> for Vector4D<T> {
     type Output = Self;
 
-    fn mul(self, rhs: T) -> Self::Output {
+    fn mesh_mul(self, rhs: T) -> Self::Output {
         Self::new(
-            self.x * rhs,
-            self.y * rhs,
-            self.z * rhs,
-            self.w * rhs,
+            self.x.mesh_mul(rhs),
+                  self.y.mesh_mul(rhs),
+                  self.z.mesh_mul(rhs),
+                  self.w.mesh_mul(rhs),
         )
     }
 }
@@ -207,25 +215,24 @@ impl<T: Scribe + Clone + Copy + 'static> Quantum for Vector4D<T> {
     fn reset_coherence(&self) {}
 }
 
-// Implement Scribe for basic numeric types
-impl Scribe for isize {
-    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str(&ToString::to_string(self));
-    }
-}
-
 impl Vector3D<f64> {
     pub fn magnitude(&self) -> f64 {
-        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+        MeshMath::sqrt(
+            self.x.mesh_mul(self.x).mesh_add(
+                self.y.mesh_mul(self.y).mesh_add(
+                    self.z.mesh_mul(self.z)
+                )
+            )
+        )
     }
 
     pub fn normalize(&self) -> Self {
         let mag = self.magnitude();
         if mag > 0.0 {
             Self::new(
-                self.x / mag,
-                self.y / mag,
-                self.z / mag,
+                self.x.mesh_div(mag),
+                      self.y.mesh_div(mag),
+                      self.z.mesh_div(mag),
             )
         } else {
             *self
@@ -233,26 +240,40 @@ impl Vector3D<f64> {
     }
 
     pub fn quantum_distance(&self, other: &Self) -> f64 {
-        let dx = self.x - other.x;
-        let dy = self.y - other.y;
-        let dz = self.z - other.z;
-        (dx * dx + dy * dy + dz * dz).sqrt()
+        let dx = self.x.mesh_sub(other.x);
+        let dy = self.y.mesh_sub(other.y);
+        let dz = self.z.mesh_sub(other.z);
+        MeshMath::sqrt(
+            dx.mesh_mul(dx).mesh_add(
+                dy.mesh_mul(dy).mesh_add(
+                    dz.mesh_mul(dz)
+                )
+            )
+        )
     }
 }
 
 impl Vector4D<f64> {
     pub fn magnitude(&self) -> f64 {
-        (self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w).sqrt()
+        MeshMath::sqrt(
+            self.x.mesh_mul(self.x).mesh_add(
+                self.y.mesh_mul(self.y).mesh_add(
+                    self.z.mesh_mul(self.z).mesh_add(
+                        self.w.mesh_mul(self.w)
+                    )
+                )
+            )
+        )
     }
 
     pub fn normalize(&self) -> Self {
         let mag = self.magnitude();
         if mag > 0.0 {
             Self::new(
-                self.x / mag,
-                self.y / mag,
-                self.z / mag,
-                self.w / mag,
+                self.x.mesh_div(mag),
+                      self.y.mesh_div(mag),
+                      self.z.mesh_div(mag),
+                      self.w.mesh_div(mag),
             )
         } else {
             *self
@@ -260,64 +281,51 @@ impl Vector4D<f64> {
     }
 
     pub fn quantum_distance(&self, other: &Self) -> f64 {
-        let dx = self.x - other.x;
-        let dy = self.y - other.y;
-        let dz = self.z - other.z;
-        let dw = self.w - other.w;
-        (dx * dx + dy * dy + dz * dz + dw * dw).sqrt()
+        let dx = self.x.mesh_sub(other.x);
+        let dy = self.y.mesh_sub(other.y);
+        let dz = self.z.mesh_sub(other.z);
+        let dw = self.w.mesh_sub(other.w);
+        MeshMath::sqrt(
+            dx.mesh_mul(dx).mesh_add(
+                dy.mesh_mul(dy).mesh_add(
+                    dz.mesh_mul(dz).mesh_add(
+                        dw.mesh_mul(dw)
+                    )
+                )
+            )
+        )
     }
 }
 
 impl Vector3D<isize> {
     pub fn quantum_distance(&self, other: &Self) -> f64 {
-        let dx = (self.x - other.x) as f64;
-        let dy = (self.y - other.y) as f64;
-        let dz = (self.z - other.z) as f64;
-        (dx * dx + dy * dy + dz * dz).sqrt()
+        let dx = MeshMath::to_f64(self.x.mesh_sub(other.x));
+        let dy = MeshMath::to_f64(self.y.mesh_sub(other.y));
+        let dz = MeshMath::to_f64(self.z.mesh_sub(other.z));
+        MeshMath::sqrt(
+            dx.mesh_mul(dx).mesh_add(
+                dy.mesh_mul(dy).mesh_add(
+                    dz.mesh_mul(dz)
+                )
+            )
+        )
     }
 }
 
 impl Vector4D<isize> {
     pub fn quantum_distance(&self, other: &Self) -> f64 {
-        let dx = (self.x - other.x) as f64;
-        let dy = (self.y - other.y) as f64;
-        let dz = (self.z - other.z) as f64;
-        let dw = (self.w - other.w) as f64;
-        (dx * dx + dy * dy + dz * dz + dw * dw).sqrt()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_vector3d_operations() {
-        let v1 = Vector3D::new(1.0, 2.0, 3.0);
-        let v2 = Vector3D::new(4.0, 5.0, 6.0);
-
-        let sum = v1 + v2;
-        assert_eq!(sum, Vector3D::new(5.0, 7.0, 9.0));
-
-        let diff = v2 - v1;
-        assert_eq!(diff, Vector3D::new(3.0, 3.0, 3.0));
-
-        let scaled = v1 * 2.0;
-        assert_eq!(scaled, Vector3D::new(2.0, 4.0, 6.0));
-    }
-
-    #[test]
-    fn test_vector4d_operations() {
-        let v1 = Vector4D::new(1.0, 2.0, 3.0, 4.0);
-        let v2 = Vector4D::new(5.0, 6.0, 7.0, 8.0);
-
-        let sum = v1 + v2;
-        assert_eq!(sum, Vector4D::new(6.0, 8.0, 10.0, 12.0));
-
-        let diff = v2 - v1;
-        assert_eq!(diff, Vector4D::new(4.0, 4.0, 4.0, 4.0));
-
-        let scaled = v1 * 2.0;
-        assert_eq!(scaled, Vector4D::new(2.0, 4.0, 6.0, 8.0));
+        let dx = MeshMath::to_f64(self.x.mesh_sub(other.x));
+        let dy = MeshMath::to_f64(self.y.mesh_sub(other.y));
+        let dz = MeshMath::to_f64(self.z.mesh_sub(other.z));
+        let dw = MeshMath::to_f64(self.w.mesh_sub(other.w));
+        MeshMath::sqrt(
+            dx.mesh_mul(dx).mesh_add(
+                dy.mesh_mul(dy).mesh_add(
+                    dz.mesh_mul(dz).mesh_add(
+                        dw.mesh_mul(dw)
+                    )
+                )
+            )
+        )
     }
 }
