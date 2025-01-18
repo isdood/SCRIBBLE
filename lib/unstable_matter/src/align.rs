@@ -16,8 +16,13 @@ use crate::{
 const ALIGN_TIMESTAMP: usize = 1705448314; // 2025-01-16 23:38:34 UTC
 const VECTOR_ALIGN: usize = 16;
 const CACHE_LINE: usize = 64;
+
+#[allow(dead_code)]
 const QUANTUM_BLOCK_SIZE: usize = 256;
+
+#[allow(dead_code)]
 const QUANTUM_POOL_SIZE: usize = 1024;
+
 const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
 
 pub type AlignedRegion = Vector3D<Zeronaut<u8>>;
@@ -156,6 +161,7 @@ impl Clone for AlignedSpace {
 }
 
 // Static quantum pool with native quantum memory management
+#[allow(dead_code)]
 static mut QUANTUM_POOL: [u8; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE] = [0; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE];
 
 pub fn vector_align() -> Alignment {

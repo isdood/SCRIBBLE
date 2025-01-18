@@ -6,9 +6,8 @@ use unstable_matter::{
 };
 
 fn main() {
-    // Updated timestamp to match current system time
     println!("MeshClock Quantum State Demo");
-    println!("Timestamp: 2025-01-18 12:37:41 UTC");
+    println!("Timestamp: 2025-01-18 12:47:13 UTC");  // Updated to current system time
     println!("Current User: isdood\n");
 
     // Initialize mesh with origin point and quantum distance

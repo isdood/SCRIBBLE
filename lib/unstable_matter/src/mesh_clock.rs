@@ -116,7 +116,9 @@ pub struct QuantumDataPattern {
     mesh_shape: QuantumCell<[Vector3D<f64>; 2]>,
     quantum_signature: QuantumCell<[u8; 32]>,
     coherence: Helium<f64>,
+    #[allow(dead_code)]
     timestamp: Helium<usize>,
+    #[allow(dead_code)]
     alignment: Alignment,
 }
 
@@ -159,8 +161,11 @@ impl Clone for QuantumDataPattern {
 
 #[derive(Debug, Clone)]
 pub struct QuantumData {
+    #[allow(dead_code)]
     phase: f64,
+    #[allow(dead_code)]
     coherence: f64,
+    #[allow(dead_code)]
     last_update: usize,
 }
 
@@ -178,7 +183,9 @@ pub struct MeshClock {
     entanglement_strength: Helium<f64>,
     pattern_buffer: QuantumCell<Option<QuantumDataPattern>>,
     coherence: Helium<f64>,
+    #[allow(dead_code)]
     region: Vector3D<Zeronaut<u8>>,
+    #[allow(dead_code)]
     alignment: Alignment,
 }
 
@@ -271,6 +278,7 @@ impl MeshClock {
         velocity_dilation * curvature * quantum_dilation
     }
 
+    #[allow(dead_code)]
     fn quantum_ping(&mut self) -> Result<usize, &'static str> {
         let strength = self.entanglement_strength.load(&HeliumOrdering::Quantum)?;
 
@@ -301,6 +309,7 @@ impl MeshClock {
         quantum_coherence * grav_coherence > QUANTUM_COHERENCE_THRESHOLD
     }
 
+    #[allow(dead_code)]
     fn classical_ping(&mut self) -> Result<usize, &'static str> {
         if self.alpha_cell.get_state() != CellState::Transmitting {
             return Err("Alpha cell not ready to transmit");
