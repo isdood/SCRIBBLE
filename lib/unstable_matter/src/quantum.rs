@@ -1,165 +1,181 @@
-/// Quantum Trait Module
-/// Last Updated: 2025-01-17 00:18:42 UTC
+/// Quantum State Management Module
+/// Last Updated: 2025-01-18 18:54:21 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use crate::scribe::{Scribe, ScribePrecision, QuantumString};
-use crate::vector::Vector3D;
-use crate::constants::QUANTUM_PAGE_SIZE as QUANTUM_BLOCK_SIZE;
+use crate::{
+    vector::Vector3D,
+    aether::{AetherCell, AetherOrdering},
+    meshmath::MeshValue,
+};
 
-pub trait Quantum: Scribe {
+/// Core trait for quantum-aware types
+pub trait Quantum {
+    /// Get quantum coherence level (0.0 to 1.0)
     fn get_coherence(&self) -> f64;
+
+    /// Check quantum stability state
     fn is_quantum_stable(&self) -> bool;
+
+    /// Apply quantum decoherence effects
     fn decay_coherence(&self);
+
+    /// Reset quantum coherence to pristine state
     fn reset_coherence(&self);
 }
 
-pub trait Quantum {
-    fn get_coherence(&self) -> Result<f64, &'static str>;
-}
-
-impl Quantum for QuantumDataPattern {
-    fn get_coherence(&self) -> Result<f64, &'static str> {
-        // Implementation here
-        unimplemented!()
-    }
-}
-
-impl Quantum for MeshClock {
-    fn get_coherence(&self) -> Result<f64, &'static str> {
-        // Implementation here
-        self.coherence.load(&HeliumOrdering::Quantum)
-    }
-}
-
-/// Represents a quantum-aligned memory block
+/// Quantum particle state representation
 #[derive(Debug)]
-pub struct QuantumBlock<T: Sized + Scribe> {
-    data: T,
-    coherence: f64,
-    position: Vector3D<isize>,
-    quantum_state: bool,
+pub struct QuantumState {
+    /// Spatial position in quantum mesh
+    position: AetherCell<Vector3D<isize>>,
+
+    /// Quantum coherence level
+    coherence: AetherCell<f64>,
+
+    /// Quantum stability indicator
+    stability: AetherCell<bool>
 }
 
-impl<T: Sized + Scribe> QuantumBlock<T> {
-    /// Creates a new quantum block with the given data
-    pub const fn new(data: T) -> Self {
+impl QuantumState {
+    /// Create new quantum state
+    #[inline]
+    pub fn new() -> Self {
         Self {
-            data,
-            coherence: 1.0,
-            position: Vector3D::new(0, 0, 0),
-            quantum_state: true,
+            position: AetherCell::new(Vector3D::new(0, 0, 0)),
+            coherence: AetherCell::new(1.0),
+            stability: AetherCell::new(true)
         }
     }
 
-    /// Gets a reference to the underlying data
-    pub fn get_data(&self) -> &T {
-        &self.data
+    /// Get current position
+    #[inline]
+    pub fn get_position(&self) -> Result<Vector3D<isize>, &'static str> {
+        self.position.load(&AetherOrdering::Quantum)
     }
 
-    /// Gets a mutable reference to the underlying data
-    pub fn get_data_mut(&mut self) -> &mut T {
-        self.decay_coherence();
-        &mut self.data
+    /// Set new position
+    #[inline]
+    pub fn set_position(&mut self, pos: Vector3D<isize>) -> Result<(), &'static str> {
+        self.position.store(pos, &AetherOrdering::Quantum)
     }
 
-    /// Gets the block size
-    pub const fn block_size() -> usize {
-        QUANTUM_BLOCK_SIZE
+    /// Check if position matches target
+    #[inline]
+    pub fn is_at_position(&self, target: &Vector3D<isize>) -> Result<bool, &'static str> {
+        Ok(self.get_position()? == *target)
     }
 
-    /// Gets the current position
-    pub fn get_position(&self) -> Vector3D<isize> {
-        self.position
+    /// Get distance to target
+    #[inline]
+    pub fn distance_to(&self, target: &Vector3D<isize>) -> Result<f64, &'static str> {
+        Ok(self.get_position()?.quantum_distance(target))
     }
 
-    /// Sets the block position
-    pub fn set_position(&mut self, pos: Vector3D<isize>) {
-        self.position = pos;
-        self.decay_coherence();
+    /// Move towards target
+    #[inline]
+    pub fn move_towards(&mut self, target: &Vector3D<isize>) -> Result<(), &'static str> {
+        let current = self.get_position()?;
+        let diff = target.mesh_sub(&current);
+        let new_pos = current.mesh_add(&diff);
+        self.set_position(new_pos)
     }
 }
 
-impl<T: Sized + Scribe> Quantum for QuantumBlock<T> {
+impl Default for QuantumState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Quantum for QuantumState {
+    #[inline]
     fn get_coherence(&self) -> f64 {
-        self.coherence
+        self.coherence.load(&AetherOrdering::Quantum).unwrap_or(0.0)
     }
 
+    #[inline]
     fn is_quantum_stable(&self) -> bool {
-        self.quantum_state && self.coherence > 0.5
+        self.stability.load(&AetherOrdering::Quantum).unwrap_or(false)
     }
 
+    #[inline]
     fn decay_coherence(&self) {
-        // SAFETY: This operation is safe because:
-        // 1. We're only modifying coherence and quantum_state
-        // 2. These modifications are atomic in nature
-        // 3. The ptr cast is valid for the lifetime of self
-        unsafe {
-            let ptr = self as *const Self as *mut Self;
-            let new_coherence = (*ptr).coherence * 0.99;
-            (*ptr).coherence = new_coherence;
-            (*ptr).quantum_state = new_coherence > 0.5;
+        if let Ok(current) = self.coherence.load(&AetherOrdering::Quantum) {
+            let _ = self.coherence.store(current * 0.99, &AetherOrdering::Quantum);
         }
     }
 
+    #[inline]
     fn reset_coherence(&self) {
-        // SAFETY: Same safety guarantees as decay_coherence
-        unsafe {
-            let ptr = self as *const Self as *mut Self;
-            (*ptr).coherence = 1.0;
-            (*ptr).quantum_state = true;
-        }
+        let _ = self.coherence.store(1.0, &AetherOrdering::Quantum);
     }
 }
 
-impl<T: Sized + Scribe> Scribe for QuantumBlock<T> {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("QuantumBlock{data=");
-        self.data.scribe(precision, output);
-        output.push_str(", coherence=");
-        output.push_f64(self.coherence, precision.decimal_places());
-        output.push_str(", pos=");
-        self.position.scribe(precision, output);
-        output.push_str(", stable=");
-        output.push_str(if self.quantum_state { "true" } else { "false" });
-        output.push_char('}');
+/// Helper functions for quantum operations
+pub mod quantum_ops {
+    use super::*;
+
+    /// Entangle two quantum states
+    #[inline]
+    pub fn entangle(a: &mut QuantumState, b: &mut QuantumState) -> Result<(), &'static str> {
+        let coherence = (a.get_coherence() + b.get_coherence()) / 2.0;
+        a.coherence.store(coherence, &AetherOrdering::Quantum)?;
+        b.coherence.store(coherence, &AetherOrdering::Quantum)?;
+        Ok(())
+    }
+
+    /// Measure quantum state (causes decoherence)
+    #[inline]
+    pub fn measure(state: &QuantumState) -> Result<f64, &'static str> {
+        let coherence = state.get_coherence();
+        state.coherence.store(coherence * 0.9, &AetherOrdering::Quantum)?;
+        Ok(coherence)
+    }
+
+    /// Apply quantum tunneling effect
+    #[inline]
+    pub fn tunnel(state: &mut QuantumState, target: &Vector3D<isize>) -> Result<(), &'static str> {
+        if state.get_coherence() > 0.5 {
+            state.set_position(*target)?;
+            state.coherence.store(state.get_coherence() * 0.8, &AetherOrdering::Quantum)?;
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scribe::tests::TestScribe;
 
     #[test]
-    fn test_quantum_block() {
-        let mut block = QuantumBlock::new(TestScribe::new(42));
-        assert!(block.is_quantum_stable());
-        assert_eq!(block.get_coherence(), 1.0);
+    fn test_quantum_state_creation() {
+        let state = QuantumState::new();
+        assert!(state.is_quantum_stable());
+        assert!(state.get_coherence() > 0.99);
     }
 
     #[test]
     fn test_quantum_position() {
-        let mut block = QuantumBlock::new(TestScribe::new(42));
-        let new_pos = Vector3D::new(1, 2, 3);
-        block.set_position(new_pos.clone());
-        assert_eq!(block.get_position(), new_pos);
-        assert!(block.get_coherence() < 1.0);
+        let mut state = QuantumState::new();
+        let pos = Vector3D::new(1, 2, 3);
+        state.set_position(pos).unwrap();
+        assert_eq!(state.get_position().unwrap(), pos);
     }
 
     #[test]
-    fn test_quantum_coherence() {
-        let block = QuantumBlock::new(TestScribe::new(42));
+    fn test_quantum_decoherence() {
+        let state = QuantumState::new();
+        let initial = state.get_coherence();
+        state.decay_coherence();
+        assert!(state.get_coherence() < initial);
+    }
 
-        // Test decay
-        for _ in 0..10 {
-            block.decay_coherence();
-        }
-        assert!(block.get_coherence() < 0.9);
-
-        // Test reset
-        block.reset_coherence();
-        assert_eq!(block.get_coherence(), 1.0);
-        assert!(block.is_quantum_stable());
+    #[test]
+    fn test_quantum_entanglement() {
+        let mut a = QuantumState::new();
+        let mut b = QuantumState::new();
+        quantum_ops::entangle(&mut a, &mut b).unwrap();
+        assert_eq!(a.get_coherence(), b.get_coherence());
     }
 }
