@@ -1,16 +1,15 @@
 [package]
-name = "scribble"
+name = "harmony_core"
 version = "0.1.0"
 edition = "2021"
 authors = ["Caleb J.D. Terkovics <isdood>"]
-description = "Core scribble library functionality"
+description = "Harmonic core functionality for scribble"
 repository = "https://github.com/isdood/scribble"
 license = "MIT"
 
 [dependencies]
-harmony_core = { path = "../harmony_core" }
 libm = "0.2.11"
 
 [lib]
-name = "scribble"
+name = "harmony_core"
 path = "src/lib.rs"

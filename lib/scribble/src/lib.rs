@@ -1,13 +1,13 @@
 #![no_std]
 
 /// Scribble Core Library
-/// Last Updated: 2025-01-18 19:52:14 UTC
+/// Last Updated: 2025-01-18 19:54:45 UTC
 /// Author: isdood
 /// Current User: isdood
 
-extern crate unstable_matter;
+extern crate harmony_core;
 
-use unstable_matter::phantom::{QuantumCell, Protected};
+use harmony_core::{HarmonicCell, Protected};
 
 /// Memory address representation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,16 +27,16 @@ impl MemoryAddress {
     }
 }
 
-/// Aether timestamp for quantum-stable memory operations
+/// Aether timestamp for harmonically-stable memory operations
 #[derive(Debug, Clone)]
 pub struct AetherTimestamp {
-    inner: QuantumCell<usize>,
+    inner: HarmonicCell<usize>,
 }
 
 impl AetherTimestamp {
     pub fn new(timestamp: usize) -> Self {
         Self {
-            inner: QuantumCell::new(timestamp),
+            inner: HarmonicCell::new(timestamp),
         }
     }
 
@@ -45,7 +45,7 @@ impl AetherTimestamp {
     }
 
     pub fn update(&mut self) {
-        self.inner.set(1705693934); // 2025-01-18 19:52:14 UTC
+        self.inner.set(1705694085); // 2025-01-18 19:54:45 UTC
     }
 
     pub fn get_coherence(&self) -> f64 {
@@ -58,15 +58,15 @@ impl AetherTimestamp {
 pub struct ScribbleMemory<T: Clone + 'static> {
     addr: MemoryAddress,
     timestamp: AetherTimestamp,
-    value: QuantumCell<T>,
+    value: HarmonicCell<T>,
 }
 
 impl<T: Clone + 'static> ScribbleMemory<T> {
     pub fn at(addr: usize) -> Self {
         Self {
             addr: MemoryAddress::new(addr),
-            timestamp: AetherTimestamp::new(1705693934), // 2025-01-18 19:52:14 UTC
-            value: QuantumCell::new(unsafe { core::ptr::read_volatile(addr as *const T) }),
+            timestamp: AetherTimestamp::new(1705694085), // 2025-01-18 19:54:45 UTC
+            value: HarmonicCell::new(unsafe { core::ptr::read_volatile(addr as *const T) }),
         }
     }
 
@@ -83,7 +83,7 @@ impl<T: Clone + 'static> ScribbleMemory<T> {
         self.timestamp.update();
     }
 
-    pub const fn addr(&self) -> usize {
+    pub fn addr(&self) -> usize {
         self.addr.as_usize()
     }
 
@@ -118,7 +118,7 @@ impl Protected for ScribbleMemory<u32> {
         self.coherence()
     }
 
-    fn is_quantum_stable(&self) -> bool {
+    fn is_harmonically_stable(&self) -> bool {
         self.coherence() > 0.9
     }
 }
@@ -135,11 +135,11 @@ mod tests {
 
     #[test]
     fn test_aether_timestamp() {
-        let mut ts = AetherTimestamp::new(1705693934);
-        assert_eq!(ts.as_usize(), 1705693934);
+        let mut ts = AetherTimestamp::new(1705694085);
+        assert_eq!(ts.as_usize(), 1705694085);
         assert!(ts.get_coherence() > 0.0);
         ts.update();
-        assert_eq!(ts.as_usize(), 1705693934); // 2025-01-18 19:52:14 UTC
+        assert_eq!(ts.as_usize(), 1705694085); // 2025-01-18 19:54:45 UTC
     }
 
     #[test]
@@ -151,12 +151,12 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_quantum() {
+    fn test_memory_harmonic() {
         let mut mem: ScribbleMemory<u32> = ScribbleMemory::at(0x1000);
-        assert_eq!(mem.timestamp(), 1705693934);
+        assert_eq!(mem.timestamp(), 1705694085);
         mem.write(42);
         assert_eq!(mem.read(), 42);
         assert!(mem.coherence() > 0.0);
-        assert!(mem.is_quantum_stable());
+        assert!(mem.is_harmonically_stable());
     }
 }
