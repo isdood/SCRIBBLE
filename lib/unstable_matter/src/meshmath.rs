@@ -1,5 +1,5 @@
 /// MeshMath - Core Mathematical Operations Module
-/// Last Updated: 2025-01-18 18:04:26 UTC
+/// Last Updated: 2025-01-18 18:41:40 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -9,7 +9,7 @@ use core::f64::consts::PI;
 pub struct MeshMath;
 
 /// Core trait for mesh-aware numeric types
-pub trait MeshValue: Copy {  // Add Copy bound here
+pub trait MeshValue: Copy {
     fn mesh_add(self, other: Self) -> Self;
     fn mesh_sub(self, other: Self) -> Self;
     fn mesh_mul(self, other: Self) -> Self;
@@ -105,6 +105,190 @@ impl MeshValue for f64 {
 
     #[inline(always)]
     fn mesh_one() -> Self { 1.0 }
+}
+
+// Implement for isize
+impl MeshValue for isize {
+    #[inline(always)]
+    fn mesh_add(self, other: Self) -> Self {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: isize;
+                core::arch::asm!(
+                    "add {}, {}",
+                    out(reg) result,
+                                 in(reg) self,
+                                 in(reg) other,
+                                 options(nomem, nostack, preserves_flags)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
+    fn mesh_sub(self, other: Self) -> Self {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: isize;
+                core::arch::asm!(
+                    "sub {}, {}",
+                    out(reg) result,
+                                 in(reg) self,
+                                 in(reg) other,
+                                 options(nomem, nostack, preserves_flags)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
+    fn mesh_mul(self, other: Self) -> Self {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: isize;
+                core::arch::asm!(
+                    "imul {}, {}",
+                    out(reg) result,
+                                 in(reg) self,
+                                 in(reg) other,
+                                 options(nomem, nostack, preserves_flags)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
+    fn mesh_div(self, other: Self) -> Self {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: isize;
+                core::arch::asm!(
+                    "mov rax, {}",
+                    "cqo",
+                    "idiv {}",
+                    in(reg) self,
+                                 in(reg) other,
+                                 out("rax") result,
+                                 out("rdx") _,
+                                 options(nostack, preserves_flags)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
+    fn mesh_neg(self) -> Self {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: isize;
+                core::arch::asm!(
+                    "neg {}",
+                    out(reg) result,
+                                 in(reg) self,
+                                 options(nomem, nostack, preserves_flags)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
+    fn mesh_zero() -> Self { 0 }
+
+    #[inline(always)]
+    fn mesh_one() -> Self { 1 }
+}
+
+// Implement for usize
+impl MeshValue for usize {
+    #[inline(always)]
+    fn mesh_add(self, other: Self) -> Self {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: usize;
+                core::arch::asm!(
+                    "add {}, {}",
+                    out(reg) result,
+                                 in(reg) self,
+                                 in(reg) other,
+                                 options(nomem, nostack, preserves_flags)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
+    fn mesh_sub(self, other: Self) -> Self {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: usize;
+                core::arch::asm!(
+                    "sub {}, {}",
+                    "cmovb {}, {}",  // If borrow, return 0
+                    out(reg) result,
+                                 in(reg) self,
+                                 in(reg) other,
+                                 in(reg) 0usize,
+                                 options(nomem, nostack)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
+    fn mesh_mul(self, other: Self) -> Self {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: usize;
+                core::arch::asm!(
+                    "mul {}",
+                    in(reg) self,
+                                 in(reg) other,
+                                 out("rax") result,
+                                 out("rdx") _,
+                                 options(nostack, preserves_flags)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
+    fn mesh_div(self, other: Self) -> Self {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: usize;
+                core::arch::asm!(
+                    "mov rax, {}",
+                    "xor rdx, rdx",
+                    "div {}",
+                    in(reg) self,
+                                 in(reg) other,
+                                 out("rax") result,
+                                 out("rdx") _,
+                                 options(nostack, preserves_flags)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
+    fn mesh_neg(self) -> Self {
+        0  // usize can't be negative, return zero
+    }
+
+    #[inline(always)]
+    fn mesh_zero() -> Self { 0 }
+
+    #[inline(always)]
+    fn mesh_one() -> Self { 1 }
 }
 
 impl MeshMath {
