@@ -1,8 +1,4 @@
 // lib/unstable_matter/examples/mesh_clock_demo.rs
-/// Last Updated: 2025-01-17 00:30:59 UTC
-/// Author: isdood
-/// Current User: isdood
-
 use unstable_matter::{
     mesh_clock::MeshClock,
     Vector3D,
@@ -10,7 +6,7 @@ use unstable_matter::{
 
 fn main() {
     println!("MeshClock Quantum State Demo");
-    println!("Timestamp: 2025-01-17 00:30:59 UTC");
+    println!("Timestamp: 2025-01-18 12:26:28 UTC");  // Updated timestamp
     println!("Current User: isdood\n");
 
     // Initialize mesh with origin point and quantum distance
@@ -66,11 +62,12 @@ fn main() {
         Err(e) => println!("Pattern replication failed: {}", e),
     }
 
-    // Test quantum ping
-    println!("\nTesting quantum ping...");
-    match mesh.ping() {
-        Ok(time) => println!("Ping successful - propagation time: {} ns", time),
-        Err(e) => println!("Ping failed: {}", e),
+    // Perform multiple pings to generate frequency data
+    println!("\nPerforming quantum measurements...");
+    for _ in 0..10 {
+        if let Ok(time) = mesh.ping() {
+            println!("  - Ping successful - propagation time: {} ns", time);
+        }
     }
 
     println!("\nFinal quantum state:");
@@ -81,7 +78,7 @@ fn main() {
     println!("  - Quantum state: {:?}", mesh.get_quantum_state());
     println!("  - Entanglement strength: {:.2}", mesh.get_entanglement_strength());
 
-    // Fixed: Properly handle the Result from get_frequency()
+    // Get frequency measurements
     match mesh.get_frequency() {
         Ok(freq) => println!("  - Frequency: {:.2} Hz", freq),
         Err(e) => println!("  - Frequency: {}", e),

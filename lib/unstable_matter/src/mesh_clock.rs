@@ -16,8 +16,6 @@ use crate::{
     meshmath::MeshMath,
 };
 
-use core::f64::consts::PI;
-
 const MESH_VECTOR_ALIGN: usize = 16;
 const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
 
