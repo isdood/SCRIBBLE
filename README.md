@@ -1,5 +1,3 @@
-I'll rewrite the README to emphasize the crystal/whimsical themes while explaining how the quantum-inspired features work in more magical terms:
-
 ```markdown
 # Scribble
 ## A Crystal-Powered Operating System with Dream-Space Computing
