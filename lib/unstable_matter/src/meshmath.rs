@@ -1,7 +1,9 @@
 /// MeshSpace Mathematics Implementation
-/// Last Updated: 2025-01-18 15:12:00 UTC
+/// Last Updated: 2025-01-18 15:58:40 UTC
 /// Author: isdood
 /// Current User: isdood
+
+use std::f64::consts::PI;
 
 // Operation traits
 pub trait MeshAdd<Rhs = Self> {
@@ -45,131 +47,16 @@ pub trait MeshScalar<T> {
 pub struct MeshMath;
 
 impl MeshMath {
-    /// Normalizes an angle to be within the range [-π, π]
-    pub fn normalize_angle(angle: f64) -> f64 {
-        let two_pi = 2.0 * std::f64::consts::PI;
-        let mut normalized = angle % two_pi;
-        if normalized > std::f64::consts::PI {
-            normalized -= two_pi;
-        } else if normalized < -std::f64::consts::PI {
-            normalized += two_pi;
-        }
-        normalized
-    }
-
-    /// Returns the absolute value of a number
-    pub fn abs(x: f64) -> f64 {
-        if x < 0.0 {
-            -x
-        } else {
-            x
-        }
-    }
-
-    /// Custom square root implementation for mesh calculations
-    pub fn sqrt(x: f64) -> f64 {
-        if x < 0.0 {
-            panic!("Cannot calculate square root of negative number in meshspace");
-        }
-        if x == 0.0 {
-            return 0.0;
-        }
-
-        let mut guess = x / 2.0;
-        let mut prev_guess = 0.0;
-        let epsilon: f64 = 1e-15;
-
-        while (guess - prev_guess).abs() > epsilon {
-            prev_guess = guess;
-            guess = (guess + x / guess) / 2.0;
-        }
-
-        guess
-    }
-
-    /// Custom sine implementation using Taylor series
-    pub fn sin(x: f64) -> f64 {
-        // Normalize angle to -2π to 2π range
-        let x = x % (2.0 * std::f64::consts::PI);
-
-        let mut result = 0.0;
-        let mut term = x;
-        let mut n = 1;
-
-        for i in 0..12 { // 12 terms for good precision
-            if i > 0 {
-                term = -term * x * x / ((2 * n) * (2 * n + 1)) as f64;
-                n += 1;
-            }
-            result += term;
-        }
-
-        result
-    }
-
-    /// Custom cosine implementation using sin(x + π/2)
-    pub fn cos(x: f64) -> f64 {
-        Self::sin(x + std::f64::consts::PI / 2.0)
-    }
-
-    /// Custom exponential function implementation
-    pub fn exp(x: f64) -> f64 {
-        let mut result = 1.0;
-        let mut term = 1.0;
-        let mut n = 1;
-        let epsilon: f64 = 1e-15;
-
-        while term.abs() > epsilon && n < 100 {
-            term *= x / n as f64;
-            result += term;
-            n += 1;
-        }
-
-        result
-    }
-
-    /// Custom natural logarithm implementation
-    pub fn ln(x: f64) -> f64 {
-        if x <= 0.0 {
-            panic!("Cannot calculate natural logarithm of non-positive number in meshspace");
-        }
-
-        let mut result = 0.0;
-        let y = (x - 1.0) / (x + 1.0);
-        let mut power = y;
-        let mut n = 1;
-        let epsilon: f64 = 1e-15;
-
-        while power.abs() > epsilon && n < 100 {
-            result += power / n as f64;
-            power *= y * y;
-            n += 2;
-        }
-
-        2.0 * result
-    }
-
-    /// Custom power function implementation
-    pub fn pow(x: f64, y: f64) -> f64 {
-        Self::exp(y * Self::ln(x))
-    }
-
-    /// Calculate hyperbolic sine
-    pub fn sinh(x: f64) -> f64 {
-        (Self::exp(x) - Self::exp(-x)) / 2.0
-    }
-
-    /// Calculate hyperbolic cosine
-    pub fn cosh(x: f64) -> f64 {
-        (Self::exp(x) + Self::exp(-x)) / 2.0
-    }
-
-    /// Convert isize to f64
-    pub fn to_f64(x: isize) -> f64 {
+    // Type conversion functions
+    pub fn isize_to_f64(x: isize) -> f64 {
         x as f64
     }
 
-    /// Basic arithmetic operations on f64
+    pub fn f64_to_isize(x: f64) -> isize {
+        x as isize
+    }
+
+    // Basic f64 operations
     pub fn add_f64(a: f64, b: f64) -> f64 {
         a + b
     }
@@ -190,7 +77,7 @@ impl MeshMath {
         -a
     }
 
-    /// Basic arithmetic operations on isize
+    // Basic isize operations
     pub fn add_isize(a: isize, b: isize) -> isize {
         a + b
     }
@@ -211,13 +98,88 @@ impl MeshMath {
         -a
     }
 
+    // Mathematical functions for f64
+    pub fn sqrt_f64(x: f64) -> f64 {
+        x.sqrt()
+    }
+
+    pub fn abs_f64(x: f64) -> f64 {
+        x.abs()
+    }
+
+    pub fn sin_f64(x: f64) -> f64 {
+        x.sin()
+    }
+
+    pub fn cos_f64(x: f64) -> f64 {
+        x.cos()
+    }
+
+    pub fn tan_f64(x: f64) -> f64 {
+        x.tan()
+    }
+
+    pub fn exp_f64(x: f64) -> f64 {
+        x.exp()
+    }
+
+    pub fn ln_f64(x: f64) -> f64 {
+        x.ln()
+    }
+
+    pub fn pow_f64(x: f64, y: f64) -> f64 {
+        x.powf(y)
+    }
+
+    // Comparison operations
+    pub fn gt_f64(a: f64, b: f64) -> bool {
+        a > b
+    }
+
+    pub fn lt_f64(a: f64, b: f64) -> bool {
+        a < b
+    }
+
+    pub fn eq_f64(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-10
+    }
+
+    pub fn gt_isize(a: isize, b: isize) -> bool {
+        a > b
+    }
+
+    pub fn lt_isize(a: isize, b: isize) -> bool {
+        a < b
+    }
+
+    pub fn eq_isize(a: isize, b: isize) -> bool {
+        a == b
+    }
+
+    // Constants
+    pub fn zero_f64() -> f64 {
+        0.0
+    }
+
+    pub fn one_f64() -> f64 {
+        1.0
+    }
+
+    pub fn pi_f64() -> f64 {
+        PI
+    }
+
+    pub fn zero_isize() -> isize {
+        0
+    }
+
+    pub fn one_isize() -> isize {
+        1
+    }
+
     // Vector operations
     pub fn dot_product_f64(a: &[f64], b: &[f64]) -> f64 {
-        let mut sum = 0.0;
-        for i in 0..a.len() {
-            sum = Self::add_f64(sum, Self::mul_f64(a[i], b[i]));
-        }
-        sum
+        a.iter().zip(b.iter()).map(|(&x, &y)| Self::mul_f64(x, y)).sum()
     }
 
     pub fn cross_product_f64(a: &[f64; 3], b: &[f64; 3]) -> [f64; 3] {
@@ -229,38 +191,58 @@ impl MeshMath {
     }
 
     pub fn vector_magnitude_f64(v: &[f64]) -> f64 {
-        Self::sqrt(Self::dot_product_f64(v, v))
+        Self::sqrt_f64(
+            v.iter()
+            .map(|&x| Self::mul_f64(x, x))
+            .fold(Self::zero_f64(), Self::add_f64)
+        )
     }
 
     pub fn normalize_vector_f64(v: &[f64]) -> Vec<f64> {
         let mag = Self::vector_magnitude_f64(v);
-        v.iter().map(|&x| Self::div_f64(x, mag)).collect()
+        if Self::gt_f64(mag, Self::zero_f64()) {
+            v.iter().map(|&x| Self::div_f64(x, mag)).collect()
+        } else {
+            v.to_vec()
+        }
+    }
+
+    // Angle operations
+    pub fn normalize_angle_f64(angle: f64) -> f64 {
+        let two_pi = Self::mul_f64(2.0, Self::pi_f64());
+        let mut normalized = angle % two_pi;
+        if Self::gt_f64(normalized, Self::pi_f64()) {
+            normalized = Self::sub_f64(normalized, two_pi);
+        } else if Self::lt_f64(normalized, Self::neg_f64(Self::pi_f64())) {
+            normalized = Self::add_f64(normalized, two_pi);
+        }
+        normalized
     }
 }
 
-// Mesh operations implementations for f64
-impl MeshAdd<f64> for f64 {
+// Implement mesh traits for primitive types
+impl MeshAdd for f64 {
     type Output = f64;
     fn mesh_add(self, rhs: f64) -> f64 {
         MeshMath::add_f64(self, rhs)
     }
 }
 
-impl MeshSub<f64> for f64 {
+impl MeshSub for f64 {
     type Output = f64;
     fn mesh_sub(self, rhs: f64) -> f64 {
         MeshMath::sub_f64(self, rhs)
     }
 }
 
-impl MeshMul<f64> for f64 {
+impl MeshMul for f64 {
     type Output = f64;
     fn mesh_mul(self, rhs: f64) -> f64 {
         MeshMath::mul_f64(self, rhs)
     }
 }
 
-impl MeshDiv<f64> for f64 {
+impl MeshDiv for f64 {
     type Output = f64;
     fn mesh_div(self, rhs: f64) -> f64 {
         MeshMath::div_f64(self, rhs)
@@ -274,29 +256,29 @@ impl MeshNeg for f64 {
     }
 }
 
-// Mesh operations implementations for isize
-impl MeshAdd<isize> for isize {
+// Implement mesh traits for isize
+impl MeshAdd for isize {
     type Output = isize;
     fn mesh_add(self, rhs: isize) -> isize {
         MeshMath::add_isize(self, rhs)
     }
 }
 
-impl MeshSub<isize> for isize {
+impl MeshSub for isize {
     type Output = isize;
     fn mesh_sub(self, rhs: isize) -> isize {
         MeshMath::sub_isize(self, rhs)
     }
 }
 
-impl MeshMul<isize> for isize {
+impl MeshMul for isize {
     type Output = isize;
     fn mesh_mul(self, rhs: isize) -> isize {
         MeshMath::mul_isize(self, rhs)
     }
 }
 
-impl MeshDiv<isize> for isize {
+impl MeshDiv for isize {
     type Output = isize;
     fn mesh_div(self, rhs: isize) -> isize {
         MeshMath::div_isize(self, rhs)
