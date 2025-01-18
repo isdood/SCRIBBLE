@@ -41,10 +41,10 @@ pub struct MeshCell {
 
 impl MeshCell {
     pub fn new(position: Vector3D<f64>) -> Self {
-        let alignment = Alignment::new(MESH_VECTOR_ALIGN);
+        let _alignment = Alignment::new(MESH_VECTOR_ALIGN); // Note the underscore
         let region = AlignedRegion::new(
             Zeronaut::zero(),
-                                        Zeronaut::zero(), // Fixed: Using Zeronaut instead of Alignment
+                                        Zeronaut::zero(),
                                         Zeronaut::zero()
         );
 
@@ -439,43 +439,35 @@ impl MeshClock {
     }
 
     pub fn ping(&mut self) -> Result<usize, &'static str> {
-        let start = CURRENT_TIMESTAMP;
-
-        // Check quantum stability
-        if !self.is_quantum_stable() {
-            return Err("Quantum state not stable");
-        }
-
-        // Get the current state
-        let quantum_state = self.quantum_state.get();
+        // Calculate base propagation time
+        let base_time = match self.quantum_state.get() {
+            QuantumState::Entangled => {
+                // Entangled states have quantum tunneling effect
+                let strength = self.get_entanglement_strength();
+                (1000.0 / strength) as usize // More strength = less time
+            },
+            QuantumState::Superposition(phase) => {
+                // Superposition creates quantum uncertainty in timing
+                let coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
+                ((1000.0 * phase) * (1.0 / coherence)) as usize
+            },
+            QuantumState::PatternTransfer => {
+                // Pattern transfer has overhead
+                2000 // Base 2 microseconds for pattern transfer
+            },
+            _ => 1000 // Base 1 microsecond for other states
+        };
 
         // Update oscillation count
         let count = self.oscillation_count.load(&HeliumOrdering::Quantum).unwrap_or(0);
         self.oscillation_count.store(count + 1, &HeliumOrdering::Quantum).unwrap_or(());
 
-        // Calculate propagation time based on quantum state
-        let duration = match quantum_state {
-            QuantumState::Entangled => {
-                // For entangled states, use a very small but non-zero time
-                1 // 1 nanosecond for entangled states
-            },
-            QuantumState::Superposition(_) => {
-                // For superposition, use quantum uncertainty
-                let coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
-                (10.0 * coherence) as usize // Scale with coherence
-            },
-            _ => {
-                // For other states, calculate actual propagation time
-                let signal_time = self.propagate_signal().unwrap_or(100);
-                signal_time
-            }
-        };
-
-        // Update the measured interval (accumulate total time)
+        // Apply quantum effects and update interval
+        let duration = (base_time as f64 * self.calculate_time_dilation()) as usize;
         let current_interval = self.measured_interval.load(&HeliumOrdering::Quantum).unwrap_or(0);
         self.measured_interval.store(current_interval + duration, &HeliumOrdering::Quantum).unwrap_or(());
 
-        // Apply quantum effects
+        // Apply coherence decay
         self.decay_coherence();
 
         Ok(duration)
