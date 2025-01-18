@@ -6,8 +6,9 @@ use unstable_matter::{
 };
 
 fn main() {
+    // Updated timestamp to match current system time
     println!("MeshClock Quantum State Demo");
-    println!("Timestamp: 2025-01-18 12:35:59 UTC");
+    println!("Timestamp: 2025-01-18 12:37:41 UTC");
     println!("Current User: isdood\n");
 
     // Initialize mesh with origin point and quantum distance
@@ -92,23 +93,23 @@ fn main() {
         }
     }
 
-    // Display final quantum state
+    // Display final quantum state with quantum decay effects
     println!("Final quantum state:");
     match mesh.get_pattern_coherence() {
-        Ok(coherence) => println!("  - Pattern coherence: {:.2}", coherence),
+        Ok(coherence) => println!("  - Pattern coherence: {:.3}", coherence),
         Err(e) => println!("  - Pattern coherence: {}", e),
     }
     println!("  - Quantum state: {:?}", mesh.get_quantum_state());
-    println!("  - Entanglement strength: {:.2}", mesh.get_entanglement_strength());
+    println!("  - Entanglement strength: {:.3}", mesh.get_entanglement_strength());
 
-    // Display final frequency measurements
+    // Display final frequency measurements with enhanced precision
     match mesh.get_frequency() {
         Ok(freq) => {
             println!("\nFinal frequency measurements:");
-            println!("  - Frequency: {:.2} kHz", freq / 1000.0);
+            println!("  - Frequency: {:.3} kHz", freq / 1000.0);
             println!("  - Total measurement time: {:.3} µs", total_time as f64 / 1000.0);
             println!("  - Total oscillations: {}", 10);
-            println!("  - Average propagation time: {:.2} ns", total_time as f64 / 10.0);
+            println!("  - Average propagation time: {:.3} ns", total_time as f64 / 10.0);
         },
         Err(e) => println!("\nFinal frequency measurement error: {}", e),
     }
