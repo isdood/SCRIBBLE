@@ -1,17 +1,25 @@
 [package]
 name = "unstable_matter"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-authors = ["isdood"]
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "Quantum-crystal hybrid memory management system"
+repository = "https://github.com/isdood/scribble"
+license = "MIT"
 
 [dependencies]
-# For mathematical functions like sqrt() and sin()
-libm = "0.2"
+# Core system dependencies
+libm = "0.2.11"
+
+# Use scribble from workspace
+scribble = { path = "../scribble" }  # Point to sibling directory
+
+[features]
+default = ["std"]
+std = []
+quantum_acceleration = []
+crystal_optimization = []
 
 [lib]
 name = "unstable_matter"
 path = "src/lib.rs"
-
-[[example]]
-name = "mesh_clock_demo"
-path = "examples/mesh_clock_demo.rs"

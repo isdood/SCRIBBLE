@@ -2,11 +2,24 @@
 name = "shard"
 version = "0.1.0"
 edition = "2021"
-authors = ["isdood"]
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "Quantum memory and crystal structure management"
+repository = "https://github.com/isdood/scribble"
+license = "MIT"
 
 [dependencies]
-hashbrown = { path = "../hashbrown" }
-vector4d = { path = "../vector4d" }
-scribble = { path = "../scribble" }
-cereal = { path = "../cereal" }
-unstable_matter = { path = "../unstable_matter" }
+# Core system dependencies
+libm = "0.2.11"
+
+# Use scribble from workspace
+scribble = { path = "../scribble" }  # Point to sibling directory
+
+[features]
+default = ["std"]
+std = []
+quantum_acceleration = []
+crystal_optimization = []
+
+[lib]
+name = "shard"
+path = "src/lib.rs"

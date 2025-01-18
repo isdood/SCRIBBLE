@@ -1,16 +1,32 @@
+[package]
+name = "scribble-workspace"
+version = "0.1.0"
+edition = "2021"
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "A kernel & OS written in rust - Workspace Root"
+repository = "https://github.com/isdood/scribble"
+license = "MIT"
+
 [workspace]
-resolver = "2"
 members = [
-    "lib/wanda",
-    "boot/spinUP",
-    "boot/spINIT",
-    "boot/spun",
     "lib/unstable_matter",
+    "lib/shard",
+    "lib/wanda",
     "lib/scribble"
 ]
+resolver = "2"
 
-[profile.dev]
-panic = "abort"
+[workspace.package]
+version = "0.1.0"
+authors = ["Caleb J.D. Terkovics <isdood>"]
+edition = "2021"
 
-[profile.release]
-panic = "abort"
+[workspace.dependencies]
+libm = "0.2.11"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+libm = "0.2.11"
+scribble = { path = "lib/scribble" }

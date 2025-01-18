@@ -1,17 +1,16 @@
-# lib/scribble/Cargo.toml
 [package]
 name = "scribble"
 version = "0.1.0"
 edition = "2021"
-authors = ["isdood"]
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "Core scribble library functionality"
+repository = "https://github.com/isdood/scribble"
+license = "MIT"
 
 [dependencies]
-uart_16550 = "0.2.0"
-spin = "0.5.2"
-pic8259 = "0.10.1"
-unstable_matter = { path = "../unstable_matter" }  # Use our own arch implementation
+unstable_matter = { path = "../unstable_matter" }
+libm = "0.2.11"
 
 [lib]
 name = "scribble"
 path = "src/lib.rs"
-

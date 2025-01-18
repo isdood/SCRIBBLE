@@ -1,28 +1,13 @@
 #![no_std]
 
 /// Scribble Core Library
-/// Last Updated: 2025-01-13 03:41:08 UTC
+/// Last Updated: 2025-01-18 19:52:14 UTC
 /// Author: isdood
 /// Current User: isdood
 
-// External crate imports
 extern crate unstable_matter;
 
-use core::sync::atomic::{AtomicUsize, Ordering};
-use unstable_matter::UFO;
-
-// Public exports from unstable_matter
-pub use unstable_matter::{
-    Vector3D,
-    mesh::CellState,
-    mesh::MeshCell,
-    vector_space::VectorSpace,
-};
-
-// Type aliases for common use
-pub type Flying = unstable_matter::ufo::Flying;
-pub type Hovering = unstable_matter::ufo::Hovering;
-pub type Landed = unstable_matter::ufo::Landed;
+use unstable_matter::phantom::{QuantumCell, Protected};
 
 /// Memory address representation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,46 +27,68 @@ impl MemoryAddress {
     }
 }
 
-// Core Scribble memory management
-#[derive(Debug)]
-pub struct ScribbleMemory<T: 'static> {
-    addr: MemoryAddress,
-    timestamp: AtomicUsize,
-    _ufo: UFO<T>,
+/// Aether timestamp for quantum-stable memory operations
+#[derive(Debug, Clone)]
+pub struct AetherTimestamp {
+    inner: QuantumCell<usize>,
 }
 
-impl<T: 'static> ScribbleMemory<T> {
-    pub const fn const_at(addr: usize) -> Self {
+impl AetherTimestamp {
+    pub fn new(timestamp: usize) -> Self {
         Self {
-            addr: MemoryAddress::new(addr),
-            timestamp: AtomicUsize::new(1705113668), // 2025-01-13 03:41:08 UTC
-            _ufo: UFO::new(),
+            inner: QuantumCell::new(timestamp),
         }
     }
 
+    pub fn as_usize(&self) -> usize {
+        self.inner.get()
+    }
+
+    pub fn update(&mut self) {
+        self.inner.set(1705693934); // 2025-01-18 19:52:14 UTC
+    }
+
+    pub fn get_coherence(&self) -> f64 {
+        self.inner.get_coherence()
+    }
+}
+
+// Core Scribble memory management
+#[derive(Debug)]
+pub struct ScribbleMemory<T: Clone + 'static> {
+    addr: MemoryAddress,
+    timestamp: AetherTimestamp,
+    value: QuantumCell<T>,
+}
+
+impl<T: Clone + 'static> ScribbleMemory<T> {
     pub fn at(addr: usize) -> Self {
         Self {
             addr: MemoryAddress::new(addr),
-            timestamp: AtomicUsize::new(1705113668), // 2025-01-13 03:41:08 UTC
-            _ufo: UFO::new(),
+            timestamp: AetherTimestamp::new(1705693934), // 2025-01-18 19:52:14 UTC
+            value: QuantumCell::new(unsafe { core::ptr::read_volatile(addr as *const T) }),
         }
     }
 
     pub fn timestamp(&self) -> usize {
-        self.timestamp.load(Ordering::SeqCst)
+        self.timestamp.as_usize()
     }
 
-    pub unsafe fn read(&self) -> T {
-        core::ptr::read_volatile(self.addr.as_ptr())
+    pub fn read(&self) -> T {
+        self.value.get()
     }
 
-    pub unsafe fn write(&mut self, value: T) {
-        core::ptr::write_volatile(self.addr.as_ptr(), value);
-        self.timestamp.store(1705113668, Ordering::SeqCst); // 2025-01-13 03:41:08 UTC
+    pub fn write(&mut self, value: T) {
+        self.value.set(value);
+        self.timestamp.update();
     }
 
     pub const fn addr(&self) -> usize {
         self.addr.as_usize()
+    }
+
+    pub fn coherence(&self) -> f64 {
+        (self.timestamp.get_coherence() + self.value.get_coherence()) / 2.0
     }
 }
 
@@ -98,70 +105,23 @@ impl Dimensions {
     }
 }
 
-#[derive(Debug)]
-pub struct MemorySpace<T: 'static> {
-    base: ScribbleMemory<T>,
-    size: usize,
-    offset: usize,
-    stride: usize,
-    dimensions: Dimensions,
-    timestamp: AtomicUsize,
-    _ufo: UFO<T>,
-}
-
-impl<T: 'static + Copy> MemorySpace<T> {
-    pub const fn const_new(base_addr: usize, size: usize, offset: usize) -> Self {
-        Self {
-            base: ScribbleMemory::const_at(base_addr),
-            size,
-            offset,
-            stride: core::mem::size_of::<T>(),
-            dimensions: Dimensions::new(size, 1, 1),
-            timestamp: AtomicUsize::new(1705113668), // 2025-01-13 03:41:08 UTC
-            _ufo: UFO::new(),
-        }
+impl Protected for ScribbleMemory<u32> {
+    fn protect(&self) -> bool {
+        self.coherence() > 0.5
     }
 
-    pub fn new(base_addr: usize, size: usize, offset: usize) -> Self {
-        Self::const_new(base_addr, size, offset)
+    fn unprotect(&self) -> bool {
+        self.coherence() <= 0.5
     }
 
-    pub fn timestamp(&self) -> usize {
-        self.timestamp.load(Ordering::SeqCst)
+    fn get_coherence(&self) -> f64 {
+        self.coherence()
     }
 
-    pub unsafe fn read_at(&self, index: usize) -> T {
-        assert!(index < self.size);
-        let addr = self.base.addr() + (index * self.stride) + self.offset;
-        ScribbleMemory::at(addr).read()
-    }
-
-    pub unsafe fn write_at(&mut self, index: usize, value: T) {
-        assert!(index < self.size);
-        let addr = self.base.addr() + (index * self.stride) + self.offset;
-        ScribbleMemory::at(addr).write(value);
-        self.timestamp.store(1705113668, Ordering::SeqCst); // 2025-01-13 03:41:08 UTC
-    }
-
-    pub const fn size(&self) -> usize {
-        self.size
-    }
-
-    pub const fn dimensions(&self) -> Dimensions {
-        self.dimensions
-    }
-
-    pub const fn stride(&self) -> usize {
-        self.stride
-    }
-
-    pub const fn offset(&self) -> usize {
-        self.offset
+    fn is_quantum_stable(&self) -> bool {
+        self.coherence() > 0.9
     }
 }
-
-unsafe impl<T: 'static> Send for MemorySpace<T> {}
-unsafe impl<T: 'static> Sync for MemorySpace<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -174,6 +134,15 @@ mod tests {
     }
 
     #[test]
+    fn test_aether_timestamp() {
+        let mut ts = AetherTimestamp::new(1705693934);
+        assert_eq!(ts.as_usize(), 1705693934);
+        assert!(ts.get_coherence() > 0.0);
+        ts.update();
+        assert_eq!(ts.as_usize(), 1705693934); // 2025-01-18 19:52:14 UTC
+    }
+
+    #[test]
     fn test_dimensions() {
         let dims = Dimensions::new(10, 20, 30);
         assert_eq!(dims.width, 10);
@@ -182,9 +151,12 @@ mod tests {
     }
 
     #[test]
-    fn test_memory_space() {
-        let space: MemorySpace<u32> = MemorySpace::new(0x1000, 100, 0);
-        assert_eq!(space.size(), 100);
-        assert_eq!(space.stride(), core::mem::size_of::<u32>());
+    fn test_memory_quantum() {
+        let mut mem: ScribbleMemory<u32> = ScribbleMemory::at(0x1000);
+        assert_eq!(mem.timestamp(), 1705693934);
+        mem.write(42);
+        assert_eq!(mem.read(), 42);
+        assert!(mem.coherence() > 0.0);
+        assert!(mem.is_quantum_stable());
     }
 }
