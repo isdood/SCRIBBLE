@@ -438,18 +438,7 @@ impl MeshClock {
         self.entanglement_strength.load(&HeliumOrdering::Quantum).unwrap_or(0.0)
     }
 
-    pub fn get_frequency(&self) -> Result<f64, &'static str> {
-        let oscillations = self.oscillation_count.load(&HeliumOrdering::Quantum).unwrap_or(0);
-        let interval = self.measured_interval.load(&HeliumOrdering::Quantum).unwrap_or(1);
-
-        if interval == 0 {
-            Err("No measurements recorded")
-        } else {
-            Ok(oscillations as f64 / interval as f64)
-        }
-    }
-
-    pub fn ping(&self) -> Result<usize, &'static str> {
+    pub fn ping(&mut self) -> Result<usize, &'static str> {
         let start = CURRENT_TIMESTAMP;
 
         // Check quantum stability
@@ -457,15 +446,52 @@ impl MeshClock {
             return Err("Quantum state not stable");
         }
 
-        // Perform quantum ping
-        let coherence = self.get_entanglement_strength();
-        if coherence < QUANTUM_COHERENCE_THRESHOLD {
-            return Err("Insufficient quantum coherence");
-        }
+        // Get the current state
+        let quantum_state = self.quantum_state.get();
 
-        // Calculate propagation time
-        let end = CURRENT_TIMESTAMP;
-        Ok(end - start)
+        // Update oscillation count
+        let count = self.oscillation_count.load(&HeliumOrdering::Quantum).unwrap_or(0);
+        self.oscillation_count.store(count + 1, &HeliumOrdering::Quantum).unwrap_or(());
+
+        // Calculate propagation time based on quantum state
+        let duration = match quantum_state {
+            QuantumState::Entangled => {
+                // For entangled states, use a very small but non-zero time
+                1 // 1 nanosecond for entangled states
+            },
+            QuantumState::Superposition(_) => {
+                // For superposition, use quantum uncertainty
+                let coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
+                (10.0 * coherence) as usize // Scale with coherence
+            },
+            _ => {
+                // For other states, calculate actual propagation time
+                let signal_time = self.propagate_signal().unwrap_or(100);
+                signal_time
+            }
+        };
+
+        // Update the measured interval (accumulate total time)
+        let current_interval = self.measured_interval.load(&HeliumOrdering::Quantum).unwrap_or(0);
+        self.measured_interval.store(current_interval + duration, &HeliumOrdering::Quantum).unwrap_or(());
+
+        // Apply quantum effects
+        self.decay_coherence();
+
+        Ok(duration)
+    }
+
+    pub fn get_frequency(&self) -> Result<f64, &'static str> {
+        let oscillations = self.oscillation_count.load(&HeliumOrdering::Quantum).unwrap_or(0);
+        let total_time = self.measured_interval.load(&HeliumOrdering::Quantum).unwrap_or(0);
+
+        if oscillations == 0 || total_time == 0 {
+            Err("No measurements recorded")
+        } else {
+            // Convert from nanoseconds to seconds and calculate frequency
+            let time_in_seconds = total_time as f64 / 1_000_000_000.0;
+            Ok(oscillations as f64 / time_in_seconds)
+        }
     }
 
     pub fn create_superposition(&mut self) -> Result<(), &'static str> {
