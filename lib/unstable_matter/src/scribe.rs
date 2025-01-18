@@ -144,6 +144,18 @@ impl Scribe for str {
     }
 }
 
+impl Scribe for isize {
+    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str(&self.to_string());
+    }
+}
+
+impl Scribe for usize {
+    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str(&self.to_string());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -156,6 +156,43 @@ impl MeshValue for isize {
     }
 }
 
+impl MeshValue for usize {
+    #[inline(always)]
+    fn mesh_add(self, other: Self) -> Self {
+        self + other
+    }
+
+    #[inline(always)]
+    fn mesh_sub(self, other: Self) -> Self {
+        self - other
+    }
+
+    #[inline(always)]
+    fn mesh_mul(self, other: Self) -> Self {
+        self * other
+    }
+
+    #[inline(always)]
+    fn mesh_div(self, other: Self) -> Self {
+        self / other
+    }
+
+    #[inline(always)]
+    fn mesh_neg(self) -> Self {
+        panic!("Cannot negate unsigned value")
+    }
+
+    #[inline(always)]
+    fn mesh_zero() -> Self {
+        0
+    }
+
+    #[inline(always)]
+    fn mesh_one() -> Self {
+        1
+    }
+}
+
 impl MeshMath {
     #[inline(always)]
     pub fn sqrt_f64(x: f64) -> f64 {
