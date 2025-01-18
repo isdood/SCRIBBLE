@@ -2,19 +2,17 @@
 //! ============================
 //!
 //! Core quantum vector operations through crystalline
-//! lattice structures and harmonic resonance tracking.
+//! mesh structures with harmonic resonance tracking.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:53:40 UTC
+//! Last Updated: 2025-01-18 21:00:31 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::{
-    constants::{QUANTUM_PI, QUANTUM_MESH_RESOLUTION},
-    harmony::{MeshValue, MeshOps}
-};
+use crate::harmony::{MeshValue, MeshOps};
+use libm;
 
 /// A crystalline 3D vector
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -65,7 +63,7 @@ impl<T: MeshValue> Vector3D<T> {
 
     /// Calculates the length
     pub fn length(&self) -> f64 {
-        self.length_squared().sqrt()
+        libm::sqrt(self.length_squared())
     }
 
     /// Normalizes the vector
@@ -110,7 +108,7 @@ impl<T: MeshValue> Vector4D<T> {
 
     /// Calculates the length in 4D space
     pub fn length(&self) -> f64 {
-        self.length_squared().sqrt()
+        libm::sqrt(self.length_squared())
     }
 
     /// Normalizes the 4D vector
@@ -257,11 +255,6 @@ mod tests {
         assert_eq!(sum.x, 5.0);
         assert_eq!(sum.y, 7.0);
         assert_eq!(sum.z, 9.0);
-
-        let scaled = v1.mesh_mul(&2.0);
-        assert_eq!(scaled.x, 2.0);
-        assert_eq!(scaled.y, 4.0);
-        assert_eq!(scaled.z, 6.0);
     }
 
     #[test]

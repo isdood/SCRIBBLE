@@ -1,136 +1,112 @@
 //! Crystalline Cube Implementation
-//! ============================
+//! ==========================
 //!
-//! Core memory management through crystalline cubes and quantum-safe
-//! allocation with harmonic resonance tracking.
+//! Core quantum cube operations through crystalline
+//! structures with harmonic resonance tracking.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:47:53 UTC
+//! Last Updated: 2025-01-18 21:18:41 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::{
-    constants::{QUANTUM_STABILITY_THRESHOLD, CUBE_TIMESTAMP},
-    harmony::{Quantum, MeshValue},
-    vector::{Vector3D, Vector4D},
-    CrystalArray,
+    constants::{QUANTUM_STABILITY_THRESHOLD, MAX_QUANTUM_SIZE},
+    harmony::Quantum,
+    vector::Vector3D,
+    idk::ShardUninit
 };
 
-/// A quantum-safe container for crystalline data
+/// A crystalline cube structure for quantum operations
 #[derive(Clone)]
-pub struct CrystalCube<T: Clone + 'static> {
-    /// The crystallized data
-    data: T,
-    /// Quantum coherence tracking
+pub struct CrystalCube<T: Clone + Default + 'static> {
+    /// 3D array of data
+    data: [[[ShardUninit<T>; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE],
+    /// Current dimensions
+    dimensions: Vector3D<u64>,
+    /// Quantum coherence
     coherence: f64,
-    /// Crystalline timestamp
-    timestamp: u64,
-    /// Position in quantum space
-    position: Vector3D<f64>,
 }
 
-/// A shared quantum-safe container with reference counting
-#[derive(Clone)]
-pub struct SharedCube<T: Clone + 'static> {
-    /// Inner crystalline cube
-    cube: CrystalCube<T>,
-    /// Reference count
-    refs: usize,
-}
+impl<T: Clone + Default + 'static> CrystalCube<T> {
+    /// Creates a new crystal cube with given dimensions
+    pub fn new(x: u64, y: u64, z: u64) -> Option<Self> {
+        if x as usize > MAX_QUANTUM_SIZE ||
+            y as usize > MAX_QUANTUM_SIZE ||
+            z as usize > MAX_QUANTUM_SIZE {
+                return None;
+            }
 
-impl<T: Clone + 'static> CrystalCube<T> {
-    /// Creates a new quantum cube with perfect crystalline coherence
-    pub fn new(value: T) -> Self {
-        Self {
-            data: value,
-            coherence: 1.0,
-            timestamp: CUBE_TIMESTAMP as u64,
-            position: Vector3D::zero(),
+            let mut cube = Self {
+                data: [[[ShardUninit::uninit(); MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE],
+                dimensions: Vector3D::new(x, y, z),
+                coherence: 1.0,
+            };
+
+        // Initialize with default values
+        for i in 0..x as usize {
+            for j in 0..y as usize {
+                for k in 0..z as usize {
+                    cube.data[i][j][k] = ShardUninit::new(T::default());
+                }
+            }
         }
+
+        Some(cube)
     }
 
-    /// Creates a new quantum cube at specific coordinates
-    pub fn new_positioned(value: T, x: f64, y: f64, z: f64) -> Self {
-        Self {
-            data: value,
-            coherence: 1.0,
-            timestamp: CUBE_TIMESTAMP as u64,
-            position: Vector3D::new(x, y, z),
-        }
+    /// Gets the current dimensions
+    pub fn dimensions(&self) -> &Vector3D<u64> {
+        &self.dimensions
     }
 
-    /// Gets a reference to the crystallized data
-    pub fn get(&self) -> &T {
-        &self.data
+    /// Gets a reference to a value at specific coordinates
+    pub fn get(&self, x: usize, y: usize, z: usize) -> Option<&T> {
+        if x >= self.dimensions.x as usize ||
+            y >= self.dimensions.y as usize ||
+            z >= self.dimensions.z as usize {
+                return None;
+            }
+            unsafe { Some(self.data[x][y][z].assume_init_ref()) }
     }
 
-    /// Gets a mutable reference to the crystallized data
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.data
+    /// Gets a mutable reference to a value at specific coordinates
+    pub fn get_mut(&mut self, x: usize, y: usize, z: usize) -> Option<&mut T> {
+        if x >= self.dimensions.x as usize ||
+            y >= self.dimensions.y as usize ||
+            z >= self.dimensions.z as usize {
+                return None;
+            }
+            unsafe { Some(self.data[x][y][z].assume_init_mut()) }
     }
 
-    /// Updates the crystallized data while maintaining coherence
-    pub fn set(&mut self, value: T) {
-        self.data = value;
+    /// Sets a value at specific coordinates
+    pub fn set(&mut self, x: usize, y: usize, z: usize, value: T) -> Result<(), &'static str> {
+        if x >= self.dimensions.x as usize ||
+            y >= self.dimensions.y as usize ||
+            z >= self.dimensions.z as usize {
+                return Err("Coordinates out of bounds");
+            }
+            self.data[x][y][z] = ShardUninit::new(value);
         self.decohere();
+        Ok(())
     }
 
-    /// Gets the current quantum coherence value
-    pub fn coherence(&self) -> f64 {
-        self.coherence
-    }
-
-    /// Gets the crystalline position in quantum space
-    pub fn position(&self) -> &Vector3D<f64> {
-        &self.position
-    }
-
-    /// Updates the crystalline position
-    pub fn set_position(&mut self, pos: Vector3D<f64>) {
-        self.position = pos;
-        self.decohere();
-    }
-}
-
-impl<T: Clone + 'static> SharedCube<T> {
-    /// Creates a new shared quantum cube
-    pub fn new(value: T) -> Self {
-        Self {
-            cube: CrystalCube::new(value),
-            refs: 1,
+    /// Clears the cube
+    pub fn clear(&mut self) {
+        for x in 0..self.dimensions.x as usize {
+            for y in 0..self.dimensions.y as usize {
+                for z in 0..self.dimensions.z as usize {
+                    self.data[x][y][z] = ShardUninit::new(T::default());
+                }
+            }
         }
-    }
-
-    /// Increments the reference count
-    pub fn inc_ref(&mut self) {
-        self.refs = self.refs.saturating_add(1);
-    }
-
-    /// Decrements the reference count
-    pub fn dec_ref(&mut self) -> bool {
-        self.refs = self.refs.saturating_sub(1);
-        self.refs == 0
-    }
-
-    /// Gets the current reference count
-    pub fn ref_count(&self) -> usize {
-        self.refs
-    }
-
-    /// Gets a reference to the inner crystalline cube
-    pub fn inner(&self) -> &CrystalCube<T> {
-        &self.cube
-    }
-
-    /// Gets a mutable reference to the inner crystalline cube
-    pub fn inner_mut(&mut self) -> &mut CrystalCube<T> {
-        &mut self.cube
+        self.recohere();
     }
 }
 
-impl<T: Clone + 'static> Quantum for CrystalCube<T> {
+impl<T: Clone + Default + 'static> Quantum for CrystalCube<T> {
     fn coherence(&self) -> f64 {
         self.coherence
     }
@@ -156,39 +132,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_crystal_cube_basics() {
-        let mut cube = CrystalCube::new(42);
-        assert_eq!(*cube.get(), 42);
+    fn test_crystal_cube_creation() {
+        let cube = CrystalCube::<u8>::new(2, 2, 2);
+        assert!(cube.is_some());
+
+        let cube = cube.unwrap();
+        assert_eq!(cube.dimensions(), &Vector3D::new(2, 2, 2));
         assert!(cube.is_stable());
-
-        cube.set(43);
-        assert_eq!(*cube.get(), 43);
-        assert!(cube.coherence() < 1.0);
     }
 
     #[test]
-    fn test_crystal_cube_position() {
-        let mut cube = CrystalCube::new_positioned(42, 1.0, 2.0, 3.0);
-        assert_eq!(cube.position().x, 1.0);
-        assert_eq!(cube.position().y, 2.0);
-        assert_eq!(cube.position().z, 3.0);
-
-        cube.set_position(Vector3D::zero());
-        assert_eq!(*cube.position(), Vector3D::zero());
+    fn test_crystal_cube_bounds() {
+        let cube = CrystalCube::<u8>::new(MAX_QUANTUM_SIZE as u64 + 1, 2, 2);
+        assert!(cube.is_none());
     }
 
     #[test]
-    fn test_shared_cube() {
-        let mut shared = SharedCube::new(42);
-        assert_eq!(shared.ref_count(), 1);
+    fn test_crystal_cube_access() {
+        let mut cube = CrystalCube::<u8>::new(2, 2, 2).unwrap();
+        assert!(cube.get(0, 0, 0).is_some());
+        assert!(cube.get(2, 2, 2).is_none());
 
-        shared.inc_ref();
-        assert_eq!(shared.ref_count(), 2);
+        assert!(cube.set(0, 0, 0, 42).is_ok());
+        assert!(cube.set(2, 2, 2, 42).is_err());
 
-        assert!(!shared.dec_ref());
-        assert_eq!(shared.ref_count(), 1);
-
-        assert!(shared.dec_ref());
-        assert_eq!(shared.ref_count(), 0);
+        assert_eq!(*cube.get(0, 0, 0).unwrap(), 42);
     }
 }

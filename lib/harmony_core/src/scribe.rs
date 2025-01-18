@@ -1,114 +1,159 @@
 //! Crystalline Scribe Implementation
-//! =============================
+//! ===========================
 //!
-//! Provides quantum-safe string operations through crystalline
-//! data structures with harmonic resonance tracking.
+//! Core quantum string operations through crystalline
+//! structures with harmonic resonance tracking.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:51:54 UTC
+//! Last Updated: 2025-01-18 21:19:42 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::{
     constants::QUANTUM_STABILITY_THRESHOLD,
-    harmony::{Quantum, MeshValue},
-    CrystalArray,
-    CrystalCube
+    harmony::Quantum,
+    vector::Vector3D,
+    idk::ShardUninit,
 };
 
-/// Maximum length for quantum strings
-const MAX_QUANTUM_STRING_LENGTH: usize = 1024;
-
-/// Crystalline precision levels for quantum-safe string operations
-#[derive(Debug, Clone, Copy)]
-pub enum ScribePrecision {
-    /// Low precision, high stability
-    Coarse = 2,
-    /// Medium precision, balanced stability
-    Standard = 4,
-    /// High precision, requires strong coherence
-    Fine = 8,
-    /// Maximum precision, perfect crystalline alignment required
-    Ultra = 16,
+/// A quantum string state
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum StringState {
+    /// Coherent string
+    Coherent,
+    /// Entangled string
+    Entangled,
+    /// Decoherent string
+    Decoherent,
 }
 
-/// A quantum-safe string implementation
+/// A quantum string for crystalline operations
 #[derive(Clone)]
 pub struct QuantumString {
-    /// Crystalline data buffer
-    buffer: CrystalArray<u8>,
-    /// Current length of coherent data
+    /// String data
+    data: [ShardUninit<u8>; 1024],
+    /// Current length
     length: usize,
-    /// Quantum coherence tracking
+    /// String position
+    position: Vector3D<f64>,
+    /// Current state
+    state: StringState,
+    /// Quantum coherence
     coherence: f64,
 }
 
 impl QuantumString {
-    /// Creates a new empty quantum string
-    pub fn new() -> Self {
-        Self {
-            buffer: CrystalArray::with_capacity(MAX_QUANTUM_STRING_LENGTH),
-            length: 0,
-            coherence: 1.0,
+    /// Creates a new quantum string from bytes
+    pub fn new(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() > 1024 {
+            return None;
         }
+
+        let mut data = [ShardUninit::uninit(); 1024];
+        for (i, &byte) in bytes.iter().enumerate() {
+            data[i] = ShardUninit::new(byte);
+        }
+
+        Some(Self {
+            data,
+            length: bytes.len(),
+             position: Vector3D::zero(),
+             state: StringState::Coherent,
+             coherence: 1.0,
+        })
     }
 
-    /// Appends a byte slice while maintaining quantum coherence
-    pub fn push_bytes(&mut self, bytes: &[u8]) -> Result<(), &'static str> {
-        let new_len = self.length.saturating_add(bytes.len());
-        if new_len > MAX_QUANTUM_STRING_LENGTH {
-            return Err("Quantum string capacity exceeded");
-        }
-
-        // Safety: We check bounds above
-        unsafe {
-            core::ptr::copy_nonoverlapping(
-                bytes.as_ptr(),
-                                           self.buffer.as_mut_ptr().add(self.length),
-                                           bytes.len()
-            );
-        }
-
-        self.length = new_len;
-        self.decohere();
-        Ok(())
-    }
-
-    /// Gets the current length of coherent data
+    /// Gets the string length
     pub fn len(&self) -> usize {
         self.length
     }
 
-    /// Checks if the string is empty
+    /// Checks if string is empty
     pub fn is_empty(&self) -> bool {
         self.length == 0
     }
 
-    /// Gets the current quantum coherence value
-    pub fn coherence(&self) -> f64 {
-        self.coherence
-    }
-
-    /// Gets a slice of the quantum string data
+    /// Gets the string bytes
     pub fn as_bytes(&self) -> &[u8] {
         unsafe {
-            core::slice::from_raw_parts(self.buffer.as_ptr(), self.length)
+            let ptr = self.data.as_ptr() as *const u8;
+            core::slice::from_raw_parts(ptr, self.length)
         }
     }
 
-    /// Gets a mutable slice of the quantum string data
-    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
-        unsafe {
-            core::slice::from_raw_parts_mut(self.buffer.as_mut_ptr(), self.length)
-        }
+    /// Gets the string position
+    pub fn position(&self) -> &Vector3D<f64> {
+        &self.position
     }
 
-    /// Clears the quantum string
-    pub fn clear(&mut self) {
-        self.length = 0;
-        self.recohere();
+    /// Gets the current state
+    pub fn state(&self) -> StringState {
+        self.state
+    }
+
+    /// Sets the position and updates quantum state
+    pub fn set_position(&mut self, x: f64, y: f64, z: f64) {
+        self.position = Vector3D::new(x, y, z);
+        self.decohere();
+    }
+
+    /// Attempts to inscribe into a crystal cube
+    pub fn inscribe(&mut self, cube: &mut CrystalCube<u8>) -> Result<(), &'static str> {
+        if self.state == StringState::Decoherent {
+            return Err("Cannot inscribe decoherent string");
+        }
+
+        let pos = self.position();
+        let start_x = meshmath::floor(pos.x) as usize;
+        let y = meshmath::floor(pos.y) as usize;
+        let z = meshmath::floor(pos.z) as usize;
+
+        for (i, byte) in self.as_bytes().iter().enumerate() {
+            let x = start_x + i;
+            if let Some(cell) = cube.get_mut(x, y, z) {
+                *cell = *byte;
+            } else {
+                return Err("String exceeds cube bounds");
+            }
+        }
+
+        self.state = StringState::Entangled;
+        self.decohere();
+        cube.decohere();
+        Ok(())
+    }
+
+    /// Attempts to extract from a crystal cube
+    pub fn extract(&mut self, cube: &CrystalCube<u8>) -> Result<(), &'static str> {
+        let pos = self.position();
+        let start_x = meshmath::floor(pos.x) as usize;
+        let y = meshmath::floor(pos.y) as usize;
+        let z = meshmath::floor(pos.z) as usize;
+
+        let mut length = 0;
+        for i in 0..1024 {
+            let x = start_x + i;
+            if let Some(&byte) = cube.get(x, y, z) {
+                if byte == 0 {
+                    break;
+                }
+                self.data[i] = ShardUninit::new(byte);
+                length += 1;
+            } else {
+                break;
+            }
+        }
+
+        if length == 0 {
+            return Err("No string found at position");
+        }
+
+        self.length = length;
+        self.state = StringState::Coherent;
+        self.decohere();
+        Ok(())
     }
 }
 
@@ -125,17 +170,13 @@ impl Quantum for QuantumString {
         self.coherence *= 0.9;
         if self.coherence < QUANTUM_STABILITY_THRESHOLD {
             self.coherence = QUANTUM_STABILITY_THRESHOLD;
+            self.state = StringState::Decoherent;
         }
     }
 
     fn recohere(&mut self) {
         self.coherence = 1.0;
-    }
-}
-
-impl Drop for QuantumString {
-    fn drop(&mut self) {
-        self.clear();
+        self.state = StringState::Coherent;
     }
 }
 
@@ -145,40 +186,23 @@ mod tests {
 
     #[test]
     fn test_quantum_string_basics() {
-        let mut qstr = QuantumString::new();
-        assert!(qstr.is_empty());
-        assert_eq!(qstr.len(), 0);
-
-        qstr.push_bytes(b"Hello").unwrap();
-        assert_eq!(qstr.len(), 5);
-        assert_eq!(qstr.as_bytes(), b"Hello");
-    }
-
-    #[test]
-    fn test_quantum_string_coherence() {
-        let mut qstr = QuantumString::new();
-        assert!(qstr.is_stable());
-
-        qstr.push_bytes(b"Test").unwrap();
-        assert!(qstr.coherence() < 1.0);
-
-        qstr.recohere();
-        assert_eq!(qstr.coherence(), 1.0);
+        let string = QuantumString::new(b"Hello, quantum world!").unwrap();
+        assert_eq!(string.len(), 19);
+        assert_eq!(string.as_bytes(), b"Hello, quantum world!");
+        assert_eq!(string.state(), StringState::Coherent);
+        assert!(string.is_stable());
     }
 
     #[test]
     fn test_quantum_string_limits() {
-        let mut qstr = QuantumString::new();
-        let large_data = [b'x'; MAX_QUANTUM_STRING_LENGTH + 1];
-        assert!(qstr.push_bytes(&large_data).is_err());
+        let long_data = [0u8; 1025];
+        assert!(QuantumString::new(&long_data).is_none());
     }
 
     #[test]
-    fn test_quantum_string_clear() {
-        let mut qstr = QuantumString::new();
-        qstr.push_bytes(b"Test").unwrap();
-        qstr.clear();
-        assert!(qstr.is_empty());
-        assert_eq!(qstr.coherence(), 1.0);
+    fn test_string_empty() {
+        let string = QuantumString::new(b"").unwrap();
+        assert!(string.is_empty());
+        assert_eq!(string.len(), 0);
     }
 }
