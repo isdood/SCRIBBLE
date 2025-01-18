@@ -1,167 +1,120 @@
-//! Crystalline Harmony Module
-//! ========================
+//! Crystalline Harmony Implementation
+//! ==============================
 //!
-//! Core crystalline traits and types for the quantum harmony system.
-//! Provides quantum-safe operations through crystalline lattice structures.
+//! Core quantum harmony traits and implementations for crystalline
+//! data structures with coherence tracking.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:34:08 UTC
+//! Last Updated: 2025-01-18 20:50:50 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-#![no_std]
+use crate::constants::QUANTUM_STABILITY_THRESHOLD;
 
-use crate::constants::*;
-
-/// Core crystalline trait for types that can exist in quantum lattice space
-pub trait Quantum: Clone + 'static {
-    /// Gets the crystalline coherence value
+/// Core quantum trait for crystalline coherence
+pub trait Quantum {
+    /// Gets the current quantum coherence value
     fn coherence(&self) -> f64;
 
-    /// Checks if the crystalline lattice is stable
-    fn is_stable(&self) -> bool {
-        self.coherence() >= QUANTUM_STABILITY_THRESHOLD
-    }
+    /// Checks if the quantum state is stable
+    fn is_stable(&self) -> bool;
 
-    /// Applies crystalline decoherence through lattice vibration
+    /// Applies quantum decoherence
     fn decohere(&mut self);
 
-    /// Restores crystalline coherence through lattice realignment
+    /// Restores quantum coherence
     fn recohere(&mut self);
 }
 
-/// Crystalline type for quantum lattice variance tracking
-#[derive(Debug, Clone, Copy)]
-pub struct QuantumPhantom<T: 'static> {
-    /// Crystalline lattice configuration
-    _lattice_config: [u8; 16],
-    /// Type-specific quantum resonance
-    _resonance: fn() -> Option<T>,
-}
-
-impl<T: 'static> QuantumPhantom<T> {
-    /// Creates a new crystalline phantom with perfect symmetry
-    pub const fn new() -> Self {
-        Self {
-            _lattice_config: [0; 16],
-            _resonance: || None,
-        }
-    }
-
-    /// Measures the crystalline lattice stability
-    pub fn lattice_stability(&self) -> f64 {
-        let mut stability = 0.0;
-        for &config in self._lattice_config.iter() {
-            stability += (config as f64) / 255.0;
-        }
-        stability / 16.0
-    }
-}
-
-/// MeshValue trait for crystalline mathematical operations
-pub trait MeshValue: Clone + 'static {
-    /// Returns the crystalline zero state
-    fn zero() -> Self;
-
-    /// Adds two crystalline values maintaining lattice symmetry
-    fn mesh_add(&self, other: &Self) -> Self;
-
-    /// Subtracts two crystalline values preserving quantum state
-    fn mesh_sub(&self, other: &Self) -> Self;
-
-    /// Multiplies two crystalline values with coherence preservation
-    fn mesh_mul(&self, other: &Self) -> Self;
-
-    /// Divides two crystalline values maintaining stability
-    fn mesh_div(&self, other: &Self) -> Self;
-
-    /// Negates a crystalline value through lattice inversion
-    fn mesh_neg(&self) -> Self;
-}
-
-/// MeshOps trait for crystalline vector operations in quantum space
+/// Trait for quantum mesh operations
 pub trait MeshOps {
     /// Output type for mesh operations
     type Output;
 
-    /// Adds two crystalline vectors preserving symmetry
+    /// Performs a mesh addition
     fn mesh_add(&self, rhs: &Self) -> Self::Output;
 
-    /// Subtracts two crystalline vectors maintaining coherence
+    /// Performs a mesh subtraction
     fn mesh_sub(&self, rhs: &Self) -> Self::Output;
 
-    /// Scales a crystalline vector by a quantum factor
+    /// Performs a mesh multiplication
     fn mesh_mul(&self, scalar: &f64) -> Self::Output;
 
-    /// Divides a crystalline vector preserving quantum state
+    /// Performs a mesh division
     fn mesh_div(&self, scalar: &f64) -> Self::Output;
 
-    /// Inverts a crystalline vector through quantum reflection
+    /// Performs a mesh negation
     fn mesh_neg(&self) -> Self::Output;
 }
 
-// Crystalline implementations for primitive types
+/// Trait for quantum mesh values
+pub trait MeshValue: Clone + 'static {
+    /// Creates a zero value
+    fn zero() -> Self;
+
+    /// Converts from f64
+    fn from_f64(v: f64) -> Option<Self>;
+
+    /// Converts to f64
+    fn to_f64(&self) -> f64;
+
+    /// Performs mesh addition
+    fn mesh_add(&self, rhs: &Self) -> Self;
+
+    /// Performs mesh subtraction
+    fn mesh_sub(&self, rhs: &Self) -> Self;
+
+    /// Performs mesh multiplication
+    fn mesh_mul(&self, rhs: &Self) -> Self;
+
+    /// Performs mesh division
+    fn mesh_div(&self, rhs: &Self) -> Self;
+
+    /// Performs mesh negation
+    fn mesh_neg(&self) -> Self;
+}
+
 impl MeshValue for f64 {
     fn zero() -> Self { 0.0 }
-
-    fn mesh_add(&self, other: &Self) -> Self {
-        let result = self + other;
-        if result.is_finite() { result } else { Self::zero() }
+    fn from_f64(v: f64) -> Option<Self> { Some(v) }
+    fn to_f64(&self) -> f64 { *self }
+    fn mesh_add(&self, rhs: &Self) -> Self { self + rhs }
+    fn mesh_sub(&self, rhs: &Self) -> Self { self - rhs }
+    fn mesh_mul(&self, rhs: &Self) -> Self { self * rhs }
+    fn mesh_div(&self, rhs: &Self) -> Self {
+        if *rhs != 0.0 { self / rhs } else { 0.0 }
     }
-
-    fn mesh_sub(&self, other: &Self) -> Self {
-        let result = self - other;
-        if result.is_finite() { result } else { Self::zero() }
-    }
-
-    fn mesh_mul(&self, other: &Self) -> Self {
-        let result = self * other;
-        if result.is_finite() { result } else { Self::zero() }
-    }
-
-    fn mesh_div(&self, other: &Self) -> Self {
-        if *other != 0.0 {
-            let result = self / other;
-            if result.is_finite() { result } else { Self::zero() }
-        } else {
-            Self::zero()
-        }
-    }
-
-    fn mesh_neg(&self) -> Self {
-        let result = -self;
-        if result.is_finite() { result } else { Self::zero() }
-    }
+    fn mesh_neg(&self) -> Self { -self }
 }
 
 impl MeshValue for i64 {
     fn zero() -> Self { 0 }
-
-    fn mesh_add(&self, other: &Self) -> Self {
-        self.saturating_add(*other)
+    fn from_f64(v: f64) -> Option<Self> { v.round() as i64 }
+    fn to_f64(&self) -> f64 { *self as f64 }
+    fn mesh_add(&self, rhs: &Self) -> Self { self.saturating_add(*rhs) }
+    fn mesh_sub(&self, rhs: &Self) -> Self { self.saturating_sub(*rhs) }
+    fn mesh_mul(&self, rhs: &Self) -> Self { self.saturating_mul(*rhs) }
+    fn mesh_div(&self, rhs: &Self) -> Self {
+        if *rhs != 0 { self.saturating_div(*rhs) } else { 0 }
     }
+    fn mesh_neg(&self) -> Self { self.saturating_neg() }
+}
 
-    fn mesh_sub(&self, other: &Self) -> Self {
-        self.saturating_sub(*other)
+impl MeshValue for u64 {
+    fn zero() -> Self { 0 }
+    fn from_f64(v: f64) -> Option<Self> {
+        if v >= 0.0 { Some(v.round() as u64) } else { None }
     }
-
-    fn mesh_mul(&self, other: &Self) -> Self {
-        self.saturating_mul(*other)
+    fn to_f64(&self) -> f64 { *self as f64 }
+    fn mesh_add(&self, rhs: &Self) -> Self { self.saturating_add(*rhs) }
+    fn mesh_sub(&self, rhs: &Self) -> Self { self.saturating_sub(*rhs) }
+    fn mesh_mul(&self, rhs: &Self) -> Self { self.saturating_mul(*rhs) }
+    fn mesh_div(&self, rhs: &Self) -> Self {
+        if *rhs != 0 { self.saturating_div(*rhs) } else { 0 }
     }
-
-    fn mesh_div(&self, other: &Self) -> Self {
-        if *other != 0 {
-            self.checked_div(*other).unwrap_or_else(Self::zero)
-        } else {
-            Self::zero()
-        }
-    }
-
-    fn mesh_neg(&self) -> Self {
-        self.checked_neg().unwrap_or_else(Self::zero)
-    }
+    fn mesh_neg(&self) -> Self { 0 }
 }
 
 #[cfg(test)]
@@ -169,16 +122,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_quantum_phantom() {
-        let phantom = QuantumPhantom::<i32>::new();
-        assert!(phantom.lattice_stability() >= 0.0);
-        assert!(phantom.lattice_stability() <= 1.0);
-    }
-
-    #[test]
-    fn test_mesh_value_f64() {
-        let a = 42.0;
-        let b = 7.0;
+    fn test_f64_mesh_ops() {
+        let a = 42.0f64;
+        let b = 7.0f64;
 
         assert_eq!(a.mesh_add(&b), 49.0);
         assert_eq!(a.mesh_sub(&b), 35.0);
@@ -188,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mesh_value_i64() {
+    fn test_i64_mesh_ops() {
         let a = 42i64;
         let b = 7i64;
 
@@ -200,16 +146,21 @@ mod tests {
     }
 
     #[test]
-    fn test_mesh_value_safety() {
-        let max = i64::MAX;
-        let min = i64::MIN;
+    fn test_u64_mesh_ops() {
+        let a = 42u64;
+        let b = 7u64;
 
-        // Test overflow protection
-        assert_eq!(max.mesh_add(&1), i64::MAX);
-        assert_eq!(min.mesh_sub(&1), i64::MIN);
+        assert_eq!(a.mesh_add(&b), 49);
+        assert_eq!(a.mesh_sub(&b), 35);
+        assert_eq!(a.mesh_mul(&b), 294);
+        assert_eq!(a.mesh_div(&b), 6);
+        assert_eq!(a.mesh_neg(), 0);
+    }
 
-        // Test division by zero
-        assert_eq!(42i64.mesh_div(&0), 0);
-        assert_eq!(42.0f64.mesh_div(&0.0), 0.0);
+    #[test]
+    fn test_mesh_value_conversions() {
+        assert_eq!(f64::from_f64(42.0), Some(42.0));
+        assert_eq!(i64::from_f64(42.5), Some(43));
+        assert_eq!(u64::from_f64(-42.0), None);
     }
 }

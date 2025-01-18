@@ -1,173 +1,190 @@
-/// Native 3D Mesh Alignment System
-/// Last Updated: 2025-01-16 23:38:34 UTC
-/// Author: isdood
-/// Current User: isdood
+//! Crystalline Alignment Implementation
+//! ==============================
+//!
+//! Core quantum alignment operations through crystalline
+//! lattice structures with harmonic resonance tracking.
+//!
+//! Author: Caleb J.D. Terkovics <isdood>
+//! Current User: isdood
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-18 20:55:08 UTC
+//! Version: 0.1.0
+//! License: MIT
 
 use crate::{
-    constants::CURRENT_TIMESTAMP,
-    Vector3D,
-    zeronaut::Zeronaut,
-    helium::Helium,
-    helium::HeliumOrdering,
-    quantum::QuantumBlock,
-    scribe::{Scribe, ScribePrecision, QuantumString},
+    constants::{
+        QUANTUM_STABILITY_THRESHOLD,
+        CRYSTAL_LATTICE_SPACING,
+        QUANTUM_MESH_RESOLUTION
+    },
+    harmony::{Quantum, MeshValue},
+    vector::Vector3D,
+    CrystalArray,
+    Zeronaut,
 };
 
-const ALIGN_TIMESTAMP: usize = 1705448314; // 2025-01-16 23:38:34 UTC
-const VECTOR_ALIGN: usize = 16;
-const CACHE_LINE: usize = 64;
-
-#[allow(dead_code)]
-const QUANTUM_BLOCK_SIZE: usize = 256;
-
-#[allow(dead_code)]
-const QUANTUM_POOL_SIZE: usize = 1024;
-
-const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
-
-pub type AlignedRegion = Vector3D<Zeronaut<u8>>;
-
-#[derive(Debug)]
-pub struct Alignment {
-    value: QuantumBlock<AlignValue>,
-    timestamp: Helium<usize>,
+/// Quantum alignment states
+#[derive(Clone, Copy, PartialEq)]
+pub enum AlignState {
+    /// Perfect crystalline alignment
+    Perfect,
+    /// Stable but imperfect alignment
+    Stable,
+    /// Unstable alignment
+    Unstable,
+    /// Complete misalignment
+    Misaligned,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct AlignValue(usize);
-
-impl Scribe for AlignValue {
-    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str(&format!("{}", self.0));
-    }
+/// Core quantum alignment implementation
+#[derive(Clone)]
+pub struct CrystalAlign<T: Clone + 'static> {
+    /// Crystalline data grid
+    grid: CrystalArray<Zeronaut<T>>,
+    /// Current alignment state
+    state: AlignState,
+    /// Quantum coherence tracking
+    coherence: f64,
+    /// Grid dimensions
+    dimensions: Vector3D<usize>,
 }
 
-impl Clone for Alignment {
-    fn clone(&self) -> Self {
+impl<T: Clone + Default + 'static> CrystalAlign<T> {
+    /// Creates a new crystal alignment grid
+    pub fn new(x: usize, y: usize, z: usize) -> Self {
+        let dimensions = Vector3D::new(x, y, z);
+        let capacity = x * y * z;
+        let mut grid = CrystalArray::with_capacity(capacity);
+
+        let zero = T::default();
+        for x in 0..dimensions.x {
+            for y in 0..dimensions.y {
+                for z in 0..dimensions.z {
+                    let pos = Vector3D::new(
+                        (x as f64) * CRYSTAL_LATTICE_SPACING,
+                                            (y as f64) * CRYSTAL_LATTICE_SPACING,
+                                            (z as f64) * CRYSTAL_LATTICE_SPACING
+                    );
+                    let zeronaut = Zeronaut::new_positioned(zero.clone(), pos.x, pos.y, pos.z);
+                }
+            }
+        }
+
         Self {
-            value: QuantumBlock::new(AlignValue(self.value.get_data().0)),
-            timestamp: self.timestamp.clone(),
-        }
-    }
-}
-
-impl Alignment {
-    pub fn new(value: usize) -> Self {
-        assert!(value.is_power_of_two(), "Alignment must be a power of 2");
-        Self {
-            value: QuantumBlock::new(AlignValue(value)),
-            timestamp: Helium::new(ALIGN_TIMESTAMP),
+            grid,
+            state: AlignState::Perfect,
+            coherence: 1.0,
+            dimensions,
         }
     }
 
-    pub fn get_value(&self) -> usize {
-        self.value.get_data().0
+    /// Gets the current alignment state
+    pub fn state(&self) -> AlignState {
+        self.state
     }
 
-    pub fn align_address(&self, addr: usize) -> usize {
-        (addr + self.get_value() - 1) & !(self.get_value() - 1)
+    /// Gets the current coherence value
+    pub fn coherence(&self) -> f64 {
+        self.coherence
     }
 
-    pub fn get_coherence(&self) -> f64 {
-        let current = CURRENT_TIMESTAMP;
-        let timestamp = self.timestamp.load(&HeliumOrdering::Quantum).unwrap_or(ALIGN_TIMESTAMP);
-        let dt = (current - timestamp) as f64;
-        (1.0 / (1.0 + dt * 1e-9)).max(0.0)
+    /// Gets the grid dimensions
+    pub fn dimensions(&self) -> &Vector3D<usize> {
+        &self.dimensions
     }
-}
 
-#[derive(Debug)]
-pub struct AlignedSpace {
-    region: AlignedRegion,
-    size: usize,
-    alignment: Alignment,
-    coherence: Helium<f64>,
-}
-
-impl AlignedSpace {
-    pub fn new(size: usize, alignment: Alignment) -> Self {
-        let aligned_size = alignment.align_address(size);
-        let zero = Zeronaut::<u8>::zero();
-        Self {
-            region: Vector3D::new_unchecked(zero.clone(), zero.clone(), zero),
-            size: aligned_size,
-            alignment,
-            coherence: Helium::new(1.0),
+    /// Gets a reference to a zeronaut at specific coordinates
+    pub fn get(&self, x: usize, y: usize, z: usize) -> Option<&Zeronaut<T>> {
+        if x >= self.dimensions.x || y >= self.dimensions.y || z >= self.dimensions.z {
+            return None;
+        }
+        let index = x + y * self.dimensions.x + z * self.dimensions.x * self.dimensions.y;
+        unsafe {
+            Some(&*self.grid.as_ptr().add(index))
         }
     }
 
-    pub fn get_region(&self) -> &AlignedRegion {
-        &self.region
-    }
-
-    pub fn get_size(&self) -> usize {
-        self.size
-    }
-
-    pub fn get_alignment(&self) -> &Alignment {
-        &self.alignment
-    }
-
-    pub fn get_coherence(&self) -> f64 {
-        self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(0.0)
-    }
-
-    pub fn is_quantum_stable(&self) -> bool {
-        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
-    }
-
-    pub fn decay_coherence(&mut self) {
-        if let Ok(current) = self.coherence.load(&HeliumOrdering::Quantum) {
-            let _ = self.coherence.store(current * 0.99, &HeliumOrdering::Quantum);
+    /// Gets a mutable reference to a zeronaut at specific coordinates
+    pub fn get_mut(&mut self, x: usize, y: usize, z: usize) -> Option<&mut Zeronaut<T>> {
+        if x >= self.dimensions.x || y >= self.dimensions.y || z >= self.dimensions.z {
+            return None;
+        }
+        let index = x + y * self.dimensions.x + z * self.dimensions.x * self.dimensions.y;
+        unsafe {
+            Some(&mut *self.grid.as_mut_ptr().add(index))
         }
     }
 
-    pub fn reset_coherence(&mut self) {
-        let _ = self.coherence.store(1.0, &HeliumOrdering::Quantum);
-    }
-
-    pub fn get_position(&self) -> Vector3D<isize> {
-        let x = self.region.get_x().as_isize();
-        let y = self.region.get_y().as_isize();
-        let z = self.region.get_z().as_isize();
-        Vector3D::new_unchecked(x, y, z)
-    }
-
-    pub fn realign(&mut self) {
-        let x = self.alignment.align_address(self.region.get_x().as_usize()) as isize;
-        let y = self.alignment.align_address(self.region.get_y().as_usize()) as isize;
-        let z = self.alignment.align_address(self.region.get_z().as_usize()) as isize;
-
-        let zero = Zeronaut::<u8>::zero();
-        self.region = Vector3D::new_unchecked(
-            Zeronaut::<u8>::new_positioned(std::ptr::null_mut(), x, y, z).unwrap_or_else(|| zero.clone()),
-                                              Zeronaut::<u8>::new_positioned(std::ptr::null_mut(), x, y, z).unwrap_or_else(|| zero.clone()),
-                                              Zeronaut::<u8>::new_positioned(std::ptr::null_mut(), x, y, z).unwrap_or_else(|| zero),
-        );
-
-        self.decay_coherence();
+    /// Updates the alignment state based on coherence
+    fn update_state(&mut self) {
+        self.state = if self.coherence >= 0.9 {
+            AlignState::Perfect
+        } else if self.coherence >= QUANTUM_STABILITY_THRESHOLD {
+            AlignState::Stable
+        } else if self.coherence >= QUANTUM_STABILITY_THRESHOLD * 0.5 {
+            AlignState::Unstable
+        } else {
+            AlignState::Misaligned
+        };
     }
 }
 
-impl Clone for AlignedSpace {
-    fn clone(&self) -> Self {
-        Self {
-            region: self.region.clone(),
-            size: self.size,
-            alignment: self.alignment.clone(),
-            coherence: self.coherence.clone(),
+impl<T: Clone + Default + 'static> Quantum for CrystalAlign<T> {
+    fn coherence(&self) -> f64 {
+        self.coherence
+    }
+
+    fn is_stable(&self) -> bool {
+        self.coherence >= QUANTUM_STABILITY_THRESHOLD
+    }
+
+    fn decohere(&mut self) {
+        self.coherence *= 0.9;
+        if self.coherence < QUANTUM_STABILITY_THRESHOLD * 0.5 {
+            self.coherence = QUANTUM_STABILITY_THRESHOLD * 0.5;
         }
+        self.update_state();
+    }
+
+    fn recohere(&mut self) {
+        self.coherence = 1.0;
+        self.state = AlignState::Perfect;
     }
 }
 
-// Static quantum pool with native quantum memory management
-#[allow(dead_code)]
-static mut QUANTUM_POOL: [u8; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE] = [0; QUANTUM_BLOCK_SIZE * QUANTUM_POOL_SIZE];
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-pub fn vector_align() -> Alignment {
-    Alignment::new(VECTOR_ALIGN)
-}
+    #[test]
+    fn test_crystal_align_basics() {
+        let align = CrystalAlign::<u8>::new(2, 2, 2);
+        assert_eq!(align.state(), AlignState::Perfect);
+        assert!(align.is_stable());
+        assert_eq!(align.dimensions(), &Vector3D::new(2, 2, 2));
+    }
 
-pub fn cache_align() -> Alignment {
-    Alignment::new(CACHE_LINE)
+    #[test]
+    fn test_crystal_align_access() {
+        let mut align = CrystalAlign::<u8>::new(2, 2, 2);
+        assert!(align.get(0, 0, 0).is_some());
+        assert!(align.get(2, 2, 2).is_none());
+
+        let zeronaut = align.get_mut(1, 1, 1);
+        assert!(zeronaut.is_some());
+    }
+
+    #[test]
+    fn test_crystal_align_coherence() {
+        let mut align = CrystalAlign::<u8>::new(2, 2, 2);
+        assert_eq!(align.coherence(), 1.0);
+
+        align.decohere();
+        assert!(align.coherence() < 1.0);
+        assert_ne!(align.state(), AlignState::Perfect);
+
+        align.recohere();
+        assert_eq!(align.coherence(), 1.0);
+        assert_eq!(align.state(), AlignState::Perfect);
+    }
 }

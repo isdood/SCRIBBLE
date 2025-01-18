@@ -1,113 +1,113 @@
 //! Crystalline Harmony Core
-//! =====================
+//! ====================
 //!
-//! Core crystalline quantum computing framework.
+//! Core quantum computing framework implemented through crystalline
+//! data structures with harmonic resonance tracking.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:46:09 UTC
+//! Last Updated: 2025-01-18 20:57:45 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 #![no_std]
+#![cfg_attr(test, no_main)]
+
+extern crate core;
 
 // Core modules
-pub mod aether;
-pub mod align;
 pub mod constants;
-pub mod cube;
+pub mod vector;
 pub mod harmony;
+pub mod aether;
+pub mod cube;
+pub mod zeronaut;
 pub mod phantom;
 pub mod scribe;
-pub mod vector;
-pub mod zeronaut;
+pub mod align;
 
-// Re-exports
-pub use {
-    aether::Aether,
-    align::{AlignState, CrystalAlign},
-    constants::{
-        QUANTUM_STABILITY_THRESHOLD,
-        CUBE_TIMESTAMP,
-        AETHER_RESONANCE_FACTOR,
-    },
-    cube::{CrystalCube, SharedCube},
-    harmony::{Quantum, MeshValue, MeshOps},
-    phantom::QuantumCell,
-    scribe::{Scribe, ScribePrecision, QuantumString},
-    vector::{Vector3D, Vector4D},
+// Re-exports for convenience
+pub use self::{
+    cube::CrystalCube,
     zeronaut::Zeronaut,
+    harmony::{Quantum, MeshValue, MeshOps},
+    vector::{Vector3D, Vector4D},
 };
 
-/// Core crystalline array type
+/// A quantum-safe array implementation
+#[derive(Clone)]
 pub struct CrystalArray<T: Clone + 'static> {
-    /// The crystalline data storage
-    data: *mut T,
-    /// Current length of the array
+    /// Internal data buffer
+    data: [T; 1024], // Fixed size for no_std
+    /// Current length
     len: usize,
-    /// Allocated capacity
-    capacity: usize,
 }
 
 impl<T: Clone + 'static> CrystalArray<T> {
-    /// Creates a new empty array
-    pub const fn new() -> Self {
+    /// Creates a new empty CrystalArray
+    pub const fn new() -> Self where T: Copy {
         Self {
-            data: core::ptr::null_mut(),
+            data: [unsafe { core::mem::zeroed() }; 1024],
             len: 0,
-            capacity: 0,
         }
     }
 
-    /// Creates an array with the given capacity
-    pub fn with_capacity(capacity: usize) -> Self {
-        let data = if capacity > 0 {
-            // Safety: We immediately set the length to 0
-            unsafe {
-                let layout = core::alloc::Layout::array::<T>(capacity).unwrap();
-                core::alloc::alloc(layout) as *mut T
-            }
-        } else {
-            core::ptr::null_mut()
-        };
-
-        Self {
-            data,
-            len: 0,
-            capacity,
-        }
+    /// Creates a new CrystalArray with given capacity (ignored in no_std)
+    pub const fn with_capacity(_capacity: usize) -> Self where T: Copy {
+        Self::new()
     }
 
-    /// Returns the length of the array
-    pub fn len(&self) -> usize {
+    /// Gets the current length
+    pub const fn len(&self) -> usize {
         self.len
     }
 
-    /// Returns true if the array is empty
-    pub fn is_empty(&self) -> bool {
+    /// Checks if empty
+    pub const fn is_empty(&self) -> bool {
         self.len == 0
     }
 
-    /// Returns the capacity of the array
-    pub fn capacity(&self) -> usize {
-        self.capacity
+    /// Gets the current capacity
+    pub const fn capacity(&self) -> usize {
+        1024
     }
-}
 
-impl<T: Clone + 'static> Drop for CrystalArray<T> {
-    fn drop(&mut self) {
-        if !self.data.is_null() && self.capacity > 0 {
-            unsafe {
-                let layout = core::alloc::Layout::array::<T>(self.capacity).unwrap();
-                core::alloc::dealloc(self.data as *mut u8, layout);
-            }
+    /// Gets a reference to the raw pointer
+    pub fn as_ptr(&self) -> *const T {
+        self.data.as_ptr()
+    }
+
+    /// Gets a mutable reference to the raw pointer
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        self.data.as_mut_ptr()
+    }
+
+    /// Pushes an element if there's space
+    pub fn push(&mut self, value: T) -> Result<(), &'static str> {
+        if self.len >= self.capacity() {
+            return Err("Array is full");
+        }
+        self.data[self.len] = value;
+        self.len += 1;
+        Ok(())
+    }
+
+    /// Pops an element
+    pub fn pop(&mut self) -> Option<T> {
+        if self.is_empty() {
+            None
+        } else {
+            self.len -= 1;
+            Some(self.data[self.len].clone())
         }
     }
-}
 
-// Prevent automatic copying of raw pointers
-impl<T: Clone + 'static> !Copy for CrystalArray<T> {}
+    /// Clears the array
+    pub fn clear(&mut self) {
+        self.len = 0;
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -115,14 +115,35 @@ mod tests {
 
     #[test]
     fn test_crystal_array_basics() {
-        let array = CrystalArray::<i32>::new();
+        let mut array = CrystalArray::<u8>::new();
         assert!(array.is_empty());
         assert_eq!(array.len(), 0);
-        assert_eq!(array.capacity(), 0);
+        assert_eq!(array.capacity(), 1024);
 
-        let array = CrystalArray::<i32>::with_capacity(10);
+        array.push(42).unwrap();
+        assert_eq!(array.len(), 1);
+        assert!(!array.is_empty());
+
+        let value = array.pop();
+        assert_eq!(value, Some(42));
         assert!(array.is_empty());
-        assert_eq!(array.len(), 0);
-        assert_eq!(array.capacity(), 10);
+    }
+
+    #[test]
+    fn test_crystal_array_capacity() {
+        let mut array = CrystalArray::<u8>::new();
+        for i in 0..1024 {
+            array.push(i as u8).unwrap();
+        }
+        assert!(array.push(0).is_err());
+    }
+
+    #[test]
+    fn test_crystal_array_clear() {
+        let mut array = CrystalArray::<u8>::new();
+        array.push(1).unwrap();
+        array.push(2).unwrap();
+        array.clear();
+        assert!(array.is_empty());
     }
 }

@@ -1,134 +1,153 @@
-//! Crystalline Alignment Module
-//! =========================
+//! Crystalline Cube Implementation
+//! ============================
 //!
-//! Provides quantum-safe alignment operations through crystalline
-//! lattice structures and harmonic resonance.
+//! Core memory management through crystalline cubes and quantum-safe
+//! allocation with harmonic resonance tracking.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:44:37 UTC
+//! Last Updated: 2025-01-18 20:47:53 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::{
-    constants::QUANTUM_STABILITY_THRESHOLD,
-    cube::CrystalCube,
+    constants::{QUANTUM_STABILITY_THRESHOLD, CUBE_TIMESTAMP},
     harmony::{Quantum, MeshValue},
-    vector::Vector3D,
-    zeronaut::Zeronaut
+    vector::{Vector3D, Vector4D},
+    CrystalArray,
 };
 
-/// Crystalline alignment state
-#[derive(Clone, Copy)]
-pub enum AlignState {
-    /// Perfect crystalline alignment
-    Perfect,
-    /// Stable but imperfect alignment
-    Stable,
-    /// Unstable alignment
-    Unstable,
-    /// Complete misalignment
-    Misaligned,
-}
-
-/// Crystalline alignment manager
-pub struct CrystalAlign {
-    /// Base alignment point
-    origin: Vector3D<f64>,
-    /// Crystalline coherence value
+/// A quantum-safe container for crystalline data
+#[derive(Clone)]
+pub struct CrystalCube<T: Clone + 'static> {
+    /// The crystallized data
+    data: T,
+    /// Quantum coherence tracking
     coherence: f64,
-    /// Current alignment state
-    state: AlignState,
+    /// Crystalline timestamp
+    timestamp: u64,
+    /// Position in quantum space
+    position: Vector3D<f64>,
 }
 
-impl CrystalAlign {
-    /// Creates a new crystalline alignment manager
-    pub fn new() -> Self {
+/// A shared quantum-safe container with reference counting
+#[derive(Clone)]
+pub struct SharedCube<T: Clone + 'static> {
+    /// Inner crystalline cube
+    cube: CrystalCube<T>,
+    /// Reference count
+    refs: usize,
+}
+
+impl<T: Clone + 'static> CrystalCube<T> {
+    /// Creates a new quantum cube with perfect crystalline coherence
+    pub fn new(value: T) -> Self {
         Self {
-            origin: Vector3D::zero(),
+            data: value,
             coherence: 1.0,
-            state: AlignState::Perfect,
+            timestamp: CUBE_TIMESTAMP as u64,
+            position: Vector3D::zero(),
         }
     }
 
-    /// Creates a new alignment at specific coordinates
-    pub fn new_positioned(x: f64, y: f64, z: f64) -> Self {
+    /// Creates a new quantum cube at specific coordinates
+    pub fn new_positioned(value: T, x: f64, y: f64, z: f64) -> Self {
         Self {
-            origin: Vector3D::new(x, y, z),
+            data: value,
             coherence: 1.0,
-            state: AlignState::Perfect,
+            timestamp: CUBE_TIMESTAMP as u64,
+            position: Vector3D::new(x, y, z),
         }
     }
 
-    /// Gets the current alignment state
-    pub fn state(&self) -> AlignState {
-        self.state
+    /// Gets a reference to the crystallized data
+    pub fn get(&self) -> &T {
+        &self.data
     }
 
-    /// Gets the crystalline coherence value
+    /// Gets a mutable reference to the crystallized data
+    pub fn get_mut(&mut self) -> &mut T {
+        &mut self.data
+    }
+
+    /// Updates the crystallized data while maintaining coherence
+    pub fn set(&mut self, value: T) {
+        self.data = value;
+        self.decohere();
+    }
+
+    /// Gets the current quantum coherence value
     pub fn coherence(&self) -> f64 {
         self.coherence
     }
 
-    /// Aligns a Zeronaut in crystalline space
-    pub fn align_zeronaut(&mut self, zeronaut: &mut Zeronaut<u8>, x: f64, y: f64, z: f64) -> Result<(), &'static str> {
-        if self.coherence < QUANTUM_STABILITY_THRESHOLD {
-            return Err("Insufficient crystalline coherence for alignment");
-        }
+    /// Gets the crystalline position in quantum space
+    pub fn position(&self) -> &Vector3D<f64> {
+        &self.position
+    }
 
-        let target = Vector3D::new(x, y, z);
-        let distance = target.mesh_sub(&self.origin);
-
-        // Check alignment bounds
-        if distance.length_squared() > 100.0 {
-            self.state = AlignState::Misaligned;
-            return Err("Target position out of crystalline alignment range");
-        }
-
-        // Perform alignment
-        zeronaut.set_position(target);
+    /// Updates the crystalline position
+    pub fn set_position(&mut self, pos: Vector3D<f64>) {
+        self.position = pos;
         self.decohere();
+    }
+}
 
-        Ok(())
+impl<T: Clone + 'static> SharedCube<T> {
+    /// Creates a new shared quantum cube
+    pub fn new(value: T) -> Self {
+        Self {
+            cube: CrystalCube::new(value),
+            refs: 1,
+        }
     }
 
-    /// Creates a grid of aligned Zeronauts
-    pub fn create_alignment_grid(&mut self, size: usize) -> Result<Vec<Zeronaut<u8>>, &'static str> {
-        if size > 16 {
-            return Err("Grid size exceeds crystalline stability limits");
-        }
-
-        let mut grid = Vec::new();
-        let zero = Zeronaut::new();
-
-        for x in 0..size {
-            for y in 0..size {
-                for z in 0..size {
-                    let mut zeronaut = zero.clone();
-                    self.align_zeronaut(&mut zeronaut, x as f64, y as f64, z as f64)?;
-                    grid.push(zeronaut);
-                }
-            }
-        }
-
-        Ok(grid)
+    /// Increments the reference count
+    pub fn inc_ref(&mut self) {
+        self.refs = self.refs.saturating_add(1);
     }
 
-    /// Applies quantum decoherence
+    /// Decrements the reference count
+    pub fn dec_ref(&mut self) -> bool {
+        self.refs = self.refs.saturating_sub(1);
+        self.refs == 0
+    }
+
+    /// Gets the current reference count
+    pub fn ref_count(&self) -> usize {
+        self.refs
+    }
+
+    /// Gets a reference to the inner crystalline cube
+    pub fn inner(&self) -> &CrystalCube<T> {
+        &self.cube
+    }
+
+    /// Gets a mutable reference to the inner crystalline cube
+    pub fn inner_mut(&mut self) -> &mut CrystalCube<T> {
+        &mut self.cube
+    }
+}
+
+impl<T: Clone + 'static> Quantum for CrystalCube<T> {
+    fn coherence(&self) -> f64 {
+        self.coherence
+    }
+
+    fn is_stable(&self) -> bool {
+        self.coherence >= QUANTUM_STABILITY_THRESHOLD
+    }
+
     fn decohere(&mut self) {
         self.coherence *= 0.9;
         if self.coherence < QUANTUM_STABILITY_THRESHOLD {
-            self.state = AlignState::Unstable;
-        } else if self.coherence < 0.8 {
-            self.state = AlignState::Stable;
+            self.coherence = QUANTUM_STABILITY_THRESHOLD;
         }
     }
 
-    /// Restores crystalline coherence
-    pub fn restore_coherence(&mut self) {
+    fn recohere(&mut self) {
         self.coherence = 1.0;
-        self.state = AlignState::Perfect;
     }
 }
 
@@ -137,35 +156,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_alignment_basics() {
-        let mut align = CrystalAlign::new();
-        assert_eq!(align.coherence(), 1.0);
-        assert!(matches!(align.state(), AlignState::Perfect));
+    fn test_crystal_cube_basics() {
+        let mut cube = CrystalCube::new(42);
+        assert_eq!(*cube.get(), 42);
+        assert!(cube.is_stable());
+
+        cube.set(43);
+        assert_eq!(*cube.get(), 43);
+        assert!(cube.coherence() < 1.0);
     }
 
     #[test]
-    fn test_zeronaut_alignment() {
-        let mut align = CrystalAlign::new();
-        let mut zeronaut = Zeronaut::new();
+    fn test_crystal_cube_position() {
+        let mut cube = CrystalCube::new_positioned(42, 1.0, 2.0, 3.0);
+        assert_eq!(cube.position().x, 1.0);
+        assert_eq!(cube.position().y, 2.0);
+        assert_eq!(cube.position().z, 3.0);
 
-        assert!(align.align_zeronaut(&mut zeronaut, 1.0, 1.0, 1.0).is_ok());
-        assert!(align.coherence() < 1.0);
+        cube.set_position(Vector3D::zero());
+        assert_eq!(*cube.position(), Vector3D::zero());
     }
 
     #[test]
-    fn test_grid_creation() {
-        let mut align = CrystalAlign::new();
-        let grid = align.create_alignment_grid(2);
-        assert!(grid.is_ok());
-        assert_eq!(grid.unwrap().len(), 8); // 2x2x2 grid
-    }
+    fn test_shared_cube() {
+        let mut shared = SharedCube::new(42);
+        assert_eq!(shared.ref_count(), 1);
 
-    #[test]
-    fn test_alignment_limits() {
-        let mut align = CrystalAlign::new();
-        let mut zeronaut = Zeronaut::new();
+        shared.inc_ref();
+        assert_eq!(shared.ref_count(), 2);
 
-        assert!(align.align_zeronaut(&mut zeronaut, 100.0, 100.0, 100.0).is_err());
-        assert!(matches!(align.state(), AlignState::Misaligned));
+        assert!(!shared.dec_ref());
+        assert_eq!(shared.ref_count(), 1);
+
+        assert!(shared.dec_ref());
+        assert_eq!(shared.ref_count(), 0);
     }
 }

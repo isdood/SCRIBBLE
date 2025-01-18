@@ -1,20 +1,21 @@
 //! Crystalline Scribe Implementation
-//! ==============================
+//! =============================
 //!
 //! Provides quantum-safe string operations through crystalline
-//! data structures and harmonic resonance.
+//! data structures with harmonic resonance tracking.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:39:21 UTC
+//! Last Updated: 2025-01-18 20:51:54 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::{
-    aether::Aether,
-    harmony::Quantum,
-    cube::Box
+    constants::QUANTUM_STABILITY_THRESHOLD,
+    harmony::{Quantum, MeshValue},
+    CrystalArray,
+    CrystalCube
 };
 
 /// Maximum length for quantum strings
@@ -33,83 +34,46 @@ pub enum ScribePrecision {
     Ultra = 16,
 }
 
-impl ScribePrecision {
-    /// Gets the number of decimal places for this precision level
-    pub fn decimal_places(&self) -> usize {
-        *self as usize
-    }
-}
-
 /// A quantum-safe string implementation
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct QuantumString {
     /// Crystalline data buffer
-    buffer: Box<[u8]>,
+    buffer: CrystalArray<u8>,
     /// Current length of coherent data
     length: usize,
+    /// Quantum coherence tracking
+    coherence: f64,
 }
 
 impl QuantumString {
     /// Creates a new empty quantum string
     pub fn new() -> Self {
         Self {
-            buffer: Box::new([0; MAX_QUANTUM_STRING_LENGTH]),
+            buffer: CrystalArray::with_capacity(MAX_QUANTUM_STRING_LENGTH),
             length: 0,
+            coherence: 1.0,
         }
     }
 
-    /// Appends a string slice while maintaining quantum coherence
-    pub fn push_str(&mut self, s: &str) {
-        let new_len = self.length.saturating_add(s.len());
-        if new_len <= MAX_QUANTUM_STRING_LENGTH {
-            self.buffer[self.length..new_len].copy_from_slice(s.as_bytes());
-            self.length = new_len;
-        }
-    }
-
-    /// Appends a floating-point number with quantum-safe precision
-    pub fn push_f64(&mut self, value: f64, precision: usize) {
-        // Convert to fixed-point for quantum stability
-        let scaled = (value * 10f64.powi(precision as i32)) as i64;
-        let mut buf = [0u8; 32];
-        let mut pos = 0;
-
-        // Handle negative values
-        if scaled < 0 {
-            buf[pos] = b'-';
-            pos += 1;
+    /// Appends a byte slice while maintaining quantum coherence
+    pub fn push_bytes(&mut self, bytes: &[u8]) -> Result<(), &'static str> {
+        let new_len = self.length.saturating_add(bytes.len());
+        if new_len > MAX_QUANTUM_STRING_LENGTH {
+            return Err("Quantum string capacity exceeded");
         }
 
-        // Convert absolute value to string
-        let mut abs = scaled.abs();
-        let whole = abs / 10i64.pow(precision as u32);
-        abs %= 10i64.pow(precision as u32);
-
-        // Write whole part
-        let whole_str = whole.to_string();
-        buf[pos..pos + whole_str.len()].copy_from_slice(whole_str.as_bytes());
-        pos += whole_str.len();
-
-        // Write fractional part if needed
-        if precision > 0 {
-            buf[pos] = b'.';
-            pos += 1;
-
-            let frac_str = abs.to_string();
-            let padding = precision.saturating_sub(frac_str.len());
-
-            // Add leading zeros
-            for _ in 0..padding {
-                buf[pos] = b'0';
-                pos += 1;
-            }
-
-            buf[pos..pos + frac_str.len()].copy_from_slice(frac_str.as_bytes());
-            pos += frac_str.len();
+        // Safety: We check bounds above
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                bytes.as_ptr(),
+                                           self.buffer.as_mut_ptr().add(self.length),
+                                           bytes.len()
+            );
         }
 
-        // Append to quantum string
-        self.push_str(core::str::from_utf8(&buf[..pos]).unwrap_or("ERROR"));
+        self.length = new_len;
+        self.decohere();
+        Ok(())
     }
 
     /// Gets the current length of coherent data
@@ -122,33 +86,56 @@ impl QuantumString {
         self.length == 0
     }
 
+    /// Gets the current quantum coherence value
+    pub fn coherence(&self) -> f64 {
+        self.coherence
+    }
+
+    /// Gets a slice of the quantum string data
+    pub fn as_bytes(&self) -> &[u8] {
+        unsafe {
+            core::slice::from_raw_parts(self.buffer.as_ptr(), self.length)
+        }
+    }
+
+    /// Gets a mutable slice of the quantum string data
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
+        unsafe {
+            core::slice::from_raw_parts_mut(self.buffer.as_mut_ptr(), self.length)
+        }
+    }
+
     /// Clears the quantum string
     pub fn clear(&mut self) {
         self.length = 0;
+        self.recohere();
     }
 }
 
-/// Trait for types that can be written to a quantum string
-pub trait Scribe {
-    /// Writes the value to a quantum string with the given precision
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString);
-}
+impl Quantum for QuantumString {
+    fn coherence(&self) -> f64 {
+        self.coherence
+    }
 
-impl Scribe for str {
-    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str(self);
+    fn is_stable(&self) -> bool {
+        self.coherence >= QUANTUM_STABILITY_THRESHOLD
+    }
+
+    fn decohere(&mut self) {
+        self.coherence *= 0.9;
+        if self.coherence < QUANTUM_STABILITY_THRESHOLD {
+            self.coherence = QUANTUM_STABILITY_THRESHOLD;
+        }
+    }
+
+    fn recohere(&mut self) {
+        self.coherence = 1.0;
     }
 }
 
-impl Scribe for f64 {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_f64(*self, precision.decimal_places());
-    }
-}
-
-impl Scribe for i64 {
-    fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str(&self.to_string());
+impl Drop for QuantumString {
+    fn drop(&mut self) {
+        self.clear();
     }
 }
 
@@ -157,43 +144,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_quantum_string_basic() {
-        let mut qs = QuantumString::new();
-        assert!(qs.is_empty());
+    fn test_quantum_string_basics() {
+        let mut qstr = QuantumString::new();
+        assert!(qstr.is_empty());
+        assert_eq!(qstr.len(), 0);
 
-        qs.push_str("Hello");
-        assert_eq!(qs.len(), 5);
-
-        qs.clear();
-        assert!(qs.is_empty());
+        qstr.push_bytes(b"Hello").unwrap();
+        assert_eq!(qstr.len(), 5);
+        assert_eq!(qstr.as_bytes(), b"Hello");
     }
 
     #[test]
-    fn test_quantum_string_numbers() {
-        let mut qs = QuantumString::new();
+    fn test_quantum_string_coherence() {
+        let mut qstr = QuantumString::new();
+        assert!(qstr.is_stable());
 
-        let value = 42.123456789;
-        qs.push_f64(value, ScribePrecision::Standard.decimal_places());
-        assert!(!qs.is_empty());
+        qstr.push_bytes(b"Test").unwrap();
+        assert!(qstr.coherence() < 1.0);
 
-        qs.clear();
-        qs.push_f64(-123.45, ScribePrecision::Fine.decimal_places());
-        assert!(!qs.is_empty());
+        qstr.recohere();
+        assert_eq!(qstr.coherence(), 1.0);
     }
 
     #[test]
-    fn test_scribe_implementations() {
-        let mut qs = QuantumString::new();
+    fn test_quantum_string_limits() {
+        let mut qstr = QuantumString::new();
+        let large_data = [b'x'; MAX_QUANTUM_STRING_LENGTH + 1];
+        assert!(qstr.push_bytes(&large_data).is_err());
+    }
 
-        "test".scribe(ScribePrecision::Standard, &mut qs);
-        assert_eq!(qs.len(), 4);
-
-        qs.clear();
-        42.0f64.scribe(ScribePrecision::Fine, &mut qs);
-        assert!(!qs.is_empty());
-
-        qs.clear();
-        42i64.scribe(ScribePrecision::Standard, &mut qs);
-        assert!(!qs.is_empty());
+    #[test]
+    fn test_quantum_string_clear() {
+        let mut qstr = QuantumString::new();
+        qstr.push_bytes(b"Test").unwrap();
+        qstr.clear();
+        assert!(qstr.is_empty());
+        assert_eq!(qstr.coherence(), 1.0);
     }
 }

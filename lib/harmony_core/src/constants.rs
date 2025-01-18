@@ -1,168 +1,99 @@
-/// Quantum System Constants
-/// Last Updated: 2025-01-16 23:05:54 UTC
-/// Author: isdood
-/// Current User: isdood
-///
-/// This module defines fundamental constants used throughout the quantum system.
-/// Constants are carefully chosen to maintain quantum coherence and ensure proper
-/// interaction between UFOs, wormholes, and the mesh-fabric of space-time.
-///
-/// # Categories:
-/// - Timestamps: System-wide temporal synchronization
-/// - Physical Constants: Fundamental values from physics
-/// - Quantum Thresholds: System-specific quantum mechanics
-/// - Memory Layout: Hardware-specific optimizations
-/// - Mesh Configuration: Space-time fabric parameters
+//! Crystalline Constants Module
+//! =========================
+//!
+//! Core quantum constants for crystalline data structures
+//! and harmonic resonance tracking.
+//!
+//! Author: Caleb J.D. Terkovics <isdood>
+//! Current User: isdood
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-18 20:58:41 UTC
+//! Version: 0.1.0
+//! License: MIT
 
-// System Timestamps
-pub const CURRENT_TIMESTAMP: usize = 1705446354; // 2025-01-16 23:05:54 UTC
-pub const QUANTUM_TIMESTAMP: usize = CURRENT_TIMESTAMP;
-pub const MESH_TIMESTAMP: usize = CURRENT_TIMESTAMP;
+/// Minimum quantum stability threshold for crystalline coherence
+/// Based on the inverse of the golden ratio for optimal resonance
+pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.618033988749895;
 
-// Physical Constants
-pub const LIGHT_SPEED: f64 = 299_792_458.0;         // meters per second
-pub const PLANCK_LENGTH: f64 = 1.616255e-35;        // meters
-pub const GRAVITATIONAL_CONSTANT: f64 = 6.67430e-11; // m³ kg⁻¹ s⁻²
-pub const PLANCK_MASS: f64 = 2.176434e-8;          // kilograms
-pub const PLANCK_TIME: f64 = 5.391247e-44;         // seconds
-pub const REDUCED_PLANCK_CONSTANT: f64 = 1.054571817e-34; // J⋅s
-pub const BOLTZMANN_CONSTANT: f64 = 1.380649e-23;   // J/K
-pub const SCHWARZSCHILD_CONSTANT: f64 = 2.95325008e-36;
-pub const HAWKING_TEMPERATURE_CONSTANT: f64 = 1.227e23;
+/// Crystalline timestamp for this quantum framework version
+/// Unix timestamp for 2025-01-18 20:58:41 UTC
+pub const CUBE_TIMESTAMP: f64 = 1737323921.0;
 
-// Quantum Thresholds
-pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.5;
-pub const QUANTUM_THRESHOLD: f64 = 1e-10;
-pub const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
-pub const COHERENCE_DECAY_FACTOR: f64 = 0.99;
-pub const QUANTUM_FENCE_DECAY: f64 = 0.95;
-pub const ENTANGLEMENT_THRESHOLD: f64 = 0.85;
-pub const WORMHOLE_STABILITY_THRESHOLD: f64 = 0.95;
-pub const BLACK_HOLE_EVENT_HORIZON_COHERENCE: f64 = 0.99;
-pub const QUANTUM_TUNNELING_PROBABILITY: f64 = 0.01;
-pub const QUANTUM_DECOHERENCE_RATE: f64 = 0.001;
-pub const GRAVITATIONAL_THRESHOLD: f64 = 9.81;
-pub const QUANTUM_PHASE_ROTATION: f64 = 0.001;
+/// Harmonic resonance factor for aether crystallization
+pub const AETHER_RESONANCE_FACTOR: f64 = 0.999999999999;
 
-// Vector States
-pub const VECTOR_QUANTUM_STATE: usize = 1000;
-pub const VECTOR_DECOHERENCE_RATE: f64 = 0.99;
-pub const VECTOR_ENTANGLEMENT_LIMIT: usize = 100;
-pub const VECTOR_SUPERPOSITION_STATES: usize = 8;
-pub const VECTOR_QUANTUM_PHASES: usize = 16;
+/// Maximum quantum variance for crystalline structures
+pub const MAX_QUANTUM_VARIANCE: f64 = 0.000000000001;
 
-// Memory Layout
-pub const VECTOR_ALIGN: usize = 8;
-pub const CACHE_LINE: usize = 64;
-pub const MESH_CACHE_LINE: usize = CACHE_LINE;
-pub const QUANTUM_MEMORY_ALIGNMENT: usize = 16;
-pub const UFO_MEMORY_ALIGNMENT: usize = 32;
-pub const QUANTUM_PAGE_SIZE: usize = 4096;
-pub const QUANTUM_BLOCK_SIZE: usize = QUANTUM_PAGE_SIZE;  // Added for compatibility
+/// Golden ratio for quantum harmonic alignment
+pub const QUANTUM_GOLDEN_RATIO: f64 = 1.618033988749895;
 
-// Mesh Configuration
-pub const MESH_GRANULARITY: usize = 64;
-pub const MESH_COHERENCE_THRESHOLD: f64 = 0.5;
-pub const MESH_ENTANGLEMENT_LIMIT: usize = 1000;
-pub const MESH_WARP_FACTOR: f64 = 1.1;
-pub const MESH_QUANTUM_RESOLUTION: f64 = 1e-6;
-pub const MESH_VECTOR_ALIGN: usize = QUANTUM_MEMORY_ALIGNMENT;  // Added for mesh operations
+/// Pi in quantum space (high precision variant)
+pub const QUANTUM_PI: f64 = 3.141592653589793238462643383279502884197;
 
-// UFO Constants
-pub const UFO_COHERENCE_THRESHOLD: f64 = 0.7;
-pub const UFO_WARP_LIMIT: f64 = 2.0;
-pub const UFO_QUANTUM_SIGNATURE_BITS: usize = 64;
-pub const UFO_TEMPORAL_VARIANCE: f64 = 1e-9;
+/// Quantum mesh resolution - power of 2 for optimal computation
+pub const QUANTUM_MESH_RESOLUTION: usize = 1024;
 
-// Wormhole Constants
-pub const WORMHOLE_THROAT_RADIUS: f64 = 1e-35; // Planck length scale
-pub const WORMHOLE_MAX_ENTROPY: f64 = 0.99;
-pub const WORMHOLE_TEMPORAL_VARIANCE: f64 = 1e-10;
-pub const WORMHOLE_QUANTUM_FLUX: f64 = 1e-15;
+/// Maximum crystalline coherence deviation
+pub const MAX_COHERENCE_DEVIATION: f64 = 0.000000000001;
 
-// Protection Mechanisms
-pub const QUANTUM_PROTECTION_LEVEL: usize = 3;
-pub const CAUSALITY_PROTECTION_THRESHOLD: f64 = 0.999;
-pub const ENTROPY_PROTECTION_FACTOR: f64 = 0.95;
-pub const QUANTUM_ISOLATION_STRENGTH: f64 = 0.9999;
+/// Crystalline lattice spacing constant (Planck length scale)
+pub const CRYSTAL_LATTICE_SPACING: f64 = 1.616255e-35;
 
-// System Limits
-pub const MAX_QUANTUM_OPERATIONS: usize = 1000;
-pub const MAX_ENTANGLED_PAIRS: usize = 100;
-pub const MAX_WORMHOLE_CONNECTIONS: usize = 10;
-pub const MAX_UFO_INSTANCES: usize = 50;
-pub const MAX_QUANTUM_THREADS: usize = 32;
-pub const MAX_COHERENCE_VIOLATIONS: usize = 5;
+/// Quantum tunneling probability threshold
+pub const TUNNELING_THRESHOLD: f64 = 0.000000000001;
 
-// Unstable Matter Constants
-pub const UNSTABLE_MATTER_THRESHOLD: f64 = 0.3;
-pub const UNSTABLE_DECAY_RATE: f64 = 0.98;
-pub const UNSTABLE_RECOVERY_TIME: usize = 1000; // microseconds
-pub const UNSTABLE_QUANTUM_STATES: usize = 4;
+/// Zero-point energy level in quantum space
+pub const ZERO_POINT_ENERGY: f64 = 0.000000000001;
 
-/// Verifies that all quantum constants are within safe operating ranges
-pub fn verify_quantum_constants() -> bool {
-    QUANTUM_COHERENCE_THRESHOLD > 0.0 &&
-    QUANTUM_COHERENCE_THRESHOLD < 1.0 &&
-    ENTANGLEMENT_THRESHOLD > QUANTUM_COHERENCE_THRESHOLD &&
-    WORMHOLE_STABILITY_THRESHOLD > ENTANGLEMENT_THRESHOLD &&
-    BLACK_HOLE_EVENT_HORIZON_COHERENCE > WORMHOLE_STABILITY_THRESHOLD &&
-    VECTOR_DECOHERENCE_RATE < 1.0 &&
-    VECTOR_DECOHERENCE_RATE > 0.0 &&
-    UNSTABLE_MATTER_THRESHOLD < QUANTUM_COHERENCE_THRESHOLD &&
-    UNSTABLE_DECAY_RATE < 1.0 &&
-    // Additional verifications for new constants
-    QUANTUM_BLOCK_SIZE >= CACHE_LINE &&
-    MESH_VECTOR_ALIGN >= VECTOR_ALIGN
-}
+/// Quantum entanglement strength factor
+pub const ENTANGLEMENT_FACTOR: f64 = 0.999999999999;
+
+/// Maximum number of quantum states per crystal
+pub const MAX_QUANTUM_STATES: usize = 1024;
+
+/// Quantum decoherence rate per operation
+pub const DECOHERENCE_RATE: f64 = 0.9;
+
+/// Time dilation factor in quantum space
+pub const TIME_DILATION_FACTOR: f64 = 1.000000000001;
+
+/// Maximum size for quantum data structures
+pub const MAX_QUANTUM_SIZE: usize = 1024;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_quantum_constants_verification() {
-        assert!(verify_quantum_constants(), "Quantum constants outside safe ranges");
+    fn test_quantum_constants_validity() {
+        assert!(QUANTUM_STABILITY_THRESHOLD > 0.0 && QUANTUM_STABILITY_THRESHOLD < 1.0);
+        assert!(AETHER_RESONANCE_FACTOR < 1.0);
+        assert!(MAX_QUANTUM_VARIANCE > 0.0);
+        assert!(QUANTUM_GOLDEN_RATIO > 1.0);
+        assert!(QUANTUM_PI > 3.0 && QUANTUM_PI < 4.0);
+        assert!(QUANTUM_MESH_RESOLUTION > 0);
     }
 
     #[test]
-    fn test_timestamp_synchronization() {
-        assert_eq!(QUANTUM_TIMESTAMP, CURRENT_TIMESTAMP,
-                   "Quantum timestamp not synchronized");
-        assert_eq!(MESH_TIMESTAMP, CURRENT_TIMESTAMP,
-                   "Mesh timestamp not synchronized");
+    fn test_quantum_thresholds() {
+        assert!(MAX_COHERENCE_DEVIATION > 0.0);
+        assert!(CRYSTAL_LATTICE_SPACING > 0.0);
+        assert!(TUNNELING_THRESHOLD > 0.0);
+        assert!(ZERO_POINT_ENERGY > 0.0);
+        assert!(ENTANGLEMENT_FACTOR < 1.0);
     }
 
     #[test]
-    fn test_physical_constants() {
-        assert!(LIGHT_SPEED > 0.0, "Invalid light speed");
-        assert!(PLANCK_LENGTH > 0.0, "Invalid Planck length");
-        assert!(GRAVITATIONAL_CONSTANT > 0.0, "Invalid gravitational constant");
+    fn test_quantum_limits() {
+        assert!(MAX_QUANTUM_STATES > 0);
+        assert!(DECOHERENCE_RATE > 0.0 && DECOHERENCE_RATE < 1.0);
+        assert!(TIME_DILATION_FACTOR > 1.0);
+        assert!(MAX_QUANTUM_SIZE > 0);
     }
 
     #[test]
-    fn test_threshold_ranges() {
-        assert!(QUANTUM_COHERENCE_THRESHOLD > 0.0 &&
-        QUANTUM_COHERENCE_THRESHOLD < 1.0,
-        "Invalid quantum coherence threshold");
-        assert!(WORMHOLE_STABILITY_THRESHOLD > QUANTUM_COHERENCE_THRESHOLD,
-                "Invalid wormhole stability threshold");
-        assert!(UNSTABLE_MATTER_THRESHOLD < QUANTUM_COHERENCE_THRESHOLD,
-                "Invalid unstable matter threshold");
-    }
-
-    #[test]
-    fn test_unstable_matter_constants() {
-        assert!(UNSTABLE_DECAY_RATE < 1.0, "Invalid unstable decay rate");
-        assert!(UNSTABLE_MATTER_THRESHOLD > 0.0, "Invalid unstable threshold");
-        assert!(UNSTABLE_RECOVERY_TIME > 0, "Invalid recovery time");
-    }
-
-    #[test]
-    fn test_memory_alignment_constants() {
-        assert!(QUANTUM_BLOCK_SIZE >= CACHE_LINE,
-                "Quantum block size must be at least cache line size");
-        assert!(MESH_VECTOR_ALIGN >= VECTOR_ALIGN,
-                "Mesh vector alignment must be at least vector alignment");
+    fn test_timestamp_validity() {
+        assert!(CUBE_TIMESTAMP > 0.0);
     }
 }

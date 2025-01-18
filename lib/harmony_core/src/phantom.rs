@@ -1,131 +1,136 @@
 //! Crystalline Phantom Implementation
-//! ===============================
+//! ==============================
 //!
-//! Provides quantum-safe memory operations through crystalline phantom references
-//! and quantum entanglement tracking with harmonic resonance.
+//! Provides quantum-safe phantom references through crystalline
+//! lattice structures and harmonic resonance tracking.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:35:38 UTC
+//! Last Updated: 2025-01-18 20:49:47 UTC
 //! Version: 0.1.0
 //! License: MIT
 
+use core::marker::PhantomData;
 use crate::{
-    constants::*,
-    scribe::{Scribe, ScribePrecision, QuantumString},
-    aether::{Aether, AetherHarmony},
-    cube::Box,
-    harmony::{Quantum, QuantumPhantom}
+    constants::QUANTUM_STABILITY_THRESHOLD,
+    harmony::{Quantum, MeshValue},
+    CrystalCube,
+    CrystalArray
 };
 
-/// A quantum-safe cell that manages crystalline references through
-/// quantum entanglement and coherence tracking
-#[derive(Debug)]
+/// A quantum-safe phantom cell for crystalline data
+#[derive(Clone)]
 pub struct QuantumCell<T: Clone + 'static> {
     /// Quantum crystalline state data
-    data: Box<Aether<T>>,
+    data: CrystalCube<T>,
     /// Crystalline phantom variance tracking
-    _phantom: QuantumPhantom<T>,
+    _phantom: PhantomData<T>,
 }
 
 impl<T: Clone + 'static> QuantumCell<T> {
     /// Creates a new QuantumCell with crystalline coherence
     pub fn new(value: T) -> Self {
         Self {
-            data: Box::new(Aether::crystallize(value)),
-            _phantom: QuantumPhantom::new(),
+            data: CrystalCube::new(value),
+            _phantom: PhantomData,
         }
     }
 
     /// Observes the crystalline state through quantum measurement
     pub fn observe(&self) -> Result<T, &'static str> {
-        self.data.glimpse()
+        if !self.is_stable() {
+            return Err("Crystalline decoherence detected");
+        }
+        Ok(self.data.get().clone())
     }
 
     /// Collapses the quantum state while maintaining crystalline coherence
-    pub fn collapse(&self, value: T) -> Result<(), &'static str> {
-        self.data.encode(value)
-    }
-
-    /// Quantum-safe load operation with crystalline stabilization
-    pub fn quantum_load(&self, harmony: &AetherHarmony) -> Result<T, &'static str> {
-        match harmony {
-            AetherHarmony::Prismatic => {
-                if !self.data.is_coherent() {
-                    return Err("Crystalline decoherence detected");
-                }
-                self.data.glimpse()
-            },
-            AetherHarmony::Amorphous => self.data.glimpse(),
-            AetherHarmony::Crystalline => {
-                if self.get_coherence() < QUANTUM_STABILITY_THRESHOLD {
-                    return Err("Crystalline stability violation");
-                }
-                self.data.glimpse()
-            }
+    pub fn collapse(&mut self, value: T) -> Result<(), &'static str> {
+        if !self.is_stable() {
+            return Err("Cannot collapse: crystalline structure unstable");
         }
-    }
-
-    /// Quantum-safe store operation with crystalline harmony
-    pub fn quantum_store(&self, value: T, harmony: &AetherHarmony) -> Result<(), &'static str> {
-        match harmony {
-            AetherHarmony::Prismatic => {
-                if !self.data.is_coherent() {
-                    return Err("Crystalline decoherence detected");
-                }
-                self.collapse(value)
-            },
-            AetherHarmony::Amorphous => self.collapse(value),
-            AetherHarmony::Crystalline => {
-                if self.get_coherence() < QUANTUM_STABILITY_THRESHOLD {
-                    return Err("Crystalline stability violation");
-                }
-                self.collapse(value)
-            }
-        }
+        self.data.set(value);
+        Ok(())
     }
 
     /// Gets the current crystalline coherence value
     pub fn get_coherence(&self) -> f64 {
-        self.data.get_coherence()
+        self.data.coherence()
     }
 
-    /// Checks if the crystalline lattice maintains coherence
-    pub fn is_coherent(&self) -> bool {
-        self.data.is_coherent()
+    /// Checks if the crystalline structure is stable
+    pub fn is_stable(&self) -> bool {
+        self.data.is_stable()
     }
 
-    /// Gets the quantum resonance value from the crystalline lattice
-    pub fn get_resonance(&self) -> f64 {
-        self.data.get_resonance()
-    }
-
-    /// Restores crystalline coherence through harmonic realignment
+    /// Restores crystalline coherence
     pub fn restore_coherence(&mut self) -> Result<(), &'static str> {
-        self.data.restore_harmony();
+        self.data.recohere();
         Ok(())
-    }
-
-    /// Diminishes crystalline resonance through controlled decoherence
-    pub fn diminish_resonance(&mut self) {
-        self.data.diminish_resonance();
     }
 }
 
-impl<T: Clone + Scribe> Scribe for QuantumCell<T> {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("⟨");
-        if let Ok(value) = self.observe() {
-            value.scribe(precision, output);
-        } else {
-            output.push_str("∅");
+impl<T: Clone + 'static> Quantum for QuantumCell<T> {
+    fn coherence(&self) -> f64 {
+        self.data.coherence()
+    }
+
+    fn is_stable(&self) -> bool {
+        self.data.is_stable()
+    }
+
+    fn decohere(&mut self) {
+        self.data.decohere();
+    }
+
+    fn recohere(&mut self) {
+        self.data.recohere();
+    }
+}
+
+/// A reference-counted quantum phantom cell
+#[derive(Clone)]
+pub struct SharedQuantumCell<T: Clone + 'static> {
+    /// Inner quantum cell
+    cell: QuantumCell<T>,
+    /// Reference count
+    refs: usize,
+}
+
+impl<T: Clone + 'static> SharedQuantumCell<T> {
+    /// Creates a new shared quantum cell
+    pub fn new(value: T) -> Self {
+        Self {
+            cell: QuantumCell::new(value),
+            refs: 1,
         }
-        output.push_str(", χ=");
-        output.push_f64(self.get_coherence(), precision.decimal_places());
-        output.push_str(", ρ=");
-        output.push_f64(self.get_resonance(), precision.decimal_places());
-        output.push_str("⟩");
+    }
+
+    /// Increments the reference count
+    pub fn inc_ref(&mut self) {
+        self.refs = self.refs.saturating_add(1);
+    }
+
+    /// Decrements the reference count
+    pub fn dec_ref(&mut self) -> bool {
+        self.refs = self.refs.saturating_sub(1);
+        self.refs == 0
+    }
+
+    /// Gets the current reference count
+    pub fn ref_count(&self) -> usize {
+        self.refs
+    }
+
+    /// Gets a reference to the inner quantum cell
+    pub fn inner(&self) -> &QuantumCell<T> {
+        &self.cell
+    }
+
+    /// Gets a mutable reference to the inner quantum cell
+    pub fn inner_mut(&mut self) -> &mut QuantumCell<T> {
+        &mut self.cell
     }
 }
 
@@ -135,52 +140,40 @@ mod tests {
 
     #[test]
     fn test_quantum_cell_basics() {
-        let cell = QuantumCell::new(42);
+        let mut cell = QuantumCell::new(42);
+        assert!(cell.is_stable());
         assert_eq!(cell.observe().unwrap(), 42);
-        assert!(cell.is_coherent());
+
+        cell.collapse(43).unwrap();
+        assert_eq!(cell.observe().unwrap(), 43);
     }
 
     #[test]
-    fn test_crystalline_coherence() {
+    fn test_quantum_coherence() {
         let mut cell = QuantumCell::new(42);
-        let initial = cell.get_coherence();
-
-        // Force decoherence through multiple collapses
-        for i in 0..5 {
-            let _ = cell.quantum_store(i, &AetherHarmony::Amorphous);
-        }
-
-        assert!(cell.get_coherence() < initial);
-    }
-
-    #[test]
-    fn test_crystalline_resonance() {
-        let mut cell = QuantumCell::new(42);
-        let initial = cell.get_resonance();
-
-        cell.diminish_resonance();
-        assert!(cell.get_resonance() < initial);
-
-        cell.restore_coherence().unwrap();
-        assert!(cell.get_resonance() > QUANTUM_STABILITY_THRESHOLD);
-    }
-
-    #[test]
-    fn test_harmonic_states() {
-        let cell = QuantumCell::new(42);
-
-        // Test crystalline state requirements
-        assert!(cell.quantum_store(43, &AetherHarmony::Crystalline).is_ok());
+        assert!(cell.get_coherence() >= QUANTUM_STABILITY_THRESHOLD);
 
         // Force decoherence
-        for _ in 0..10 {
-            let _ = cell.quantum_store(42, &AetherHarmony::Amorphous);
+        for _ in 0..5 {
+            cell.decohere();
         }
 
-        // Should fail in crystalline state
-        assert!(cell.quantum_store(44, &AetherHarmony::Crystalline).is_err());
-        // Should work in amorphous state
-        assert!(cell.quantum_store(44, &AetherHarmony::Amorphous).is_ok());
+        assert!(cell.observe().is_err());
+    }
+
+    #[test]
+    fn test_shared_quantum_cell() {
+        let mut shared = SharedQuantumCell::new(42);
+        assert_eq!(shared.ref_count(), 1);
+
+        shared.inc_ref();
+        assert_eq!(shared.ref_count(), 2);
+
+        assert!(!shared.dec_ref());
+        assert_eq!(shared.ref_count(), 1);
+
+        assert!(shared.dec_ref());
+        assert_eq!(shared.ref_count(), 0);
     }
 
     #[test]
@@ -189,11 +182,11 @@ mod tests {
 
         // Force decoherence
         for _ in 0..5 {
-            cell.diminish_resonance();
+            cell.decohere();
         }
 
-        let decoherent = cell.get_coherence();
+        assert!(cell.observe().is_err());
         cell.restore_coherence().unwrap();
-        assert!(cell.get_coherence() > decoherent);
+        assert!(cell.observe().is_ok());
     }
 }
