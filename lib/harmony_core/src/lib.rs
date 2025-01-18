@@ -1,161 +1,128 @@
-//! Harmony Core Library
-//! ===================
+//! Crystalline Harmony Core
+//! =====================
 //!
-//! A quantum-harmonic memory management system for the Scribble kernel.
-//!
-//! This module provides core functionality for managing quantum-harmonic memory cells,
-//! including coherence tracking and harmonic memory protection.
+//! Core crystalline quantum computing framework.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:14:23 UTC
+//! Last Updated: 2025-01-18 20:46:09 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 #![no_std]
 
 // Core modules
-mod aether;
-mod cube;
-mod phantom;
-mod constants;
-mod vector;
-mod scribe;
-mod zeronaut;
-mod align;
-mod harmony;
+pub mod aether;
+pub mod align;
+pub mod constants;
+pub mod cube;
+pub mod harmony;
+pub mod phantom;
+pub mod scribe;
+pub mod vector;
+pub mod zeronaut;
 
-// Re-export commonly used types and traits
+// Re-exports
 pub use {
-    aether::{Aether, AetherHarmony},
-    cube::Box,
-    vector::Vector3D,
-    scribe::{Scribe, ScribePrecision, QuantumString},
-    harmony::Quantum,
-    align::{Alignment, AlignedSpace},
+    aether::Aether,
+    align::{AlignState, CrystalAlign},
     constants::{
-        CURRENT_TIMESTAMP,
         QUANTUM_STABILITY_THRESHOLD,
-        COHERENCE_DECAY_FACTOR,
-        PLANCK_LENGTH,
-        VECTOR_ALIGN,
-        VECTOR_QUANTUM_STATE,
+        CUBE_TIMESTAMP,
+        AETHER_RESONANCE_FACTOR,
     },
+    cube::{CrystalCube, SharedCube},
+    harmony::{Quantum, MeshValue, MeshOps},
+    phantom::QuantumCell,
+    scribe::{Scribe, ScribePrecision, QuantumString},
+    vector::{Vector3D, Vector4D},
+    zeronaut::Zeronaut,
 };
 
-/// A thread-safe container for harmonic memory operations
-#[derive(Debug)]
-pub struct HarmonicCell<T: Clone + 'static> {
-    /// Aether-managed value
-    essence: Aether<T>,
-    /// Memory cube for aligned storage
-    cube: Box<T>,
-    /// Quantum coherence tracking
-    harmony: Aether<f64>,
+/// Core crystalline array type
+pub struct CrystalArray<T: Clone + 'static> {
+    /// The crystalline data storage
+    data: *mut T,
+    /// Current length of the array
+    len: usize,
+    /// Allocated capacity
+    capacity: usize,
 }
 
-impl<T: Clone + 'static> HarmonicCell<T> {
-    /// Creates a new HarmonicCell with the given value
-    pub fn new(value: T) -> Self {
+impl<T: Clone + 'static> CrystalArray<T> {
+    /// Creates a new empty array
+    pub const fn new() -> Self {
         Self {
-            essence: Aether::crystallize(value.clone()),
-            cube: Box::new(value),
-            harmony: Aether::crystallize(1.0),
+            data: core::ptr::null_mut(),
+            len: 0,
+            capacity: 0,
         }
     }
 
-    /// Retrieves the current value
-    pub fn get(&self) -> T {
-        self.essence.glimpse().unwrap_or_else(|_| self.cube.as_ref().clone())
-    }
+    /// Creates an array with the given capacity
+    pub fn with_capacity(capacity: usize) -> Self {
+        let data = if capacity > 0 {
+            // Safety: We immediately set the length to 0
+            unsafe {
+                let layout = core::alloc::Layout::array::<T>(capacity).unwrap();
+                core::alloc::alloc(layout) as *mut T
+            }
+        } else {
+            core::ptr::null_mut()
+        };
 
-    /// Updates the stored value
-    pub fn set(&self, value: T) {
-        let _ = self.essence.encode(value.clone());
-        *self.cube.as_mut() = value;
-    }
-
-    /// Gets the current coherence value
-    pub fn get_coherence(&self) -> f64 {
-        let aether_coherence = self.essence.get_resonance();
-        let cube_coherence = self.cube.get_coherence();
-        let harmony_coherence = self.harmony.glimpse().unwrap_or(1.0);
-        (aether_coherence + cube_coherence + harmony_coherence) / 3.0
-    }
-
-    /// Checks if the cell is harmonically stable
-    pub fn is_harmonically_stable(&self) -> bool {
-        self.get_coherence() > QUANTUM_STABILITY_THRESHOLD &&
-        self.cube.is_quantum_stable()
-    }
-
-    /// Causes natural coherence decay
-    pub fn decay_coherence(&mut self) {
-        self.essence.diminish_resonance();
-        self.cube.decay_coherence();
-        if let Ok(current) = self.harmony.glimpse() {
-            let _ = self.harmony.encode(current * COHERENCE_DECAY_FACTOR);
+        Self {
+            data,
+            len: 0,
+            capacity,
         }
     }
 
-    /// Restores harmonic coherence
-    pub fn restore_harmony(&mut self) {
-        self.essence.restore_harmony();
-        self.cube.reset_coherence();
-        let _ = self.harmony.encode(1.0);
+    /// Returns the length of the array
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Returns true if the array is empty
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Returns the capacity of the array
+    pub fn capacity(&self) -> usize {
+        self.capacity
     }
 }
 
-/// Trait for protected memory operations
-pub trait Protected {
-    /// Enables memory protection
-    fn protect(&self) -> bool;
-
-    /// Disables memory protection
-    fn unprotect(&self) -> bool;
-
-    /// Gets the current coherence value
-    fn get_coherence(&self) -> f64;
-
-    /// Checks if the memory is harmonically stable
-    fn is_harmonically_stable(&self) -> bool;
+impl<T: Clone + 'static> Drop for CrystalArray<T> {
+    fn drop(&mut self) {
+        if !self.data.is_null() && self.capacity > 0 {
+            unsafe {
+                let layout = core::alloc::Layout::array::<T>(self.capacity).unwrap();
+                core::alloc::dealloc(self.data as *mut u8, layout);
+            }
+        }
+    }
 }
+
+// Prevent automatic copying of raw pointers
+impl<T: Clone + 'static> !Copy for CrystalArray<T> {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_harmonic_cell() {
-        let cell = HarmonicCell::new(42);
-        assert_eq!(cell.get(), 42);
-        assert!(cell.get_coherence() > 0.0);
-        assert!(cell.is_harmonically_stable());
-    }
+    fn test_crystal_array_basics() {
+        let array = CrystalArray::<i32>::new();
+        assert!(array.is_empty());
+        assert_eq!(array.len(), 0);
+        assert_eq!(array.capacity(), 0);
 
-    #[test]
-    fn test_coherence_decay() {
-        let mut cell = HarmonicCell::new(42);
-        let initial_coherence = cell.get_coherence();
-
-        for _ in 0..5 {
-            cell.decay_coherence();
-        }
-
-        assert!(cell.get_coherence() < initial_coherence);
-    }
-
-    #[test]
-    fn test_harmony_restoration() {
-        let mut cell = HarmonicCell::new(42);
-
-        for _ in 0..5 {
-            cell.decay_coherence();
-        }
-
-        let decayed_coherence = cell.get_coherence();
-        cell.restore_harmony();
-        assert!(cell.get_coherence() > decayed_coherence);
+        let array = CrystalArray::<i32>::with_capacity(10);
+        assert!(array.is_empty());
+        assert_eq!(array.len(), 0);
+        assert_eq!(array.capacity(), 10);
     }
 }

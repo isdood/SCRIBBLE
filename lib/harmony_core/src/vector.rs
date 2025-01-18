@@ -1,546 +1,295 @@
-/// Ethereal Vector Crystallography Module
-/// Last Updated: 2025-01-18 18:31:47 UTC
-/// Author: isdood
-/// Current User: isdood
+//! Crystalline Vector Implementation
+//! ==============================
+//!
+//! Provides quantum-safe vector operations through crystalline
+//! lattice structures and harmonic resonance.
+//!
+//! Author: Caleb J.D. Terkovics <isdood>
+//! Current User: isdood
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-18 20:37:02 UTC
+//! Version: 0.1.0
+//! License: MIT
 
 use crate::{
+    harmony::{MeshValue, MeshOps},
     scribe::{Scribe, ScribePrecision, QuantumString},
-    quantum::Quantum,
-    meshmath::{MeshMath, MeshValue},
+    constants::QUANTUM_STABILITY_THRESHOLD
 };
 
-/// Three-dimensional ethereal vector structure
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vector3D<T> where T: MeshValue + Copy {
-    /// Prismatic axis (x-component)
-    prime: T,
-    /// Resonant axis (y-component)
-    resonant: T,
-    /// Harmonic axis (z-component)
-    harmonic: T,
+/// A three-dimensional vector in crystalline space
+#[derive(Debug, Clone, Copy)]
+pub struct Vector3D<T> {
+    x: T,
+    y: T,
+    z: T,
 }
 
 impl<T: MeshValue + Copy> Vector3D<T> {
-    /// Create a new vector (compatibility method)
-    #[inline(always)]
+    /// Creates a new Vector3D in crystalline space
     pub fn new(x: T, y: T, z: T) -> Self {
-        Self::crystallize(x, y, z)
+        Self { x, y, z }
     }
 
-    /// Crystallize a new vector from raw components
-    #[inline(always)]
-    pub const fn crystallize(prime: T, resonant: T, harmonic: T) -> Self {
-        Self { prime, resonant, harmonic }
+    /// Creates a zero vector with perfect crystalline symmetry
+    pub fn zero() -> Self where T: MeshValue {
+        Self::new(T::zero(), T::zero(), T::zero())
     }
 
-    /// Create a null-space vector
-    #[inline(always)]
-    pub fn void() -> Self {
-        Self::crystallize(T::mesh_zero(), T::mesh_zero(), T::mesh_zero())
+    /// Computes the quantum dot product preserving crystalline coherence
+    pub fn dot(&self, other: &Self) -> T {
+        self.x.mesh_mul(&other.x)
+        .mesh_add(&self.y.mesh_mul(&other.y))
+        .mesh_add(&self.z.mesh_mul(&other.z))
     }
 
-    /// Create a unity-resonance vector
-    #[inline(always)]
-    pub fn unity() -> Self {
-        Self::crystallize(T::mesh_one(), T::mesh_one(), T::mesh_one())
+    /// Returns the squared length in crystalline space
+    pub fn length_squared(&self) -> T {
+        self.dot(self)
     }
 
-    /// Access x-component (compatibility method)
-    #[inline(always)]
-    pub fn x(&self) -> T { self.prime }
-
-    /// Access y-component (compatibility method)
-    #[inline(always)]
-    pub fn y(&self) -> T { self.resonant }
-
-    /// Access z-component (compatibility method)
-    #[inline(always)]
-    pub fn z(&self) -> T { self.harmonic }
-
-    /// Access prime axis component
-    #[inline(always)]
-    pub fn prime(&self) -> T { self.prime }
-
-    /// Access resonant axis component
-    #[inline(always)]
-    pub fn resonant(&self) -> T { self.resonant }
-
-    /// Access harmonic axis component
-    #[inline(always)]
-    pub fn harmonic(&self) -> T { self.harmonic }
-
-    /// Normalize vector (compatibility method)
-    #[inline]
-    pub fn normalize(&self) -> Self where T: Into<f64> + From<f64> {
-        self.mesh_normalize()
-    }
-
-    /// Calculate magnitude (compatibility method)
-    #[inline]
-    pub fn magnitude(&self) -> f64 where T: Into<f64> {
-        self.mesh_magnitude()
-    }
-
-    /// Harmonically combine vectors
-    #[inline]
-    pub fn mesh_add(&self, other: &Self) -> Self {
-        Self::crystallize(
-            self.prime.mesh_add(other.prime),
-                          self.resonant.mesh_add(other.resonant),
-                          self.harmonic.mesh_add(other.harmonic)
-        )
-    }
-
-    /// Extract ethereal difference
-    #[inline]
-    pub fn mesh_sub(&self, other: &Self) -> Self {
-        Self::crystallize(
-            self.prime.mesh_sub(other.prime),
-                          self.resonant.mesh_sub(other.resonant),
-                          self.harmonic.mesh_sub(other.harmonic)
-        )
-    }
-
-    /// Amplify vector by resonance factor
-    #[inline]
-    pub fn mesh_mul(&self, resonance: T) -> Self {
-        Self::crystallize(
-            self.prime.mesh_mul(resonance),
-                          self.resonant.mesh_mul(resonance),
-                          self.harmonic.mesh_mul(resonance)
-        )
-    }
-
-    /// Attenuate vector by resonance factor
-    #[inline]
-    pub fn mesh_div(&self, resonance: T) -> Self {
-        Self::crystallize(
-            self.prime.mesh_div(resonance),
-                          self.resonant.mesh_div(resonance),
-                          self.harmonic.mesh_div(resonance)
-        )
-    }
-
-    /// Invert vector polarity
-    #[inline]
-    pub fn mesh_neg(&self) -> Self {
-        Self::crystallize(
-            self.prime.mesh_neg(),
-                          self.resonant.mesh_neg(),
-                          self.harmonic.mesh_neg()
-        )
-    }
-
-    /// Calculate harmonic resonance between vectors
-    #[inline]
-    pub fn mesh_dot(&self, other: &Self) -> T {
-        self.prime.mesh_mul(other.prime)
-        .mesh_add(self.resonant.mesh_mul(other.resonant))
-        .mesh_add(self.harmonic.mesh_mul(other.harmonic))
-    }
-
-    /// Measure total resonance magnitude
-    #[inline]
-    pub fn mesh_magnitude_squared(&self) -> T {
-        self.mesh_dot(self)
-    }
-
-    /// Generate crystalline cross-resonance
-    #[inline]
-    pub fn mesh_cross(&self, other: &Self) -> Self {
-        Self::crystallize(
-            self.resonant.mesh_mul(other.harmonic).mesh_sub(self.harmonic.mesh_mul(other.resonant)),
-                          self.harmonic.mesh_mul(other.prime).mesh_sub(self.prime.mesh_mul(other.harmonic)),
-                          self.prime.mesh_mul(other.resonant).mesh_sub(self.resonant.mesh_mul(other.prime))
+    /// Computes the cross product with quantum stability
+    pub fn cross(&self, other: &Self) -> Self {
+        Self::new(
+            self.y.mesh_mul(&other.z).mesh_sub(&self.z.mesh_mul(&other.y)),
+                  self.z.mesh_mul(&other.x).mesh_sub(&self.x.mesh_mul(&other.z)),
+                  self.x.mesh_mul(&other.y).mesh_sub(&self.y.mesh_mul(&other.x))
         )
     }
 }
 
-impl<T: MeshValue + Copy + Into<f64>> Vector3D<T> {
-    /// Calculate absolute resonance magnitude
-    #[inline]
-    pub fn mesh_magnitude(&self) -> f64 {
-        let p: f64 = self.prime.into();
-        let r: f64 = self.resonant.into();
-        let h: f64 = self.harmonic.into();
-        (p * p + r * r + h * h).sqrt()
+impl<T: MeshValue + Copy> MeshOps for Vector3D<T> {
+    type Output = Self;
+
+    fn mesh_add(&self, rhs: &Self) -> Self {
+        Self::new(
+            self.x.mesh_add(&rhs.x),
+                  self.y.mesh_add(&rhs.y),
+                  self.z.mesh_add(&rhs.z)
+        )
     }
 
-    /// Normalize to unit resonance
-    #[inline]
-    pub fn mesh_normalize(&self) -> Self where T: From<f64> {
-        let magnitude = self.mesh_magnitude();
-        if MeshMath::eq_f64(magnitude, 0.0) {
-            *self
+    fn mesh_sub(&self, rhs: &Self) -> Self {
+        Self::new(
+            self.x.mesh_sub(&rhs.x),
+                  self.y.mesh_sub(&rhs.y),
+                  self.z.mesh_sub(&rhs.z)
+        )
+    }
+
+    fn mesh_mul(&self, scalar: &f64) -> Self {
+        Self::new(
+            self.x.mesh_mul(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                  self.y.mesh_mul(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                  self.z.mesh_mul(&T::from_f64(*scalar).unwrap_or_else(T::zero))
+        )
+    }
+
+    fn mesh_div(&self, scalar: &f64) -> Self {
+        if *scalar != 0.0 {
+            Self::new(
+                self.x.mesh_div(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                      self.y.mesh_div(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                      self.z.mesh_div(&T::from_f64(*scalar).unwrap_or_else(T::zero))
+            )
         } else {
-            let factor: T = T::from(1.0 / magnitude);
-            self.mesh_mul(factor)
+            Self::zero()
         }
     }
 
-    /// Calculate ethereal distance
-    #[inline]
-    pub fn mesh_distance(&self, other: &Self) -> f64 {
-        self.mesh_sub(other).mesh_magnitude()
-    }
-}
-
-impl Vector3D<isize> {
-    /// Calculate quantum-aligned distance
-    #[inline]
-    pub fn quantum_distance(&self, other: &Self) -> f64 {
-        let diff = self.mesh_sub(other);
-        let dp = MeshMath::isize_to_f64(diff.prime);
-        let dr = MeshMath::isize_to_f64(diff.resonant);
-        let dh = MeshMath::isize_to_f64(diff.harmonic);
-
-        MeshMath::sqrt_f64(
-            dp.mesh_mul(dp)
-            .mesh_add(dr.mesh_mul(dr))
-            .mesh_add(dh.mesh_mul(dh))
+    fn mesh_neg(&self) -> Self {
+        Self::new(
+            self.x.mesh_neg(),
+                  self.y.mesh_neg(),
+                  self.z.mesh_neg()
         )
     }
 }
 
-impl<T: MeshValue + Scribe + Copy> Scribe for Vector3D<T> {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("⟨∴");  // Ethereal vector symbol
-        self.prime.scribe(precision, output);
-        output.push_str("∥");   // Parallel symbol
-        self.resonant.scribe(precision, output);
-        output.push_str("∥");
-        self.harmonic.scribe(precision, output);
-        output.push_str("∴⟩");
-    }
-}
-
-impl<T: MeshValue + Copy> Default for Vector3D<T> {
-    fn default() -> Self {
-        Self::void()
-    }
-}
-
-impl<T: MeshValue + Copy> Quantum for Vector3D<T> {
-    #[inline(always)]
-    fn get_coherence(&self) -> f64 {
-        1.0  // Perfect crystalline coherence
-    }
-
-    #[inline(always)]
-    fn is_quantum_stable(&self) -> bool {
-        true  // Vectors maintain eternal stability
-    }
-
-    #[inline(always)]
-    fn decay_coherence(&self) {}  // Vectors resist entropy
-
-    #[inline(always)]
-    fn reset_coherence(&self) {}  // No reset needed for perfect forms
-}
-
-// Standard operators
-impl<T: MeshValue + Copy> std::ops::Add for Vector3D<T> {
-    type Output = Self;
-
-    #[inline]
-    fn add(self, other: Self) -> Self::Output {
-        self.mesh_add(&other)
-    }
-}
-
-impl<T: MeshValue + Copy> std::ops::Sub for Vector3D<T> {
-    type Output = Self;
-
-    #[inline]
-    fn sub(self, other: Self) -> Self::Output {
-        self.mesh_sub(&other)
-    }
-}
-
-impl<T: MeshValue + Copy> std::ops::Mul<T> for Vector3D<T> {
-    type Output = Self;
-
-    #[inline]
-    fn mul(self, resonance: T) -> Self::Output {
-        self.mesh_mul(resonance)
-    }
-}
-
-impl<T: MeshValue + Copy> std::ops::Div<T> for Vector3D<T> {
-    type Output = Self;
-
-    #[inline]
-    fn div(self, resonance: T) -> Self::Output {
-        self.mesh_div(resonance)
-    }
-}
-
-impl<T: MeshValue + Copy> std::ops::Neg for Vector3D<T> {
-    type Output = Self;
-
-    #[inline]
-    fn neg(self) -> Self::Output {
-        self.mesh_neg()
-    }
-}
-
-/// Hypercrystalline Vector Implementation - Fourth Dimensional Resonance
-/// Last Updated: 2025-01-18 18:22:46 UTC
-/// Author: isdood
-/// Current User: isdood
-
-/// Four-dimensional ethereal vector structure
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vector4D<T> where T: MeshValue + Copy {
-    /// Prismatic axis
-    pub prime: T,
-    /// Resonant axis
-    pub resonant: T,
-    /// Harmonic axis
-    pub harmonic: T,
-    /// Ethereal axis (transcendent dimension)
-    pub aetheric: T,
+/// A four-dimensional vector in crystalline space
+#[derive(Debug, Clone, Copy)]
+pub struct Vector4D<T> {
+    x: T,
+    y: T,
+    z: T,
+    w: T,
 }
 
 impl<T: MeshValue + Copy> Vector4D<T> {
-    /// Crystallize a hyperdimensional vector
-    #[inline(always)]
-    pub const fn crystallize(prime: T, resonant: T, harmonic: T, aetheric: T) -> Self {
-        Self {
-            prime,
-            resonant,
-            harmonic,
-            aetheric
-        }
+    /// Creates a new Vector4D in crystalline space
+    pub fn new(x: T, y: T, z: T, w: T) -> Self {
+        Self { x, y, z, w }
     }
 
-    /// Create a hyperspace null vector
-    #[inline(always)]
-    pub fn void() -> Self {
-        Self::crystallize(
-            T::mesh_zero(),
-                          T::mesh_zero(),
-                          T::mesh_zero(),
-                          T::mesh_zero()
+    /// Creates a zero vector with perfect crystalline symmetry
+    pub fn zero() -> Self where T: MeshValue {
+        Self::new(T::zero(), T::zero(), T::zero(), T::zero())
+    }
+
+    /// Computes the quantum dot product preserving crystalline coherence
+    pub fn dot(&self, other: &Self) -> T {
+        self.x.mesh_mul(&other.x)
+        .mesh_add(&self.y.mesh_mul(&other.y))
+        .mesh_add(&self.z.mesh_mul(&other.z))
+        .mesh_add(&self.w.mesh_mul(&other.w))
+    }
+
+    /// Returns the squared length in crystalline space
+    pub fn length_squared(&self) -> T {
+        self.dot(self)
+    }
+
+    /// Projects to 3D crystalline space by dividing by w
+    pub fn project_3d(&self) -> Vector3D<T> {
+        Vector3D::new(
+            self.x.mesh_div(&self.w),
+                      self.y.mesh_div(&self.w),
+                      self.z.mesh_div(&self.w)
         )
-    }
-
-    /// Create a hyperspace unity vector
-    #[inline(always)]
-    pub fn unity() -> Self {
-        Self::crystallize(
-            T::mesh_one(),
-                          T::mesh_one(),
-                          T::mesh_one(),
-                          T::mesh_one()
-        )
-    }
-
-    /// Access prismatic component
-    #[inline(always)]
-    pub fn prime(&self) -> T { self.prime }
-
-    /// Access resonant component
-    #[inline(always)]
-    pub fn resonant(&self) -> T { self.resonant }
-
-    /// Access harmonic component
-    #[inline(always)]
-    pub fn harmonic(&self) -> T { self.harmonic }
-
-    /// Access aetheric component
-    #[inline(always)]
-    pub fn aetheric(&self) -> T { self.aetheric }
-
-    /// Harmonically combine hypervectors
-    #[inline]
-    pub fn mesh_add(&self, other: &Self) -> Self {
-        Self::crystallize(
-            self.prime.mesh_add(other.prime),
-                          self.resonant.mesh_add(other.resonant),
-                          self.harmonic.mesh_add(other.harmonic),
-                          self.aetheric.mesh_add(other.aetheric)
-        )
-    }
-
-    /// Extract hyperspace difference
-    #[inline]
-    pub fn mesh_sub(&self, other: &Self) -> Self {
-        Self::crystallize(
-            self.prime.mesh_sub(other.prime),
-                          self.resonant.mesh_sub(other.resonant),
-                          self.harmonic.mesh_sub(other.harmonic),
-                          self.aetheric.mesh_sub(other.aetheric)
-        )
-    }
-
-    /// Amplify hypervector by resonance factor
-    #[inline]
-    pub fn mesh_mul(&self, resonance: T) -> Self {
-        Self::crystallize(
-            self.prime.mesh_mul(resonance),
-                          self.resonant.mesh_mul(resonance),
-                          self.harmonic.mesh_mul(resonance),
-                          self.aetheric.mesh_mul(resonance)
-        )
-    }
-
-    /// Attenuate hypervector by resonance factor
-    #[inline]
-    pub fn mesh_div(&self, resonance: T) -> Self {
-        Self::crystallize(
-            self.prime.mesh_div(resonance),
-                          self.resonant.mesh_div(resonance),
-                          self.harmonic.mesh_div(resonance),
-                          self.aetheric.mesh_div(resonance)
-        )
-    }
-
-    /// Invert hyperspace polarity
-    #[inline]
-    pub fn mesh_neg(&self) -> Self {
-        Self::crystallize(
-            self.prime.mesh_neg(),
-                          self.resonant.mesh_neg(),
-                          self.harmonic.mesh_neg(),
-                          self.aetheric.mesh_neg()
-        )
-    }
-
-    /// Calculate hyperdimensional resonance
-    #[inline]
-    pub fn mesh_dot(&self, other: &Self) -> T {
-        self.prime.mesh_mul(other.prime)
-        .mesh_add(self.resonant.mesh_mul(other.resonant))
-        .mesh_add(self.harmonic.mesh_mul(other.harmonic))
-        .mesh_add(self.aetheric.mesh_mul(other.aetheric))
-    }
-
-    /// Measure total hyperresonance magnitude
-    #[inline]
-    pub fn mesh_magnitude_squared(&self) -> T {
-        self.mesh_dot(self)
     }
 }
 
-impl Vector4D<f64> {
-    /// Calculate absolute hyperresonance magnitude
-    #[inline]
-    pub fn mesh_magnitude(&self) -> f64 {
-        MeshMath::sqrt_f64(self.mesh_magnitude_squared())
+impl<T: MeshValue + Copy> MeshOps for Vector4D<T> {
+    type Output = Self;
+
+    fn mesh_add(&self, rhs: &Self) -> Self {
+        Self::new(
+            self.x.mesh_add(&rhs.x),
+                  self.y.mesh_add(&rhs.y),
+                  self.z.mesh_add(&rhs.z),
+                  self.w.mesh_add(&rhs.w)
+        )
     }
 
-    /// Normalize to unit hyperresonance
-    #[inline]
-    pub fn mesh_normalize(&self) -> Self {
-        let magnitude = self.mesh_magnitude();
-        if MeshMath::eq_f64(magnitude, 0.0) {
-            *self
+    fn mesh_sub(&self, rhs: &Self) -> Self {
+        Self::new(
+            self.x.mesh_sub(&rhs.x),
+                  self.y.mesh_sub(&rhs.y),
+                  self.z.mesh_sub(&rhs.z),
+                  self.w.mesh_sub(&rhs.w)
+        )
+    }
+
+    fn mesh_mul(&self, scalar: &f64) -> Self {
+        Self::new(
+            self.x.mesh_mul(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                  self.y.mesh_mul(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                  self.z.mesh_mul(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                  self.w.mesh_mul(&T::from_f64(*scalar).unwrap_or_else(T::zero))
+        )
+    }
+
+    fn mesh_div(&self, scalar: &f64) -> Self {
+        if *scalar != 0.0 {
+            Self::new(
+                self.x.mesh_div(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                      self.y.mesh_div(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                      self.z.mesh_div(&T::from_f64(*scalar).unwrap_or_else(T::zero)),
+                      self.w.mesh_div(&T::from_f64(*scalar).unwrap_or_else(T::zero))
+            )
         } else {
-            self.mesh_div(magnitude)
+            Self::zero()
         }
     }
 
-    /// Calculate ethereal hyperdistance
-    #[inline]
-    pub fn mesh_distance(&self, other: &Self) -> f64 {
-        self.mesh_sub(other).mesh_magnitude()
-    }
-}
-
-impl Vector4D<isize> {
-    /// Calculate quantum-aligned hyperdistance
-    #[inline]
-    pub fn quantum_distance(&self, other: &Self) -> f64 {
-        let diff = self.mesh_sub(other);
-        let dp = MeshMath::isize_to_f64(diff.prime);
-        let dr = MeshMath::isize_to_f64(diff.resonant);
-        let dh = MeshMath::isize_to_f64(diff.harmonic);
-        let da = MeshMath::isize_to_f64(diff.aetheric);
-
-        MeshMath::sqrt_f64(
-            dp.mesh_mul(dp)
-            .mesh_add(dr.mesh_mul(dr))
-            .mesh_add(dh.mesh_mul(dh))
-            .mesh_add(da.mesh_mul(da))
+    fn mesh_neg(&self) -> Self {
+        Self::new(
+            self.x.mesh_neg(),
+                  self.y.mesh_neg(),
+                  self.z.mesh_neg(),
+                  self.w.mesh_neg()
         )
     }
 }
 
-impl<T: MeshValue + Scribe + Copy> Scribe for Vector4D<T> {
+impl<T: MeshValue + Scribe> Scribe for Vector3D<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("⟨∷");  // Hyperspace vector symbol
-        self.prime.scribe(precision, output);
-        output.push_str("∥");    // Parallel symbol
-        self.resonant.scribe(precision, output);
-        output.push_str("∥");
-        self.harmonic.scribe(precision, output);
-        output.push_str("∥");
-        self.aetheric.scribe(precision, output);
-        output.push_str("∷⟩");
+        output.push_str("⟨");
+        self.x.scribe(precision, output);
+        output.push_str(", ");
+        self.y.scribe(precision, output);
+        output.push_str(", ");
+        self.z.scribe(precision, output);
+        output.push_str("⟩");
     }
 }
 
-impl<T: MeshValue + Copy> Quantum for Vector4D<T> {
-    #[inline(always)]
-    fn get_coherence(&self) -> f64 {
-        1.0  // Perfect hypercrystalline coherence
-    }
-
-    #[inline(always)]
-    fn is_quantum_stable(&self) -> bool {
-        true  // Hypervectors maintain eternal stability
-    }
-
-    #[inline(always)]
-    fn decay_coherence(&self) {}  // Hypervectors transcend entropy
-
-    #[inline(always)]
-    fn reset_coherence(&self) {}  // No reset needed for perfect hyperforms
-}
-
-// Hypercrystalline operator implementations
-impl<T: MeshValue + Copy> std::ops::Add for Vector4D<T> {
-    type Output = Self;
-
-    #[inline]
-    fn add(self, other: Self) -> Self::Output {
-        self.mesh_add(&other)
+impl<T: MeshValue + Scribe> Scribe for Vector4D<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("⟨");
+        self.x.scribe(precision, output);
+        output.push_str(", ");
+        self.y.scribe(precision, output);
+        output.push_str(", ");
+        self.z.scribe(precision, output);
+        output.push_str(", ");
+        self.w.scribe(precision, output);
+        output.push_str("⟩");
     }
 }
 
-impl<T: MeshValue + Copy> std::ops::Sub for Vector4D<T> {
-    type Output = Self;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    #[inline]
-    fn sub(self, other: Self) -> Self::Output {
-        self.mesh_sub(&other)
+    #[test]
+    fn test_vector3d_operations() {
+        let v1 = Vector3D::new(1.0, 2.0, 3.0);
+        let v2 = Vector3D::new(4.0, 5.0, 6.0);
+
+        let sum = v1.mesh_add(&v2);
+        assert_eq!(sum.x, 5.0);
+        assert_eq!(sum.y, 7.0);
+        assert_eq!(sum.z, 9.0);
+
+        let dot = v1.dot(&v2);
+        assert_eq!(dot, 32.0);
+
+        let cross = v1.cross(&v2);
+        assert_eq!(cross.x, -3.0);
+        assert_eq!(cross.y, 6.0);
+        assert_eq!(cross.z, -3.0);
     }
-}
 
-impl<T: MeshValue + Copy> std::ops::Mul<T> for Vector4D<T> {
-    type Output = Self;
+    #[test]
+    fn test_vector4d_operations() {
+        let v1 = Vector4D::new(1.0, 2.0, 3.0, 4.0);
+        let v2 = Vector4D::new(5.0, 6.0, 7.0, 8.0);
 
-    #[inline]
-    fn mul(self, resonance: T) -> Self::Output {
-        self.mesh_mul(resonance)
+        let diff = v2.mesh_sub(&v1);
+        assert_eq!(diff.x, 4.0);
+        assert_eq!(diff.y, 4.0);
+        assert_eq!(diff.z, 4.0);
+        assert_eq!(diff.w, 4.0);
+
+        let scaled = v1.mesh_mul(&2.0);
+        assert_eq!(scaled.x, 2.0);
+        assert_eq!(scaled.y, 4.0);
+        assert_eq!(scaled.z, 6.0);
+        assert_eq!(scaled.w, 8.0);
     }
-}
 
-impl<T: MeshValue + Copy> std::ops::Div<T> for Vector4D<T> {
-    type Output = Self;
+    #[test]
+    fn test_vector_projection() {
+        let v4 = Vector4D::new(2.0, 4.0, 6.0, 2.0);
+        let v3 = v4.project_3d();
 
-    #[inline]
-    fn div(self, resonance: T) -> Self::Output {
-        self.mesh_div(resonance)
+        assert_eq!(v3.x, 1.0);
+        assert_eq!(v3.y, 2.0);
+        assert_eq!(v3.z, 3.0);
     }
-}
 
-impl<T: MeshValue + Copy> std::ops::Neg for Vector4D<T> {
-    type Output = Self;
+    #[test]
+    fn test_zero_vectors() {
+        let v3 = Vector3D::<f64>::zero();
+        assert_eq!(v3.x, 0.0);
+        assert_eq!(v3.y, 0.0);
+        assert_eq!(v3.z, 0.0);
 
-    #[inline]
-    fn neg(self) -> Self::Output {
-        self.mesh_neg()
+        let v4 = Vector4D::<f64>::zero();
+        assert_eq!(v4.x, 0.0);
+        assert_eq!(v4.y, 0.0);
+        assert_eq!(v4.z, 0.0);
+        assert_eq!(v4.w, 0.0);
     }
 }

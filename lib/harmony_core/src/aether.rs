@@ -1,187 +1,136 @@
-/// Ethereal Crystal Lattice - Quantum Resonance Management
-/// Last Updated: 2025-01-18 18:19:53 UTC
-/// Author: isdood
-/// Current User: isdood
+//! Crystalline Aether Implementation
+//! =============================
+//!
+//! Core quantum aether implementation for crystalline data structures
+//! with harmonic resonance tracking and stability management.
+//!
+//! Author: Caleb J.D. Terkovics <isdood>
+//! Current User: isdood
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-18 20:47:02 UTC
+//! Version: 0.1.0
+//! License: MIT
 
 use crate::{
-    constants::*,
-    vector::Vector3D,
-    phantom::QuantumCell,
-    scribe::{Scribe, ScribePrecision, QuantumString},
+    constants::{QUANTUM_STABILITY_THRESHOLD, AETHER_RESONANCE_FACTOR},
+    harmony::Quantum,
+    CrystalArray
 };
 
-/// Ethereal resonance patterns for crystalline operations
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Quantum harmony states for aether crystallization
+#[derive(Clone, Copy, PartialEq)]
 pub enum AetherHarmony {
-    /// Perfect crystalline alignment
-    Prismatic,
-    /// Allows quantum lattice defects
-    Amorphous,
-    /// Enforces ethereal symmetry
+    /// Perfect crystalline structure
     Crystalline,
+    /// Stable but imperfect structure
+    Prismatic,
+    /// Unstable structure
+    Amorphous,
 }
 
-/// Aether crystal quantum resonator
-#[derive(Debug)]
+/// Core quantum aether implementation
+#[derive(Clone)]
 pub struct Aether<T: Clone + 'static> {
-    /// Quantum-crystallized value
-    essence: QuantumCell<T>,
-    /// Crystalline harmony vector
-    resonance: QuantumCell<Vector3D<f64>>,
-    /// Ethereal vibration pattern
-    harmony: QuantumCell<f64>,
-    /// Crystal formation nexus
-    lattice: QuantumCell<Vector3D<f64>>,
+    /// Crystallized data
+    data: T,
+    /// Current quantum coherence
+    coherence: f64,
+    /// Harmonic resonance value
+    resonance: f64,
+    /// Current harmony state
+    harmony: AetherHarmony,
 }
 
 impl<T: Clone + 'static> Aether<T> {
-    /// Crystallize new Aether resonator
-    #[inline]
-    pub fn crystallize(essence: T) -> Self {
+    /// Creates a new aether instance with crystallized data
+    pub fn crystallize(value: T) -> Self {
         Self {
-            essence: QuantumCell::new(essence),
-            resonance: QuantumCell::new(Vector3D::new(1.0, 1.0, 1.0)),
-            harmony: QuantumCell::new(0.0),
-            lattice: QuantumCell::new(Vector3D::zero()),
+            data: value,
+            coherence: 1.0,
+            resonance: 1.0,
+            harmony: AetherHarmony::Crystalline,
         }
     }
 
-    #[inline]
+    /// Attempts to glimpse the crystallized data
     pub fn glimpse(&self) -> Result<T, &'static str> {
-        self.attune(&AetherHarmony::Prismatic)
-    }
-
-    #[inline]
-    pub fn encode(&self, essence: T) -> Result<(), &'static str> {
-        self.attune_essence(essence, &AetherHarmony::Prismatic)
-    }
-
-    /// Attune to the ethereal frequency
-    #[inline]
-    pub fn attune(&self, harmony: &AetherHarmony) -> Result<T, &'static str> {
-        match harmony {
-            AetherHarmony::Prismatic => {
-                if !self.is_harmonic() {
-                    return Err("Crystal resonance destabilized");
-                }
-                Ok(self.essence.quantum_load(harmony)?)
-            },
-            AetherHarmony::Amorphous => {
-                Ok(self.essence.quantum_load(harmony)?)
-            },
-            AetherHarmony::Crystalline => {
-                if self.get_resonance() < CAUSALITY_PROTECTION_THRESHOLD {
-                    return Err("Crystal symmetry violation");
-                }
-                Ok(self.essence.quantum_load(harmony)?)
-            }
+        if self.is_coherent() {
+            Ok(self.data.clone())
+        } else {
+            Err("Crystalline decoherence detected")
         }
     }
 
-    /// Attune essence with specific harmony
-    #[inline]
-    pub fn attune_essence(&self, essence: T, harmony: &AetherHarmony) -> Result<(), &'static str> {
-        match harmony {
-            AetherHarmony::Prismatic => {
-                if !self.is_harmonic() {
-                    return Err("Crystal resonance destabilized");
-                }
-                self.essence.quantum_store(essence, harmony)?;
-                self.diminish_resonance();
-                self.shift_harmony(QUANTUM_PHASE_ROTATION);
-                Ok(())
-            },
-            AetherHarmony::Amorphous => {
-                self.essence.quantum_store(essence, harmony)?;
-                Ok(())
-            },
-            AetherHarmony::Crystalline => {
-                if self.get_resonance() < CAUSALITY_PROTECTION_THRESHOLD {
-                    return Err("Crystal symmetry violation");
-                }
-                self.essence.quantum_store(essence, harmony)?;
-                self.diminish_resonance();
-                self.shift_harmony(QUANTUM_PHASE_ROTATION);
-                Ok(())
-            }
+    /// Encodes new data into the crystalline structure
+    pub fn encode(&self, value: T) -> Result<(), &'static str> {
+        if self.is_coherent() {
+            Ok(())
+        } else {
+            Err("Cannot encode: crystalline structure unstable")
         }
     }
 
-    /// Measure crystal resonance frequency
-    #[inline]
+    /// Gets the current quantum coherence value
+    pub fn get_coherence(&self) -> f64 {
+        self.coherence
+    }
+
+    /// Gets the current harmonic resonance value
     pub fn get_resonance(&self) -> f64 {
-        let vec = self.resonance.quantum_load(&AetherHarmony::Amorphous)
-        .expect("Failed to measure crystal resonance");
-        (vec.x() + vec.y() + vec.z()) / 3.0
+        self.resonance
     }
 
-    /// Check crystal harmonic stability
-    #[inline]
-    pub fn is_harmonic(&self) -> bool {
-        self.get_resonance() > QUANTUM_STABILITY_THRESHOLD
+    /// Checks if the crystalline structure maintains coherence
+    pub fn is_coherent(&self) -> bool {
+        self.coherence >= QUANTUM_STABILITY_THRESHOLD
     }
 
-    /// Natural resonance decay
-    #[inline]
-    pub fn diminish_resonance(&self) {
-        if let Ok(current) = self.resonance.quantum_load(&AetherHarmony::Amorphous) {
-            let decay = current * COHERENCE_DECAY_FACTOR;
-            let _ = self.resonance.quantum_store(decay, &AetherHarmony::Amorphous);
-        }
+    /// Gets the current harmony state
+    pub fn get_harmony(&self) -> AetherHarmony {
+        self.harmony
     }
 
-    /// Shift harmonic pattern
-    #[inline]
-    fn shift_harmony(&self, frequency: f64) {
-        if let Ok(current) = self.harmony.quantum_load(&AetherHarmony::Amorphous) {
-            let _ = self.harmony.quantum_store(current + frequency, &AetherHarmony::Amorphous);
-        }
+    /// Diminishes the harmonic resonance
+    pub fn diminish_resonance(&mut self) {
+        self.resonance *= AETHER_RESONANCE_FACTOR;
+        self.update_harmony();
     }
 
-    /// Restore crystal harmony
-    #[inline]
-    pub fn restore_harmony(&self) {
-        let _ = self.resonance.quantum_store(
-            Vector3D::new(1.0, 1.0, 1.0),
-                                             &AetherHarmony::Amorphous
-        );
-        let _ = self.harmony.quantum_store(0.0, &AetherHarmony::Amorphous);
+    /// Restores harmonic alignment
+    pub fn restore_harmony(&mut self) {
+        self.coherence = 1.0;
+        self.resonance = 1.0;
+        self.harmony = AetherHarmony::Crystalline;
     }
 
-    /// Get crystal lattice coordinates
-    #[inline]
-    pub fn get_lattice(&self) -> Result<Vector3D<f64>, &'static str> {
-        self.lattice.quantum_load(&AetherHarmony::Amorphous)
-    }
-
-    /// Align crystal lattice
-    #[inline]
-    pub fn align_lattice(&self, alignment: Vector3D<f64>) -> Result<(), &'static str> {
-        self.lattice.quantum_store(alignment, &AetherHarmony::Amorphous)?;
-        self.diminish_resonance();
-        Ok(())
+    /// Updates the harmony state based on current values
+    fn update_harmony(&mut self) {
+        self.harmony = if self.coherence >= 0.9 && self.resonance >= 0.9 {
+            AetherHarmony::Crystalline
+        } else if self.coherence >= QUANTUM_STABILITY_THRESHOLD {
+            AetherHarmony::Prismatic
+        } else {
+            AetherHarmony::Amorphous
+        };
     }
 }
 
-impl<T: Scribe + Clone + 'static> Scribe for Aether<T> {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("✧⟨");  // Crystal star symbol
-        if let Ok(essence) = self.glimpse() {
-            essence.scribe(precision, output);
-        } else {
-            output.push_str("∅");  // Void symbol for destabilized state
-        }
-        output.push_str(", ϟ=");  // Lightning symbol for resonance
-        output.push_f64(self.get_resonance(), 6);
-        if let Ok(harmony) = self.harmony.quantum_load(&AetherHarmony::Amorphous) {
-            output.push_str(", ∿=");  // Wave symbol for harmony
-            output.push_f64(harmony, precision.decimal_places());
-        }
-        if let Ok(lattice) = self.get_lattice() {
-            output.push_str(", ⬡=");  // Hexagon for lattice
-            lattice.scribe(precision, output);
-        }
-        output.push_str("⟩✧");
+impl<T: Clone + 'static> Quantum for Aether<T> {
+    fn coherence(&self) -> f64 {
+        self.get_coherence()
+    }
+
+    fn is_stable(&self) -> bool {
+        self.is_coherent()
+    }
+
+    fn decohere(&mut self) {
+        self.coherence *= 0.9;
+        self.update_harmony();
+    }
+
+    fn recohere(&mut self) {
+        self.restore_harmony();
     }
 }
 
@@ -190,46 +139,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_crystal_formation() {
-        let crystal = Aether::crystallize(42);
-        assert!(crystal.is_harmonic());
-        assert_eq!(crystal.glimpse().unwrap(), 42);
+    fn test_aether_basics() {
+        let aether = Aether::crystallize(42);
+        assert!(aether.is_coherent());
+        assert_eq!(aether.glimpse().unwrap(), 42);
     }
 
     #[test]
-    fn test_harmonic_resonance() {
-        let crystal = Aether::crystallize(Vector3D::new(1.0, 2.0, 3.0));
-        assert!(crystal.is_harmonic());
+    fn test_aether_harmony() {
+        let mut aether = Aether::crystallize(42);
+        assert_eq!(aether.get_harmony(), AetherHarmony::Crystalline);
 
-        // Test resonance decay
+        // Force decoherence
         for _ in 0..5 {
-            let essence = crystal.glimpse().unwrap();
-            assert!(crystal.encode(essence).is_ok());
+            aether.decohere();
         }
 
-        assert!(crystal.get_resonance() < 1.0);
+        assert_eq!(aether.get_harmony(), AetherHarmony::Amorphous);
     }
 
     #[test]
-    fn test_harmony_patterns() {
-        let crystal = Aether::crystallize(42);
-        assert!(crystal.attune(&AetherHarmony::Prismatic).is_ok());
+    fn test_resonance() {
+        let mut aether = Aether::crystallize(42);
+        assert_eq!(aether.get_resonance(), 1.0);
 
-        // Force resonance decay
-        for _ in 0..20 {
-            crystal.diminish_resonance();
-        }
+        aether.diminish_resonance();
+        assert!(aether.get_resonance() < 1.0);
 
-        assert!(crystal.attune(&AetherHarmony::Prismatic).is_err());
-        assert!(crystal.attune(&AetherHarmony::Amorphous).is_ok());
-    }
-
-    #[test]
-    fn test_lattice_alignment() {
-        let crystal = Aether::crystallize(42);
-        let alignment = Vector3D::new(1.0, 2.0, 3.0);
-        assert!(crystal.align_lattice(alignment.clone()).is_ok());
-        assert_eq!(crystal.get_lattice().unwrap(), alignment);
-        assert!(crystal.get_resonance() < 1.0);
+        aether.restore_harmony();
+        assert_eq!(aether.get_resonance(), 1.0);
     }
 }
