@@ -17,6 +17,8 @@ const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CellState {
+    Active,
+    Inactive,
     Transmitting,
     Receiving,
     Calibrating,
@@ -71,10 +73,6 @@ impl MeshCell {
         Ok(())
     }
 
-    pub fn is_quantum_stable(&self) -> bool {
-        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
-    }
-
     pub fn get_last_update(&self) -> usize {
         self.last_update.load(&HeliumOrdering::Quantum).unwrap_or(CURRENT_TIMESTAMP)
     }
@@ -106,10 +104,6 @@ impl QuantumDataPattern {
         self.quantum_signature.get().clone()
     }
 
-    pub fn decay_coherence(&self) {
-        let current = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
-        self.coherence.store(current * 0.99, &HeliumOrdering::Quantum).unwrap_or(());
-    }
 }
 
 impl Clone for QuantumDataPattern {
@@ -156,7 +150,7 @@ pub struct MeshClock {
     quantum_state: Helium<QuantumState>,
     entanglement_strength: Helium<f64>,
     pattern_coherence: Helium<f64>,
-    pattern_buffer: Option<Vec<f64>>,
+    pattern_buffer: Option<QuantumDataPattern>
     coherence: Helium<f64>,
     region: Vector3D<f64>,
     alignment: Alignment,
@@ -200,6 +194,10 @@ impl MeshClock {
         self.coherence.store(value, &HeliumOrdering::Quantum)
     }
 
+    fn get_coherence(&self) -> f64 {
+        self.coherence.load(HeliumOrdering::Quantum)
+    }
+
     pub fn get_quantum_state(&self) -> Result<QuantumState, &'static str> {
         self.quantum_state.load(&HeliumOrdering::Quantum)
     }
@@ -224,6 +222,14 @@ impl MeshClock {
 
     pub fn update_timestamp(&mut self) -> Result<(), &'static str> {
         self.last_ping.store(CURRENT_TIMESTAMP as u64, &HeliumOrdering::Quantum)
+    }
+
+    fn convert_timestamp(ts: usize) -> u64 {
+        ts.try_into().unwrap_or(0)
+    }
+
+    fn convert_timestamp_back(ts: u64) -> usize {
+        ts.try_into().unwrap_or(0)
     }
 
     pub fn store_pattern(&mut self, pattern: QuantumDataPattern) -> Result<(), &'static str> {
@@ -263,15 +269,13 @@ impl MeshClock {
         self.set_quantum_state(QuantumState::PatternTransfer)
     }
 
-    fn decay_coherence(&mut self) -> Result<(), &'static str> {
-        if let Ok(current) = self.coherence.load(&HeliumOrdering::Quantum) {
-            self.coherence.store(current * 0.99, &HeliumOrdering::Quantum)?;
-        }
-        Ok(())
+    fn decay_coherence(&self) {
+        let current = self.get_coherence();
+        self.coherence.store(current * 0.99, HeliumOrdering::Quantum);
     }
 
     fn is_quantum_stable(&self) -> bool {
-        self.get_coherence().unwrap_or(0.0) > QUANTUM_COHERENCE_THRESHOLD
+        self.get_coherence() > QUANTUM_COHERENCE_THRESHOLD
     }
 
     // Add type conversion helpers
@@ -379,12 +383,6 @@ impl MeshClock {
         self.decay_coherence();
 
         Ok(0) // Instantaneous due to entanglement
-    }
-
-    fn decay_coherence(&self) {
-        if let Ok(current) = self.coherence.load(&HeliumOrdering::Quantum) {
-            let _ = self.coherence.store(current * 0.99, &HeliumOrdering::Quantum);
-        }
     }
 
     #[allow(dead_code)]

@@ -136,6 +136,18 @@ impl<T: 'static> QuantumCell<T> {
     pub fn get_coherence(&self) -> f64 {
         f64::from_bits(self.coherence.load(Ordering::Relaxed))
     }
+
+    pub fn quantum_load(&self) -> T {
+        // Implementation depends on your needs
+        unsafe { (*self.value.get()).clone() }
+    }
+
+    pub fn quantum_store(&self, value: T, ordering: &HeliumOrdering) -> Result<(), &'static str> {
+        unsafe {
+            *self.value.get() = value;
+            Ok(())
+        }
+    }
 }
 
 impl<T: 'static> Clone for QuantumCell<T>
@@ -152,6 +164,20 @@ impl<T: 'static> Drop for QuantumCell<T> {
         unsafe {
             drop(Box::from_raw(self.value.load(Ordering::Acquire)));
             drop(Box::from_raw(self.timestamp.load(Ordering::Acquire)));
+        }
+    }
+}
+
+impl<T: 'static> QuantumCell<T> {
+    pub fn quantum_load(&self) -> T {
+        // Implementation depends on your needs
+        unsafe { (*self.value.get()).clone() }
+    }
+
+    pub fn quantum_store(&self, value: T, ordering: &HeliumOrdering) -> Result<(), &'static str> {
+        unsafe {
+            *self.value.get() = value;
+            Ok(())
         }
     }
 }
