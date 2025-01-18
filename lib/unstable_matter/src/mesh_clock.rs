@@ -3,17 +3,12 @@
 /// Author: isdood
 /// Current User: isdood
 
-use crate::align::AlignedRegion;
-
 use crate::{
-    zeronaut::Zeronaut,
     vector::Vector3D,
-    align::Alignment,
+    mesh::{MeshCell, CellState as MeshCellState},
+    align::{Alignment, vector_align},
     helium::{Helium, HeliumOrdering},
-    phantom::QuantumCell,
-    constants::{CURRENT_TIMESTAMP, GRAVITATIONAL_CONSTANT},
-    grav::GravityField,
-    meshmath::MeshMath,
+    constants::{CURRENT_TIMESTAMP, GRAVITATIONAL_CONSTANT, QUANTUM_COHERENCE_THRESHOLD},
 };
 
 const MESH_VECTOR_ALIGN: usize = 16;
@@ -28,15 +23,6 @@ pub enum CellState {
     Superposition,
     PatternReplication,
     QuantumDecoherence,
-}
-
-pub struct MeshCell {
-    position: QuantumCell<Vector3D<f64>>,
-    state: QuantumCell<CellState>,
-    quantum_signature: QuantumCell<[u8; 32]>,
-    region: AlignedRegion,
-    coherence: Helium<f64>,
-    last_update: Helium<usize>,
 }
 
 impl MeshCell {
@@ -58,16 +44,16 @@ impl MeshCell {
         }
     }
 
+    fn as_u64(value: usize) -> u64 {
+        value as u64
+    }
+
+    fn as_usize(value: u64) -> usize {
+        value as usize
+    }
+
     pub fn get_region(&self) -> &AlignedRegion {
         &self.region
-    }
-
-    pub fn get_position(&self) -> Vector3D<f64> {
-        self.position.get().clone()
-    }
-
-    pub fn get_state(&self) -> CellState {
-        self.state.get().clone()
     }
 
     pub fn set_state(&self, new_state: CellState) {
@@ -100,15 +86,6 @@ impl MeshCell {
     pub fn get_last_update(&self) -> usize {
         self.last_update.load(&HeliumOrdering::Quantum).unwrap_or(CURRENT_TIMESTAMP)
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum QuantumState {
-    Coherent,
-    Entangled,
-    Superposition(f64),
-    PatternTransfer,
-    Decoherent,
 }
 
 #[derive(Debug)]
@@ -169,23 +146,31 @@ pub struct QuantumData {
     last_update: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum QuantumState {
+    Coherent,
+    Entangled,
+    Superposition(f64),
+    PatternTransfer,
+    Decoherent,
+}
+
 pub struct MeshClock {
     alpha_cell: MeshCell,
     omega_cell: MeshCell,
-    signal_vector: QuantumCell<Vector3D<f64>>,
-    gravity_field: Option<GravityField>,
-    spacetime_curvature: QuantumCell<f64>,
+    signal_vector: Vector3D<f64>,
+    gravity_field: Helium<f64>,
+    spacetime_curvature: Helium<f64>,
     gravitational_coherence: Helium<f64>,
-    last_ping: Helium<usize>,
+    last_ping: Helium<u64>,
     oscillation_count: Helium<usize>,
     measured_interval: Helium<usize>,
-    quantum_state: QuantumCell<QuantumState>,
+    quantum_state: Helium<QuantumState>,
     entanglement_strength: Helium<f64>,
-    pattern_buffer: QuantumCell<Option<QuantumDataPattern>>,
+    pattern_coherence: Helium<f64>,
+    pattern_buffer: Option<Vec<f64>>,
     coherence: Helium<f64>,
-    #[allow(dead_code)]
-    region: Vector3D<Zeronaut<u8>>,
-    #[allow(dead_code)]
+    region: Vector3D<f64>,
     alignment: Alignment,
 }
 
@@ -196,26 +181,129 @@ impl MeshClock {
                                       alpha_pos.y(),
                                       alpha_pos.z()
         );
-        let alignment = Alignment::new(MESH_VECTOR_ALIGN);
-        let region = Vector3D::new(Zeronaut::zero(), Zeronaut::zero(), Zeronaut::zero());
+        let alignment = vector_align();
+        let region = Vector3D::new(0.0, 0.0, 0.0);
 
         Self {
             alpha_cell: MeshCell::new(alpha_pos),
             omega_cell: MeshCell::new(omega_pos),
-            signal_vector: QuantumCell::new(Vector3D::new(distance, 0.0, 0.0)),
-            gravity_field: None,
-            spacetime_curvature: QuantumCell::new(1.0),
+            signal_vector: Vector3D::new(distance, 0.0, 0.0),
+            gravity_field: Helium::new(1.0),
+            spacetime_curvature: Helium::new(1.0),
             gravitational_coherence: Helium::new(1.0),
-            last_ping: Helium::new(CURRENT_TIMESTAMP),
+            last_ping: Helium::new(CURRENT_TIMESTAMP as u64),
             oscillation_count: Helium::new(0),
             measured_interval: Helium::new(0),
-            quantum_state: QuantumCell::new(QuantumState::Coherent),
+            quantum_state: Helium::new(QuantumState::Coherent),
             entanglement_strength: Helium::new(1000.0),
-            pattern_buffer: QuantumCell::new(None),
+            pattern_coherence: Helium::new(0.0),
+            pattern_buffer: None,
             coherence: Helium::new(1.0),
             region,
             alignment,
         }
+    }
+
+    pub fn get_signal_vector(&self) -> Vector3D<f64> {
+        self.signal_vector.clone()
+    }
+
+    pub fn get_coherence(&self) -> Result<f64, &'static str> {
+        self.coherence.load(&HeliumOrdering::Quantum)
+    }
+
+    pub fn set_coherence(&mut self, value: f64) -> Result<(), &'static str> {
+        self.coherence.store(value, &HeliumOrdering::Quantum)
+    }
+
+    pub fn get_quantum_state(&self) -> Result<QuantumState, &'static str> {
+        self.quantum_state.load(&HeliumOrdering::Quantum)
+    }
+
+    pub fn set_quantum_state(&mut self, state: QuantumState) -> Result<(), &'static str> {
+        self.quantum_state.store(state, &HeliumOrdering::Quantum)
+    }
+
+    pub fn check_cell_states(&self) -> bool {
+        self.alpha_cell.get_state() != CellState::Active &&
+        self.omega_cell.get_state() != CellState::Active
+    }
+
+    pub fn handle_drift(&mut self, current_ts: u64, mesh_time: u64) -> usize {
+        let drift = if current_ts >= mesh_time {
+            (current_ts - mesh_time) as usize
+        } else {
+            (mesh_time - current_ts) as usize
+        };
+        drift
+    }
+
+    pub fn update_timestamp(&mut self) -> Result<(), &'static str> {
+        self.last_ping.store(CURRENT_TIMESTAMP as u64, &HeliumOrdering::Quantum)
+    }
+
+    pub fn update_pattern_buffer(&mut self, pattern: Vec<f64>) {
+        self.pattern_buffer = Some(pattern);
+    }
+
+    pub fn get_pattern_buffer(&self) -> Option<&Vec<f64>> {
+        self.pattern_buffer.as_ref()
+    }
+
+    // Quantum state transitions
+    fn transition_to_coherent(&mut self) -> Result<(), &'static str> {
+        self.set_quantum_state(QuantumState::Coherent)?;
+        self.update_timestamp()
+    }
+
+    fn transition_to_decoherent(&mut self) -> Result<(), &'static str> {
+        self.set_quantum_state(QuantumState::Decoherent)?;
+        self.update_timestamp()
+    }
+
+    fn transition_to_superposition(&mut self, phase: f64) -> Result<(), &'static str> {
+        self.set_quantum_state(QuantumState::Superposition(phase))
+    }
+
+    fn transition_to_entangled(&mut self) -> Result<(), &'static str> {
+        self.set_quantum_state(QuantumState::Entangled)
+    }
+
+    fn transition_to_pattern_transfer(&mut self, pattern: Vec<f64>) -> Result<(), &'static str> {
+        self.update_pattern_buffer(pattern);
+        self.set_quantum_state(QuantumState::PatternTransfer)
+    }
+
+    fn decay_coherence(&mut self) -> Result<(), &'static str> {
+        if let Ok(current) = self.coherence.load(&HeliumOrdering::Quantum) {
+            self.coherence.store(current * 0.99, &HeliumOrdering::Quantum)?;
+        }
+        Ok(())
+    }
+
+    fn is_quantum_stable(&self) -> bool {
+        self.get_coherence().unwrap_or(0.0) > QUANTUM_COHERENCE_THRESHOLD
+    }
+
+    // Add type conversion helpers
+    fn as_u64(value: usize) -> u64 {
+        value as u64
+    }
+
+    fn as_usize(value: u64) -> usize {
+        value as usize
+    }
+
+    pub fn set_entanglement_strength(&mut self, strength: f64) -> Result<(), &'static str> {
+        if strength < 0.0 {
+            return Err("Entanglement strength cannot be negative");
+        }
+        self.entanglement_strength.store(strength, &HeliumOrdering::Quantum)?;
+        Ok(())
+    }
+
+    pub fn update_gravity_field(&mut self, field: &GravityField) -> Result<(), &'static str> {
+        self.gravity_field.store(field.strength(), &HeliumOrdering::Quantum)
     }
 
     pub fn set_gravity_field(&mut self, field: GravityField) {
@@ -248,6 +336,14 @@ impl MeshClock {
             .store(grav_coherence, &HeliumOrdering::Quantum)
             .unwrap_or(());
         }
+    }
+
+    pub fn set_spacetime_curvature(&mut self, curvature: f64) -> Result<(), &'static str> {
+        self.spacetime_curvature.store(curvature, &HeliumOrdering::Quantum)
+    }
+
+    pub fn get_spacetime_curvature(&self) -> Result<f64, &'static str> {
+        self.spacetime_curvature.load(&HeliumOrdering::Quantum)
     }
 
     pub fn calculate_time_dilation(&self) -> f64 {
@@ -432,54 +528,182 @@ impl MeshClock {
         (base_coherence * (1.0 - (force_diff * GRAVITATIONAL_CONSTANT * 1e-10))).max(0.0).min(1.0)  // Now GRAVITATIONAL_CONSTANT is in scope
     }
 
-    pub fn get_pattern_coherence(&self) -> Result<f64, &'static str> {
-        match self.pattern_buffer.get() {
-            Some(pattern) => Ok(pattern.get_coherence()),
-            None => Err("No pattern loaded")
-        }
-    }
-
-    pub fn get_quantum_state(&self) -> QuantumState {
-        self.quantum_state.get()
-    }
-
     pub fn get_entanglement_strength(&self) -> f64 {
         self.entanglement_strength.load(&HeliumOrdering::Quantum).unwrap_or(0.0)
     }
 
-    pub fn ping(&mut self) -> Result<usize, &'static str> {
-        // Calculate base propagation time
-        let base_time = match self.quantum_state.get() {
+    fn calculate_propagation_time(&self) -> usize {
+        match self.quantum_state.get() {
             QuantumState::Entangled => {
-                // Entangled states have quantum tunneling effect
+                // Entangled states have quantum tunneling effect - faster propagation
                 let strength = self.get_entanglement_strength();
-                (1000.0 / strength) as usize // More strength = less time
+                let coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
+                ((1000.0 / strength) * coherence * 2.0) as usize
             },
             QuantumState::Superposition(phase) => {
                 // Superposition creates quantum uncertainty in timing
                 let coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
-                ((1000.0 * phase) * (1.0 / coherence)) as usize
+                // Add complexity factor based on coherence
+                let complexity = 1.0 + (1.0 - coherence);
+                ((1500.0 * phase) * complexity) as usize
             },
             QuantumState::PatternTransfer => {
-                // Pattern transfer has overhead
-                2000 // Base 2 microseconds for pattern transfer
+                // Pattern transfer has overhead but benefits from coherence
+                let base_time = 2000;
+                let coherence = self.get_pattern_coherence().unwrap_or(1.0);
+                let complexity_factor = 1.0 + (1.0 - coherence);
+                (base_time as f64 * complexity_factor) as usize
             },
-            _ => 1000 // Base 1 microsecond for other states
-        };
+            QuantumState::Coherent => {
+                // Base coherent state timing
+                1000
+            },
+            QuantumState::Decoherent => {
+                // Decoherent states have highly unstable timing
+                4000 // Maximum delay due to loss of quantum coherence
+            }
+        }
+    }
 
-        // Update oscillation count
+    pub fn evolve_quantum_state(&mut self) -> Result<(), &'static str> {
+        let current_coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
+
+        match self.quantum_state.get() {
+            QuantumState::Coherent => {
+                // Coherent states have a chance to enter superposition or entanglement
+                if current_coherence < 0.95 {
+                    if self.oscillation_count.load(&HeliumOrdering::Quantum).unwrap_or(0) % 2 == 0 {
+                        self.create_superposition()?;
+                    } else {
+                        self.entangle_cells()?;
+                    }
+                }
+            },
+            QuantumState::Entangled => {
+                // Entangled states decohere faster and transition to superposition
+                let strength = self.get_entanglement_strength();
+                if strength < 990.0 {  // Lowered threshold to see more transitions
+                    if current_coherence < 0.97 {  // Increased threshold
+                        self.create_superposition()?;
+                    }
+                }
+            },
+            QuantumState::Superposition(phase) => {
+                // Superposition states may collapse to pattern transfer
+                if current_coherence < 0.85 || phase > 0.8 {
+                    self.transfer_quantum_pattern()?;
+                }
+            },
+            QuantumState::PatternTransfer => {
+                // Pattern transfer may return to coherent state
+                if self.get_pattern_coherence()? > 0.7 {
+                    self.quantum_state.set(QuantumState::Coherent);
+                    self.coherence.store(0.9, &HeliumOrdering::Quantum)?;
+                }
+            },
+            QuantumState::Decoherent => {
+                // Attempt recovery to coherent state
+                if current_coherence > 0.5 {
+                    self.quantum_state.set(QuantumState::Coherent);
+                    self.coherence.store(0.8, &HeliumOrdering::Quantum)?;
+                }
+            }
+        }
+
+        // Update pattern coherence based on state
+        match self.quantum_state.get() {
+            QuantumState::PatternTransfer => {
+                let current = self.get_pattern_coherence()?.max(0.1);
+                self.pattern_coherence.store(current * 0.995, &HeliumOrdering::Quantum)?;
+            },
+            QuantumState::Superposition(_) => {
+                self.pattern_coherence.store(0.8, &HeliumOrdering::Quantum)?;
+            },
+            _ => {
+                self.pattern_coherence.store(0.0, &HeliumOrdering::Quantum)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    // Update the ping method to use our new timing calculation
+    pub fn ping(&mut self) -> Result<usize, &'static str> {
+        // Previous validation
+        if !self.is_quantum_stable() {
+            return Err("Quantum state not stable");
+        }
+
+        // Calculate propagation before evolution
+        let duration = self.calculate_propagation_time();
+
+        // Apply quantum effects
+        self.apply_quantum_effects()?;
+
+        // Evolve quantum state
+        self.evolve_quantum_state()?;
+
+        // Update measurements
         let count = self.oscillation_count.load(&HeliumOrdering::Quantum).unwrap_or(0);
-        self.oscillation_count.store(count + 1, &HeliumOrdering::Quantum).unwrap_or(());
+        self.oscillation_count.store(count + 1, &HeliumOrdering::Quantum)?;
 
-        // Apply quantum effects and update interval
-        let duration = (base_time as f64 * self.calculate_time_dilation()) as usize;
         let current_interval = self.measured_interval.load(&HeliumOrdering::Quantum).unwrap_or(0);
-        self.measured_interval.store(current_interval + duration, &HeliumOrdering::Quantum).unwrap_or(());
-
-        // Apply coherence decay
-        self.decay_coherence();
+        self.measured_interval.store(current_interval + duration, &HeliumOrdering::Quantum)?;
 
         Ok(duration)
+    }
+
+    pub fn get_state_stability(&self) -> f64 {
+        let coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(0.0);
+        match self.quantum_state.get() {
+            QuantumState::Coherent => coherence,
+            QuantumState::Entangled => coherence * (self.get_entanglement_strength() / 1000.0),
+            QuantumState::Superposition(phase) => coherence * phase,
+            QuantumState::PatternTransfer => self.get_pattern_coherence().unwrap_or(0.0),
+            QuantumState::Decoherent => 0.0
+        }
+    }
+
+    pub fn get_oscillation_count(&self) -> Result<usize, &'static str> {
+        self.oscillation_count
+        .load(&HeliumOrdering::Quantum)
+        .map_err(|_| "Failed to read oscillation count")
+    }
+
+    fn apply_quantum_effects(&mut self) -> Result<(), &'static str> {
+        match self.quantum_state.get() {
+            QuantumState::Entangled => {
+                // Slight decay in entanglement strength
+                let strength = self.get_entanglement_strength();
+                if strength > 100.0 {
+                    self.set_entanglement_strength(strength * 0.999)?;
+                }
+
+                // Add slight coherence decay for entangled state
+                let current_coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
+                self.coherence.store(current_coherence * 0.998, &HeliumOrdering::Quantum)?;
+            },
+            QuantumState::Superposition(phase) => {
+                // Add coherence decay
+                let current_coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
+                self.coherence.store(current_coherence * 0.995, &HeliumOrdering::Quantum)?;
+
+                // Phase fluctuation with coherence influence
+                let new_phase = phase * 0.999 + (0.001 * current_coherence);
+                self.quantum_state.set(QuantumState::Superposition(new_phase));
+            },
+            QuantumState::PatternTransfer => {
+                // Add gradual coherence decay for pattern transfer
+                let current_coherence = self.get_pattern_coherence().unwrap_or(1.0);
+                self.coherence.store(current_coherence * 0.997, &HeliumOrdering::Quantum)?;
+            },
+            QuantumState::Decoherent => {
+                // Once decoherent, system remains unstable
+                self.coherence.store(0.0, &HeliumOrdering::Quantum)?;
+            },
+            _ => {}
+        }
+        Ok(())
     }
 
     pub fn get_frequency(&self) -> Result<f64, &'static str> {
