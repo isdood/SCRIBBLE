@@ -1,5 +1,5 @@
 /// MeshSpace Mathematics Implementation
-/// Last Updated: 2025-01-18 15:03:45 UTC
+/// Last Updated: 2025-01-18 15:06:30 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -22,6 +22,11 @@ pub trait MeshMul<Rhs = Self> {
 pub trait MeshDiv<Rhs = Self> {
     type Output;
     fn mesh_div(self, rhs: Rhs) -> Self::Output;
+}
+
+pub trait MeshNeg {
+    type Output;
+    fn mesh_neg(self) -> Self::Output;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -151,62 +156,118 @@ impl MeshMath {
     pub fn to_f64(x: isize) -> f64 {
         x as f64
     }
+
+    /// Basic arithmetic operations on f64
+    pub fn add_f64(a: f64, b: f64) -> f64 {
+        a + b
+    }
+
+    pub fn sub_f64(a: f64, b: f64) -> f64 {
+        a - b
+    }
+
+    pub fn mul_f64(a: f64, b: f64) -> f64 {
+        a * b
+    }
+
+    pub fn div_f64(a: f64, b: f64) -> f64 {
+        a / b
+    }
+
+    pub fn neg_f64(a: f64) -> f64 {
+        -a
+    }
+
+    /// Basic arithmetic operations on isize
+    pub fn add_isize(a: isize, b: isize) -> isize {
+        a + b
+    }
+
+    pub fn sub_isize(a: isize, b: isize) -> isize {
+        a - b
+    }
+
+    pub fn mul_isize(a: isize, b: isize) -> isize {
+        a * b
+    }
+
+    pub fn div_isize(a: isize, b: isize) -> isize {
+        a / b
+    }
+
+    pub fn neg_isize(a: isize) -> isize {
+        -a
+    }
 }
 
-// Implement mesh operations for f64
+// Mesh operations implementations for f64
 impl MeshAdd<f64> for f64 {
     type Output = f64;
     fn mesh_add(self, rhs: f64) -> f64 {
-        self + rhs
+        MeshMath::add_f64(self, rhs)
     }
 }
 
 impl MeshSub<f64> for f64 {
     type Output = f64;
     fn mesh_sub(self, rhs: f64) -> f64 {
-        self - rhs
+        MeshMath::sub_f64(self, rhs)
     }
 }
 
 impl MeshMul<f64> for f64 {
     type Output = f64;
     fn mesh_mul(self, rhs: f64) -> f64 {
-        self * rhs
+        MeshMath::mul_f64(self, rhs)
     }
 }
 
 impl MeshDiv<f64> for f64 {
     type Output = f64;
     fn mesh_div(self, rhs: f64) -> f64 {
-        self / rhs
+        MeshMath::div_f64(self, rhs)
     }
 }
 
-// Implement mesh operations for isize
+impl MeshNeg for f64 {
+    type Output = f64;
+    fn mesh_neg(self) -> f64 {
+        MeshMath::neg_f64(self)
+    }
+}
+
+// Mesh operations implementations for isize
 impl MeshAdd<isize> for isize {
     type Output = isize;
     fn mesh_add(self, rhs: isize) -> isize {
-        self + rhs
+        MeshMath::add_isize(self, rhs)
     }
 }
 
 impl MeshSub<isize> for isize {
     type Output = isize;
     fn mesh_sub(self, rhs: isize) -> isize {
-        self - rhs
+        MeshMath::sub_isize(self, rhs)
     }
 }
 
 impl MeshMul<isize> for isize {
     type Output = isize;
     fn mesh_mul(self, rhs: isize) -> isize {
-        self * rhs
+        MeshMath::mul_isize(self, rhs)
     }
 }
 
 impl MeshDiv<isize> for isize {
     type Output = isize;
     fn mesh_div(self, rhs: isize) -> isize {
-        self / rhs
+        MeshMath::div_isize(self, rhs)
+    }
+}
+
+impl MeshNeg for isize {
+    type Output = isize;
+    fn mesh_neg(self) -> isize {
+        MeshMath::neg_isize(self)
     }
 }
