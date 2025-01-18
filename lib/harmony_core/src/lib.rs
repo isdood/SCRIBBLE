@@ -4,93 +4,75 @@
 //! A quantum-harmonic memory management system for the Scribble kernel.
 //!
 //! This module provides core functionality for managing quantum-harmonic memory cells,
-//! including coherence tracking, atomic operations, and memory protection.
-//!
-//! Key Features:
-//! - Harmonic Cell: Thread-safe quantum memory container
-//! - Protected Memory: Memory protection through coherence monitoring
-//! - Atomic Operations: Safe concurrent memory access
+//! including coherence tracking and harmonic memory protection.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 19:59:33 UTC
+//! Last Updated: 2025-01-18 20:01:44 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 #![no_std]
 
-use core::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
+use crate::aether::{Aether, AetherHarmony};
+use crate::cube::Box;
 
-pub const CURRENT_TIMESTAMP: usize = 1705694373; // 2025-01-18 19:59:33 UTC
+pub const CURRENT_TIMESTAMP: usize = 1705694504; // 2025-01-18 20:01:44 UTC
 pub const HARMONY_STABILITY_THRESHOLD: f64 = 0.9;
 pub const COHERENCE_DECAY_FACTOR: f64 = 0.99;
 
-/// A thread-safe container for quantum-harmonic memory operations
+/// A thread-safe container for harmonic memory operations
 #[derive(Debug)]
 pub struct HarmonicCell<T: Clone + 'static> {
-    /// Atomic pointer to the stored value
-    value: AtomicPtr<T>,
-    /// Atomic coherence value (stored as bits of f64)
-    coherence: AtomicU64,
-    /// Atomic pointer to the last modification timestamp
-    timestamp: AtomicPtr<usize>,
+    /// Aether-managed value
+    essence: Aether<T>,
+    /// Memory cube for aligned storage
+    cube: Box<T>,
 }
 
 impl<T: Clone + 'static> HarmonicCell<T> {
     /// Creates a new HarmonicCell with the given value
-    ///
-    /// # Arguments
-    /// * `value` - The initial value to store
-    ///
-    /// # Returns
-    /// A new HarmonicCell initialized with the given value
     pub fn new(value: T) -> Self {
-        let ptr = Box::into_raw(Box::new(value));
-        let ts = Box::into_raw(Box::new(CURRENT_TIMESTAMP));
         Self {
-            value: AtomicPtr::new(ptr),
-            coherence: AtomicU64::new(f64::to_bits(1.0)),
-            timestamp: AtomicPtr::new(ts),
+            essence: Aether::crystallize(value.clone()),
+            cube: Box::new(value),
         }
     }
 
     /// Retrieves the current value
-    ///
-    /// # Returns
-    /// A clone of the stored value
     pub fn get(&self) -> T {
-        unsafe {
-            (*self.value.load(Ordering::Acquire)).clone()
-        }
+        self.essence.glimpse().unwrap_or_else(|_| self.cube.as_ref().clone())
     }
 
     /// Updates the stored value
-    ///
-    /// # Arguments
-    /// * `value` - The new value to store
     pub fn set(&self, value: T) {
-        let new_ptr = Box::into_raw(Box::new(value));
-        let old_ptr = self.value.swap(new_ptr, Ordering::AcqRel);
-        unsafe {
-            drop(Box::from_raw(old_ptr));
-        }
+        let _ = self.essence.encode(value.clone());
+        *self.cube.as_mut() = value;
     }
 
     /// Gets the current coherence value
-    ///
-    /// # Returns
-    /// The coherence value as a float between 0.0 and 1.0
     pub fn get_coherence(&self) -> f64 {
-        f64::from_bits(self.coherence.load(Ordering::Relaxed))
+        let aether_coherence = self.essence.get_resonance();
+        let cube_coherence = self.cube.get_coherence();
+        (aether_coherence + cube_coherence) / 2.0
     }
-}
 
-impl<T: Clone + 'static> Drop for HarmonicCell<T> {
-    fn drop(&mut self) {
-        unsafe {
-            drop(Box::from_raw(self.value.load(Ordering::Acquire)));
-            drop(Box::from_raw(self.timestamp.load(Ordering::Acquire)));
-        }
+    /// Checks if the cell is harmonically stable
+    pub fn is_harmonically_stable(&self) -> bool {
+        self.get_coherence() > HARMONY_STABILITY_THRESHOLD &&
+        self.cube.is_quantum_stable()
+    }
+
+    /// Causes natural coherence decay
+    pub fn decay_coherence(&mut self) {
+        self.essence.diminish_resonance();
+        self.cube.decay_coherence();
+    }
+
+    /// Restores harmonic coherence
+    pub fn restore_harmony(&mut self) {
+        self.essence.restore_harmony();
+        self.cube.reset_coherence();
     }
 }
 
@@ -107,4 +89,44 @@ pub trait Protected {
 
     /// Checks if the memory is harmonically stable
     fn is_harmonically_stable(&self) -> bool;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_harmonic_cell() {
+        let cell = HarmonicCell::new(42);
+        assert_eq!(cell.get(), 42);
+        assert!(cell.get_coherence() > 0.0);
+        assert!(cell.is_harmonically_stable());
+    }
+
+    #[test]
+    fn test_coherence_decay() {
+        let mut cell = HarmonicCell::new(42);
+        let initial_coherence = cell.get_coherence();
+
+        // Test decay
+        for _ in 0..5 {
+            cell.decay_coherence();
+        }
+
+        assert!(cell.get_coherence() < initial_coherence);
+    }
+
+    #[test]
+    fn test_harmony_restoration() {
+        let mut cell = HarmonicCell::new(42);
+
+        // Force decay
+        for _ in 0..5 {
+            cell.decay_coherence();
+        }
+
+        let decayed_coherence = cell.get_coherence();
+        cell.restore_harmony();
+        assert!(cell.get_coherence() > decayed_coherence);
+    }
 }
