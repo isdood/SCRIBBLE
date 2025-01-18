@@ -1,5 +1,5 @@
 /// Quantum Phantom Implementation
-/// Last Updated: 2025-01-15 05:10:43 UTC
+/// Last Updated: 2025-01-18 17:05:28 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -9,6 +9,7 @@ use crate::{
     constants::*,
     vector::Vector3D,
     scribe::{Scribe, ScribePrecision, QuantumString},
+    helium::HeliumOrdering,
 };
 
 #[derive(Debug)]
@@ -99,13 +100,13 @@ impl Scribe for PhantomSpace {
 }
 
 #[derive(Debug)]
-pub struct QuantumCell<T: 'static> {
+pub struct QuantumCell<T: Clone + 'static> {
     value: AtomicPtr<T>,
     coherence: AtomicU64,
     timestamp: AtomicPtr<usize>,
 }
 
-impl<T: 'static> QuantumCell<T> {
+impl<T: Clone + 'static> QuantumCell<T> {
     pub fn new(value: T) -> Self {
         let ptr = Box::into_raw(Box::new(value));
         let ts = Box::into_raw(Box::new(CURRENT_TIMESTAMP));
@@ -116,10 +117,7 @@ impl<T: 'static> QuantumCell<T> {
         }
     }
 
-    pub fn get(&self) -> T
-    where
-    T: Clone,
-    {
+    pub fn get(&self) -> T {
         unsafe {
             (*self.value.load(Ordering::Acquire)).clone()
         }
@@ -137,47 +135,48 @@ impl<T: 'static> QuantumCell<T> {
         f64::from_bits(self.coherence.load(Ordering::Relaxed))
     }
 
-    pub fn quantum_load(&self) -> T {
-        // Implementation depends on your needs
-        unsafe { (*self.value.get()).clone() }
+    pub fn quantum_load(&self, ordering: &HeliumOrdering) -> Result<T, &'static str> {
+        let ptr = match ordering {
+            HeliumOrdering::Quantum => self.value.load(Ordering::SeqCst),
+            HeliumOrdering::Relaxed => self.value.load(Ordering::Relaxed),
+        };
+
+        if ptr.is_null() {
+            Err("Quantum decoherence detected")
+        } else {
+            unsafe {
+                Ok((*ptr).clone())
+            }
+        }
     }
 
     pub fn quantum_store(&self, value: T, ordering: &HeliumOrdering) -> Result<(), &'static str> {
-        unsafe {
-            *self.value.get() = value;
-            Ok(())
+        let new_ptr = Box::into_raw(Box::new(value));
+        let old_ptr = match ordering {
+            HeliumOrdering::Quantum => self.value.swap(new_ptr, Ordering::SeqCst),
+            HeliumOrdering::Relaxed => self.value.swap(new_ptr, Ordering::Relaxed),
+        };
+
+        if !old_ptr.is_null() {
+            unsafe {
+                drop(Box::from_raw(old_ptr));
+            }
         }
+        Ok(())
     }
 }
 
-impl<T: 'static> Clone for QuantumCell<T>
-where
-T: Clone,
-{
+impl<T: Clone + 'static> Clone for QuantumCell<T> {
     fn clone(&self) -> Self {
         Self::new(self.get())
     }
 }
 
-impl<T: 'static> Drop for QuantumCell<T> {
+impl<T: Clone + 'static> Drop for QuantumCell<T> {
     fn drop(&mut self) {
         unsafe {
             drop(Box::from_raw(self.value.load(Ordering::Acquire)));
             drop(Box::from_raw(self.timestamp.load(Ordering::Acquire)));
-        }
-    }
-}
-
-impl<T: 'static> QuantumCell<T> {
-    pub fn quantum_load(&self) -> T {
-        // Implementation depends on your needs
-        unsafe { (*self.value.get()).clone() }
-    }
-
-    pub fn quantum_store(&self, value: T, ordering: &HeliumOrdering) -> Result<(), &'static str> {
-        unsafe {
-            *self.value.get() = value;
-            Ok(())
         }
     }
 }
@@ -199,7 +198,7 @@ mod tests {
         assert!(ps.is_quantum_stable());
         ps.set_position(1.0, 2.0, 3.0);
         let pos = ps.get_position();
-        assert_eq!(*pos.x(), 1.0);
+        assert_eq!(*pos.get_x(), 1.0);
     }
 
     #[test]
@@ -208,5 +207,12 @@ mod tests {
         assert_eq!(cell.get(), 42);
         cell.set(84);
         assert_eq!(cell.get(), 84);
+    }
+
+    #[test]
+    fn test_quantum_operations() {
+        let cell = QuantumCell::new(42);
+        assert!(cell.quantum_store(84, &HeliumOrdering::Quantum).is_ok());
+        assert_eq!(cell.quantum_load(&HeliumOrdering::Quantum).unwrap(), 84);
     }
 }

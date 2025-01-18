@@ -1,5 +1,5 @@
 /// Quantum-Safe Zero-Based Memory Navigation Module
-/// Last Updated: 2025-01-17 00:17:30 UTC
+/// Last Updated: 2025-01-18 17:03:10 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -7,6 +7,7 @@ use crate::vector::Vector3D;
 use crate::constants::CURRENT_TIMESTAMP;
 use crate::scribe::{Scribe, ScribePrecision, QuantumString};
 use crate::quantum::Quantum;
+use crate::meshmath::MeshValue;
 
 /// Error margin for quantum position calculations
 const QUANTUM_EPSILON: f64 = 1e-10;
@@ -14,7 +15,7 @@ const QUANTUM_EPSILON: f64 = 1e-10;
 const TUNNEL_THRESHOLD: f64 = 0.01;
 
 /// Represents a quantum-safe non-null pointer with spatial coordinates
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct Zeronaut<T> {
     ptr: *mut T,
     position: Vector3D<isize>,
@@ -26,6 +27,91 @@ pub struct Zeronaut<T> {
 // Safety implementations remain unchanged
 unsafe impl<T: Send> Send for Zeronaut<T> {}
 unsafe impl<T: Send> Sync for Zeronaut<T> {}
+
+// Implement Copy and Clone manually since we have raw pointers
+impl<T> Copy for Zeronaut<T> {}
+
+impl<T> Clone for Zeronaut<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+// Implement MeshValue for Zeronaut<T>
+impl<T> MeshValue for Zeronaut<T> {
+    fn mesh_add(self, other: Self) -> Self {
+        Self {
+            ptr: self.ptr,
+            position: self.position.mesh_add(&other.position),
+            quantum_state: self.quantum_state && other.quantum_state,
+            coherence: self.coherence * other.coherence,
+            last_tunnel: self.last_tunnel,
+        }
+    }
+
+    fn mesh_sub(self, other: Self) -> Self {
+        Self {
+            ptr: self.ptr,
+            position: self.position.mesh_sub(&other.position),
+            quantum_state: self.quantum_state && other.quantum_state,
+            coherence: self.coherence / other.coherence,
+            last_tunnel: self.last_tunnel,
+        }
+    }
+
+    fn mesh_mul(self, scalar: Self) -> Self {
+        Self {
+            ptr: self.ptr,
+            position: self.position.mesh_mul(scalar.coherence as isize),
+            quantum_state: self.quantum_state,
+            coherence: self.coherence * scalar.coherence,
+            last_tunnel: self.last_tunnel,
+        }
+    }
+
+    fn mesh_div(self, scalar: Self) -> Self {
+        if scalar.coherence == 0.0 {
+            return self;
+        }
+        Self {
+            ptr: self.ptr,
+            position: self.position.mesh_div(scalar.coherence.abs() as isize),
+            quantum_state: self.quantum_state,
+            coherence: self.coherence / scalar.coherence,
+            last_tunnel: self.last_tunnel,
+        }
+    }
+
+    fn mesh_neg(self) -> Self {
+        Self {
+            ptr: self.ptr,
+            position: self.position.mesh_neg(),
+            quantum_state: self.quantum_state,
+            coherence: -self.coherence,
+            last_tunnel: self.last_tunnel,
+        }
+    }
+
+    fn mesh_zero() -> Self {
+        Self {
+            ptr: std::ptr::null_mut(),
+            position: Vector3D::new(0, 0, 0),
+            quantum_state: true,
+            coherence: 0.0,
+            last_tunnel: CURRENT_TIMESTAMP,
+        }
+    }
+
+    fn mesh_one() -> Self {
+        Self {
+            ptr: std::ptr::null_mut(),
+            position: Vector3D::new(1, 1, 1),
+            quantum_state: true,
+            coherence: 1.0,
+            last_tunnel: CURRENT_TIMESTAMP,
+        }
+    }
+}
 
 impl<T> Zeronaut<T> {
     // Constructor implementations remain unchanged
@@ -127,7 +213,6 @@ impl<T> Zeronaut<T> {
     }
 }
 
-// Scribe implementation remains unchanged
 impl<T: Scribe> Scribe for Zeronaut<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         let hex = format!("0x{:x}", self.ptr as usize);
@@ -144,7 +229,6 @@ impl<T: Scribe> Scribe for Zeronaut<T> {
     }
 }
 
-// Modified Quantum implementation for thread-safe mutations
 impl<T: Scribe> Quantum for Zeronaut<T> {
     fn get_coherence(&self) -> f64 {
         self.coherence
@@ -176,7 +260,6 @@ impl<T: Scribe> Quantum for Zeronaut<T> {
     }
 }
 
-// Tests remain unchanged
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,5 +287,20 @@ mod tests {
         let target = Vector3D::new(0, 0, 0);
         assert!(zeronaut.tunnel_to(target));
         assert!(zeronaut.get_coherence() < 1.0);
+    }
+
+    #[test]
+    fn test_mesh_operations() {
+        let z1 = Zeronaut::<i32>::zero();
+        let z2 = Zeronaut::<i32>::zero();
+
+        let sum = z1.mesh_add(z2);
+        assert_eq!(sum.get_position(), Vector3D::new(0, 0, 0));
+
+        let diff = z1.mesh_sub(z2);
+        assert_eq!(diff.get_position(), Vector3D::new(0, 0, 0));
+
+        let scaled = z1.mesh_mul(z2);
+        assert_eq!(scaled.get_position(), Vector3D::new(0, 0, 0));
     }
 }

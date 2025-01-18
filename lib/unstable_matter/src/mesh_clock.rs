@@ -1,19 +1,19 @@
-/// Quantum Mesh System Module with Gravitational Effects
-/// Last Updated: 2025-01-17 00:14:34 UTC
+/// Quantum Space-Time Synchronization Module
+/// Last Updated: 2025-01-18 17:34:38 UTC
 /// Author: isdood
 /// Current User: isdood
 
 use crate::{
     vector::Vector3D,
-    align::{Alignment, vector_align},
+    quantum::Quantum,
     helium::{Helium, HeliumOrdering},
-    constants::{CURRENT_TIMESTAMP, GRAVITATIONAL_CONSTANT, QUANTUM_COHERENCE_THRESHOLD},
+    phantom::QuantumCell,
+    meshmath::MeshMath,
+    grav::GravityField,
+    constants::{CURRENT_TIMESTAMP, QUANTUM_THRESHOLD},
 };
 
-use crate::mesh::CellState;
-
 const MESH_VECTOR_ALIGN: usize = 16;
-const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CellState {
@@ -316,8 +316,8 @@ impl MeshClock {
             );
 
             let curvature = self.calculate_spacetime_curvature(
-                alpha_force.magnitude(),
-                                                               omega_force.magnitude()
+                alpha_force.mesh_magnitude(),
+                                                               omega_force.mesh_magnitude()
             );
             self.spacetime_curvature.set(curvature);
 
@@ -342,7 +342,7 @@ impl MeshClock {
     pub fn calculate_time_dilation(&self) -> f64 {
         let c = 299_792_458.0; // speed of light m/s
         let distance_vector = self.signal_vector.get().clone();
-        let distance = distance_vector.magnitude();
+        let distance = distance_vector.mesh_magnitude();
 
         let velocity_dilation = 1.0 / MeshMath::sqrt(1.0 - (distance * distance) / (c * c));
         let curvature = self.spacetime_curvature.get().clone();
@@ -418,7 +418,7 @@ impl MeshClock {
         }
 
         let distance_vector = self.signal_vector.get().clone();
-        let distance = distance_vector.magnitude();
+        let distance = distance_vector.mesh_magnitude();
         let c = 299_792_458.0; // speed of light m/s
 
         let time_dilation = self.calculate_time_dilation();
@@ -478,8 +478,7 @@ impl MeshClock {
     fn generate_quantum_signature(&self) -> [u8; 32] {
         let mut signature = [0u8; 32];
         let oscillations = self.oscillation_count.load(&HeliumOrdering::Quantum).unwrap_or(0);
-        let coherence = (self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0) * 255.0) as u8;
-
+        let coherence = self.get_coherence().max(1.0);
         for i in 0..32 {
             signature[i] = ((oscillations + i) as u8).wrapping_add(coherence);
         }
@@ -500,7 +499,7 @@ impl MeshClock {
         alpha_force: Vector3D<f64>,
         omega_force: Vector3D<f64>
     ) -> f64 {
-        let force_diff = (alpha_force - omega_force).magnitude();
+        let force_diff = (alpha_force - omega_force).mesh_magnitude();
         if !force_diff.is_finite() {
             return 0.0;
         }
@@ -517,12 +516,12 @@ impl MeshClock {
             QuantumState::Entangled => {
                 // Entangled states have quantum tunneling effect - faster propagation
                 let strength = self.get_entanglement_strength();
-                let coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
+                let coherence = self.get_coherence().max(1.0);
                 ((1000.0 / strength) * coherence * 2.0) as usize
             },
             QuantumState::Superposition(phase) => {
                 // Superposition creates quantum uncertainty in timing
-                let coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
+                let coherence = self.get_coherence().max(1.0);
                 // Add complexity factor based on coherence
                 let complexity = 1.0 + (1.0 - coherence);
                 ((1500.0 * phase) * complexity) as usize
@@ -530,7 +529,7 @@ impl MeshClock {
             QuantumState::PatternTransfer => {
                 // Pattern transfer has overhead but benefits from coherence
                 let base_time = 2000;
-                let coherence = self.get_coherence().unwrap_or(1.0);
+                let coherence = self.get_coherence().max(1.0);
                 let complexity_factor = 1.0 + (1.0 - coherence);
                 (base_time as f64 * complexity_factor) as usize
             },
@@ -634,7 +633,7 @@ impl MeshClock {
     }
 
     pub fn get_state_stability(&self) -> f64 {
-        let coherence = self.coherence.load(&HeliumOrdering::Quantum).unwrap_or(0.0);
+        let coherence = self.get_coherence().max(1.0);
         match self.quantum_state.get() {
             QuantumState::Coherent => coherence,
             QuantumState::Entangled => coherence * (self.get_entanglement_strength() / 1000.0),
@@ -828,7 +827,7 @@ mod tests {
             let _ = clock.ping();
         }
 
-        let coherence = clock.coherence.load(&HeliumOrdering::Quantum).unwrap_or(1.0);
+        let coherence = self.get_coherence().max(1.0);
         assert!(coherence < 1.0);
     }
 

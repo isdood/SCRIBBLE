@@ -103,14 +103,10 @@ impl Vector3D<f64> {
 
     pub fn mesh_normalize(&self) -> Self {
         let mag = self.mesh_magnitude();
-        if MeshMath::eq_f64(mag, T::mesh_zero()) {
+        if MeshMath::eq_f64(mag, f64::mesh_zero()) {  // Changed from T::mesh_zero()
             *self
         } else {
-            Self::new(
-                self.x.mesh_div(mag),
-                      self.y.mesh_div(mag),
-                      self.z.mesh_div(mag)
-            )
+            self.mesh_div(mag)
         }
     }
 
@@ -154,7 +150,9 @@ impl<T: MeshValue + Scribe> Scribe for Vector3D<T> {
 }
 
 impl<T: MeshValue + 'static> Quantum for Vector3D<T> {
-    fn get_coherence(&self) -> f64 { T::mesh_one() }
+    fn get_coherence(&self) -> f64 {
+        f64::mesh_one()  // Changed from T::mesh_one()
+    }
     fn is_quantum_stable(&self) -> bool { true }
     fn decay_coherence(&self) {}
     fn reset_coherence(&self) {}
@@ -297,15 +295,10 @@ impl Vector4D<f64> {
 
     pub fn mesh_normalize(&self) -> Self {
         let mag = self.mesh_magnitude();
-        if MeshMath::eq_f64(mag, T::mesh_zero()) {
+        if MeshMath::eq_f64(mag, f64::mesh_zero()) {  // Changed from T::mesh_zero()
             *self
         } else {
-            Self::new(
-                self.x.mesh_div(mag),
-                      self.y.mesh_div(mag),
-                      self.z.mesh_div(mag),
-                      self.w.mesh_div(mag)
-            )
+            self.mesh_div(mag)
         }
     }
 
@@ -355,7 +348,9 @@ impl<T: MeshValue + Scribe> Scribe for Vector4D<T> {
 }
 
 impl<T: MeshValue + 'static> Quantum for Vector4D<T> {
-    fn get_coherence(&self) -> f64 { T::mesh_one() }
+    fn get_coherence(&self) -> f64 {
+        f64::mesh_one()  // Changed from T::mesh_one()
+    }
     fn is_quantum_stable(&self) -> bool { true }
     fn decay_coherence(&self) {}
     fn reset_coherence(&self) {}
