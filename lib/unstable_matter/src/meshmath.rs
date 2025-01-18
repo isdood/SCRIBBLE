@@ -1,5 +1,5 @@
 /// MeshSpace Mathematics Implementation
-/// Last Updated: 2025-01-18 15:06:30 UTC
+/// Last Updated: 2025-01-18 15:12:00 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -27,6 +27,18 @@ pub trait MeshDiv<Rhs = Self> {
 pub trait MeshNeg {
     type Output;
     fn mesh_neg(self) -> Self::Output;
+}
+
+// Vector-specific traits
+pub trait MeshVec<T> {
+    fn mesh_dot(&self, other: &Self) -> T;
+    fn mesh_magnitude(&self) -> T;
+    fn mesh_normalize(&self) -> Self;
+    fn mesh_cross(&self, other: &Self) -> Self;
+}
+
+pub trait MeshScalar<T> {
+    fn mesh_scale(&self, scalar: T) -> Self;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -197,6 +209,32 @@ impl MeshMath {
 
     pub fn neg_isize(a: isize) -> isize {
         -a
+    }
+
+    // Vector operations
+    pub fn dot_product_f64(a: &[f64], b: &[f64]) -> f64 {
+        let mut sum = 0.0;
+        for i in 0..a.len() {
+            sum = Self::add_f64(sum, Self::mul_f64(a[i], b[i]));
+        }
+        sum
+    }
+
+    pub fn cross_product_f64(a: &[f64; 3], b: &[f64; 3]) -> [f64; 3] {
+        [
+            Self::sub_f64(Self::mul_f64(a[1], b[2]), Self::mul_f64(a[2], b[1])),
+            Self::sub_f64(Self::mul_f64(a[2], b[0]), Self::mul_f64(a[0], b[2])),
+            Self::sub_f64(Self::mul_f64(a[0], b[1]), Self::mul_f64(a[1], b[0])),
+        ]
+    }
+
+    pub fn vector_magnitude_f64(v: &[f64]) -> f64 {
+        Self::sqrt(Self::dot_product_f64(v, v))
+    }
+
+    pub fn normalize_vector_f64(v: &[f64]) -> Vec<f64> {
+        let mag = Self::vector_magnitude_f64(v);
+        v.iter().map(|&x| Self::div_f64(x, mag)).collect()
     }
 }
 
