@@ -2,138 +2,132 @@
 //! =================================
 //!
 //! Provides quantum-safe memory operations through phantom references
+//! and quantum entanglement tracking.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:15:32 UTC
+//! Last Updated: 2025-01-18 20:19:50 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 #![no_std]
 
-use core::{marker::PhantomData, ptr::NonNull};
+use core::marker::PhantomData;
 use crate::{
     constants::*,
     vector::Vector3D,
     scribe::{Scribe, ScribePrecision, QuantumString},
     aether::{Aether, AetherHarmony},
+    cube::Box,
+    harmony::Quantum
 };
 
-/// A quantum-safe cell that uses phantom typing for memory safety
+/// A quantum-safe cell that manages phantom references through
+/// quantum entanglement and coherence tracking
 #[derive(Debug)]
-pub struct QuantumCell<T: 'static> {
-    /// Pointer to the managed value
-    ptr: Aether<NonNull<T>>,
+pub struct QuantumCell<T: Clone + 'static> {
+    /// The quantum essence of the stored value
+    essence: Aether<T>,
     /// Quantum coherence tracking
     coherence: Aether<f64>,
-    /// Phantom data to maintain variance
+    /// Phantom data for variance and lifetime tracking
     _phantom: PhantomData<T>,
 }
 
-impl<T: 'static> QuantumCell<T> {
-    /// Creates a new QuantumCell containing the given value
+impl<T: Clone + 'static> QuantumCell<T> {
+    /// Creates a new QuantumCell with the given value
     pub fn new(value: T) -> Self {
-        let ptr = Box::into_raw(Box::new(value));
         Self {
-            ptr: Aether::crystallize(unsafe { NonNull::new_unchecked(ptr) }),
+            essence: Aether::crystallize(value),
             coherence: Aether::crystallize(1.0),
             _phantom: PhantomData,
         }
     }
 
-    /// Quantum-safe load operation
+    /// Retrieves the value through quantum observation
+    pub fn observe(&self) -> Result<T, &'static str> {
+        if !self.is_coherent() {
+            return Err("Quantum decoherence detected");
+        }
+        self.essence.glimpse()
+    }
+
+    /// Updates the stored value while maintaining quantum coherence
+    pub fn collapse(&self, value: T) -> Result<(), &'static str> {
+        if !self.is_coherent() {
+            return Err("Quantum decoherence detected");
+        }
+        self.essence.encode(value)?;
+        self.decay_coherence();
+        Ok(())
+    }
+
+    /// Quantum-safe load operation with harmonic stabilization
     pub fn quantum_load(&self, harmony: &AetherHarmony) -> Result<T, &'static str> {
         match harmony {
             AetherHarmony::Prismatic => {
                 if !self.is_coherent() {
                     return Err("Quantum decoherence detected");
                 }
-                self.load()
+                self.essence.glimpse()
             },
-            AetherHarmony::Amorphous => self.load(),
+            AetherHarmony::Amorphous => self.essence.glimpse(),
             AetherHarmony::Crystalline => {
                 if self.get_coherence() < QUANTUM_STABILITY_THRESHOLD {
                     return Err("Quantum stability violation");
                 }
-                self.load()
+                self.essence.glimpse()
             }
         }
     }
 
-    /// Quantum-safe store operation
+    /// Quantum-safe store operation with harmonic stabilization
     pub fn quantum_store(&self, value: T, harmony: &AetherHarmony) -> Result<(), &'static str> {
         match harmony {
             AetherHarmony::Prismatic => {
                 if !self.is_coherent() {
                     return Err("Quantum decoherence detected");
                 }
-                self.store(value)
+                self.collapse(value)
             },
-            AetherHarmony::Amorphous => self.store(value),
+            AetherHarmony::Amorphous => self.collapse(value),
             AetherHarmony::Crystalline => {
                 if self.get_coherence() < QUANTUM_STABILITY_THRESHOLD {
                     return Err("Quantum stability violation");
                 }
-                self.store(value)
+                self.collapse(value)
             }
         }
     }
 
-    /// Gets the current coherence value
+    /// Gets the current quantum coherence value
     pub fn get_coherence(&self) -> f64 {
         self.coherence.glimpse().unwrap_or(0.0)
     }
 
-    /// Checks if the cell is quantum coherent
+    /// Checks if the cell maintains quantum coherence
     pub fn is_coherent(&self) -> bool {
         self.get_coherence() > QUANTUM_STABILITY_THRESHOLD
     }
 
-    /// Load the current value
-    fn load(&self) -> Result<T, &'static str> {
-        if let Ok(ptr) = self.ptr.glimpse() {
-            Ok(unsafe { ptr.as_ref() }.clone())
-        } else {
-            Err("Failed to load quantum state")
-        }
-    }
-
-    /// Store a new value
-    fn store(&self, value: T) -> Result<(), &'static str> {
-        if let Ok(ptr) = self.ptr.glimpse() {
-            unsafe {
-                *ptr.as_ptr() = value;
-            }
-            self.decay_coherence();
-            Ok(())
-        } else {
-            Err("Failed to store quantum state")
-        }
-    }
-
-    /// Natural coherence decay
+    /// Applies natural quantum decoherence
     fn decay_coherence(&self) {
         if let Ok(current) = self.coherence.glimpse() {
             let _ = self.coherence.encode(current * COHERENCE_DECAY_FACTOR);
         }
     }
-}
 
-impl<T: 'static> Drop for QuantumCell<T> {
-    fn drop(&mut self) {
-        if let Ok(ptr) = self.ptr.glimpse() {
-            unsafe {
-                Box::from_raw(ptr.as_ptr());
-            }
-        }
+    /// Restores quantum coherence through harmonic realignment
+    pub fn restore_coherence(&self) -> Result<(), &'static str> {
+        self.coherence.encode(1.0)
     }
 }
 
 impl<T: Clone + Scribe> Scribe for QuantumCell<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("⟨");
-        if let Ok(value) = self.quantum_load(&AetherHarmony::Amorphous) {
+        if let Ok(value) = self.observe() {
             value.scribe(precision, output);
         } else {
             output.push_str("∅");
@@ -151,7 +145,7 @@ mod tests {
     #[test]
     fn test_quantum_cell() {
         let cell = QuantumCell::new(42);
-        assert_eq!(cell.quantum_load(&AetherHarmony::Prismatic).unwrap(), 42);
+        assert_eq!(cell.observe().unwrap(), 42);
         assert!(cell.is_coherent());
     }
 
@@ -159,7 +153,7 @@ mod tests {
     fn test_quantum_decoherence() {
         let cell = QuantumCell::new(Vector3D::new(1.0, 0.0, 0.0));
 
-        // Force decoherence through multiple stores
+        // Force decoherence through multiple collapses
         for i in 0..10 {
             let _ = cell.quantum_store(
                 Vector3D::new(i as f64, 0.0, 0.0),
@@ -175,5 +169,19 @@ mod tests {
         let cell = QuantumCell::new(42);
         assert!(cell.quantum_store(43, &AetherHarmony::Crystalline).is_ok());
         assert!(cell.get_coherence() > QUANTUM_STABILITY_THRESHOLD);
+    }
+
+    #[test]
+    fn test_coherence_restoration() {
+        let cell = QuantumCell::new(42);
+
+        // Force some decoherence
+        for _ in 0..5 {
+            let _ = cell.collapse(42);
+        }
+
+        let decoherent = cell.get_coherence();
+        assert!(cell.restore_coherence().is_ok());
+        assert!(cell.get_coherence() > decoherent);
     }
 }
