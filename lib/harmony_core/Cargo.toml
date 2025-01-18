@@ -9,7 +9,3 @@ license = "MIT"
 
 [dependencies]
 libm = "0.2.11"
-
-[lib]
-name = "harmony_core"
-path = "src/lib.rs"

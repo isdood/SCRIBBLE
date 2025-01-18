@@ -1,191 +1,147 @@
-/// Quantum Phantom Implementation
-/// Last Updated: 2025-01-18 17:05:28 UTC
-/// Author: isdood
-/// Current User: isdood
+//! Phantom Quantum Cell Implementation
+//! =================================
+//!
+//! Provides quantum-safe memory operations through phantom references
+//!
+//! Author: Caleb J.D. Terkovics <isdood>
+//! Current User: isdood
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-18 20:15:32 UTC
+//! Version: 0.1.0
+//! License: MIT
 
-use crate::quantum::Quantum;
-use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
+#![no_std]
+
+use core::{marker::PhantomData, ptr::NonNull};
 use crate::{
     constants::*,
     vector::Vector3D,
     scribe::{Scribe, ScribePrecision, QuantumString},
-    helium::HeliumOrdering,
+    aether::{Aether, AetherHarmony},
 };
 
+/// A quantum-safe cell that uses phantom typing for memory safety
 #[derive(Debug)]
-pub struct PhantomSpace {
-    position: AtomicPtr<Vector3D<f64>>,
-    coherence: AtomicU64,
-    timestamp: AtomicPtr<usize>,
+pub struct QuantumCell<T: 'static> {
+    /// Pointer to the managed value
+    ptr: Aether<NonNull<T>>,
+    /// Quantum coherence tracking
+    coherence: Aether<f64>,
+    /// Phantom data to maintain variance
+    _phantom: PhantomData<T>,
 }
 
-impl PhantomSpace {
-    pub fn new() -> Self {
-        let pos = Box::into_raw(Box::new(Vector3D::new(0.0, 0.0, 0.0)));
-        let ts = Box::into_raw(Box::new(CURRENT_TIMESTAMP));
+impl<T: 'static> QuantumCell<T> {
+    /// Creates a new QuantumCell containing the given value
+    pub fn new(value: T) -> Self {
+        let ptr = Box::into_raw(Box::new(value));
         Self {
-            position: AtomicPtr::new(pos),
-            coherence: AtomicU64::new(f64::to_bits(1.0)),
-            timestamp: AtomicPtr::new(ts),
+            ptr: Aether::crystallize(unsafe { NonNull::new_unchecked(ptr) }),
+            coherence: Aether::crystallize(1.0),
+            _phantom: PhantomData,
         }
     }
 
-    pub fn set_position(&self, x: f64, y: f64, z: f64) {
-        let new_pos = Box::into_raw(Box::new(Vector3D::new(x, y, z)));
-        let old_pos = self.position.swap(new_pos, Ordering::AcqRel);
-        unsafe {
-            drop(Box::from_raw(old_pos));
+    /// Quantum-safe load operation
+    pub fn quantum_load(&self, harmony: &AetherHarmony) -> Result<T, &'static str> {
+        match harmony {
+            AetherHarmony::Prismatic => {
+                if !self.is_coherent() {
+                    return Err("Quantum decoherence detected");
+                }
+                self.load()
+            },
+            AetherHarmony::Amorphous => self.load(),
+            AetherHarmony::Crystalline => {
+                if self.get_coherence() < QUANTUM_STABILITY_THRESHOLD {
+                    return Err("Quantum stability violation");
+                }
+                self.load()
+            }
         }
     }
 
-    pub fn get_position(&self) -> Vector3D<f64> {
-        unsafe {
-            (*self.position.load(Ordering::Acquire)).clone()
+    /// Quantum-safe store operation
+    pub fn quantum_store(&self, value: T, harmony: &AetherHarmony) -> Result<(), &'static str> {
+        match harmony {
+            AetherHarmony::Prismatic => {
+                if !self.is_coherent() {
+                    return Err("Quantum decoherence detected");
+                }
+                self.store(value)
+            },
+            AetherHarmony::Amorphous => self.store(value),
+            AetherHarmony::Crystalline => {
+                if self.get_coherence() < QUANTUM_STABILITY_THRESHOLD {
+                    return Err("Quantum stability violation");
+                }
+                self.store(value)
+            }
         }
     }
 
+    /// Gets the current coherence value
     pub fn get_coherence(&self) -> f64 {
-        f64::from_bits(self.coherence.load(Ordering::Relaxed))
+        self.coherence.glimpse().unwrap_or(0.0)
     }
 
-    pub fn is_quantum_stable(&self) -> bool {
+    /// Checks if the cell is quantum coherent
+    pub fn is_coherent(&self) -> bool {
         self.get_coherence() > QUANTUM_STABILITY_THRESHOLD
     }
 
-    pub fn decay_coherence(&self) {
-        let current = self.get_coherence();
-        self.coherence.store(f64::to_bits(current * COHERENCE_DECAY_FACTOR), Ordering::Relaxed);
-    }
-
-    pub fn reset_coherence(&self) {
-        self.coherence.store(f64::to_bits(1.0), Ordering::Relaxed);
-    }
-}
-
-impl Drop for PhantomSpace {
-    fn drop(&mut self) {
-        unsafe {
-            drop(Box::from_raw(self.position.load(Ordering::Acquire)));
-            drop(Box::from_raw(self.timestamp.load(Ordering::Acquire)));
-        }
-    }
-}
-
-impl Quantum for PhantomSpace {
-    fn get_coherence(&self) -> f64 {
-        self.get_coherence()
-    }
-
-    fn is_quantum_stable(&self) -> bool {
-        self.is_quantum_stable()
-    }
-
-    fn decay_coherence(&self) {
-        self.decay_coherence();
-    }
-
-    fn reset_coherence(&self) {
-        self.reset_coherence();
-    }
-}
-
-impl Scribe for PhantomSpace {
-    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        output.push_str("PhantomSpace{pos=");
-        self.get_position().scribe(precision, output);
-        output.push_str(", coherence=");
-        output.push_f64(self.get_coherence(), precision.decimal_places());
-        output.push_char('}');
-    }
-}
-
-#[derive(Debug)]
-pub struct QuantumCell<T: Clone + 'static> {
-    value: AtomicPtr<T>,
-    coherence: AtomicU64,
-    timestamp: AtomicPtr<usize>,
-}
-
-impl<T: Clone + 'static> QuantumCell<T> {
-    pub fn new(value: T) -> Self {
-        let ptr = Box::into_raw(Box::new(value));
-        let ts = Box::into_raw(Box::new(CURRENT_TIMESTAMP));
-        Self {
-            value: AtomicPtr::new(ptr),
-            coherence: AtomicU64::new(f64::to_bits(1.0)),
-            timestamp: AtomicPtr::new(ts),
-        }
-    }
-
-    pub fn get(&self) -> T {
-        unsafe {
-            (*self.value.load(Ordering::Acquire)).clone()
-        }
-    }
-
-    pub fn set(&self, value: T) {
-        let new_ptr = Box::into_raw(Box::new(value));
-        let old_ptr = self.value.swap(new_ptr, Ordering::AcqRel);
-        unsafe {
-            drop(Box::from_raw(old_ptr));
-        }
-    }
-
-    pub fn get_coherence(&self) -> f64 {
-        f64::from_bits(self.coherence.load(Ordering::Relaxed))
-    }
-
-    pub fn quantum_load(&self, ordering: &HeliumOrdering) -> Result<T, &'static str> {
-        let ptr = match ordering {
-            HeliumOrdering::Quantum => self.value.load(Ordering::SeqCst),
-            HeliumOrdering::Relaxed => self.value.load(Ordering::Relaxed),
-        };
-
-        if ptr.is_null() {
-            Err("Quantum decoherence detected")
+    /// Load the current value
+    fn load(&self) -> Result<T, &'static str> {
+        if let Ok(ptr) = self.ptr.glimpse() {
+            Ok(unsafe { ptr.as_ref() }.clone())
         } else {
-            unsafe {
-                Ok((*ptr).clone())
-            }
+            Err("Failed to load quantum state")
         }
     }
 
-    pub fn quantum_store(&self, value: T, ordering: &HeliumOrdering) -> Result<(), &'static str> {
-        let new_ptr = Box::into_raw(Box::new(value));
-        let old_ptr = match ordering {
-            HeliumOrdering::Quantum => self.value.swap(new_ptr, Ordering::SeqCst),
-            HeliumOrdering::Relaxed => self.value.swap(new_ptr, Ordering::Relaxed),
-        };
-
-        if !old_ptr.is_null() {
+    /// Store a new value
+    fn store(&self, value: T) -> Result<(), &'static str> {
+        if let Ok(ptr) = self.ptr.glimpse() {
             unsafe {
-                drop(Box::from_raw(old_ptr));
+                *ptr.as_ptr() = value;
             }
+            self.decay_coherence();
+            Ok(())
+        } else {
+            Err("Failed to store quantum state")
         }
-        Ok(())
+    }
+
+    /// Natural coherence decay
+    fn decay_coherence(&self) {
+        if let Ok(current) = self.coherence.glimpse() {
+            let _ = self.coherence.encode(current * COHERENCE_DECAY_FACTOR);
+        }
     }
 }
 
-impl<T: Clone + 'static> Clone for QuantumCell<T> {
-    fn clone(&self) -> Self {
-        Self::new(self.get())
-    }
-}
-
-impl<T: Clone + 'static> Drop for QuantumCell<T> {
+impl<T: 'static> Drop for QuantumCell<T> {
     fn drop(&mut self) {
-        unsafe {
-            drop(Box::from_raw(self.value.load(Ordering::Acquire)));
-            drop(Box::from_raw(self.timestamp.load(Ordering::Acquire)));
+        if let Ok(ptr) = self.ptr.glimpse() {
+            unsafe {
+                Box::from_raw(ptr.as_ptr());
+            }
         }
     }
 }
 
-pub trait Protected {
-    fn protect(&self) -> bool;
-    fn unprotect(&self) -> bool;
-    fn get_coherence(&self) -> f64;
-    fn is_quantum_stable(&self) -> bool;
+impl<T: Clone + Scribe> Scribe for QuantumCell<T> {
+    fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
+        output.push_str("⟨");
+        if let Ok(value) = self.quantum_load(&AetherHarmony::Amorphous) {
+            value.scribe(precision, output);
+        } else {
+            output.push_str("∅");
+        }
+        output.push_str(", χ=");
+        output.push_f64(self.get_coherence(), precision.decimal_places());
+        output.push_str("⟩");
+    }
 }
 
 #[cfg(test)]
@@ -193,26 +149,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_phantom_space() {
-        let ps = PhantomSpace::new();
-        assert!(ps.is_quantum_stable());
-        ps.set_position(1.0, 2.0, 3.0);
-        let pos = ps.get_position();
-        assert_eq!(*pos.get_x(), 1.0);
-    }
-
-    #[test]
     fn test_quantum_cell() {
         let cell = QuantumCell::new(42);
-        assert_eq!(cell.get(), 42);
-        cell.set(84);
-        assert_eq!(cell.get(), 84);
+        assert_eq!(cell.quantum_load(&AetherHarmony::Prismatic).unwrap(), 42);
+        assert!(cell.is_coherent());
     }
 
     #[test]
-    fn test_quantum_operations() {
+    fn test_quantum_decoherence() {
+        let cell = QuantumCell::new(Vector3D::new(1.0, 0.0, 0.0));
+
+        // Force decoherence through multiple stores
+        for i in 0..10 {
+            let _ = cell.quantum_store(
+                Vector3D::new(i as f64, 0.0, 0.0),
+                                       &AetherHarmony::Amorphous
+            );
+        }
+
+        assert!(cell.get_coherence() < 1.0);
+    }
+
+    #[test]
+    fn test_quantum_stability() {
         let cell = QuantumCell::new(42);
-        assert!(cell.quantum_store(84, &HeliumOrdering::Quantum).is_ok());
-        assert_eq!(cell.quantum_load(&HeliumOrdering::Quantum).unwrap(), 84);
+        assert!(cell.quantum_store(43, &AetherHarmony::Crystalline).is_ok());
+        assert!(cell.get_coherence() > QUANTUM_STABILITY_THRESHOLD);
     }
 }

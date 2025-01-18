@@ -7,19 +7,42 @@
 //! including coherence tracking and harmonic memory protection.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
+//! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:01:44 UTC
+//! Last Updated: 2025-01-18 20:14:23 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 #![no_std]
 
-use crate::aether::{Aether, AetherHarmony};
-use crate::cube::Box;
+// Core modules
+mod aether;
+mod cube;
+mod phantom;
+mod constants;
+mod vector;
+mod scribe;
+mod zeronaut;
+mod align;
+mod harmony;
 
-pub const CURRENT_TIMESTAMP: usize = 1705694504; // 2025-01-18 20:01:44 UTC
-pub const HARMONY_STABILITY_THRESHOLD: f64 = 0.9;
-pub const COHERENCE_DECAY_FACTOR: f64 = 0.99;
+// Re-export commonly used types and traits
+pub use {
+    aether::{Aether, AetherHarmony},
+    cube::Box,
+    vector::Vector3D,
+    scribe::{Scribe, ScribePrecision, QuantumString},
+    harmony::Quantum,
+    align::{Alignment, AlignedSpace},
+    constants::{
+        CURRENT_TIMESTAMP,
+        QUANTUM_STABILITY_THRESHOLD,
+        COHERENCE_DECAY_FACTOR,
+        PLANCK_LENGTH,
+        VECTOR_ALIGN,
+        VECTOR_QUANTUM_STATE,
+    },
+};
 
 /// A thread-safe container for harmonic memory operations
 #[derive(Debug)]
@@ -28,6 +51,8 @@ pub struct HarmonicCell<T: Clone + 'static> {
     essence: Aether<T>,
     /// Memory cube for aligned storage
     cube: Box<T>,
+    /// Quantum coherence tracking
+    harmony: Aether<f64>,
 }
 
 impl<T: Clone + 'static> HarmonicCell<T> {
@@ -36,6 +61,7 @@ impl<T: Clone + 'static> HarmonicCell<T> {
         Self {
             essence: Aether::crystallize(value.clone()),
             cube: Box::new(value),
+            harmony: Aether::crystallize(1.0),
         }
     }
 
@@ -54,12 +80,13 @@ impl<T: Clone + 'static> HarmonicCell<T> {
     pub fn get_coherence(&self) -> f64 {
         let aether_coherence = self.essence.get_resonance();
         let cube_coherence = self.cube.get_coherence();
-        (aether_coherence + cube_coherence) / 2.0
+        let harmony_coherence = self.harmony.glimpse().unwrap_or(1.0);
+        (aether_coherence + cube_coherence + harmony_coherence) / 3.0
     }
 
     /// Checks if the cell is harmonically stable
     pub fn is_harmonically_stable(&self) -> bool {
-        self.get_coherence() > HARMONY_STABILITY_THRESHOLD &&
+        self.get_coherence() > QUANTUM_STABILITY_THRESHOLD &&
         self.cube.is_quantum_stable()
     }
 
@@ -67,12 +94,16 @@ impl<T: Clone + 'static> HarmonicCell<T> {
     pub fn decay_coherence(&mut self) {
         self.essence.diminish_resonance();
         self.cube.decay_coherence();
+        if let Ok(current) = self.harmony.glimpse() {
+            let _ = self.harmony.encode(current * COHERENCE_DECAY_FACTOR);
+        }
     }
 
     /// Restores harmonic coherence
     pub fn restore_harmony(&mut self) {
         self.essence.restore_harmony();
         self.cube.reset_coherence();
+        let _ = self.harmony.encode(1.0);
     }
 }
 
@@ -108,7 +139,6 @@ mod tests {
         let mut cell = HarmonicCell::new(42);
         let initial_coherence = cell.get_coherence();
 
-        // Test decay
         for _ in 0..5 {
             cell.decay_coherence();
         }
@@ -120,7 +150,6 @@ mod tests {
     fn test_harmony_restoration() {
         let mut cell = HarmonicCell::new(42);
 
-        // Force decay
         for _ in 0..5 {
             cell.decay_coherence();
         }
