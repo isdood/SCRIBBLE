@@ -1,0 +1,47 @@
+// libs/shard/src/tests.rs
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vector_operations() {
+        let mut emu = ShardEmulator::new();
+        
+        // Test VADD4D
+        let inst = ShardInstruction {
+            opcode: ShardOpcode::VADD4D,
+            dest: 0,
+            src1: 1,
+            src2: Some(2),
+            imm: None,
+            addr: None,
+        };
+        
+        emu.regs.v_regs[1] = Vector4D::new(1.0, 2.0, 3.0, 4.0);
+        emu.regs.v_regs[2] = Vector4D::new(5.0, 6.0, 7.0, 8.0);
+        
+        assert!(emu.execute(&inst).is_ok());
+        assert_eq!(emu.regs.v_regs[0], Vector4D::new(6.0, 8.0, 10.0, 12.0));
+    }
+
+    #[test]
+    fn test_quantum_entanglement() {
+        let mut emu = ShardEmulator::new();
+        
+        // Initialize quantum state
+        emu.regs.qs_regs[1] = vec![1.0, 0.0, 0.0, 0.0];
+        
+        let inst = ShardInstruction {
+            opcode: ShardOpcode::QENT,
+            dest: 0,
+            src1: 1,
+            src2: None,
+            imm: None,
+            addr: None,
+        };
+        
+        assert!(emu.execute(&inst).is_ok());
+        assert!(emu.regs.qs_regs[0][0] < 1.0); // Check decoherence
+    }
+}

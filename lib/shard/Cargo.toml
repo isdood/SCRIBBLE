@@ -1,0 +1,12 @@
+[package]
+name = "shard"
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
+
+[dependencies]
+hashbrown = { path = "../hashbrown" }
+vector4d = { path = "../vector4d" }
+scribble = { path = "../scribble" }
+cereal = { path = "../cereal" }
+unstable_matter = { path = "../unstable_matter" }
