@@ -7,24 +7,23 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 21:10:09 UTC
+//! Last Updated: 2025-01-18 21:21:29 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use core::ops::Deref;
-use libm::floor;
 use crate::{
     constants::{ZERO_POINT_ENERGY, QUANTUM_STABILITY_THRESHOLD},
     harmony::Quantum,
     vector::Vector3D,
-    cube::CrystalCube
+    cube::CrystalCube,
+    idk::ShardUninit,
 };
 
 /// A quantum zero-point navigator
 #[derive(Clone)]
 pub struct Zeronaut<T: Clone + Default + 'static> {
     /// Contained data
-    data: T,
+    data: ShardUninit<T>,
     /// Current position
     position: Vector3D<f64>,
     /// Zero-point energy level
@@ -37,7 +36,7 @@ impl<T: Clone + Default + 'static> Zeronaut<T> {
     /// Creates a new zeronaut with positioned data
     pub fn new_positioned(data: T, x: f64, y: f64, z: f64) -> Self {
         Self {
-            data,
+            data: ShardUninit::new(data),
             position: Vector3D::new(x, y, z),
             energy: ZERO_POINT_ENERGY,
             coherence: 1.0,
@@ -46,12 +45,12 @@ impl<T: Clone + Default + 'static> Zeronaut<T> {
 
     /// Gets a reference to the contained data
     pub fn data(&self) -> &T {
-        &self.data
+        unsafe { self.data.assume_init_ref() }
     }
 
     /// Gets a mutable reference to the contained data
     pub fn data_mut(&mut self) -> &mut T {
-        &mut self.data
+        unsafe { self.data.assume_init_mut() }
     }
 
     /// Gets the current position
@@ -76,7 +75,7 @@ impl<T: Clone + Default + 'static> Zeronaut<T> {
             let dx = target.x - self.position.x;
             let dy = target.y - self.position.y;
             let dz = target.z - self.position.z;
-            libm::sqrt(dx * dx + dy * dy + dz * dz)
+            meshmath::sqrt(dx * dx + dy * dy + dz * dz)
         };
 
         // Check if tunneling is possible based on energy and distance
@@ -92,12 +91,16 @@ impl<T: Clone + Default + 'static> Zeronaut<T> {
     /// Attempts to enter a crystal cube
     pub fn enter_cube(&mut self, cube: &mut CrystalCube<T>) -> Result<(), &'static str> {
         let pos = self.position();
-        let x = floor(pos.x) as usize;
-        let y = floor(pos.y) as usize;
-        let z = floor(pos.z) as usize;
+        let x = meshmath::floor(pos.x) as usize;
+        let y = meshmath::floor(pos.y) as usize;
+        let z = meshmath::floor(pos.z) as usize;
 
         if let Some(cell) = cube.get_mut(x, y, z) {
-            core::mem::swap(cell, &mut self.data);
+            unsafe {
+                let mut temp = ShardUninit::new(T::default());
+                core::ptr::swap(self.data.as_mut_ptr(), temp.as_mut_ptr());
+                *cell = temp.assume_init();
+            }
             self.decohere();
             cube.decohere();
             Ok(())
@@ -164,5 +167,13 @@ mod tests {
 
         let far_target = Vector3D::new(100.0, 100.0, 100.0);
         assert!(zeronaut.tunnel(&far_target).is_err());
+    }
+
+    #[test]
+    fn test_zeronaut_cube_interaction() {
+        let mut zeronaut = Zeronaut::new_positioned(42u8, 0.0, 0.0, 0.0);
+        let mut cube = CrystalCube::<u8>::new(2, 2, 2).unwrap();
+        assert!(zeronaut.enter_cube(&mut cube).is_ok());
+        assert_eq!(*cube.get(0, 0, 0).unwrap(), 42);
     }
 }
