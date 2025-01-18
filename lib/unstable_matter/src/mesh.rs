@@ -1,5 +1,5 @@
 /// Quantum Mesh Module
-/// Last Updated: 2025-01-16 02:33:44 UTC
+/// Last Updated: 2025-01-18 17:58:31 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -13,6 +13,7 @@ use crate::{
     Wormhole,
     WormholeGlitch,
     helium::Helium,
+    meshmath::MeshMath,
 };
 
 #[derive(Debug, Clone)]
@@ -25,9 +26,9 @@ pub struct MeshDimensions {
 impl MeshDimensions {
     pub fn new(vec: Vector3D<usize>) -> Self {
         Self {
-            width: vec.x(),
-            height: vec.y(),
-            depth: vec.z(),
+            width: vec.get_x().clone(),
+            height: vec.get_y().clone(),
+            depth: vec.get_z().clone(),
         }
     }
 
@@ -40,14 +41,18 @@ impl MeshDimensions {
     pub fn z(&self) -> usize { self.depth }
 
     pub fn volume(&self) -> usize {
-        self.width * self.height * self.depth
+        self.width.mesh_mul(self.height).mesh_mul(self.depth)
     }
 }
 
 impl Scribe for MeshDimensions {
     fn scribe(&self, _precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("Mesh[");
-        output.push_str(&format!("{}x{}x{}", self.width, self.height, self.depth));
+        output.push_usize(self.width);
+        output.push_char('x');
+        output.push_usize(self.height);
+        output.push_char('x');
+        output.push_usize(self.depth);
         output.push_char(']');
     }
 }
@@ -67,7 +72,7 @@ pub struct MeshCell {
     mass: Helium<f64>,
     state: QuantumCell<CellState>,
     coherence: Helium<f64>,
-    timestamp: Helium<usize>,
+    timestamp: Helium<u64>,
     wormhole_connection: Option<Wormhole>,
 }
 
@@ -78,7 +83,7 @@ impl MeshCell {
             mass: Helium::new(1.0),
             state: QuantumCell::new(CellState::Free),
             coherence: Helium::new(1.0),
-            timestamp: Helium::new(CURRENT_TIMESTAMP),
+            timestamp: Helium::new(CURRENT_TIMESTAMP.try_into().unwrap()),
             wormhole_connection: None,
         }
     }
@@ -89,10 +94,10 @@ impl MeshCell {
         }
 
         let position = self.position.get().clone();
-        let new_position = position + force;
+        let new_position = position.mesh_add(force);
         self.position.set(new_position);
         self.decay_coherence();
-        self.timestamp.quantum_store(CURRENT_TIMESTAMP);
+        self.timestamp.quantum_store(CURRENT_TIMESTAMP.try_into().unwrap(), &HeliumOrdering::Quantum)?;
         Ok(())
     }
 
@@ -102,11 +107,11 @@ impl MeshCell {
         }
 
         let position = self.position.get().clone();
-        let mass = self.mass.quantum_load();
+        let mass = self.mass.quantum_load(&HeliumOrdering::Quantum)?;
         let force = field.calculate_force_at(position, mass);
         self.apply_force(force)?;
 
-        if force.magnitude() > GRAVITATIONAL_THRESHOLD {
+        if force.mesh_magnitude() > GRAVITATIONAL_THRESHOLD {
             self.state.set(CellState::QuantumUncertain);
         }
 
@@ -120,11 +125,11 @@ impl MeshCell {
 
         let position = self.position.get().clone();
         let blackhole_pos = blackhole.get_position();
-        let distance = (position - blackhole_pos).magnitude();
+        let distance = position.mesh_sub(blackhole_pos).mesh_magnitude();
 
         if distance <= blackhole.get_event_horizon_radius() {
             self.state.set(CellState::Absorbed);
-            blackhole.absorb_mass(self.mass.quantum_load())?;
+            blackhole.absorb_mass(self.mass.quantum_load(&HeliumOrdering::Quantum)?)?;
             return Ok(());
         }
 
@@ -152,7 +157,8 @@ impl MeshCell {
     }
 
     pub fn get_mass(&self) -> f64 {
-        self.mass.quantum_load()
+        self.mass.quantum_load(&HeliumOrdering::Quantum)
+        .expect("Failed to load mass")
     }
 
     pub fn get_state(&self) -> CellState {
@@ -160,7 +166,8 @@ impl MeshCell {
     }
 
     pub fn get_coherence(&self) -> f64 {
-        self.coherence.quantum_load()
+        self.coherence.quantum_load(&HeliumOrdering::Quantum)
+        .expect("Failed to load coherence")
     }
 
     pub fn is_quantum_stable(&self) -> bool {
@@ -168,9 +175,11 @@ impl MeshCell {
     }
 
     fn decay_coherence(&self) {
-        let current = self.coherence.quantum_load();
-        let new_coherence = current * COHERENCE_DECAY_FACTOR;
-        self.coherence.quantum_store(new_coherence);
+        let current = self.coherence.quantum_load(&HeliumOrdering::Quantum)
+        .expect("Failed to load coherence");
+        let new_coherence = current.mesh_mul(COHERENCE_DECAY_FACTOR);
+        self.coherence.quantum_store(new_coherence, &HeliumOrdering::Quantum)
+        .expect("Failed to store coherence");
     }
 }
 
