@@ -1,14 +1,9 @@
 /// MeshMath - Core Mathematical Operations Module
-/// Last Updated: 2025-01-18 17:49:26 UTC
+/// Last Updated: 2025-01-18 17:52:20 UTC
 /// Author: isdood
 /// Current User: isdood
 
-use crate::{
-    arch::x86_64::instructions,
-    helium::Helium,
-    phantom::QuantumCell,
-    unstable::UnstableDescriptor,
-};
+use crate::arch::x86_64::instructions;
 
 pub struct MeshMath;
 
@@ -23,7 +18,7 @@ pub trait MeshValue: Copy {
     fn mesh_one() -> Self;
 }
 
-// Implement for f64 using quantum-safe instructions
+// Implement for f64
 impl MeshValue for f64 {
     #[inline(always)]
     fn mesh_add(self, other: Self) -> Self {
@@ -115,7 +110,7 @@ impl MeshValue for f64 {
     }
 }
 
-// Implement for isize using quantum-safe instructions
+// Implement for isize
 impl MeshValue for isize {
     #[inline(always)]
     fn mesh_add(self, other: Self) -> Self {
@@ -168,7 +163,7 @@ impl MeshValue for isize {
     #[inline(always)]
     fn mesh_div(self, other: Self) -> Self {
         instructions::without_interrupts(|| {
-            self / other // Use native division with interrupts disabled
+            self / other // Use native division for isize
         })
     }
 
@@ -307,12 +302,44 @@ impl MeshMath {
     }
 
     #[inline(always)]
+    pub fn isize_to_f64(x: isize) -> f64 {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: f64;
+                core::arch::asm!(
+                    "cvtsi2sd {}, {}",
+                    out(xmm_reg) result,
+                                 in(reg) x,
+                                 options(nomem, nostack, preserves_flags)
+                );
+                result
+            }
+        })
+    }
+
+    #[inline(always)]
     pub fn abs_f64(x: f64) -> f64 {
         instructions::without_interrupts(|| {
             unsafe {
                 let mask: u64 = !(1u64 << 63);
                 let bits: u64 = std::mem::transmute(x);
                 std::mem::transmute(bits & mask)
+            }
+        })
+    }
+
+    #[inline(always)]
+    pub fn usize_to_f64(x: usize) -> f64 {
+        instructions::without_interrupts(|| {
+            unsafe {
+                let result: f64;
+                core::arch::asm!(
+                    "cvtsi2sd {}, {}",
+                    out(xmm_reg) result,
+                                 in(reg) x,
+                                 options(nomem, nostack, preserves_flags)
+                );
+                result
             }
         })
     }
@@ -337,5 +364,21 @@ mod tests {
         assert!(MeshMath::eq_f64(MeshMath::sin_f64(0.0), 0.0));
         assert!(MeshMath::eq_f64(MeshMath::cos_f64(0.0), 1.0));
         assert_eq!(MeshMath::abs_f64(-1.0), 1.0);
+    }
+
+    #[test]
+    fn test_conversions() {
+        assert_eq!(MeshMath::isize_to_f64(42), 42.0);
+        assert_eq!(MeshMath::usize_to_f64(42), 42.0);
+    }
+
+    #[test]
+    fn test_unsigned_ops() {
+        let a: usize = 42;
+        let b: usize = 12;
+        assert_eq!(a.mesh_add(b), 54);
+        assert_eq!(a.mesh_sub(b), 30);
+        assert_eq!(a.mesh_mul(b), 504);
+        assert_eq!(a.mesh_div(b), 3);
     }
 }
