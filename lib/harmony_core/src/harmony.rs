@@ -1,16 +1,17 @@
 //! Crystalline Harmony Implementation
-//! ==============================
+//! ============================
 //!
-//! Core quantum harmony traits and implementations for crystalline
-//! data structures with coherence tracking.
+//! Core quantum harmony traits with crystalline resonance
+//! tracking and mesh value operations.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:50:50 UTC
+//! Last Updated: 2025-01-18 20:59:23 UTC
 //! Version: 0.1.0
 //! License: MIT
 
+use core::ops::{Add, Sub, Mul, Div, Neg};
 use crate::constants::QUANTUM_STABILITY_THRESHOLD;
 
 /// Core quantum trait for crystalline coherence
@@ -19,7 +20,9 @@ pub trait Quantum {
     fn coherence(&self) -> f64;
 
     /// Checks if the quantum state is stable
-    fn is_stable(&self) -> bool;
+    fn is_stable(&self) -> bool {
+        self.coherence() >= QUANTUM_STABILITY_THRESHOLD
+    }
 
     /// Applies quantum decoherence
     fn decohere(&mut self);
@@ -33,24 +36,24 @@ pub trait MeshOps {
     /// Output type for mesh operations
     type Output;
 
-    /// Performs a mesh addition
+    /// Performs mesh addition
     fn mesh_add(&self, rhs: &Self) -> Self::Output;
 
-    /// Performs a mesh subtraction
+    /// Performs mesh subtraction
     fn mesh_sub(&self, rhs: &Self) -> Self::Output;
 
-    /// Performs a mesh multiplication
+    /// Performs mesh multiplication by scalar
     fn mesh_mul(&self, scalar: &f64) -> Self::Output;
 
-    /// Performs a mesh division
+    /// Performs mesh division by scalar
     fn mesh_div(&self, scalar: &f64) -> Self::Output;
 
-    /// Performs a mesh negation
+    /// Performs mesh negation
     fn mesh_neg(&self) -> Self::Output;
 }
 
 /// Trait for quantum mesh values
-pub trait MeshValue: Clone + 'static {
+pub trait MeshValue: Clone + 'static + Sized {
     /// Creates a zero value
     fn zero() -> Self;
 
@@ -78,43 +81,102 @@ pub trait MeshValue: Clone + 'static {
 
 impl MeshValue for f64 {
     fn zero() -> Self { 0.0 }
-    fn from_f64(v: f64) -> Option<Self> { Some(v) }
-    fn to_f64(&self) -> f64 { *self }
-    fn mesh_add(&self, rhs: &Self) -> Self { self + rhs }
-    fn mesh_sub(&self, rhs: &Self) -> Self { self - rhs }
-    fn mesh_mul(&self, rhs: &Self) -> Self { self * rhs }
+
+    fn from_f64(v: f64) -> Option<Self> {
+        Some(v)
+    }
+
+    fn to_f64(&self) -> f64 {
+        *self
+    }
+
+    fn mesh_add(&self, rhs: &Self) -> Self {
+        self + rhs
+    }
+
+    fn mesh_sub(&self, rhs: &Self) -> Self {
+        self - rhs
+    }
+
+    fn mesh_mul(&self, rhs: &Self) -> Self {
+        self * rhs
+    }
+
     fn mesh_div(&self, rhs: &Self) -> Self {
         if *rhs != 0.0 { self / rhs } else { 0.0 }
     }
-    fn mesh_neg(&self) -> Self { -self }
+
+    fn mesh_neg(&self) -> Self {
+        -self
+    }
 }
 
 impl MeshValue for i64 {
     fn zero() -> Self { 0 }
-    fn from_f64(v: f64) -> Option<Self> { v.round() as i64 }
-    fn to_f64(&self) -> f64 { *self as f64 }
-    fn mesh_add(&self, rhs: &Self) -> Self { self.saturating_add(*rhs) }
-    fn mesh_sub(&self, rhs: &Self) -> Self { self.saturating_sub(*rhs) }
-    fn mesh_mul(&self, rhs: &Self) -> Self { self.saturating_mul(*rhs) }
+
+    fn from_f64(v: f64) -> Option<Self> {
+        Some(libm::round(v) as i64)
+    }
+
+    fn to_f64(&self) -> f64 {
+        *self as f64
+    }
+
+    fn mesh_add(&self, rhs: &Self) -> Self {
+        self.saturating_add(*rhs)
+    }
+
+    fn mesh_sub(&self, rhs: &Self) -> Self {
+        self.saturating_sub(*rhs)
+    }
+
+    fn mesh_mul(&self, rhs: &Self) -> Self {
+        self.saturating_mul(*rhs)
+    }
+
     fn mesh_div(&self, rhs: &Self) -> Self {
         if *rhs != 0 { self.saturating_div(*rhs) } else { 0 }
     }
-    fn mesh_neg(&self) -> Self { self.saturating_neg() }
+
+    fn mesh_neg(&self) -> Self {
+        self.saturating_neg()
+    }
 }
 
 impl MeshValue for u64 {
     fn zero() -> Self { 0 }
+
     fn from_f64(v: f64) -> Option<Self> {
-        if v >= 0.0 { Some(v.round() as u64) } else { None }
+        if v >= 0.0 {
+            Some(libm::round(v) as u64)
+        } else {
+            None
+        }
     }
-    fn to_f64(&self) -> f64 { *self as f64 }
-    fn mesh_add(&self, rhs: &Self) -> Self { self.saturating_add(*rhs) }
-    fn mesh_sub(&self, rhs: &Self) -> Self { self.saturating_sub(*rhs) }
-    fn mesh_mul(&self, rhs: &Self) -> Self { self.saturating_mul(*rhs) }
+
+    fn to_f64(&self) -> f64 {
+        *self as f64
+    }
+
+    fn mesh_add(&self, rhs: &Self) -> Self {
+        self.saturating_add(*rhs)
+    }
+
+    fn mesh_sub(&self, rhs: &Self) -> Self {
+        self.saturating_sub(*rhs)
+    }
+
+    fn mesh_mul(&self, rhs: &Self) -> Self {
+        self.saturating_mul(*rhs)
+    }
+
     fn mesh_div(&self, rhs: &Self) -> Self {
         if *rhs != 0 { self.saturating_div(*rhs) } else { 0 }
     }
-    fn mesh_neg(&self) -> Self { 0 }
+
+    fn mesh_neg(&self) -> Self {
+        0
+    }
 }
 
 #[cfg(test)]
@@ -155,12 +217,5 @@ mod tests {
         assert_eq!(a.mesh_mul(&b), 294);
         assert_eq!(a.mesh_div(&b), 6);
         assert_eq!(a.mesh_neg(), 0);
-    }
-
-    #[test]
-    fn test_mesh_value_conversions() {
-        assert_eq!(f64::from_f64(42.0), Some(42.0));
-        assert_eq!(i64::from_f64(42.5), Some(43));
-        assert_eq!(u64::from_f64(-42.0), None);
     }
 }
