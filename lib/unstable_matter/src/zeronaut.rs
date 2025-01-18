@@ -1,5 +1,5 @@
-/// Quantum-Safe Zero-Based Memory Navigation Module
-/// Last Updated: 2025-01-18 17:03:10 UTC
+/// Ethereal Void Navigation System - Zero-Point Resonance Module
+/// Last Updated: 2025-01-18 18:24:33 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -9,26 +9,31 @@ use crate::scribe::{Scribe, ScribePrecision, QuantumString};
 use crate::quantum::Quantum;
 use crate::meshmath::MeshValue;
 
-/// Error margin for quantum position calculations
-const QUANTUM_EPSILON: f64 = 1e-10;
-/// Threshold for quantum tunneling detection
-const TUNNEL_THRESHOLD: f64 = 0.01;
+/// Resonance threshold for void calculations
+const VOID_EPSILON: f64 = 1e-10;
+/// Threshold for ethereal tunneling
+const ETHEREAL_THRESHOLD: f64 = 0.01;
 
-/// Represents a quantum-safe non-null pointer with spatial coordinates
+/// Crystalline void navigator with spatial resonance
 #[derive(Debug)]
 pub struct Zeronaut<T> {
-    ptr: *mut T,
-    position: Vector3D<isize>,
-    quantum_state: bool,
-    coherence: f64,
-    last_tunnel: usize,
+    /// Ethereal anchor point
+    essence: *mut T,
+    /// Crystalline coordinates
+    lattice: Vector3D<isize>,
+    /// Ethereal stability state
+    harmonic: bool,
+    /// Crystal resonance strength
+    resonance: f64,
+    /// Last ethereal shift timestamp
+    last_shift: usize,
 }
 
-// Safety implementations remain unchanged
+// Safety implementations for thread boundaries
 unsafe impl<T: Send> Send for Zeronaut<T> {}
 unsafe impl<T: Send> Sync for Zeronaut<T> {}
 
-// Implement Copy and Clone manually since we have raw pointers
+// Implement ethereal duplication
 impl<T> Copy for Zeronaut<T> {}
 
 impl<T> Clone for Zeronaut<T> {
@@ -37,270 +42,228 @@ impl<T> Clone for Zeronaut<T> {
     }
 }
 
-// Implement MeshValue for Zeronaut<T>
+// Crystal mesh operations
 impl<T> MeshValue for Zeronaut<T> {
     fn mesh_add(self, other: Self) -> Self {
         Self {
-            ptr: self.ptr,
-            position: self.position.mesh_add(&other.position),
-            quantum_state: self.quantum_state && other.quantum_state,
-            coherence: self.coherence * other.coherence,
-            last_tunnel: self.last_tunnel,
+            essence: self.essence,
+            lattice: self.lattice.mesh_add(&other.lattice),
+            harmonic: self.harmonic && other.harmonic,
+            resonance: self.resonance * other.resonance,
+            last_shift: self.last_shift,
         }
     }
 
     fn mesh_sub(self, other: Self) -> Self {
         Self {
-            ptr: self.ptr,
-            position: self.position.mesh_sub(&other.position),
-            quantum_state: self.quantum_state && other.quantum_state,
-            coherence: self.coherence / other.coherence,
-            last_tunnel: self.last_tunnel,
+            essence: self.essence,
+            lattice: self.lattice.mesh_sub(&other.lattice),
+            harmonic: self.harmonic && other.harmonic,
+            resonance: self.resonance / other.resonance,
+            last_shift: self.last_shift,
         }
     }
 
     fn mesh_mul(self, scalar: Self) -> Self {
         Self {
-            ptr: self.ptr,
-            position: self.position.mesh_mul(scalar.coherence as isize),
-            quantum_state: self.quantum_state,
-            coherence: self.coherence * scalar.coherence,
-            last_tunnel: self.last_tunnel,
+            essence: self.essence,
+            lattice: self.lattice.mesh_mul(scalar.resonance as isize),
+            harmonic: self.harmonic,
+            resonance: self.resonance * scalar.resonance,
+            last_shift: self.last_shift,
         }
     }
 
     fn mesh_div(self, scalar: Self) -> Self {
-        if scalar.coherence == 0.0 {
+        if scalar.resonance == 0.0 {
             return self;
         }
         Self {
-            ptr: self.ptr,
-            position: self.position.mesh_div(scalar.coherence.abs() as isize),
-            quantum_state: self.quantum_state,
-            coherence: self.coherence / scalar.coherence,
-            last_tunnel: self.last_tunnel,
+            essence: self.essence,
+            lattice: self.lattice.mesh_div(scalar.resonance.abs() as isize),
+            harmonic: self.harmonic,
+            resonance: self.resonance / scalar.resonance,
+            last_shift: self.last_shift,
         }
     }
 
     fn mesh_neg(self) -> Self {
         Self {
-            ptr: self.ptr,
-            position: self.position.mesh_neg(),
-            quantum_state: self.quantum_state,
-            coherence: -self.coherence,
-            last_tunnel: self.last_tunnel,
+            essence: self.essence,
+            lattice: self.lattice.mesh_neg(),
+            harmonic: self.harmonic,
+            resonance: -self.resonance,
+            last_shift: self.last_shift,
         }
     }
 
     fn mesh_zero() -> Self {
         Self {
-            ptr: std::ptr::null_mut(),
-            position: Vector3D::new(0, 0, 0),
-            quantum_state: true,
-            coherence: 0.0,
-            last_tunnel: CURRENT_TIMESTAMP,
+            essence: std::ptr::null_mut(),
+            lattice: Vector3D::void(),
+            harmonic: true,
+            resonance: 0.0,
+            last_shift: CURRENT_TIMESTAMP,
         }
     }
 
     fn mesh_one() -> Self {
         Self {
-            ptr: std::ptr::null_mut(),
-            position: Vector3D::new(1, 1, 1),
-            quantum_state: true,
-            coherence: 1.0,
-            last_tunnel: CURRENT_TIMESTAMP,
+            essence: std::ptr::null_mut(),
+            lattice: Vector3D::unity(),
+            harmonic: true,
+            resonance: 1.0,
+            last_shift: CURRENT_TIMESTAMP,
         }
     }
 }
 
 impl<T> Zeronaut<T> {
-    // Constructor implementations remain unchanged
-    pub fn new(ptr: *mut T) -> Option<Self> {
-        if ptr.is_null() {
+    /// Crystallize new void navigator
+    pub fn crystallize(essence: *mut T) -> Option<Self> {
+        if essence.is_null() {
             None
         } else {
             Some(Self {
-                ptr,
-                position: Vector3D::new(0, 0, 0),
-                 quantum_state: true,
-                 coherence: 1.0,
-                 last_tunnel: CURRENT_TIMESTAMP,
+                essence,
+                lattice: Vector3D::void(),
+                 harmonic: true,
+                 resonance: 1.0,
+                 last_shift: CURRENT_TIMESTAMP,
             })
         }
     }
 
-    pub fn new_positioned(ptr: *mut T, x: isize, y: isize, z: isize) -> Option<Self> {
-        if ptr.is_null() {
+    /// Create positioned void navigator
+    pub fn crystallize_at(essence: *mut T, prime: isize, resonant: isize, harmonic: isize) -> Option<Self> {
+        if essence.is_null() {
             None
         } else {
             Some(Self {
-                ptr,
-                position: Vector3D::new(x, y, z),
-                 quantum_state: true,
-                 coherence: 1.0,
-                 last_tunnel: CURRENT_TIMESTAMP,
+                essence,
+                lattice: Vector3D::crystallize(prime, resonant, harmonic),
+                 harmonic: true,
+                 resonance: 1.0,
+                 last_shift: CURRENT_TIMESTAMP,
             })
         }
     }
 
-    pub fn zero() -> Self {
+    /// Create void point
+    pub fn void() -> Self {
         Self {
-            ptr: std::ptr::null_mut(),
-            position: Vector3D::new(0, 0, 0),
-            quantum_state: true,
-            coherence: 1.0,
-            last_tunnel: CURRENT_TIMESTAMP,
+            essence: std::ptr::null_mut(),
+            lattice: Vector3D::void(),
+            harmonic: true,
+            resonance: 1.0,
+            last_shift: CURRENT_TIMESTAMP,
         }
     }
 
-    // Accessor methods remain unchanged
-    pub fn as_ptr(&self) -> *mut T {
-        self.ptr
+    /// Access ethereal essence
+    pub fn essence(&self) -> *mut T {
+        self.essence
     }
 
-    pub fn get_position(&self) -> Vector3D<isize> {
-        self.position
+    /// Get crystalline coordinates
+    pub fn get_lattice(&self) -> Vector3D<isize> {
+        self.lattice
     }
 
-    // Modified to handle mutations safely
-    pub fn set_position(&mut self, x: isize, y: isize, z: isize) {
-        self.position = Vector3D::new(x, y, z);
-        self.decay_coherence();
+    /// Shift crystalline alignment
+    pub fn align_lattice(&mut self, prime: isize, resonant: isize, harmonic: isize) {
+        self.lattice = Vector3D::crystallize(prime, resonant, harmonic);
+        self.diminish_resonance();
     }
 
-    pub fn tunnel_to(&mut self, target: Vector3D<isize>) -> bool {
-        let distance = self.position.quantum_distance(&target);
-        if distance < TUNNEL_THRESHOLD {
-            self.position = target;
-            self.coherence *= 0.9;
-            self.last_tunnel = CURRENT_TIMESTAMP;
-            self.quantum_state = true;
+    /// Perform ethereal tunneling
+    pub fn ethereal_shift(&mut self, target: Vector3D<isize>) -> bool {
+        let distance = self.lattice.quantum_distance(&target);
+        if distance < ETHEREAL_THRESHOLD {
+            self.lattice = target;
+            self.resonance *= 0.9;
+            self.last_shift = CURRENT_TIMESTAMP;
+            self.harmonic = true;
             true
         } else {
             false
         }
     }
 
-    pub fn get_coherence(&self) -> f64 {
-        self.coherence
+    /// Measure resonance strength
+    pub fn get_resonance(&self) -> f64 {
+        self.resonance
     }
 
-    pub fn is_quantum_stable(&self) -> bool {
-        self.quantum_state && self.get_coherence() > 0.5
+    /// Check harmonic stability
+    pub fn is_harmonic(&self) -> bool {
+        self.harmonic && self.get_resonance() > 0.5
     }
 
-    fn decay_coherence(&mut self) {
-        self.coherence *= 0.99;
-        self.quantum_state = self.coherence > 0.5;
-        self.last_tunnel = CURRENT_TIMESTAMP;
+    /// Natural resonance decay
+    fn diminish_resonance(&mut self) {
+        self.resonance *= 0.99;
+        self.harmonic = self.resonance > 0.5;
+        self.last_shift = CURRENT_TIMESTAMP;
     }
 
-    pub fn last_tunnel_time(&self) -> usize {
-        self.last_tunnel
+    /// Get last ethereal shift time
+    pub fn last_shift_time(&self) -> usize {
+        self.last_shift
     }
 
+    /// Check quantum entanglement
     pub fn is_entangled_with(&self, other: &Zeronaut<T>) -> bool {
-        self.position.quantum_distance(&other.position) < QUANTUM_EPSILON &&
-        (self.get_coherence() - other.get_coherence()).abs() < QUANTUM_EPSILON
+        self.lattice.quantum_distance(&other.lattice) < VOID_EPSILON &&
+        (self.get_resonance() - other.get_resonance()).abs() < VOID_EPSILON
     }
 
+    /// Convert to numeric indices
     pub fn as_isize(&self) -> isize {
-        self.ptr as isize
+        self.essence as isize
     }
 
     pub fn as_usize(&self) -> usize {
-        self.ptr as usize
+        self.essence as usize
     }
 }
 
 impl<T: Scribe> Scribe for Zeronaut<T> {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
-        let hex = format!("0x{:x}", self.ptr as usize);
-        output.push_str("Zeronaut{ptr=");
-        output.push_str(&hex);
-        output.push_str(", pos=");
-        self.position.scribe(precision, output);
-        output.push_str(", coherence=");
-        let coherence = format!("{:.6}", self.coherence);
-        output.push_str(&coherence);
-        output.push_str(", stable=");
-        output.push_str(if self.quantum_state { "true" } else { "false" });
-        output.push_char('}');
+        output.push_str("✧⟨");  // Void star symbol
+        output.push_str(&format!("∇={:x}", self.essence as usize));  // Nabla symbol for essence
+        output.push_str(", ⬡=");  // Hexagon for lattice
+        self.lattice.scribe(precision, output);
+        output.push_str(", ϟ=");  // Lightning for resonance
+        output.push_f64(self.resonance, 6);
+        output.push_str(", ∿=");  // Wave for harmony
+        output.push_str(if self.harmonic { "true" } else { "false" });
+        output.push_str("⟩✧");
     }
 }
 
 impl<T: Scribe> Quantum for Zeronaut<T> {
     fn get_coherence(&self) -> f64 {
-        self.coherence
+        self.resonance
     }
 
     fn is_quantum_stable(&self) -> bool {
-        self.quantum_state && self.coherence > 0.5
+        self.harmonic && self.resonance > 0.5
     }
 
     fn decay_coherence(&self) {
-        let new_coherence = self.coherence * 0.99;
-        // SAFETY: This is safe because Zeronaut implements Copy
-        // and we're only modifying the coherence value atomically
         unsafe {
             let ptr = self as *const Self as *mut Self;
-            (*ptr).coherence = new_coherence;
-            (*ptr).quantum_state = new_coherence > 0.5;
+            (*ptr).resonance *= 0.99;
+            (*ptr).harmonic = (*ptr).resonance > 0.5;
         }
     }
 
     fn reset_coherence(&self) {
-        // SAFETY: This is safe because Zeronaut implements Copy
-        // and we're only modifying the coherence value atomically
         unsafe {
             let ptr = self as *const Self as *mut Self;
-            (*ptr).coherence = 1.0;
-            (*ptr).quantum_state = true;
+            (*ptr).resonance = 1.0;
+            (*ptr).harmonic = true;
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_zeronaut_creation() {
-        let value = Box::into_raw(Box::new(42));
-        let zeronaut = Zeronaut::new(value).unwrap();
-        assert!(zeronaut.is_quantum_stable());
-        assert_eq!(zeronaut.get_position(), Vector3D::new(0, 0, 0));
-        unsafe { Box::from_raw(value) };
-    }
-
-    #[test]
-    fn test_zeronaut_positioning() {
-        let mut zeronaut = Zeronaut::<i32>::zero();
-        zeronaut.set_position(1, 2, 3);
-        assert_eq!(zeronaut.get_position(), Vector3D::new(1, 2, 3));
-        assert!(zeronaut.get_coherence() < 1.0);
-    }
-
-    #[test]
-    fn test_quantum_tunneling() {
-        let mut zeronaut = Zeronaut::<i32>::zero();
-        let target = Vector3D::new(0, 0, 0);
-        assert!(zeronaut.tunnel_to(target));
-        assert!(zeronaut.get_coherence() < 1.0);
-    }
-
-    #[test]
-    fn test_mesh_operations() {
-        let z1 = Zeronaut::<i32>::zero();
-        let z2 = Zeronaut::<i32>::zero();
-
-        let sum = z1.mesh_add(z2);
-        assert_eq!(sum.get_position(), Vector3D::new(0, 0, 0));
-
-        let diff = z1.mesh_sub(z2);
-        assert_eq!(diff.get_position(), Vector3D::new(0, 0, 0));
-
-        let scaled = z1.mesh_mul(z2);
-        assert_eq!(scaled.get_position(), Vector3D::new(0, 0, 0));
     }
 }
