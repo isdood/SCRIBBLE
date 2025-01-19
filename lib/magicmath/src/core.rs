@@ -1,5 +1,3 @@
-// lib/magicmath/src/core.rs
-
 //! Core Mathematical Operations for Crystal Lattice HPC Systems
 //! ===============================================
 //!
@@ -21,6 +19,7 @@ use crate::{
     brot,
 };
 use errors::core::MathError;
+use scribe::native_string::String; // Import the correct String type
 
 /// Core harmony state tracking for all mathematical operations
 #[derive(Debug, Clone, Copy)]
@@ -248,7 +247,7 @@ pub fn harmony_div<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
 pub fn harmony_sqrt<T: MeshValue>(a: &T) -> Result<T, MathError> {
     let val = a.to_f64()?;
     if val < 0.0 {
-        return Err(MathError::InvalidDomain("Square root of negative number".to_string()));
+        return Err(MathError::InvalidDomain(String::from("Square root of negative number"))); // Convert to custom String
     }
     Ok(T::from(val.sqrt()))
 }

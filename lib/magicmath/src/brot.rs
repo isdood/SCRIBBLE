@@ -1,5 +1,3 @@
-// lib/magicmath/src/brot.rs
-
 //! Mandelbrot Set Implementation for Crystal Lattice Systems
 //! ===============================================
 //!
@@ -18,6 +16,7 @@ use crate::constants::{
     HARMONY_STABILITY_THRESHOLD,
 };
 use errors::MathError;
+use scribe::native_string::String; // Import the correct String type
 
 /// Parameters for Mandelbrot set calculation
 #[derive(Debug, Clone, Copy)]
@@ -116,7 +115,7 @@ pub fn iterate_mandelbrot(
         // Check for stability loss
         if state.stability < HARMONY_MANDELBROT_THRESHOLD {
             return Err(MathError::MandelbrotStabilityLoss(
-                "Harmony stability lost during iteration".to_string()
+                String::from("Harmony stability lost during iteration")
             ));
         }
 

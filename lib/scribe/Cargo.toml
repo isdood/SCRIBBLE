@@ -8,9 +8,8 @@ license = "MIT"
 repository = "https://github.com/isdood/scribble"
 
 [dependencies]
-# No external dependencies - native implementation
 
 [package.metadata]
 created = "2025-01-19 14:32:23"
-updated = "2025-01-19 14:32:23"
+updated = "2025-01-19 18:05:24"
 current_user = "isdood"

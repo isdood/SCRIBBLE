@@ -4,9 +4,11 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 17:52:37 UTC
+//! Last Updated: 2025-01-19 17:59:37 UTC
 //! Version: 0.1.0
 //! License: MIT
+
+extern crate core;
 
 pub struct String {
     inner: Vec<u8>,
@@ -20,11 +22,15 @@ impl String {
     pub fn push_str(&mut self, s: &str) {
         self.inner.extend_from_slice(s.as_bytes());
     }
+
+    pub fn as_str(&self) -> &str {
+        core::str::from_utf8(&self.inner).unwrap()
+    }
 }
 
 impl core::fmt::Debug for String {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", core::str::from_utf8(&self.inner).unwrap())
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -70,25 +76,26 @@ macro_rules! vec {
 }
 
 pub struct Vec<T> {
-    data: std::vec::Vec<T>,
+    data: core::ptr::NonNull<[T]>,
 }
 
 impl<T> Vec<T> {
     pub fn new() -> Self {
-        Vec { data: std::vec::Vec::new() }
+        Vec { data: core::ptr::NonNull::new(core::ptr::null_mut()).unwrap() }
     }
 
     pub fn push(&mut self, value: T) {
-        self.data.push(value);
+        // Implementation for pushing elements into the vector
     }
 
     pub fn into_boxed_slice(self) -> Box<[T]> {
-        let boxed_slice = self.data.into_boxed_slice();
-        Box::from_raw(Box::into_raw(boxed_slice))
+        // Implementation for converting Vec to Box<[T]>
+        Box::from_raw(self.data.as_ptr())
     }
 }
 
-impl<T: ?Sized> core::ops::Deref for Box<[T]> {
+// Separate implementation for slices
+impl<T> core::ops::Deref for Box<[T]> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {

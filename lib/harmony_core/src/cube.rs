@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19 09:48:03 UTC
-//! Last Updated: 2025-01-19 17:52:37 UTC
+//! Last Updated: 2025-01-19 17:59:37 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -84,8 +84,8 @@ impl<T: Default + Clone + Scribe> CrystalCube<T> {
 }
 
 impl<T: Default + Clone + Scribe> Scribe for CrystalCube<T> {
-    fn scribe(&self) -> String {
-        let mut result = String::new();
+    fn scribe(&self) -> crate::native::String {
+        let mut result = crate::native::String::new();
         for x in 0..self.size {
             for y in 0..self.size {
                 for z in 0..self.size {
@@ -111,8 +111,10 @@ mod tests {
     }
 
     impl Scribe for TestType {
-        fn scribe(&self) -> String {
-            format!("{}", self.value)
+        fn scribe(&self) -> crate::native::String {
+            let mut result = crate::native::String::new();
+            result.push_str(&format!("{}", self.value));
+            result
         }
     }
 
@@ -141,6 +143,6 @@ mod tests {
         let mut cube = CrystalCube::new(2);
         let test_value = TestType { value: 42 };
         cube.set_state(0, 0, 0, test_value.clone()).unwrap();
-        assert!(cube.scribe().contains("(0,0,0): 42"));
+        assert!(cube.scribe().as_str().contains("(0,0,0): 42"));
     }
 }

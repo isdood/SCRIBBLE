@@ -1,5 +1,3 @@
-// lib/magicmath/src/errors.rs
-
 //! Core Error Types for Crystal Computing Systems
 //! ===========================================
 //!
@@ -11,6 +9,7 @@
 //! License: MIT
 
 use scribe::Scribe;
+use scribe::native_string::String; // Import the correct String type
 
 /// Core error type for crystal computing operations
 #[derive(Debug, Clone)]
@@ -121,22 +120,99 @@ impl Scribe for CrystalError {
 impl Scribe for MathError {
     fn scribe(&self) -> String {
         match self {
-            Self::DivisionByZero => "Division by zero".to_string(),
-            Self::Overflow(msg) => format!("Overflow error: {}", msg),
-            Self::Underflow(msg) => format!("Underflow error: {}", msg),
-            Self::InvalidDomain(msg) => format!("Invalid domain: {}", msg),
-            Self::HarmonyStateUnstable => "Harmony state became unstable".to_string(),
-            Self::ConversionError(msg) => format!("Conversion error: {}", msg),
-            Self::InvalidParameter(msg) => format!("Invalid parameter: {}", msg),
-            Self::LogarithmDomainError(val) => format!("Logarithm domain error: {}", val),
-            Self::JuliaStabilityLoss(msg) => format!("Julia set stability loss: {}", msg),
-            Self::MandelbrotStabilityLoss(msg) => format!("Mandelbrot set stability loss: {}", msg),
-            Self::FractalStabilityLoss(msg) => format!("Fractal stability loss: {}", msg),
-            Self::FractalTypeMismatch => "Fractal type mismatch".to_string(),
-            Self::ComplexConvergenceFailure(msg) => format!("Complex convergence failure: {}", msg),
-            Self::ResonanceLoss(msg) => format!("Resonance loss: {}", msg),
-            Self::IterationLimitExceeded(limit) => format!("Iteration limit exceeded: {}", limit),
-            Self::HarmonyError(msg) => format!("Harmony error: {}", msg),
+            Self::DivisionByZero => {
+                let mut result = String::new();
+                result.push_str("Division by zero");
+                result
+            },
+            Self::Overflow(msg) => {
+                let mut result = String::new();
+                result.push_str("Overflow error: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::Underflow(msg) => {
+                let mut result = String::new();
+                result.push_str("Underflow error: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::InvalidDomain(msg) => {
+                let mut result = String::new();
+                result.push_str("Invalid domain: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::HarmonyStateUnstable => {
+                let mut result = String::new();
+                result.push_str("Harmony state became unstable");
+                result
+            },
+            Self::ConversionError(msg) => {
+                let mut result = String::new();
+                result.push_str("Conversion error: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::InvalidParameter(msg) => {
+                let mut result = String::new();
+                result.push_str("Invalid parameter: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::LogarithmDomainError(val) => {
+                let mut result = String::new();
+                result.push_str("Logarithm domain error: ");
+                result.push_str(&val.to_string());
+                result
+            },
+            Self::JuliaStabilityLoss(msg) => {
+                let mut result = String::new();
+                result.push_str("Julia set stability loss: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::MandelbrotStabilityLoss(msg) => {
+                let mut result = String::new();
+                result.push_str("Mandelbrot set stability loss: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::FractalStabilityLoss(msg) => {
+                let mut result = String::new();
+                result.push_str("Fractal stability loss: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::FractalTypeMismatch => {
+                let mut result = String::new();
+                result.push_str("Fractal type mismatch");
+                result
+            },
+            Self::ComplexConvergenceFailure(msg) => {
+                let mut result = String::new();
+                result.push_str("Complex convergence failure: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::ResonanceLoss(msg) => {
+                let mut result = String::new();
+                result.push_str("Resonance loss: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
+            Self::IterationLimitExceeded(limit) => {
+                let mut result = String::new();
+                result.push_str("Iteration limit exceeded: ");
+                result.push_str(&limit.to_string());
+                result
+            },
+            Self::HarmonyError(msg) => {
+                let mut result = String::new();
+                result.push_str("Harmony error: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
         }
     }
 }
@@ -144,12 +220,37 @@ impl Scribe for MathError {
 impl Scribe for QuantumError {
     fn scribe(&self) -> String {
         match self {
-            Self::InvalidState => "Invalid quantum state".to_string(),
-            Self::BoundaryViolation => "Crystal boundary violation".to_string(),
-            Self::CoherenceLoss => "Loss of quantum coherence".to_string(),
-            Self::PhaseMisalignment => "Phase misalignment detected".to_string(),
-            Self::ResonanceFailure => "Resonance failure".to_string(),
-            Self::AlignmentFailure(msg) => format!("Alignment failure: {}", msg),
+            Self::InvalidState => {
+                let mut result = String::new();
+                result.push_str("Invalid quantum state");
+                result
+            },
+            Self::BoundaryViolation => {
+                let mut result = String::new();
+                result.push_str("Crystal boundary violation");
+                result
+            },
+            Self::CoherenceLoss => {
+                let mut result = String::new();
+                result.push_str("Loss of quantum coherence");
+                result
+            },
+            Self::PhaseMisalignment => {
+                let mut result = String::new();
+                result.push_str("Phase misalignment detected");
+                result
+            },
+            Self::ResonanceFailure => {
+                let mut result = String::new();
+                result.push_str("Resonance failure");
+                result
+            },
+            Self::AlignmentFailure(msg) => {
+                let mut result = String::new();
+                result.push_str("Alignment failure: ");
+                result.push_str(msg.to_str()); // Convert to &str
+                result
+            },
             Self::VectorError(e) => e.scribe(),
         }
     }
@@ -158,10 +259,26 @@ impl Scribe for QuantumError {
 impl Scribe for VectorError {
     fn scribe(&self) -> String {
         match self {
-            Self::DivisionByZero => "Division by zero".to_string(),
-            Self::InvalidDimension => "Invalid vector dimension".to_string(),
-            Self::Overflow => "Vector operation overflow".to_string(),
-            Self::NormalizationError => "Vector normalization error".to_string(),
+            Self::DivisionByZero => {
+                let mut result = String::new();
+                result.push_str("Division by zero");
+                result
+            },
+            Self::InvalidDimension => {
+                let mut result = String::new();
+                result.push_str("Invalid vector dimension");
+                result
+            },
+            Self::Overflow => {
+                let mut result = String::new();
+                result.push_str("Vector operation overflow");
+                result
+            },
+            Self::NormalizationError => {
+                let mut result = String::new();
+                result.push_str("Vector normalization error");
+                result
+            },
         }
     }
 }
@@ -169,10 +286,26 @@ impl Scribe for VectorError {
 impl Scribe for CoherenceError {
     fn scribe(&self) -> String {
         match self {
-            Self::InvalidValue => "Invalid coherence value".to_string(),
-            Self::PhaseAlignmentFailure => "Phase alignment failure".to_string(),
-            Self::BoundaryViolation => "Boundary violation".to_string(),
-            Self::ResonanceFailure => "Resonance failure".to_string(),
+            Self::InvalidValue => {
+                let mut result = String::new();
+                result.push_str("Invalid coherence value");
+                result
+            },
+            Self::PhaseAlignmentFailure => {
+                let mut result = String::new();
+                result.push_str("Phase alignment failure");
+                result
+            },
+            Self::BoundaryViolation => {
+                let mut result = String::new();
+                result.push_str("Boundary violation");
+                result
+            },
+            Self::ResonanceFailure => {
+                let mut result = String::new();
+                result.push_str("Resonance failure");
+                result
+            },
         }
     }
 }
@@ -222,31 +355,31 @@ mod tests {
     #[test]
     fn test_crystal_error_scribe() {
         let error = CrystalError::Math(MathError::DivisionByZero);
-        assert_eq!(error.scribe(), "Division by zero");
+        assert_eq!(error.scribe().to_str(), "Division by zero");
     }
 
     #[test]
     fn test_math_error_scribe() {
         let error = MathError::InvalidDomain("test".to_string());
-        assert_eq!(error.scribe(), "Invalid domain: test");
+        assert_eq!(error.scribe().to_str(), "Invalid domain: test");
     }
 
     #[test]
     fn test_quantum_error_scribe() {
         let error = QuantumError::InvalidState;
-        assert_eq!(error.scribe(), "Invalid quantum state");
+        assert_eq!(error.scribe().to_str(), "Invalid quantum state");
     }
 
     #[test]
     fn test_vector_error_scribe() {
         let error = VectorError::DivisionByZero;
-        assert_eq!(error.scribe(), "Division by zero");
+        assert_eq!(error.scribe().to_str(), "Division by zero");
     }
 
     #[test]
     fn test_coherence_error_scribe() {
         let error = CoherenceError::InvalidValue;
-        assert_eq!(error.scribe(), "Invalid coherence value");
+        assert_eq!(error.scribe().to_str(), "Invalid coherence value");
     }
 
     #[test]

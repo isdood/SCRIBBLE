@@ -4,9 +4,13 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 14:25:58 UTC
+//! Last Updated: 2025-01-19 18:02:27 UTC
 //! Version: 0.1.0
 //! License: MIT
+
+pub mod native_string; // Add this line to include the new module
+
+use native_string::String; // Use the custom String type
 
 /// Core trait for types that can be converted to string representations
 pub trait Scribe {
@@ -15,17 +19,24 @@ pub trait Scribe {
 
     /// Get the type name for debugging and error messages
     fn type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
+        core::any::type_name::<Self>()
     }
 
     /// Get a debug representation
     fn scribe_debug(&self) -> String {
-        format!("{}({:?})", self.type_name(), self.scribe())
+        let mut result = String::new();
+        result.push_str(self.type_name());
+        result.push_str("(");
+        result.push_str(&self.scribe().to_str()); // Use to_str method here
+        result.push_str(")");
+        result
     }
 }
 
 /// Helper functions for working with Scribe types
 pub mod utils {
+    use super::native_string::String; // Use the custom String type
+
     /// Join multiple strings with a separator
     pub fn join(items: &[String], separator: &str) -> String {
         let mut result = String::new();
@@ -33,22 +44,20 @@ pub mod utils {
             if i > 0 {
                 result.push_str(separator);
             }
-            result.push_str(item);
+            result.push_str(item.to_str()); // Use to_str method here
         }
         result
     }
 
     /// Format multiple scribeable items
     pub fn format_multiple<T: super::Scribe>(items: &[T], separator: &str) -> String {
-        let strings: Vec<String> = items.iter().map(|item| item.scribe()).collect();
+        let strings: std::vec::Vec<String> = items.iter().map(|item| item.scribe()).collect();
         join(&strings, separator)
     }
 
     /// Wrap a string with a prefix and suffix
     pub fn wrap(content: &str, prefix: &str, suffix: &str) -> String {
-        let mut result = String::with_capacity(
-            prefix.len() + content.len() + suffix.len()
-        );
+        let mut result = String::new();
         result.push_str(prefix);
         result.push_str(content);
         result.push_str(suffix);
@@ -88,8 +97,8 @@ pub trait ScribeResultExt {
 impl<T: Scribe, E: Scribe> ScribeResultExt for ScribeResult<T, E> {
     fn to_scribe_string(&self) -> String {
         match self {
-            Ok(value) => utils::wrap(&value.scribe(), "Ok(", ")"),
-            Err(error) => utils::wrap(&error.scribe(), "Err(", ")"),
+            Ok(value) => utils::wrap(&value.scribe().to_str(), "Ok(", ")"), // Use to_str method here
+            Err(error) => utils::wrap(&error.scribe().to_str(), "Err(", ")"), // Use to_str method here
         }
     }
 }
@@ -97,6 +106,7 @@ impl<T: Scribe, E: Scribe> ScribeResultExt for ScribeResult<T, E> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::native_string::String; // Use the custom String type
 
     #[derive(Debug)]
     struct TestType {
@@ -106,23 +116,35 @@ mod tests {
 
     impl Scribe for TestType {
         fn scribe(&self) -> String {
-            format!("{}: {}", self.name, self.value)
+            let mut result = String::new();
+            result.push_str(&self.name.to_str()); // Use to_str method here
+            result.push_str(": ");
+            result.push_str(&self.value.to_string());
+            result
         }
     }
 
     #[test]
     fn test_basic_scribe() {
+        let mut name = String::new();
+        name.push_str("test");
         let test = TestType {
-            name: "test".to_string(),
+            name,
             value: 42,
         };
-        assert_eq!(test.scribe(), "test: 42");
+        assert_eq!(test.scribe().to_str(), "test: 42");
     }
 
     #[test]
     fn test_utils_join() {
-        let items = vec!["a".to_string(), "b".to_string(), "c".to_string()];
-        assert_eq!(utils::join(&items, ", "), "a, b, c");
+        let mut a = String::new();
+        a.push_str("a");
+        let mut b = String::new();
+        b.push_str("b");
+        let mut c = String::new();
+        c.push_str("c");
+        let items = vec![a, b, c];
+        assert_eq!(utils::join(&items, ", ").to_str(), "a, b, c");
     }
 
     #[test]
@@ -131,37 +153,44 @@ mod tests {
             TestType { name: "first".to_string(), value: 1 },
             TestType { name: "second".to_string(), value: 2 },
         ];
-        assert_eq!(utils::format_multiple(&items, "; "), "first: 1; second: 2");
+        assert_eq!(utils::format_multiple(&items, "; ").to_str(), "first: 1; second: 2");
     }
 
     #[test]
     fn test_utils_wrap() {
         let content = "test";
-        assert_eq!(utils::bracketed(content), "[test]");
-        assert_eq!(utils::parenthesized(content), "(test)");
-        assert_eq!(utils::braced(content), "{test}");
-        assert_eq!(utils::quoted(content), "\"test\"");
+        assert_eq!(utils::bracketed(content).to_str(), "[test]");
+        assert_eq!(utils::parenthesized(content).to_str(), "(test)");
+        assert_eq!(utils::braced(content).to_str(), "{test}");
+        assert_eq!(utils::quoted(content).to_str(), "\"test\"");
     }
 
     #[test]
     fn test_result_scribe() {
+        let mut success_name = String::new();
+        success_name.push_str("success");
         let ok_result: ScribeResult<TestType, TestType> = Ok(TestType {
-            name: "success".to_string(),
-                                                             value: 1,
-        });
-        let err_result: ScribeResult<TestType, TestType> = Err(TestType {
-            name: "error".to_string(),
-                                                               value: 0,
+            name: success_name,
+            value: 1,
         });
 
-        assert_eq!(ok_result.to_scribe_string(), "Ok(success: 1)");
-        assert_eq!(err_result.to_scribe_string(), "Err(error: 0)");
+        let mut error_name = String::new();
+        error_name.push_str("error");
+        let err_result: ScribeResult<TestType, TestType> = Err(TestType {
+            name: error_name,
+            value: 0,
+        });
+
+        assert_eq!(ok_result.to_scribe_string().to_str(), "Ok(success: 1)");
+        assert_eq!(err_result.to_scribe_string().to_str(), "Err(error: 0)");
     }
 
     #[test]
     fn test_type_name() {
+        let mut name = String::new();
+        name.push_str("test");
         let test = TestType {
-            name: "test".to_string(),
+            name,
             value: 42,
         };
         assert!(test.type_name().contains("TestType"));
