@@ -1,5 +1,5 @@
 [package]
-name = "meshmath"
+name = "magicmath"
 version = "0.1.0"
 edition = "2021"
 authors = ["Caleb J.D. Terkovics <isdood>"]
