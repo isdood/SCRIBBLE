@@ -4,8 +4,8 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:53:17 UTC
-//! Version: 0.1.0
+//! Last Updated: 2025-01-19 13:35:00 UTC
+//! Version: 0.1.1
 //! License: MIT
 
 use core::fmt;

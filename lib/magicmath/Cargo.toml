@@ -7,3 +7,4 @@ description = "Math operations for mesh-based quantum computations"
 license = "MIT"
 
 [dependencies]
+rustversion = "1.0"

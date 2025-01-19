@@ -1,156 +1,117 @@
-//! Scribe - Crystal Data Recording Operations
-//! ====================================
+//! Error Types for Crystal Computing
+//! ============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:57:36 UTC
-//! Version: 0.1.0
+//! Last Updated: 2025-01-19 13:58:19 UTC
+//! Version: 0.1.1
 //! License: MIT
 
-use meshmath::sqrt;
-use crate::{
-    vector::Vector3D,
-    crystal::CrystalCube,
-    errors::QuantumError,
-    constants::{
-        QUANTUM_STABILITY_THRESHOLD,
-        MAX_QUANTUM_SIZE
-    },
-    align::{Alignment, AlignmentState},
-    idk::ShardUninit,
-};
+use scribe::Scribe;
+use crate::align::AlignmentState;
 
-/// Core scribe state for data recording
+/// Core error type for quantum operations
 #[derive(Debug)]
-pub struct ScribeCore {
-    /// Data storage
-    data: ShardUninit<[u8; MAX_QUANTUM_SIZE]>,
-    /// Current write position
-    position: usize,
+pub enum QuantumError {
+    /// Invalid quantum state
+    InvalidState,
+    /// Boundary violation in crystal structure
+    BoundaryViolation,
+    /// Loss of quantum coherence
+    CoherenceLoss,
+    /// Phase misalignment
+    PhaseMisalignment,
+    /// Resonance failure
+    ResonanceFailure,
+    /// Alignment failure
+    AlignmentFailure(AlignmentState),
+    /// Vector operation error
+    VectorError(VectorError),
 }
 
-/// Crystal data recording operator
+/// Error type for vector operations
 #[derive(Debug)]
-pub struct Scribe {
-    /// Core scribe data
-    core: ScribeCore,
-    /// Position in crystal space
-    pos: Vector3D<f64>,
-    /// Current coherence value
-    coherence: f64,
-    /// Quantum alignment
-    alignment: Alignment,
+pub enum VectorError {
+    /// Division by zero
+    DivisionByZero,
+    /// Invalid dimension
+    InvalidDimension,
+    /// Overflow error
+    Overflow,
+    /// Normalization error
+    NormalizationError,
 }
 
-impl ScribeCore {
-    /// Create a new scribe core
-    pub const fn new() -> Self {
-        Self {
-            data: ShardUninit::new(),
-            position: 0,
+/// Error type for coherence operations
+#[derive(Debug)]
+pub enum CoherenceError {
+    /// Invalid coherence value
+    InvalidValue,
+    /// Phase alignment failure
+    PhaseAlignmentFailure,
+    /// Boundary violation
+    BoundaryViolation,
+    /// Resonance failure
+    ResonanceFailure,
+}
+
+impl Scribe for QuantumError {
+    fn scribe(&self) -> String {
+        match self {
+            Self::InvalidState => "Invalid quantum state".to_string(),
+            Self::BoundaryViolation => "Crystal boundary violation".to_string(),
+            Self::CoherenceLoss => "Loss of quantum coherence".to_string(),
+            Self::PhaseMisalignment => "Phase misalignment detected".to_string(),
+            Self::ResonanceFailure => "Resonance failure".to_string(),
+            Self::AlignmentFailure(state) => format!("Alignment failure: {:?}", state),
+            Self::VectorError(e) => format!("Vector error: {:?}", e),
         }
-    }
-
-    /// Check if position is valid
-    pub fn is_valid_position(&self, pos: usize) -> bool {
-        pos < MAX_QUANTUM_SIZE
-    }
-
-    /// Write data to storage
-    pub unsafe fn write(&mut self, value: u8) -> Result<(), QuantumError> {
-        if !self.is_valid_position(self.position) {
-            return Err(QuantumError::BoundaryViolation);
-        }
-
-        let data = self.data.get_mut()
-        .ok_or(QuantumError::InvalidState)?;
-
-        data[self.position] = value;
-        self.position += 1;
-        Ok(())
-    }
-
-    /// Read data from storage
-    pub unsafe fn read(&self, pos: usize) -> Result<u8, QuantumError> {
-        if !self.is_valid_position(pos) {
-            return Err(QuantumError::BoundaryViolation);
-        }
-
-        let data = self.data.get_ref()
-        .ok_or(QuantumError::InvalidState)?;
-
-        Ok(data[pos])
     }
 }
 
-impl Scribe {
-    /// Create a new scribe
-    pub fn new(position: Vector3D<f64>) -> Self {
-        Self {
-            core: ScribeCore::new(),
-            pos: position.clone(),
-            coherence: 1.0,
-            alignment: Alignment::new(position),
+impl Scribe for VectorError {
+    fn scribe(&self) -> String {
+        match self {
+            Self::DivisionByZero => "Division by zero".to_string(),
+            Self::InvalidDimension => "Invalid vector dimension".to_string(),
+            Self::Overflow => "Vector operation overflow".to_string(),
+            Self::NormalizationError => "Vector normalization error".to_string(),
         }
     }
+}
 
-    /// Get current position
-    pub fn position(&self) -> &Vector3D<f64> {
-        &self.pos
-    }
-
-    /// Set position
-    pub fn set_position(&mut self, pos: &Vector3D<f64>) -> Result<(), QuantumError> {
-        if pos.magnitude()? > MAX_QUANTUM_SIZE as f64 {
-            return Err(QuantumError::BoundaryViolation);
+impl Scribe for CoherenceError {
+    fn scribe(&self) -> String {
+        match self {
+            Self::InvalidValue => "Invalid coherence value".to_string(),
+            Self::PhaseAlignmentFailure => "Phase alignment failure".to_string(),
+            Self::BoundaryViolation => "Boundary violation".to_string(),
+            Self::ResonanceFailure => "Resonance failure".to_string(),
         }
-        self.pos = pos.clone();
-        Ok(())
     }
+}
 
-    /// Record data to crystal cube
-    pub fn record(&mut self, cube: &mut CrystalCube<u8>, value: u8) -> Result<(), QuantumError> {
-        if !self.is_coherent() {
-            return Err(QuantumError::CoherenceLoss);
+/// Result type alias for quantum operations
+pub type QuantumResult<T> = Result<T, QuantumError>;
+
+/// Result type alias for coherence operations
+pub type CoherenceResult<T> = Result<T, CoherenceError>;
+
+impl From<VectorError> for QuantumError {
+    fn from(error: VectorError) -> Self {
+        Self::VectorError(error)
+    }
+}
+
+impl From<CoherenceError> for QuantumError {
+    fn from(error: CoherenceError) -> Self {
+        match error {
+            CoherenceError::InvalidValue => Self::InvalidState,
+            CoherenceError::PhaseAlignmentFailure => Self::PhaseMisalignment,
+            CoherenceError::BoundaryViolation => Self::BoundaryViolation,
+            CoherenceError::ResonanceFailure => Self::ResonanceFailure,
         }
-
-        let pos = self.position();
-        cube.set_state_at(pos, value)?;
-
-        unsafe {
-            self.core.write(value)?;
-        }
-
-        Ok(())
-    }
-
-    /// Read data from crystal cube
-    pub fn read(&self, cube: &CrystalCube<u8>) -> Result<u8, QuantumError> {
-        if !self.is_coherent() {
-            return Err(QuantumError::CoherenceLoss);
-        }
-
-        cube.get_state_at(self.position())
-    }
-
-    /// Check if scribe is coherent
-    pub fn is_coherent(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD
-    }
-
-    /// Get current alignment state
-    pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.get_state()
-    }
-
-    /// Calculate quantum resonance
-    pub fn calculate_resonance(&self) -> Result<f64, QuantumError> {
-        if !self.is_coherent() {
-            return Err(QuantumError::CoherenceLoss);
-        }
-
-        Ok(sqrt(self.coherence))
     }
 }
 
@@ -159,29 +120,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_scribe_creation() {
-        let pos = Vector3D::new(0.0, 0.0, 0.0);
-        let scribe = Scribe::new(pos);
-        assert!(scribe.is_coherent());
+    fn test_quantum_error_scribe() {
+        let error = QuantumError::InvalidState;
+        assert_eq!(error.scribe(), "Invalid quantum state");
     }
 
     #[test]
-    fn test_position_setting() {
-        let mut scribe = Scribe::new(Vector3D::new(0.0, 0.0, 0.0));
-        let new_pos = Vector3D::new(1.0, 1.0, 1.0);
-        assert!(scribe.set_position(&new_pos).is_ok());
+    fn test_vector_error_scribe() {
+        let error = VectorError::DivisionByZero;
+        assert_eq!(error.scribe(), "Division by zero");
     }
 
     #[test]
-    fn test_resonance_calculation() {
-        let scribe = Scribe::new(Vector3D::new(0.0, 0.0, 0.0));
-        assert!(scribe.calculate_resonance().is_ok());
+    fn test_coherence_error_scribe() {
+        let error = CoherenceError::InvalidValue;
+        assert_eq!(error.scribe(), "Invalid coherence value");
     }
 
     #[test]
-    fn test_boundary_violation() {
-        let mut scribe = Scribe::new(Vector3D::new(0.0, 0.0, 0.0));
-        let invalid_pos = Vector3D::new(MAX_QUANTUM_SIZE as f64 + 1.0, 0.0, 0.0);
-        assert!(scribe.set_position(&invalid_pos).is_err());
+    fn test_error_conversion() {
+        let vec_error = VectorError::DivisionByZero;
+        let quantum_error: QuantumError = vec_error.into();
+        assert!(matches!(quantum_error, QuantumError::VectorError(_)));
+    }
+
+    #[test]
+    fn test_coherence_error_conversion() {
+        let coherence_error = CoherenceError::InvalidValue;
+        let quantum_error: QuantumError = coherence_error.into();
+        assert!(matches!(quantum_error, QuantumError::InvalidState));
     }
 }

@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 10:41:02 UTC
+//! Last Updated: 2025-01-19 14:07:27 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -17,6 +17,8 @@ pub mod core;
 pub mod errors;
 pub mod constants;
 pub mod traits;
+pub mod deref;
+pub mod derefmut;
 
 // Feature modules
 pub mod fractal;
@@ -65,6 +67,16 @@ pub use crate::brot::{
     iterate_mandelbrot,
 };
 
+pub use crate::deref::{
+    QuantumDeref,
+    QuantumDerefable,
+};
+
+pub use crate::derefmut::{
+    QuantumDerefMut,
+    QuantumDerefMutable,
+};
+
 /// Library configuration and version information
 pub mod config {
     /// Current library version
@@ -83,7 +95,7 @@ pub mod config {
     pub const CREATED: &str = "2025-01-19";
 
     /// Last update timestamp
-    pub const UPDATED: &str = "2025-01-19 10:41:02 UTC";
+    pub const UPDATED: &str = "2025-01-19 14:07:27 UTC";
 
     /// Current user
     pub const CURRENT_USER: &str = "isdood";
@@ -115,6 +127,10 @@ pub mod prelude {
         MandelbrotState,
         MandelbrotVariant,
         iterate_mandelbrot,
+        QuantumDeref,
+        QuantumDerefable,
+        QuantumDerefMut,
+        QuantumDerefMutable,
     };
 
     pub use crate::core::{
@@ -133,14 +149,14 @@ pub mod prelude {
 
 // Version compatibility check
 #[doc(hidden)]
-#[cfg(not(feature = "unstable"))]
 const _: () = {
     // Ensure we're using a compatible version of Rust
-    #[cfg(not(rust_compiler_version = "1.70.0"))]
-    compile_error!("MagicMath requires Rust 1.70.0 or later");
+    #[rustversion::attr(not(since(1.70)), error("MagicMath requires Rust 1.70.0 or later"))]
+    const CHECK_RUST_VERSION: () = ();
 };
 
 /// Create a new QuantumMath instance with default configuration
+#[inline]
 pub fn new() -> QuantumMath {
     QuantumMath::new()
 }
@@ -153,6 +169,7 @@ mod tests {
     #[test]
     fn test_version() {
         assert_eq!(config::VERSION, "0.1.0");
+        assert_eq!(config::UPDATED, "2025-01-19 14:07:27 UTC");
     }
 
     #[test]

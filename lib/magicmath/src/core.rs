@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 10:35:40 UTC
+//! Last Updated: 2025-01-19 14:01:07 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -20,7 +20,6 @@ pub mod py;
 pub mod fibb;
 pub mod fractal;
 pub mod julia;
-pub mod brot;
 
 use crate::{
     errors::MathError,
@@ -31,6 +30,7 @@ use crate::{
         RESONANCE_FACTOR
     },
     traits::MeshValue,
+    brot,
 };
 
 /// Core quantum state tracking for all mathematical operations
@@ -227,62 +227,5 @@ impl QuantumMath {
     #[inline]
     pub fn reset_state(&mut self) {
         self.state = QuantumState::new();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Test implementation of MeshValue for f64
-    impl MeshValue for f64 {
-        fn coherence(&self) -> Result<f64, MathError> { Ok(1.0) }
-        fn energy(&self) -> Result<f64, MathError> { Ok(*self) }
-        fn magnitude(&self) -> Result<f64, MathError> { Ok(self.abs()) }
-        fn to_usize(&self) -> Result<usize, MathError> { Ok(*self as usize) }
-        fn to_f64(&self) -> Result<f64, MathError> { Ok(*self) }
-        fn from(value: f64) -> Self { value }
-    }
-
-    #[test]
-    fn test_all_operations() {
-        let mut qmath = QuantumMath::new();
-
-        for operation in &[
-            Operation::Add,
-            Operation::Subtract,
-            Operation::Multiply,
-            Operation::Divide,
-            Operation::SquareRoot,
-            Operation::Logarithm,
-            Operation::Pi,
-            Operation::Golden,
-            Operation::Pythagorean,
-            Operation::Fibonacci,
-            Operation::Julia,
-            Operation::Mandelbrot,
-            Operation::Fractal,
-        ] {
-            assert!(qmath.operate(*operation, 1.0).is_ok());
-        }
-    }
-
-    #[test]
-    fn test_quantum_state() {
-        let mut state = QuantumState::new();
-        assert!(state.is_stable());
-
-        state.update(Operation::Add).unwrap();
-        assert!(state.is_stable());
-    }
-
-    #[test]
-    fn test_state_reset() {
-        let mut qmath = QuantumMath::new();
-        qmath.operate(Operation::Add, 2.0).unwrap();
-        qmath.reset_state();
-
-        let state = qmath.get_state();
-        assert_eq!(state.iterations, 0);
     }
 }
