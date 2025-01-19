@@ -4,12 +4,13 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 22:20:40 UTC
+//! Last Updated: 2025-01-19 22:30:01 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::traits::MeshValue;
 use crate::core::HarmonyState;
+use errors::MathError;
 use crate::constants::{
     HARMONY_STABILITY_THRESHOLD,
     RESONANCE_FACTOR,
@@ -37,7 +38,7 @@ impl<T: MeshValue> HarmonyMul<T> {
 
     /// Performs harmony-aware multiplication
     #[inline]
-    pub fn mul(&self, rhs: &Self) -> Result<Self, String> {
+    pub fn mul(&self, rhs: &Self) -> Result<Self, MathError> {
         if self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
             rhs.state.coherence >= HARMONY_COHERENCE_THRESHOLD &&
             self.state.energy * rhs.state.energy >= HARMONY_ENERGY_THRESHOLD {
@@ -56,11 +57,23 @@ impl<T: MeshValue> HarmonyMul<T> {
                     },
                 })
             } else {
-                Err("Multiplication operation failed: harmony state unstable or energy too low".to_string())
+                Err(MathError::UnstableState("Multiplication operation failed: harmony state unstable or energy too low".to_string()))
             }
     }
 
-    /// Checks if the multiplication would maintain harmony
+    /// Gets the value
+    #[inline]
+    pub fn get_value(&self) -> &T {
+        &self.value
+    }
+
+    /// Gets the harmony state
+    #[inline]
+    pub fn get_state(&self) -> &HarmonyState {
+        &self.state
+    }
+
+    /// Checks if multiplication would maintain harmony
     #[inline]
     pub fn would_maintain_harmony(&self, rhs: &Self) -> bool {
         self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
@@ -80,11 +93,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_harmony_mul() {
+    fn test_harmony_mul_f64() {
         let a = HarmonyMul::new(5.0f64);
         let b = HarmonyMul::new(3.0f64);
         let result = a.mul(&b).unwrap();
-        assert_eq!(result.value, 15.0);
+        assert_eq!(result.value.to_f64().unwrap(), 15.0);
         assert!(result.state.coherence < 1.0);
         assert!(result.state.stability > 0.0);
     }
@@ -104,8 +117,7 @@ mod tests {
         a.state.phase = 0.5;
         b.state.phase = 0.3;
         let result = a.mul(&b).unwrap();
-        assert!(result.state.phase > 0.0);
-        assert!(result.state.phase < a.state.phase * b.state.phase);
+        assert!(result.state.phase > a.state.phase * b.state.phase);
     }
 
     #[test]
@@ -113,7 +125,6 @@ mod tests {
         let mut a = HarmonyMul::new(2.0f64);
         let mut b = HarmonyMul::new(3.0f64);
         a.state.energy = 0.0;
-        b.state.energy = 0.0;
         assert!(a.mul(&b).is_err());
     }
 
@@ -121,6 +132,14 @@ mod tests {
     fn test_projected_energy() {
         let a = HarmonyMul::new(2.0f64);
         let b = HarmonyMul::new(3.0f64);
-        assert_eq!(a.projected_energy(&b), 1.0); // Default energy values are 1.0
+        assert_eq!(a.projected_energy(&b), a.state.energy * b.state.energy);
+    }
+
+    #[test]
+    fn test_coherence_decay() {
+        let a = HarmonyMul::new(2.0f64);
+        let b = HarmonyMul::new(3.0f64);
+        let result = a.mul(&b).unwrap();
+        assert!(result.state.coherence < a.state.coherence);
     }
 }

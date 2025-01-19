@@ -4,19 +4,20 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 22:21:41 UTC
+//! Last Updated: 2025-01-19 22:30:59 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::traits::MeshValue;
 use crate::core::HarmonyState;
+use errors::MathError;
 use crate::constants::{
     HARMONY_STABILITY_THRESHOLD,
     RESONANCE_FACTOR,
     PHASE_ATTENUATION_FACTOR,
     HARMONY_COHERENCE_THRESHOLD,
-    SINGULARITY_THRESHOLD,
-    HARMONY_ENERGY_THRESHOLD
+    HARMONY_ENERGY_THRESHOLD,
+    SINGULARITY_THRESHOLD
 };
 
 /// Native implementation of harmony-aware division
@@ -38,13 +39,12 @@ impl<T: MeshValue> HarmonyDiv<T> {
 
     /// Performs harmony-aware division
     #[inline]
-    pub fn div(&self, rhs: &Self) -> Result<Self, String> {
+    pub fn div(&self, rhs: &Self) -> Result<Self, MathError> {
         // Check for division by zero using singularity threshold
         if rhs.value.to_f64()?.abs() < SINGULARITY_THRESHOLD {
-            return Err("Division operation failed: denominator too close to singularity".to_string());
+            return Err(MathError::DivisionByZero);
         }
 
-        // Check harmony state stability
         if self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
             rhs.state.coherence >= HARMONY_COHERENCE_THRESHOLD &&
             self.state.energy >= HARMONY_ENERGY_THRESHOLD {
@@ -63,29 +63,38 @@ impl<T: MeshValue> HarmonyDiv<T> {
                     },
                 })
             } else {
-                Err("Division operation failed: harmony state unstable or energy too low".to_string())
+                Err(MathError::UnstableState("Division operation failed: harmony state unstable or energy too low".to_string()))
             }
+    }
+
+    /// Gets the value
+    #[inline]
+    pub fn get_value(&self) -> &T {
+        &self.value
+    }
+
+    /// Gets the harmony state
+    #[inline]
+    pub fn get_state(&self) -> &HarmonyState {
+        &self.state
     }
 
     /// Checks if division would maintain harmony
     #[inline]
-    pub fn would_maintain_harmony(&self, rhs: &Self) -> bool {
-        self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
-        rhs.state.coherence >= HARMONY_COHERENCE_THRESHOLD &&
-        self.state.energy >= HARMONY_ENERGY_THRESHOLD &&
-        rhs.value.to_f64().map_or(false, |v| v.abs() >= SINGULARITY_THRESHOLD)
-    }
-
-    /// Gets the projected stability after division
-    #[inline]
-    pub fn projected_stability(&self, rhs: &Self) -> f64 {
-        (self.state.stability / rhs.state.stability).sqrt()
+    pub fn would_maintain_harmony(&self, rhs: &Self) -> Result<bool, MathError> {
+        let rhs_magnitude = rhs.value.to_f64()?.abs();
+        Ok(
+            self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
+            rhs.state.coherence >= HARMONY_COHERENCE_THRESHOLD &&
+            self.state.energy >= HARMONY_ENERGY_THRESHOLD &&
+            rhs_magnitude >= SINGULARITY_THRESHOLD
+        )
     }
 
     /// Checks for potential singularities in the operation
     #[inline]
-    pub fn check_singularity(&self, rhs: &Self) -> bool {
-        rhs.value.to_f64().map_or(true, |v| v.abs() < SINGULARITY_THRESHOLD)
+    pub fn check_singularity(&self, rhs: &Self) -> Result<bool, MathError> {
+        Ok(rhs.value.to_f64()?.abs() < SINGULARITY_THRESHOLD)
     }
 }
 
@@ -94,11 +103,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_harmony_div() {
+    fn test_harmony_div_f64() {
         let a = HarmonyDiv::new(6.0f64);
         let b = HarmonyDiv::new(2.0f64);
         let result = a.div(&b).unwrap();
-        assert_eq!(result.value, 3.0);
+        assert_eq!(result.value.to_f64().unwrap(), 3.0);
         assert!(result.state.coherence < 1.0);
         assert!(result.state.stability > 0.0);
     }
@@ -107,7 +116,7 @@ mod tests {
     fn test_harmony_div_by_zero() {
         let a = HarmonyDiv::new(5.0f64);
         let b = HarmonyDiv::new(0.0f64);
-        assert!(a.div(&b).is_err());
+        assert!(matches!(a.div(&b), Err(MathError::DivisionByZero)));
     }
 
     #[test]
@@ -131,16 +140,17 @@ mod tests {
     fn test_singularity_check() {
         let a = HarmonyDiv::new(5.0f64);
         let b = HarmonyDiv::new(SINGULARITY_THRESHOLD / 2.0);
-        assert!(a.check_singularity(&b));
+        assert!(a.check_singularity(&b).unwrap());
 
         let c = HarmonyDiv::new(1.0f64);
-        assert!(!a.check_singularity(&c));
+        assert!(!a.check_singularity(&c).unwrap());
     }
 
     #[test]
-    fn test_projected_stability() {
+    fn test_coherence_decay() {
         let a = HarmonyDiv::new(6.0f64);
         let b = HarmonyDiv::new(2.0f64);
-        assert_eq!(a.projected_stability(&b), 1.0); // Default stability values are 1.0
+        let result = a.div(&b).unwrap();
+        assert!(result.state.coherence < a.state.coherence);
     }
 }

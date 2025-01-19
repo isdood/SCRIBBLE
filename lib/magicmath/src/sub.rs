@@ -4,16 +4,17 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 22:20:00 UTC
+//! Last Updated: 2025-01-19 22:28:44 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::traits::MeshValue;
 use crate::core::HarmonyState;
+use errors::MathError;
 use crate::constants::{
     HARMONY_STABILITY_THRESHOLD,
     RESONANCE_FACTOR,
-    PHASE_COUPLING_CONSTANT,
+    PHASE_DECOUPLING_CONSTANT,
     HARMONY_COHERENCE_THRESHOLD
 };
 
@@ -36,28 +37,41 @@ impl<T: MeshValue> HarmonySub<T> {
 
     /// Performs harmony-aware subtraction
     #[inline]
-    pub fn sub(&self, rhs: &Self) -> Result<Self, String> {
+    pub fn sub(&self, rhs: &Self) -> Result<Self, MathError> {
         if self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
             rhs.state.coherence >= HARMONY_COHERENCE_THRESHOLD {
+
                 let new_value = self.value.sub(&rhs.value)?;
-                let new_phase = (self.state.phase - rhs.state.phase) * PHASE_COUPLING_CONSTANT;
+                let new_phase = (self.state.phase - rhs.state.phase) * PHASE_DECOUPLING_CONSTANT;
 
                 Ok(Self {
                     value: new_value,
                     state: HarmonyState {
                         coherence: self.state.coherence * RESONANCE_FACTOR,
                         phase: new_phase,
-                        energy: (self.state.energy - rhs.state.energy).abs(), // Energy difference must be positive
+                        energy: (self.state.energy - rhs.state.energy).abs(),
                    stability: self.state.stability * RESONANCE_FACTOR,
                    iterations: self.state.iterations + 1,
                     },
                 })
             } else {
-                Err("Subtraction operation failed: harmony state unstable".to_string())
+                Err(MathError::UnstableState("Subtraction operation failed: harmony state unstable".to_string()))
             }
     }
 
-    /// Checks if the subtraction would maintain harmony
+    /// Gets the value
+    #[inline]
+    pub fn get_value(&self) -> &T {
+        &self.value
+    }
+
+    /// Gets the harmony state
+    #[inline]
+    pub fn get_state(&self) -> &HarmonyState {
+        &self.state
+    }
+
+    /// Checks if the operation would maintain harmony
     #[inline]
     pub fn would_maintain_harmony(&self, rhs: &Self) -> bool {
         self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
@@ -70,11 +84,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_harmony_sub() {
+    fn test_harmony_sub_f64() {
         let a = HarmonySub::new(5.0f64);
         let b = HarmonySub::new(3.0f64);
         let result = a.sub(&b).unwrap();
-        assert_eq!(result.value, 2.0);
+        assert_eq!(result.value.to_f64().unwrap(), 2.0);
         assert!(result.state.coherence < 1.0);
         assert!(result.state.stability > 0.0);
     }
@@ -88,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn test_harmony_sub_phase_coupling() {
+    fn test_harmony_sub_phase_decoupling() {
         let mut a = HarmonySub::new(5.0f64);
         let mut b = HarmonySub::new(3.0f64);
         a.state.phase = 0.5;
@@ -105,6 +119,14 @@ mod tests {
 
         let mut unstable = HarmonySub::new(1.0f64);
         unstable.state.coherence = 0.0;
-        assert!(!a.would_maintain_harmony(&unstable));
+        assert!(!unstable.would_maintain_harmony(&a));
+    }
+
+    #[test]
+    fn test_energy_always_positive() {
+        let a = HarmonySub::new(3.0f64);
+        let b = HarmonySub::new(5.0f64);
+        let result = a.sub(&b).unwrap();
+        assert!(result.state.energy >= 0.0);
     }
 }

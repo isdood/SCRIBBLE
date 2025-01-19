@@ -4,12 +4,13 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 22:19:12 UTC
+//! Last Updated: 2025-01-19 22:28:00 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::traits::MeshValue;
 use crate::core::HarmonyState;
+use errors::MathError;
 use crate::constants::{
     HARMONY_STABILITY_THRESHOLD,
     RESONANCE_FACTOR,
@@ -35,7 +36,7 @@ impl<T: MeshValue> HarmonyAdd<T> {
 
     /// Performs harmony-aware addition
     #[inline]
-    pub fn add(&self, rhs: &Self) -> Result<Self, String> {
+    pub fn add(&self, rhs: &Self) -> Result<Self, MathError> {
         if self.state.coherence >= HARMONY_STABILITY_THRESHOLD {
             let new_value = self.value.add(&rhs.value)?;
             let new_phase = (self.state.phase + rhs.state.phase) * PHASE_COUPLING_CONSTANT;
@@ -51,8 +52,26 @@ impl<T: MeshValue> HarmonyAdd<T> {
                 },
             })
         } else {
-            Err("Addition operation failed: harmony state unstable".to_string())
+            Err(MathError::UnstableState("Addition operation failed: harmony state unstable".to_string()))
         }
+    }
+
+    /// Gets the value
+    #[inline]
+    pub fn get_value(&self) -> &T {
+        &self.value
+    }
+
+    /// Gets the harmony state
+    #[inline]
+    pub fn get_state(&self) -> &HarmonyState {
+        &self.state
+    }
+
+    /// Checks if the operation would maintain harmony
+    #[inline]
+    pub fn would_maintain_harmony(&self, rhs: &Self) -> bool {
+        self.state.coherence >= HARMONY_STABILITY_THRESHOLD
     }
 }
 
@@ -61,11 +80,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_harmony_add() {
+    fn test_harmony_add_f64() {
         let a = HarmonyAdd::new(5.0f64);
         let b = HarmonyAdd::new(3.0f64);
         let result = a.add(&b).unwrap();
-        assert_eq!(result.value, 8.0);
+        assert_eq!(result.value.to_f64().unwrap(), 8.0);
         assert!(result.state.coherence < 1.0);
         assert!(result.state.stability > 0.0);
     }
@@ -86,5 +105,16 @@ mod tests {
         b.state.phase = 0.3;
         let result = a.add(&b).unwrap();
         assert!(result.state.phase < a.state.phase + b.state.phase);
+    }
+
+    #[test]
+    fn test_harmony_maintenance_check() {
+        let a = HarmonyAdd::new(5.0f64);
+        let b = HarmonyAdd::new(3.0f64);
+        assert!(a.would_maintain_harmony(&b));
+
+        let mut unstable = HarmonyAdd::new(1.0f64);
+        unstable.state.coherence = 0.0;
+        assert!(!unstable.would_maintain_harmony(&a));
     }
 }
