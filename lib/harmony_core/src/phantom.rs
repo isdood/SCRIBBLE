@@ -1,186 +1,187 @@
-//! Crystalline Phantom Implementation
-//! ============================
+//! Phantom - Crystal Quantum State Observer
+//! ==================================
 //!
-//! Core quantum phantom operations through crystalline
-//! structures with harmonic resonance tracking.
+//! A quantum state observer specialized for crystal lattice computing,
+//! enabling non-destructive observation of quantum states in crystalline structures.
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 08:41:06 UTC
+//! Last Updated: 2025-01-19 09:03:16 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::{
-    constants::QUANTUM_STABILITY_THRESHOLD,
-    harmony::Quantum,
-    vector::Vector4D,
-    cube::CrystalCube,
-    aether::CoherenceError,
-    idk::ShardUninit,
-    scribe::{Scribe, QuantumInscriber},
-};
+use meshmath::floor;
+use crate::aether::CoherenceError;
+use crate::idk::ShardUninit;
+use crate::scribe::{Scribe, QuantumInscriber};
+use crate::vector::Vector3D;
+use crate::crystal::{CrystalLattice, CrystalNode};
 
-/// A quantum phantom state
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum PhantomState {
-    /// Fully materialized
-    Materialized,
-    /// Partially materialized
-    Partial,
-    /// Fully dematerialized
-    Dematerialized,
+/// Crystal observation parameters
+#[derive(Debug, Clone)]
+pub struct CrystalObservation {
+    /// Crystal resonance frequency during observation
+    resonance: f64,
+    /// Phase coherence level
+    coherence: f64,
+    /// Observation strength (0.0 - 1.0)
+    strength: f64,
+    /// Quantum entanglement depth
+    entanglement_depth: u32,
 }
 
-/// A quantum phantom for 4D operations
+impl Default for CrystalObservation {
+    fn default() -> Self {
+        Self {
+            resonance: 1.0,
+            coherence: 1.0,
+            strength: 0.5,
+            entanglement_depth: 1,
+        }
+    }
+}
+
+/// Quantum state observer for crystal lattices
+#[derive(Debug)]
 pub struct Phantom<T: Clone + Default + 'static> {
-    /// Phantom data
+    /// Position in crystal lattice
+    pos: Vector3D,
+    /// Quantum state data
     data: ShardUninit<T>,
-    /// 4D position including quantum time
-    position: Vector4D<f64>,
-    /// Current state
-    state: PhantomState,
-    /// Quantum coherence
-    coherence: f64,
-    /// Quantum inscriber for state transitions
-    inscriber: QuantumInscriber,
+    /// Crystal observation parameters
+    observation: CrystalObservation,
+    /// Associated crystal lattice
+    lattice: Option<CrystalLattice>,
+    /// Quantum inscriber for state recording
+    inscriber: Option<QuantumInscriber>,
 }
 
 impl<T: Clone + Default + 'static> Phantom<T> {
-    /// Creates a new phantom with positioned data
-    pub fn new_positioned(data: T, x: f64, y: f64, z: f64, w: f64) -> Self {
+    /// Create a new Phantom observer
+    pub fn new() -> Self {
         Self {
-            data: ShardUninit::new(data),
-            position: Vector4D::new(x, y, z, w),
-            state: PhantomState::Materialized,
-            coherence: 1.0,
-            inscriber: QuantumInscriber::new(),
+            pos: Vector3D::zero(),
+            data: ShardUninit::uninit(),
+            observation: CrystalObservation::default(),
+            lattice: None,
+            inscriber: None,
         }
     }
 
-    /// Gets a reference to the phantom data
-    pub fn data(&self) -> &T {
-        unsafe {
-            self.data.assume_init_ref()
-            .expect("Quantum state verification failed")
+    /// Initialize with crystal lattice
+    pub fn with_lattice(lattice: CrystalLattice) -> Self {
+        Self {
+            pos: Vector3D::zero(),
+            data: ShardUninit::uninit(),
+            observation: CrystalObservation::default(),
+            lattice: Some(lattice),
+            inscriber: None,
         }
     }
 
-    /// Gets a mutable reference to the phantom data
-    pub fn data_mut(&mut self) -> &mut T {
-        unsafe {
-            self.data.assume_init_mut()
-            .expect("Quantum state verification failed")
+    /// Get current position in crystal lattice
+    pub fn position(&self) -> &Vector3D {
+        &self.pos
+    }
+
+    /// Get crystal observation parameters
+    pub fn observation_params(&self) -> &CrystalObservation {
+        &self.observation
+    }
+
+    /// Set position in crystal lattice
+    pub fn set_position(&mut self, pos: Vector3D) -> Result<(), CoherenceError> {
+        if let Some(ref lattice) = self.lattice {
+            if !lattice.is_valid_position(&pos) {
+                return Err(CoherenceError::CrystalDecoherence);
+            }
         }
-    }
-
-    /// Gets the current 4D position
-    pub fn position(&self) -> &Vector4D<f64> {
-        &self.position
-    }
-
-    /// Gets the current state
-    pub fn state(&self) -> PhantomState {
-        self.state
-    }
-
-    /// Sets the 4D position and updates quantum state
-    pub fn set_position(&mut self, x: f64, y: f64, z: f64, w: f64) {
-        self.position = Vector4D::new(x, y, z, w);
-        self.decohere();
-    }
-
-    /// Attempts to materialize into a crystal cube
-    pub fn materialize(&mut self, cube: &mut CrystalCube<T>) -> Result<(), &'static str> {
-        if self.state == PhantomState::Dematerialized {
-            return Err("Cannot materialize while dematerialized");
-        }
-
-        let pos = self.position();
-        let x = pos.x.floor() as usize;
-        let y = pos.y.floor() as usize;
-        let z = pos.z.floor() as usize;
-
-        // Use inscriber to safely transfer quantum state
-        let result = unsafe {
-            // Extract data through quantum inscriber
-            let data = self.inscriber.extract(&self.data)
-            .map_err(|_| "Failed to extract quantum data")?;
-
-            // Inscribe data into cube
-            self.inscriber.inscribe(cube, x, y, z, data)
-            .map_err(|_| "Failed to inscribe quantum data")?;
-
-            Ok(())
-        };
-
-        if result.is_ok() {
-            self.state = PhantomState::Materialized;
-            self.decohere();
-            cube.decohere();
-        }
-
-        result
-    }
-
-    /// Attempts to dematerialize from current position
-    pub fn dematerialize(&mut self) -> Result<(), &'static str> {
-        if self.state == PhantomState::Dematerialized {
-            return Err("Already dematerialized");
-        }
-
-        // Stabilize quantum state before dematerialization
-        self.data.stabilize()
-        .map_err(|_| "Failed to stabilize quantum state")?;
-
-        self.state = PhantomState::Dematerialized;
-        self.decohere();
+        self.pos = pos;
         Ok(())
     }
-}
 
-impl<T: Clone + Default + 'static> Clone for Phantom<T> {
-    fn clone(&self) -> Self {
-        // Use inscriber to safely clone quantum state
-        let data = unsafe {
-            let extracted = self.inscriber.extract(&self.data)
-            .expect("Failed to extract quantum data for clone");
-            ShardUninit::new(extracted)
-        };
-
-        Self {
-            data,
-            position: self.position.clone(),
-            state: self.state,
-            coherence: self.coherence,
-            inscriber: QuantumInscriber::new(),
-        }
-    }
-}
-
-impl<T: Clone + Default + 'static> Quantum for Phantom<T> {
-    fn coherence(&self) -> f64 {
-        self.coherence
+    /// Get discrete crystal lattice coordinates
+    pub fn lattice_position(&self) -> (usize, usize, usize) {
+        let pos = self.position();
+        let x = floor(pos.x) as usize;
+        let y = floor(pos.y) as usize;
+        let z = floor(pos.z) as usize;
+        (x, y, z)
     }
 
-    fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD
-    }
+    /// Observe quantum state at current position
+    pub fn observe(&mut self) -> Result<&T, CoherenceError> {
+        // Verify crystal coherence
+        self.verify_crystal_coherence()?;
 
-    fn decohere(&mut self) {
-        self.coherence *= 0.9;
-        if self.coherence < QUANTUM_STABILITY_THRESHOLD {
-            self.coherence = QUANTUM_STABILITY_THRESHOLD;
-            self.state = PhantomState::Partial;
+        let (x, y, z) = self.lattice_position();
+        if let Some(ref lattice) = self.lattice {
+            // Get crystal node state
+            let node = lattice.get_node(x, y, z)?;
+
+            // Perform non-destructive observation
+            self.perform_observation(node)?;
+
+            // Return observed state
+            unsafe {
+                Ok(self.data.assume_init_ref()
+                .map_err(|_| CoherenceError::QuantumInstability)?)
+            }
+        } else {
+            Err(CoherenceError::CrystalDecoherence)
         }
     }
 
-    fn recohere(&mut self) {
-        // Attempt to stabilize quantum state
-        if self.data.stabilize().is_ok() {
-            self.coherence = 1.0;
-            self.state = PhantomState::Materialized;
+    /// Perform non-destructive quantum observation
+    fn perform_observation(&mut self, node: &CrystalNode) -> Result<(), CoherenceError> {
+        // Calculate observation parameters
+        let coherence_factor = self.observation.coherence *
+        self.observation.strength *
+        node.get_phase_coherence();
+
+        if coherence_factor < 0.1 {
+            return Err(CoherenceError::QuantumInstability);
         }
+
+        // Adjust crystal resonance
+        self.observation.resonance *= node.get_resonance_factor();
+
+        // Record observation if inscriber is present
+        if let Some(ref mut inscriber) = self.inscriber {
+            inscriber.record_observation(
+                self.pos,
+                coherence_factor,
+                self.observation.entanglement_depth
+            )?;
+        }
+
+        Ok(())
+    }
+
+    /// Verify crystal coherence state
+    fn verify_crystal_coherence(&self) -> Result<(), CoherenceError> {
+        if self.observation.resonance < 0.1 {
+            return Err(CoherenceError::CrystalDecoherence);
+        }
+        if self.observation.coherence < 0.1 {
+            return Err(CoherenceError::QuantumInstability);
+        }
+        Ok(())
+    }
+
+    /// Set quantum inscriber for observation recording
+    pub fn set_inscriber(&mut self, inscriber: QuantumInscriber) {
+        self.inscriber = Some(inscriber);
+    }
+
+    /// Adjust observation strength
+    pub fn set_observation_strength(&mut self, strength: f64) -> Result<(), CoherenceError> {
+        if !(0.0..=1.0).contains(&strength) {
+            return Err(CoherenceError::QuantumInstability);
+        }
+        self.observation.strength = strength;
+        Ok(())
     }
 }
 
@@ -189,72 +190,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_phantom_basics() {
-        let phantom = Phantom::new_positioned(42u8, 1.0, 2.0, 3.0, 0.0);
-        assert_eq!(*phantom.data(), 42);
-        assert_eq!(phantom.position().x, 1.0);
-        assert_eq!(phantom.position().y, 2.0);
-        assert_eq!(phantom.position().z, 3.0);
-        assert_eq!(phantom.position().w, 0.0);
-        assert_eq!(phantom.state(), PhantomState::Materialized);
-        assert!(phantom.is_stable());
+    fn test_phantom_creation() {
+        let phantom = Phantom::<u8>::new();
+        assert_eq!(phantom.position(), &Vector3D::zero());
     }
 
     #[test]
-    fn test_phantom_state_changes() {
-        let mut phantom = Phantom::new_positioned(42u8, 0.0, 0.0, 0.0, 0.0);
-        assert!(phantom.dematerialize().is_ok());
-        assert_eq!(phantom.state(), PhantomState::Dematerialized);
-        assert!(phantom.dematerialize().is_err());
+    fn test_observation_params() {
+        let phantom = Phantom::<u8>::new();
+        let params = phantom.observation_params();
+        assert_eq!(params.strength, 0.5);
+        assert_eq!(params.entanglement_depth, 1);
     }
 
     #[test]
-    fn test_phantom_materialization() {
-        let mut phantom = Phantom::new_positioned(42u8, 0.0, 0.0, 0.0, 0.0);
-        let mut cube = CrystalCube::<u8>::new(2, 2, 2).unwrap();
-
-        assert!(phantom.materialize(&mut cube).is_ok());
-        assert_eq!(*cube.get(0, 0, 0).unwrap(), 42);
-
-        phantom.dematerialize().unwrap();
-        assert!(phantom.materialize(&mut cube).is_err());
-    }
-
-    #[test]
-    fn test_phantom_coherence() {
-        let mut phantom = Phantom::new_positioned(42u8, 0.0, 0.0, 0.0, 0.0);
-        assert!(phantom.is_stable());
-        assert_eq!(phantom.coherence(), 1.0);
-
-        // Force decoherence
-        for _ in 0..10 {
-            phantom.decohere();
-        }
-
-        assert!(!phantom.is_stable());
-        assert_eq!(phantom.state(), PhantomState::Partial);
-
-        phantom.recohere();
-        assert!(phantom.is_stable());
-        assert_eq!(phantom.state(), PhantomState::Materialized);
-    }
-
-    #[test]
-    fn test_phantom_stabilization() {
-        let mut phantom = Phantom::new_positioned(42u8, 0.0, 0.0, 0.0, 0.0);
-
-        // Decohere and verify state
-        phantom.decohere();
-        assert!(!phantom.is_stable());
-
-        // Attempt to recohere
-        phantom.recohere();
-        assert!(phantom.is_stable());
-        assert_eq!(*phantom.data(), 42);
-
-        // Verify quantum coherence
-        unsafe {
-            assert!(phantom.data.assume_init_ref().is_ok());
-        }
+    fn test_crystal_coherence() {
+        let phantom = Phantom::<u8>::new();
+        assert!(phantom.verify_crystal_coherence().is_ok());
     }
 }
