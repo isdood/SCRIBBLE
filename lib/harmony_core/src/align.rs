@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:35:20 UTC
+//! Last Updated: 2025-01-19 09:36:43 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -41,7 +41,7 @@ pub struct Alignment {
     /// Reference vector for alignment
     reference: Vector3D<f64>,
     /// Phantom state for quantum alignment
-    phantom: Phantom,
+    phantom: Phantom<f64>,
 }
 
 impl Alignment {
@@ -50,7 +50,7 @@ impl Alignment {
         Self {
             state: AlignmentState::Unknown,
             reference,
-            phantom: Phantom::new(),
+            phantom: Phantom::<f64>::new(),
         }
     }
 
@@ -107,10 +107,11 @@ impl Alignment {
 
     /// Check if alignment is stable
     pub fn is_stable(&self) -> bool {
-        matches!(self.state,
-                 AlignmentState::Perfect |
-                 AlignmentState::Partial(c) if c >= QUANTUM_STABILITY_THRESHOLD
-        )
+        match self.state {
+            AlignmentState::Perfect => true,
+            AlignmentState::Partial(c) => c >= QUANTUM_STABILITY_THRESHOLD,
+            _ => false
+        }
     }
 }
 
