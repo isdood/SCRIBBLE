@@ -4,18 +4,16 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 19:01:27 UTC
+//! Last Updated: 2025-01-19 19:02:24 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::traits::MeshValue;
 use crate::constants::{
     HARMONY_STABILITY_THRESHOLD,
-    MESH_RESOLUTION_MIN,
-    MESH_RESOLUTION_MAX,
-    MESH_PRECISION_DEFAULT,
+    mesh::{RESOLUTION_MIN, RESOLUTION_MAX, PRECISION_DEFAULT},
 };
-use errors::core::MathError;
+use errors::core::{Error as MathError, ErrorKind};
 use scribe::native_string::String;
 
 /// Mesh mathematics operations for crystal lattice systems
@@ -32,15 +30,16 @@ pub struct MeshMath {
 impl MeshMath {
     /// Create new mesh math instance with specified resolution
     pub fn new(resolution: usize) -> Result<Self, MathError> {
-        if resolution < MESH_RESOLUTION_MIN || resolution > MESH_RESOLUTION_MAX {
-            return Err(MathError::ValidationError(
+        if resolution < RESOLUTION_MIN || resolution > RESOLUTION_MAX {
+            return Err(MathError::new(
+                ErrorKind::InvalidInput,
                 String::from("Mesh resolution out of valid range")
             ));
         }
 
         Ok(Self {
             resolution,
-            precision: MESH_PRECISION_DEFAULT,
+            precision: PRECISION_DEFAULT,
             stability: 1.0,
         })
     }
@@ -48,7 +47,8 @@ impl MeshMath {
     /// Set mesh precision for calculations
     pub fn set_precision(&mut self, precision: f64) -> Result<(), MathError> {
         if precision <= 0.0 {
-            return Err(MathError::ValidationError(
+            return Err(MathError::new(
+                ErrorKind::InvalidInput,
                 String::from("Precision must be positive")
             ));
         }
@@ -77,7 +77,8 @@ impl MeshMath {
 
         // Check for invalid values
         if val.is_nan() || val.is_infinite() {
-            return Err(MathError::ValidationError(
+            return Err(MathError::new(
+                ErrorKind::InvalidInput,
                 String::from("Cannot interpolate NaN or infinite value on crystal mesh")
             ));
         }
@@ -85,7 +86,8 @@ impl MeshMath {
         // Update stability based on operation
         self.stability *= 0.99;
         if self.stability < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::StabilityError(
+            return Err(MathError::new(
+                ErrorKind::StabilityLoss,
                 String::from("Crystal mesh stability lost during interpolation")
             ));
         }

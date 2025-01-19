@@ -1,12 +1,10 @@
-// lib/magicmath/src/constants.rs
-
 //! Constants for Crystal Lattice HPC Systems
 //! ===============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 10:39:51 UTC
+//! Last Updated: 2025-01-19 19:04:45 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -88,7 +86,7 @@ pub const SYSTEM_VERSION: &str = "0.1.0";
 pub const SYSTEM_NAME: &str = "MagicMath Crystal Lattice HPC";
 pub const SYSTEM_AUTHOR: &str = "Caleb J.D. Terkovics <isdood>";
 pub const SYSTEM_CREATED: &str = "2025-01-19";
-pub const SYSTEM_UPDATED: &str = "2025-01-19 10:39:51 UTC";
+pub const SYSTEM_UPDATED: &str = "2025-01-19 19:04:45 UTC";
 pub const SYSTEM_LICENSE: &str = "MIT";
 
 // Module-specific Constants
@@ -115,6 +113,28 @@ pub mod complex {
     pub const ONE: (f64, f64) = (1.0, 0.0);
     pub const ZERO: (f64, f64) = (0.0, 0.0);
     pub const INF: (f64, f64) = (f64::INFINITY, f64::INFINITY);
+}
+
+pub mod mesh {
+    // Resolution bounds
+    pub const RESOLUTION_MIN: usize = 10;
+    pub const RESOLUTION_MAX: usize = 10_000;
+    pub const PRECISION_DEFAULT: f64 = 1e-6;
+
+    // Mesh stability thresholds
+    pub const STABILITY_THRESHOLD: f64 = 0.25;
+    pub const COHERENCE_THRESHOLD: f64 = 0.15;
+    pub const PRECISION_THRESHOLD: f64 = 1e-12;
+
+    // Mesh optimization parameters
+    pub const CACHE_LINE_SIZE: usize = 64;
+    pub const VECTOR_WIDTH: usize = 4;
+    pub const PREFETCH_DISTANCE: usize = 8;
+
+    // Default mesh dimensions
+    pub const DEFAULT_WIDTH: usize = 100;
+    pub const DEFAULT_HEIGHT: usize = 100;
+    pub const DEFAULT_DEPTH: usize = 1;
 }
 
 #[cfg(test)]
@@ -170,5 +190,15 @@ mod tests {
         assert!(harmony::MAX_COHERENCE > harmony::MIN_COHERENCE);
         assert!(harmony::MAX_ENERGY > harmony::MIN_ENERGY);
         assert!(harmony::MAX_PHASE > harmony::MIN_PHASE);
+    }
+
+    #[test]
+    fn test_mesh_constants() {
+        assert!(mesh::RESOLUTION_MAX > mesh::RESOLUTION_MIN);
+        assert!(mesh::PRECISION_DEFAULT > 0.0);
+        assert!(mesh::STABILITY_THRESHOLD > mesh::COHERENCE_THRESHOLD);
+        assert!(mesh::DEFAULT_WIDTH > 0);
+        assert!(mesh::DEFAULT_HEIGHT > 0);
+        assert!(mesh::DEFAULT_DEPTH > 0);
     }
 }
