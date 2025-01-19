@@ -4,7 +4,7 @@
 //!
 //! Author: isdood
 //! Current User: isdood
-//! Last Updated: 2025-01-19 08:24:12 UTC
+//! Last Updated: 2025-01-19 08:31:18 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -18,14 +18,18 @@ use crate::{
 };
 
 /// Quantum-aware alignment cell
-pub struct AlignmentCell<T: Clone + Default + 'static> {
+pub struct AlignmentCell<T>
+where T: Clone + Default + 'static
+{
     /// Value phantom for quantum state tracking
     phantom: Phantom<T>,
     /// Current coherence level
     coherence: f64,
 }
 
-impl<T: Clone + Default + 'static> Clone for AlignmentCell<T> {
+impl<T> Clone for AlignmentCell<T>
+where T: Clone + Default + 'static
+{
     fn clone(&self) -> Self {
         Self {
             phantom: self.phantom.clone(),
@@ -34,9 +38,10 @@ impl<T: Clone + Default + 'static> Clone for AlignmentCell<T> {
     }
 }
 
-impl<T: Clone + Default + 'static> AlignmentCell<T> {
+impl<T> AlignmentCell<T>
+where T: Clone + Default + 'static
+{
     /// Creates a new alignment cell
-    #[inline]
     pub fn new(value: T) -> Self {
         Self {
             phantom: Phantom::<T>::new_positioned(value, 0.0, 0.0, 0.0, QUANTUM_GOLDEN_RATIO),
@@ -45,16 +50,15 @@ impl<T: Clone + Default + 'static> AlignmentCell<T> {
     }
 
     /// Gets current value
-    #[inline]
     pub fn get(&self) -> T {
-        let data: &T = self.phantom.data();
-        data.clone()
+        let data: T = self.phantom.data().clone();
+        data
     }
 
     /// Sets new value
-    #[inline]
     pub fn set(&mut self, value: T) -> bool {
-        if !AlignmentCell::<T>::is_quantum_stable(self) {
+        let stable = AlignmentCell::<T>::is_quantum_stable(self);
+        if !stable {
             return false;
         }
         *self.phantom.data_mut() = value;
@@ -63,37 +67,36 @@ impl<T: Clone + Default + 'static> AlignmentCell<T> {
     }
 
     /// Gets current coherence
-    #[inline]
     pub fn get_coherence(&self) -> f64 {
-        let phantom_ref: &Phantom<T> = &self.phantom;
-        self.coherence * phantom_ref.coherence()
+        self.coherence * <Phantom<T> as Quantum>::coherence(&self.phantom)
     }
 
     /// Checks quantum stability
-    #[inline]
     pub fn is_quantum_stable(&self) -> bool {
-        let phantom_ref: &Phantom<T> = &self.phantom;
-        AlignmentCell::<T>::get_coherence(self) > QUANTUM_STABILITY_THRESHOLD &&
-        phantom_ref.state() == PhantomState::Materialized
+        let coherence = AlignmentCell::<T>::get_coherence(self);
+        coherence > QUANTUM_STABILITY_THRESHOLD &&
+        <Phantom<T>>::state(&self.phantom) == PhantomState::Materialized
     }
 
     /// Applies quantum decoherence
-    #[inline]
     fn decay_coherence(&mut self) {
         self.coherence *= 0.99;
-        let phantom_mut: &mut Phantom<T> = &mut self.phantom;
-        phantom_mut.decohere();
+        <Phantom<T> as Quantum>::decohere(&mut self.phantom);
     }
 }
 
-impl<T: Clone + Default + 'static> Default for AlignmentCell<T> {
+impl<T> Default for AlignmentCell<T>
+where T: Clone + Default + 'static
+{
     fn default() -> Self {
         Self::new(T::default())
     }
 }
 
 /// 4D Crystal alignment grid
-pub struct AlignmentGrid<T: Clone + Default + 'static> {
+pub struct AlignmentGrid<T>
+where T: Clone + Default + 'static
+{
     /// 4D crystal grid
     grid: CrystalCube<AlignmentCell<T>>,
     /// Grid dimensionality
@@ -102,7 +105,9 @@ pub struct AlignmentGrid<T: Clone + Default + 'static> {
     phantom: Phantom<bool>,
 }
 
-impl<T: Clone + Default + 'static> AlignmentGrid<T> {
+impl<T> AlignmentGrid<T>
+where T: Clone + Default + 'static
+{
     /// Creates a new alignment grid
     pub fn new(dimensions: Vector4D<f64>) -> Self {
         let grid = CrystalCube::<AlignmentCell<T>>::new(
@@ -121,7 +126,7 @@ impl<T: Clone + Default + 'static> AlignmentGrid<T> {
         for z in 0..dimensions.z as usize {
             for y in 0..dimensions.y as usize {
                 for x in 0..dimensions.x as usize {
-                    let cell: AlignmentCell<T> = AlignmentCell::<T>::default();
+                    let cell = AlignmentCell::<T>::default();
                     this.grid.set(x, y, z, cell)
                     .expect("Failed to initialize grid cell");
                 }
@@ -133,22 +138,26 @@ impl<T: Clone + Default + 'static> AlignmentGrid<T> {
 
     /// Gets value at 4D coordinates
     pub fn get(&self, pos: &Vector4D<f64>) -> Option<T> {
-        if !AlignmentGrid::<T>::is_valid_position(self, pos) || !AlignmentGrid::<T>::is_quantum_stable(self) {
+        let valid = AlignmentGrid::<T>::is_valid_position(self, pos);
+        let stable = AlignmentGrid::<T>::is_quantum_stable(self);
+        if !valid || !stable {
             return None;
         }
 
         self.grid.get(pos.x as usize, pos.y as usize, pos.z as usize)
-        .map(|cell: &AlignmentCell<T>| cell.get())
+        .map(|cell: &AlignmentCell<T>| AlignmentCell::<T>::get(cell))
     }
 
     /// Sets value at 4D coordinates
     pub fn set(&mut self, pos: &Vector4D<f64>, value: T) -> bool {
-        if !AlignmentGrid::<T>::is_valid_position(self, pos) || !AlignmentGrid::<T>::is_quantum_stable(self) {
+        let valid = AlignmentGrid::<T>::is_valid_position(self, pos);
+        let stable = AlignmentGrid::<T>::is_quantum_stable(self);
+        if !valid || !stable {
             return false;
         }
 
         if let Some(cell) = self.grid.get_mut(pos.x as usize, pos.y as usize, pos.z as usize) {
-            let success = cell.set(value);
+            let success = AlignmentCell::<T>::set(cell, value);
             if success {
                 self.decay_coherence();
             }
@@ -159,13 +168,11 @@ impl<T: Clone + Default + 'static> AlignmentGrid<T> {
     }
 
     /// Gets grid dimensions
-    #[inline]
     pub fn dimensions(&self) -> &Vector4D<f64> {
         &self.dimensions
     }
 
     /// Verifies position validity
-    #[inline]
     fn is_valid_position(&self, pos: &Vector4D<f64>) -> bool {
         pos.x >= 0.0 && pos.x < self.dimensions.x &&
         pos.y >= 0.0 && pos.y < self.dimensions.y &&
@@ -175,32 +182,30 @@ impl<T: Clone + Default + 'static> AlignmentGrid<T> {
 
     /// Gets quantum coherence at position
     pub fn get_coherence(&self, pos: &Vector4D<f64>) -> Option<f64> {
-        if !AlignmentGrid::<T>::is_valid_position(self, pos) {
+        let valid = AlignmentGrid::<T>::is_valid_position(self, pos);
+        if !valid {
             return None;
         }
 
         self.grid.get(pos.x as usize, pos.y as usize, pos.z as usize)
-        .map(|cell: &AlignmentCell<T>| cell.get_coherence())
+        .map(|cell: &AlignmentCell<T>| AlignmentCell::<T>::get_coherence(cell))
     }
 
     /// Checks quantum stability
-    #[inline]
     pub fn is_quantum_stable(&self) -> bool {
-        let phantom_ref: &Phantom<bool> = &self.phantom;
-        phantom_ref.coherence() > QUANTUM_STABILITY_THRESHOLD &&
-        phantom_ref.state() == PhantomState::Materialized
+        <Phantom<bool> as Quantum>::coherence(&self.phantom) > QUANTUM_STABILITY_THRESHOLD &&
+        <Phantom<bool>>::state(&self.phantom) == PhantomState::Materialized
     }
 
     /// Apply quantum decoherence
-    #[inline]
     fn decay_coherence(&mut self) {
-        let phantom_mut: &mut Phantom<bool> = &mut self.phantom;
-        phantom_mut.decohere();
+        <Phantom<bool> as Quantum>::decohere(&mut self.phantom);
     }
 
     /// Attempt quantum stabilization
     pub fn stabilize(&mut self) -> bool {
-        if !self.phantom.is_stable() {
+        let stable = <Phantom<bool> as Quantum>::is_stable(&self.phantom);
+        if !stable {
             return false;
         }
 
@@ -209,7 +214,8 @@ impl<T: Clone + Default + 'static> AlignmentGrid<T> {
             for y in 0..self.dimensions.y as usize {
                 for x in 0..self.dimensions.x as usize {
                     if let Some(cell) = self.grid.get(x, y, z) {
-                        if !AlignmentCell::<T>::is_quantum_stable(cell) {
+                        let cell_stable = AlignmentCell::<T>::is_quantum_stable(cell);
+                        if !cell_stable {
                             success = false;
                             break;
                         }
@@ -220,7 +226,7 @@ impl<T: Clone + Default + 'static> AlignmentGrid<T> {
 
         if success {
             *self.phantom.data_mut() = true;
-            self.phantom.recohere();
+            <Phantom<bool> as Quantum>::recohere(&mut self.phantom);
         }
         success
     }
@@ -232,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_alignment_cell() {
-        let mut cell: AlignmentCell<u64> = AlignmentCell::new(42);
+        let mut cell = AlignmentCell::<u64>::new(42);
         assert_eq!(cell.get(), 42);
         assert!(cell.is_quantum_stable());
 
@@ -243,7 +249,7 @@ mod tests {
 
     #[test]
     fn test_alignment_grid() {
-        let mut grid: AlignmentGrid<u64> = AlignmentGrid::new(Vector4D::new(4.0, 4.0, 4.0, 4.0));
+        let mut grid = AlignmentGrid::<u64>::new(Vector4D::new(4.0, 4.0, 4.0, 4.0));
         let pos = Vector4D::new(1.0, 1.0, 1.0, 1.0);
 
         assert!(grid.set(&pos, 42));
@@ -253,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_quantum_decoherence() {
-        let mut grid: AlignmentGrid<u64> = AlignmentGrid::new(Vector4D::new(2.0, 2.0, 2.0, 2.0));
+        let mut grid = AlignmentGrid::<u64>::new(Vector4D::new(2.0, 2.0, 2.0, 2.0));
         let pos = Vector4D::new(0.0, 0.0, 0.0, 0.0);
 
         // Force quantum decoherence

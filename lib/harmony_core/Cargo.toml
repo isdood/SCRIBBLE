@@ -9,6 +9,13 @@ license = "MIT"
 
 [dependencies]
 libm = "0.2.11"
+meshmath = "0.1.0"  # Add meshmath dependency
+shard = { path = "../shard" }  # Add shard dependency
+
+[features]
+default = ["std"]
+std = []
+no_std = []
 
 [[test]]
 name = "simd_tests"

@@ -7,7 +7,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 21:20:36 UTC
+//! Last Updated: 2025-01-19 08:41:06 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -16,7 +16,9 @@ use crate::{
     harmony::Quantum,
     vector::Vector4D,
     cube::CrystalCube,
+    aether::CoherenceError,
     idk::ShardUninit,
+    scribe::{Scribe, QuantumInscriber},
 };
 
 /// A quantum phantom state
@@ -31,7 +33,6 @@ pub enum PhantomState {
 }
 
 /// A quantum phantom for 4D operations
-#[derive(Clone)]
 pub struct Phantom<T: Clone + Default + 'static> {
     /// Phantom data
     data: ShardUninit<T>,
@@ -41,6 +42,8 @@ pub struct Phantom<T: Clone + Default + 'static> {
     state: PhantomState,
     /// Quantum coherence
     coherence: f64,
+    /// Quantum inscriber for state transitions
+    inscriber: QuantumInscriber,
 }
 
 impl<T: Clone + Default + 'static> Phantom<T> {
@@ -51,17 +54,24 @@ impl<T: Clone + Default + 'static> Phantom<T> {
             position: Vector4D::new(x, y, z, w),
             state: PhantomState::Materialized,
             coherence: 1.0,
+            inscriber: QuantumInscriber::new(),
         }
     }
 
     /// Gets a reference to the phantom data
     pub fn data(&self) -> &T {
-        unsafe { self.data.assume_init_ref() }
+        unsafe {
+            self.data.assume_init_ref()
+            .expect("Quantum state verification failed")
+        }
     }
 
     /// Gets a mutable reference to the phantom data
     pub fn data_mut(&mut self) -> &mut T {
-        unsafe { self.data.assume_init_mut() }
+        unsafe {
+            self.data.assume_init_mut()
+            .expect("Quantum state verification failed")
+        }
     }
 
     /// Gets the current 4D position
@@ -87,23 +97,30 @@ impl<T: Clone + Default + 'static> Phantom<T> {
         }
 
         let pos = self.position();
-        let x = meshmath::floor(pos.x) as usize;
-        let y = meshmath::floor(pos.y) as usize;
-        let z = meshmath::floor(pos.z) as usize;
+        let x = pos.x.floor() as usize;
+        let y = pos.y.floor() as usize;
+        let z = pos.z.floor() as usize;
 
-        if let Some(cell) = cube.get_mut(x, y, z) {
-            unsafe {
-                let mut temp = ShardUninit::new(T::default());
-                core::ptr::swap(self.data.as_mut_ptr(), temp.as_mut_ptr());
-                *cell = temp.assume_init();
-            }
+        // Use inscriber to safely transfer quantum state
+        let result = unsafe {
+            // Extract data through quantum inscriber
+            let data = self.inscriber.extract(&self.data)
+            .map_err(|_| "Failed to extract quantum data")?;
+
+            // Inscribe data into cube
+            self.inscriber.inscribe(cube, x, y, z, data)
+            .map_err(|_| "Failed to inscribe quantum data")?;
+
+            Ok(())
+        };
+
+        if result.is_ok() {
             self.state = PhantomState::Materialized;
             self.decohere();
             cube.decohere();
-            Ok(())
-        } else {
-            Err("Invalid cube coordinates")
         }
+
+        result
     }
 
     /// Attempts to dematerialize from current position
@@ -112,9 +129,32 @@ impl<T: Clone + Default + 'static> Phantom<T> {
             return Err("Already dematerialized");
         }
 
+        // Stabilize quantum state before dematerialization
+        self.data.stabilize()
+        .map_err(|_| "Failed to stabilize quantum state")?;
+
         self.state = PhantomState::Dematerialized;
         self.decohere();
         Ok(())
+    }
+}
+
+impl<T: Clone + Default + 'static> Clone for Phantom<T> {
+    fn clone(&self) -> Self {
+        // Use inscriber to safely clone quantum state
+        let data = unsafe {
+            let extracted = self.inscriber.extract(&self.data)
+            .expect("Failed to extract quantum data for clone");
+            ShardUninit::new(extracted)
+        };
+
+        Self {
+            data,
+            position: self.position.clone(),
+            state: self.state,
+            coherence: self.coherence,
+            inscriber: QuantumInscriber::new(),
+        }
     }
 }
 
@@ -136,8 +176,11 @@ impl<T: Clone + Default + 'static> Quantum for Phantom<T> {
     }
 
     fn recohere(&mut self) {
-        self.coherence = 1.0;
-        self.state = PhantomState::Materialized;
+        // Attempt to stabilize quantum state
+        if self.data.stabilize().is_ok() {
+            self.coherence = 1.0;
+            self.state = PhantomState::Materialized;
+        }
     }
 }
 
@@ -175,5 +218,43 @@ mod tests {
 
         phantom.dematerialize().unwrap();
         assert!(phantom.materialize(&mut cube).is_err());
+    }
+
+    #[test]
+    fn test_phantom_coherence() {
+        let mut phantom = Phantom::new_positioned(42u8, 0.0, 0.0, 0.0, 0.0);
+        assert!(phantom.is_stable());
+        assert_eq!(phantom.coherence(), 1.0);
+
+        // Force decoherence
+        for _ in 0..10 {
+            phantom.decohere();
+        }
+
+        assert!(!phantom.is_stable());
+        assert_eq!(phantom.state(), PhantomState::Partial);
+
+        phantom.recohere();
+        assert!(phantom.is_stable());
+        assert_eq!(phantom.state(), PhantomState::Materialized);
+    }
+
+    #[test]
+    fn test_phantom_stabilization() {
+        let mut phantom = Phantom::new_positioned(42u8, 0.0, 0.0, 0.0, 0.0);
+
+        // Decohere and verify state
+        phantom.decohere();
+        assert!(!phantom.is_stable());
+
+        // Attempt to recohere
+        phantom.recohere();
+        assert!(phantom.is_stable());
+        assert_eq!(*phantom.data(), 42);
+
+        // Verify quantum coherence
+        unsafe {
+            assert!(phantom.data.assume_init_ref().is_ok());
+        }
     }
 }
