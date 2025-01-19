@@ -1,3 +1,5 @@
+// lib/magicmath/src/traits.rs
+
 //! Traits for Crystal Lattice HPC Systems
 //! ============================
 //!
@@ -67,8 +69,8 @@ pub trait FractalValue: ComplexQuantum {
     fn iterations(&self) -> Result<usize, MathError>;
 }
 
-/// Trait for quantum state tracking
-pub trait QuantumState {
+/// Trait for harmony state tracking
+pub trait HarmonyState {
     /// Get current coherence
     fn get_coherence(&self) -> Result<f64, MathError>;
 
@@ -81,15 +83,15 @@ pub trait QuantumState {
     /// Get current stability
     fn get_stability(&self) -> Result<f64, MathError>;
 
-    /// Update quantum state
+    /// Update harmony state
     fn update_state(&mut self, coherence: f64, phase: f64, energy: f64) -> Result<(), MathError>;
 
     /// Check if state is stable
     fn is_stable(&self) -> Result<bool, MathError>;
 }
 
-/// Trait for quantum operations
-pub trait QuantumOperation {
+/// Trait for harmony operations
+pub trait HarmonyOperation {
     /// Get operation coherence factor
     fn coherence_factor(&self) -> f64;
 

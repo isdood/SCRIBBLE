@@ -1,3 +1,5 @@
+// lib/magicmath/src/errors/lib.rs
+
 //! Crystal Computing Error Types
 //! ===========================
 //!

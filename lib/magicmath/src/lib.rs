@@ -1,3 +1,5 @@
+// lib/magicmath/src/lib.rs
+
 //! MagicMath: High-Performance Crystal Lattice Mathematical Operations
 //! =======================================================
 //!
@@ -8,11 +10,10 @@
 //! Version: 0.1.0
 //! License: MIT
 //!
-//! A comprehensive library for quantum-aware mathematical operations
+//! A comprehensive library for harmony-aware mathematical operations
 //! on crystal lattice systems, providing high-precision calculations
-//! with quantum state preservation and stability monitoring.
+//! with harmony state preservation and stability monitoring.
 
-// Core modules
 pub mod core;
 pub mod constants;
 pub mod traits;
@@ -42,14 +43,14 @@ pub use crate::core::{
     harmony_fibonacci,
 };
 
-pub use crate::errors::{
+pub use errors::{
     MathError,
     MathResult,
 };
 
 pub use crate::traits::{
     MeshValue,
-    ComplexHarmony,
+    ComplexQuantum,
     FractalValue,
     HarmonyState as HarmonyStateTrait,
     HarmonyOperation,
@@ -118,7 +119,7 @@ pub mod prelude {
         HarmonyState,
         Operation,
         MeshValue,
-        ComplexHarmony,
+        ComplexQuantum,
         FractalValue,
         HarmonyStateTrait,
         HarmonyOperation,
@@ -150,7 +151,7 @@ pub mod prelude {
         harmony_pythagoras,
         harmony_fibonacci,
     };
-    pub use crate::errors::{MathError, MathResult};
+    pub use errors::{MathError, MathResult};
 }
 
 // Version compatibility check

@@ -1,3 +1,5 @@
+// lib/magicmath/src/errors.rs
+
 //! Core Error Types for Crystal Computing Systems
 //! ===========================================
 //!
@@ -34,8 +36,8 @@ pub enum MathError {
     Underflow(String),
     /// Invalid domain for operation
     InvalidDomain(String),
-    /// Quantum state became unstable
-    QuantumStateUnstable,
+    /// Harmony state became unstable
+    HarmonyStateUnstable,
     /// Conversion error between types
     ConversionError(String),
     /// Invalid parameter value
@@ -52,12 +54,12 @@ pub enum MathError {
     FractalTypeMismatch,
     /// Complex number convergence failure
     ComplexConvergenceFailure(String),
-    /// Resonance loss in quantum state
+    /// Resonance loss in harmony state
     ResonanceLoss(String),
     /// Iteration limit exceeded
     IterationLimitExceeded(usize),
-    /// Generic quantum error
-    QuantumError(String),
+    /// Generic harmony error
+    HarmonyError(String),
 }
 
 /// Error type for quantum operations
@@ -123,7 +125,7 @@ impl Scribe for MathError {
             Self::Overflow(msg) => format!("Overflow error: {}", msg),
             Self::Underflow(msg) => format!("Underflow error: {}", msg),
             Self::InvalidDomain(msg) => format!("Invalid domain: {}", msg),
-            Self::QuantumStateUnstable => "Quantum state became unstable".to_string(),
+            Self::HarmonyStateUnstable => "Harmony state became unstable".to_string(),
             Self::ConversionError(msg) => format!("Conversion error: {}", msg),
             Self::InvalidParameter(msg) => format!("Invalid parameter: {}", msg),
             Self::LogarithmDomainError(val) => format!("Logarithm domain error: {}", val),
@@ -134,7 +136,7 @@ impl Scribe for MathError {
             Self::ComplexConvergenceFailure(msg) => format!("Complex convergence failure: {}", msg),
             Self::ResonanceLoss(msg) => format!("Resonance loss: {}", msg),
             Self::IterationLimitExceeded(limit) => format!("Iteration limit exceeded: {}", limit),
-            Self::QuantumError(msg) => format!("Quantum error: {}", msg),
+            Self::HarmonyError(msg) => format!("Harmony error: {}", msg),
         }
     }
 }

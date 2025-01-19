@@ -17,7 +17,7 @@ use crate::constants::{
     COMPLEX_ITERATION_LIMIT,
     HARMONY_STABILITY_THRESHOLD,
 };
-use crate::errors::MathError;
+use errors::MathError;
 
 /// Parameters for Mandelbrot set calculation
 #[derive(Debug, Clone, Copy)]

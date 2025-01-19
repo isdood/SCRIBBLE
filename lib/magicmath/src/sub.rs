@@ -1,3 +1,5 @@
+// lib/magicmath/src/sub.rs
+
 //! Subtraction Operations for Crystal Lattice HPC Systems
 //! ============================================
 //!
@@ -13,18 +15,18 @@ use crate::{
     constants::{
         MAX_LATTICE_SIZE,
         MIN_LATTICE_SIZE,
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
         RESONANCE_FACTOR,
         PHASE_COUPLING_CONSTANT
     },
     traits::MeshValue,
 };
 
-/// Quantum-aware subtraction for crystal lattice values
+/// Harmony-aware subtraction for crystal lattice values
 /// Maintains coherence through resonance stabilization
-pub fn quantum_sub<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
+pub fn harmony_sub<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     let coherence = calculate_decoherence(a, b)?;
-    if coherence < QUANTUM_STABILITY_THRESHOLD {
+    if coherence < HARMONY_STABILITY_THRESHOLD {
         return Err(MathError::CoherenceLoss);
     }
 
@@ -41,15 +43,15 @@ pub fn aligned_sub<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
         return Err(MathError::AlignmentError);
     }
 
-    quantum_sub(a, b)
+    harmony_sub(a, b)
 }
 
-/// Anti-resonant subtraction for enhanced quantum stability
+/// Anti-resonant subtraction for enhanced harmony stability
 pub fn antiresonant_sub<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     let antiresonance = calculate_antiresonance(a, b)?;
     let scaled_result = apply_antiresonance(a, b, antiresonance)?;
 
-    quantum_sub(scaled_result, T::zero())
+    harmony_sub(scaled_result, T::zero())
 }
 
 /// Subtract lattice values with phase decoupling
@@ -59,7 +61,7 @@ pub fn phase_sub<T: MeshValue>(a: T, b: T, phase: f64) -> Result<T, MathError> {
     }
 
     let phase_adjusted = apply_phase_decoupling(a, b, phase)?;
-    quantum_sub(phase_adjusted.0, phase_adjusted.1)
+    harmony_sub(phase_adjusted.0, phase_adjusted.1)
 }
 
 // Internal helper functions
@@ -118,7 +120,7 @@ fn apply_phase_decoupling<T: MeshValue>(a: T, b: T, phase: f64) -> Result<(T, T)
     Ok((decoupled_a, decoupled_b))
 }
 
-/// Quantum state for alignment calculations in subtraction
+/// Harmony state for alignment calculations in subtraction
 #[derive(Debug, Clone, Copy)]
 pub struct AlignmentState {
     coherence: f64,
@@ -129,7 +131,7 @@ pub struct AlignmentState {
 impl AlignmentState {
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD
+        self.coherence >= HARMONY_STABILITY_THRESHOLD
     }
 
     #[inline]
@@ -169,9 +171,9 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_sub() {
-        assert_eq!(quantum_sub(5.0, 3.0).unwrap(), 2.0);
-        assert!(quantum_sub(1.0, 2.0).is_err()); // Below minimum
+    fn test_harmony_sub() {
+        assert_eq!(harmony_sub(5.0, 3.0).unwrap(), 2.0);
+        assert!(harmony_sub(1.0, 2.0).is_err()); // Below minimum
     }
 
     #[test]
