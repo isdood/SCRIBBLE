@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 13:12:00 UTC
+//! Last Updated: 2025-01-19 17:52:37 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -13,6 +13,7 @@
 
 // External crates
 extern crate magicmath;
+extern crate scribe;
 
 // Module declarations
 pub mod vector;
@@ -22,11 +23,11 @@ pub mod crystal;
 pub mod errors;
 pub mod zeronaut;
 pub mod phantom;
-pub mod scribe;
 pub mod align;
 pub mod aether;
 pub mod cube;
 pub mod growth; // New module for crystal growth patterns
+pub mod native; // New module for native types and macros
 
 // Re-exports from local modules
 pub use crystal::{CrystalLattice, CrystalNode};
@@ -39,6 +40,7 @@ pub use harmony::{Quantum, Phase, Resonance};
 pub use align::{Alignment, AlignmentState, AlignmentResult};
 pub use aether::AetherField;
 pub use growth::{GrowthPattern, GrowthState, CrystalGrowth}; // New exports
+pub use native::{String, Box, vec, Vec}; // New exports
 
 // Re-exports from magicmath
 pub use magicmath::{
@@ -56,7 +58,7 @@ pub use magicmath::{
     iterate_mandelbrot,
 };
 
-/// Constants for crystal computing operations
+// Constants for crystal computing operations
 pub mod constants {
     /// Maximum size of a quantum dimension
     pub const MAX_QUANTUM_SIZE: usize = 256;
@@ -95,14 +97,14 @@ pub mod constants {
 
 /// Initialize a new quantum math context for crystal operations
 pub fn init_quantum_math() -> QuantumMath {
-    magicmath::new()
+    QuantumMath::new()
 }
 
 /// Create growth parameters for crystal expansion
 pub fn create_growth_params() -> FractalParams {
     FractalParams::default()
-        .with_max_iterations(constants::MAX_FRACTAL_DEPTH)
-        .with_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD)
+    .with_max_iterations(constants::MAX_FRACTAL_DEPTH)
+    .with_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD)
 }
 
 #[cfg(test)]

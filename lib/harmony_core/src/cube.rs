@@ -4,31 +4,36 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19 09:48:03 UTC
-//! Last Updated: 2025-01-19 09:48:03 UTC
+//! Last Updated: 2025-01-19 17:50:50 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use meshmath::floor;
+use magicmath::floor::floor;
 use crate::{
     errors::QuantumError,
     vector::Vector3D,
     constants::MAX_QUANTUM_SIZE,
     align::{Alignment, AlignmentState},
+    scribe::Scribe,
+    native::{String, Box, vec, Vec}, // Use custom native types and macros
 };
 
 /// A three-dimensional crystal cube structure
 #[derive(Debug)]
 pub struct CrystalCube<T> {
     alignment: Alignment,
-    data: [[T; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE],
+    data: Box<[Box<[Box<[T]>]>]>,  // Use nested arrays managed by Box
     size: usize,
 }
 
-impl<T: Default + Clone> CrystalCube<T> {
+impl<T: Default + Clone + Scribe> CrystalCube<T> {
     /// Create a new crystal cube with given size
     pub fn new(size: usize) -> Self {
         let size = size.min(MAX_QUANTUM_SIZE);
-        let mut data = [[T::default(); MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE];
+        let data = vec![
+            vec![vec![T::default(); size]; size];
+            size
+        ].into_boxed_slice();
         let alignment = Alignment::new(Vector3D::new(0.0, 0.0, 0.0));
 
         Self { data, size, alignment }
@@ -52,7 +57,7 @@ impl<T: Default + Clone> CrystalCube<T> {
     }
 
     /// Get state at vector position
-    pub fn get_state_at(&self, pos: &Vector3D<f64>) -> Result<T, QuantumError> {
+    pub fn get_state_at(&self, pos: &Vector3D) -> Result<T, QuantumError> {
         let x = floor(pos.x) as usize;
         let y = floor(pos.y) as usize;
         let z = floor(pos.z) as usize;
@@ -60,7 +65,7 @@ impl<T: Default + Clone> CrystalCube<T> {
     }
 
     /// Set state at vector position
-    pub fn set_state_at(&mut self, pos: &Vector3D<f64>, value: T) -> Result<(), QuantumError> {
+    pub fn set_state_at(&mut self, pos: &Vector3D, value: T) -> Result<(), QuantumError> {
         let x = floor(pos.x) as usize;
         let y = floor(pos.y) as usize;
         let z = floor(pos.z) as usize;
@@ -78,26 +83,64 @@ impl<T: Default + Clone> CrystalCube<T> {
     }
 }
 
+impl<T: Default + Clone + Scribe> Scribe for CrystalCube<T> {
+    fn scribe(&self) -> String {
+        let mut result = String::new();
+        for x in 0..self.size {
+            for y in 0..self.size {
+                for z in 0..self.size {
+                    result.push_str(&format!(
+                        "({},{},{}): {}\n",
+                                             x, y, z,
+                                             self.data[x][y][z].scribe()
+                    ));
+                }
+            }
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[derive(Default, Clone, Debug)]
+    struct TestType {
+        value: i32,
+    }
+
+    impl Scribe for TestType {
+        fn scribe(&self) -> String {
+            format!("{}", self.value)
+        }
+    }
+
     #[test]
     fn test_cube_creation() {
-        let cube: CrystalCube<f64> = CrystalCube::new(4);
+        let cube: CrystalCube<TestType> = CrystalCube::new(4);
         assert_eq!(cube.size(), 4);
     }
 
     #[test]
     fn test_state_access() {
         let mut cube = CrystalCube::new(4);
-        assert!(cube.set_state(0, 0, 0, 1.0).is_ok());
-        assert_eq!(cube.get_state(0, 0, 0).unwrap(), 1.0);
+        let test_value = TestType { value: 42 };
+        assert!(cube.set_state(0, 0, 0, test_value.clone()).is_ok());
+        assert_eq!(cube.get_state(0, 0, 0).unwrap().value, 42);
     }
 
     #[test]
     fn test_boundary_violation() {
-        let cube = CrystalCube::<f64>::new(4);
+        let cube = CrystalCube::<TestType>::new(4);
         assert!(cube.get_state(4, 0, 0).is_err());
+    }
+
+    #[test]
+    fn test_cube_scribe() {
+        let mut cube = CrystalCube::new(2);
+        let test_value = TestType { value: 42 };
+        cube.set_state(0, 0, 0, test_value.clone()).unwrap();
+        assert!(cube.scribe().contains("(0,0,0): 42"));
     }
 }

@@ -4,29 +4,20 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 14:09:45 UTC
+//! Last Updated: 2025-01-19 17:43:21 UTC
 //! Version: 0.1.1
 //! License: MIT
 
-use magicmath::{deref, derefmut};
-use zeronaut::NonNull;
+use core::ops::{Deref, DerefMut};
+use core::ptr::NonNull; // Corrected import for NonNull
 use crate::phantom::PhantomCore;
 use scribe::Scribe;
 use crate::{
     errors::{QuantumError, CoherenceError},
     align::AlignmentState,
+    cube::CubeBox, // Ensure CubeBox is correctly defined and imported
 };
-
-/// Core error type for coherence operations
-#[derive(Debug)]
-pub enum CoherenceError {
-    /// Invalid coherence value
-    InvalidValue,
-    /// Phase alignment failure
-    PhaseAlignmentFailure,
-    /// Invalid state detected
-    InvalidState,
-}
+use core::mem::MaybeUninit;
 
 /// Result type for coherence operations
 pub type CoherenceResult<T> = Result<T, CoherenceError>;
@@ -102,17 +93,18 @@ impl<T> ShardUninit<T> {
 impl<T> QuantumState<T> {
     /// Create a new quantum state
     pub fn new(value: T) -> Self {
+        let boxed = CubeBox::new(value);
         Self {
-            ptr: NonNull::new(Box::into_raw(Box::new(value))).unwrap(),
+            ptr: NonNull::new(boxed.value).unwrap(),
             _phantom: PhantomCore::new(),
         }
     }
 
     /// Get the inner value
     pub fn into_inner(self) -> T {
-        let value = unsafe { Box::from_raw(self.ptr.as_ptr()) };
+        let value = CubeBox { value: self.ptr.as_ptr() }.into_inner();
         core::mem::forget(self);
-        *value
+        value
     }
 
     /// Check coherence of the state
@@ -127,12 +119,12 @@ impl<T> QuantumState<T> {
 impl<T> Drop for QuantumState<T> {
     fn drop(&mut self) {
         unsafe {
-            Box::from_raw(self.ptr.as_ptr());
+            CubeBox { value: self.ptr.as_ptr() };
         }
     }
 }
 
-impl<T> deref::Deref for QuantumState<T> {
+impl<T> Deref for QuantumState<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -140,7 +132,7 @@ impl<T> deref::Deref for QuantumState<T> {
     }
 }
 
-impl<T> derefmut::DerefMut for QuantumState<T> {
+impl<T> DerefMut for QuantumState<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.ptr.as_mut() }
     }

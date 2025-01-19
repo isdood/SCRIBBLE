@@ -8,7 +8,7 @@
 //! Version: 0.1.0
 //! License: MIT
 
-use meshmath::sqrt;
+use magicmath::sqrt;
 use crate::{
     constants::{
         QUANTUM_STABILITY_THRESHOLD,
@@ -29,14 +29,14 @@ pub struct AetherField {
     /// Field coherence
     coherence: f64,
     /// Field position
-    position: Vector3D<f64>,
+    position: Vector3D,
     /// Field alignment
     alignment: Alignment,
 }
 
 impl AetherField {
     /// Create a new aether field
-    pub fn new(position: Vector3D<f64>) -> Self {
+    pub fn new(position: Vector3D) -> Self {
         Self {
             strength: 1.0,
             coherence: 1.0,
@@ -46,7 +46,7 @@ impl AetherField {
     }
 
     /// Get field strength at point
-    pub fn strength_at(&self, point: &Vector3D<f64>) -> Result<f64, QuantumError> {
+    pub fn strength_at(&self, point: &Vector3D) -> Result<f64, QuantumError> {
         let distance = self.position.dot(point)?;
         if distance > MAX_QUANTUM_SIZE as f64 {
             return Err(QuantumError::BoundaryViolation);
@@ -75,7 +75,7 @@ impl AetherField {
     }
 
     /// Align field with target position
-    pub fn align_with_position(&mut self, target: &Vector3D<f64>) -> Result<(), QuantumError> {
+    pub fn align_with_position(&mut self, target: &Vector3D) -> Result<(), QuantumError> {
         let state = self.alignment.align_with(target)?;
         match state {
             AlignmentState::Perfect | AlignmentState::Partial(_) => Ok(()),
@@ -113,6 +113,10 @@ impl crate::harmony::Quantum for AetherField {
         self.coherence = target_phase * AETHER_RESONANCE_FACTOR;
         Ok(())
     }
+
+    fn alignment_state(&self) -> AlignmentState {
+        self.alignment.get_state()
+    }
 }
 
 #[cfg(test)]
@@ -137,9 +141,9 @@ mod tests {
     #[test]
     fn test_coherence_operations() {
         let mut field = AetherField::new(Vector3D::new(0.0, 0.0, 0.0));
-        assert!(field.is_stable());
+        assert!(field.coherence() >= QUANTUM_STABILITY_THRESHOLD);
         field.decohere();
-        assert!(!field.is_stable());
+        assert!(field.coherence() == 0.0);
     }
 
     #[test]

@@ -1,12 +1,10 @@
-// lib/magicmath/src/lib.rs
-
 //! MagicMath: High-Performance Crystal Lattice Mathematical Operations
 //! =======================================================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 14:35:35 UTC
+//! Last Updated: 2025-01-19 17:41:04 UTC
 //! Version: 0.1.0
 //! License: MIT
 //!
@@ -19,6 +17,7 @@ pub mod constants;
 pub mod traits;
 pub mod deref;
 pub mod derefmut;
+pub mod floor; // Added floor module
 
 // Feature modules
 pub mod fractal;
@@ -43,6 +42,7 @@ pub use crate::core::{
     harmony_fibonacci,
 };
 
+// Import the errors module
 pub use errors::{
     MathError,
     MathResult,
@@ -88,6 +88,10 @@ pub use crate::derefmut::{
     HarmonyDerefMutable,
 };
 
+// Re-export floor and sqrt functions
+pub use crate::core::harmony_sqrt as sqrt;
+pub use crate::floor::floor;
+
 /// Library configuration and version information
 pub mod config {
     /// Current library version
@@ -106,7 +110,7 @@ pub mod config {
     pub const CREATED: &str = "2025-01-19";
 
     /// Last update timestamp
-    pub const UPDATED: &str = "2025-01-19 14:35:35 UTC";
+    pub const UPDATED: &str = "2025-01-19 17:41:04 UTC";
 
     /// Current user
     pub const CURRENT_USER: &str = "isdood";
@@ -150,6 +154,8 @@ pub mod prelude {
         harmony_phi,
         harmony_pythagoras,
         harmony_fibonacci,
+        floor, // Added floor to prelude
+        sqrt,  // Added sqrt to prelude
     };
     pub use errors::{MathError, MathResult};
 }

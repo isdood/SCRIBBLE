@@ -8,8 +8,7 @@
 //! Version: 0.1.0
 //! License: MIT
 
-use core::marker::PhantomData;
-use meshmath::{floor, sqrt};
+use magicmath::{floor, sqrt};
 use crate::{
     vector::Vector3D,
     crystal::CrystalNode,
@@ -28,8 +27,6 @@ use crate::{
 pub struct PhantomCore<T> {
     /// Core data storage
     data: ShardUninit<T>,
-    /// State verification marker
-    _marker: PhantomData<T>,
 }
 
 /// Phantom quantum state operator
@@ -38,7 +35,7 @@ pub struct Phantom<T: Clone + Default + 'static> {
     /// Core phantom data
     core: PhantomCore<T>,
     /// Position in quantum space
-    position: Vector3D<f64>,
+    position: Vector3D,
     /// Current coherence value
     coherence: f64,
     /// Quantum alignment
@@ -50,7 +47,6 @@ impl<T> PhantomCore<T> {
     pub const fn new() -> Self {
         Self {
             data: ShardUninit::new(),
-            _marker: PhantomData,
         }
     }
 
@@ -72,7 +68,7 @@ impl<T> PhantomCore<T> {
 
 impl<T: Clone + Default + 'static> Phantom<T> {
     /// Create a new phantom
-    pub fn new(position: Vector3D<f64>) -> Self {
+    pub fn new(position: Vector3D) -> Self {
         Self {
             core: PhantomCore::new(),
             position: position.clone(),
@@ -82,12 +78,12 @@ impl<T: Clone + Default + 'static> Phantom<T> {
     }
 
     /// Get phantom position
-    pub fn position(&self) -> &Vector3D<f64> {
+    pub fn position(&self) -> &Vector3D {
         &self.position
     }
 
     /// Set phantom position
-    pub fn set_position(&mut self, pos: Vector3D<f64>) -> Result<(), QuantumError> {
+    pub fn set_position(&mut self, pos: Vector3D) -> Result<(), QuantumError> {
         if pos.magnitude()? > MAX_QUANTUM_SIZE as f64 {
             return Err(QuantumError::BoundaryViolation);
         }
@@ -125,7 +121,7 @@ impl<T: Clone + Default + 'static> Phantom<T> {
     }
 
     /// Calculate quantum projection
-    pub fn project(&self, target: &Vector3D<f64>) -> Result<f64, QuantumError> {
+    pub fn project(&self, target: &Vector3D) -> Result<f64, QuantumError> {
         let dot = self.position.dot(target)?;
         let mag = sqrt(dot * dot)?;
 
@@ -134,6 +130,11 @@ impl<T: Clone + Default + 'static> Phantom<T> {
         }
 
         Ok(mag)
+    }
+
+    /// Check if the phantom is stable
+    fn is_stable(&self) -> bool {
+        self.coherence >= QUANTUM_STABILITY_THRESHOLD
     }
 }
 

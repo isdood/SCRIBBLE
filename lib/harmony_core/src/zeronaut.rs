@@ -8,7 +8,7 @@
 //! Version: 0.1.0
 //! License: MIT
 
-use meshmath::sqrt;
+use magicmath::{sqrt, floor};
 use crate::{
     vector::Vector3D,
     crystal::CrystalNode,
@@ -38,7 +38,7 @@ pub struct Zeronaut {
     /// Core zero-point data
     core: ZeroCore,
     /// Position in quantum space
-    position: Vector3D<f64>,
+    position: Vector3D,
     /// Current coherence value
     coherence: f64,
     /// Quantum alignment
@@ -96,7 +96,7 @@ impl ZeroCore {
 
 impl Zeronaut {
     /// Create a new zeronaut
-    pub fn new(position: Vector3D<f64>) -> Self {
+    pub fn new(position: Vector3D) -> Self {
         Self {
             core: ZeroCore::new(),
             position: position.clone(),
@@ -106,12 +106,12 @@ impl Zeronaut {
     }
 
     /// Get current position
-    pub fn position(&self) -> &Vector3D<f64> {
+    pub fn position(&self) -> &Vector3D {
         &self.position
     }
 
     /// Set position
-    pub fn set_position(&mut self, pos: Vector3D<f64>) -> Result<(), QuantumError> {
+    pub fn set_position(&mut self, pos: Vector3D) -> Result<(), QuantumError> {
         if pos.magnitude()? > MAX_QUANTUM_SIZE as f64 {
             return Err(QuantumError::BoundaryViolation);
         }

@@ -8,8 +8,8 @@ repository = "https://github.com/isdood/scribble"
 license = "MIT"
 
 [dependencies]
-libm = "0.2.11"
 magicmath = { path = "../magicmath" }
+scribe = { path = "../scribe" }
 
 [[test]]
 name = "simd_tests"

@@ -11,7 +11,7 @@
 use magicmath::{sqrt, QuantumMath};
 use crate::{
     vector::{Vector3D, Vector4D},
-    crystal::CrystalCube,
+    crystal::CrystalNode,
     errors::QuantumError,
     constants::{QUANTUM_STABILITY_THRESHOLD, ALIGNMENT_THRESHOLD},
     idk::ShardUninit,
@@ -96,32 +96,6 @@ impl Alignment {
             AlignmentState::Perfect
         } else if coherence >= QUANTUM_STABILITY_THRESHOLD {
             AlignmentState::Partial(coherence)
-        } else {
-            AlignmentState::Misaligned
-        };
-
-        self.core.set_state(self.state);
-        Ok(self.state)
-    }
-
-    /// Calculate quantum alignment with crystal cube
-    pub fn align_quantum(&mut self, cube: &CrystalCube) -> AlignmentResult<AlignmentState> {
-        let mut qmath = QuantumMath::new();
-        // Get quantum state vector
-        let state = Vector4D::new(
-            self.reference.x,
-            self.reference.y,
-            self.reference.z,
-            sqrt(cube.get_state(0, 0, 0)?)
-        );
-
-        // Calculate quantum alignment factor
-        let alignment = state.magnitude()?;
-
-        self.state = if alignment >= ALIGNMENT_THRESHOLD {
-            AlignmentState::Perfect
-        } else if alignment >= QUANTUM_STABILITY_THRESHOLD {
-            AlignmentState::Partial(alignment)
         } else {
             AlignmentState::Misaligned
         };
