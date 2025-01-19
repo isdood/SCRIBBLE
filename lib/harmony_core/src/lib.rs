@@ -4,12 +4,15 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:48:03 UTC
-//! Version: 0.1.0
+//! Last Updated: 2025-01-19 13:12:00 UTC
+//! Version: 0.1.1
 //! License: MIT
 
 #![no_std]
 #![feature(const_trait_impl)]
+
+// External crates
+extern crate magicmath;
 
 // Module declarations
 pub mod vector;
@@ -23,8 +26,9 @@ pub mod scribe;
 pub mod align;
 pub mod aether;
 pub mod cube;
+pub mod growth; // New module for crystal growth patterns
 
-// Re-exports
+// Re-exports from local modules
 pub use crystal::{CrystalLattice, CrystalNode};
 pub use errors::{QuantumError, CoherenceError, QuantumResult, CoherenceResult};
 pub use vector::{Vector3D, Vector4D};
@@ -34,6 +38,23 @@ pub use scribe::Scribe;
 pub use harmony::{Quantum, Phase, Resonance};
 pub use align::{Alignment, AlignmentState, AlignmentResult};
 pub use aether::AetherField;
+pub use growth::{GrowthPattern, GrowthState, CrystalGrowth}; // New exports
+
+// Re-exports from magicmath
+pub use magicmath::{
+    QuantumMath,
+    FractalParams,
+    FractalState,
+    JuliaParams,
+    JuliaState,
+    JuliaVariant,
+    MandelbrotParams,
+    MandelbrotState,
+    MandelbrotVariant,
+    generate_fractal,
+    iterate_julia,
+    iterate_mandelbrot,
+};
 
 /// Constants for crystal computing operations
 pub mod constants {
@@ -60,6 +81,28 @@ pub mod constants {
 
     /// Alignment threshold for quantum operations
     pub const ALIGNMENT_THRESHOLD: f64 = 0.95;
+
+    /// Crystal growth rate factor
+    pub const GROWTH_RATE_FACTOR: f64 = 0.5;
+
+    /// Maximum fractal iteration depth for crystal growth
+    pub const MAX_FRACTAL_DEPTH: usize = 64;
+
+    /// Julia set parameters for optimal crystal growth
+    pub const JULIA_GROWTH_REAL: f64 = -0.4;
+    pub const JULIA_GROWTH_IMAG: f64 = 0.6;
+}
+
+/// Initialize a new quantum math context for crystal operations
+pub fn init_quantum_math() -> QuantumMath {
+    magicmath::new()
+}
+
+/// Create growth parameters for crystal expansion
+pub fn create_growth_params() -> FractalParams {
+    FractalParams::default()
+        .with_max_iterations(constants::MAX_FRACTAL_DEPTH)
+        .with_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD)
 }
 
 #[cfg(test)]
@@ -75,5 +118,24 @@ mod tests {
         assert!(constants::MIN_PHASE_COHERENCE < constants::MAX_PHASE_COHERENCE);
         assert!(constants::AETHER_RESONANCE_FACTOR > 0.0);
         assert!(constants::ALIGNMENT_THRESHOLD > 0.9);
+    }
+
+    #[test]
+    fn test_quantum_math_init() {
+        let qmath = init_quantum_math();
+        assert!(qmath.get_state().is_stable());
+    }
+
+    #[test]
+    fn test_growth_params() {
+        let params = create_growth_params();
+        assert_eq!(params.max_iterations(), constants::MAX_FRACTAL_DEPTH);
+        assert_eq!(params.threshold(), constants::CRYSTAL_RESONANCE_THRESHOLD);
+    }
+
+    #[test]
+    fn test_julia_constants() {
+        assert!((-2.0..=2.0).contains(&constants::JULIA_GROWTH_REAL));
+        assert!((-2.0..=2.0).contains(&constants::JULIA_GROWTH_IMAG));
     }
 }
