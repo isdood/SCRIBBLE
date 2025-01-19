@@ -1,3 +1,5 @@
+// lib/magicmath/src/fractal.rs
+
 //! Fractal Generation for Crystal Lattice Systems
 //! ===============================================
 //!
@@ -10,11 +12,11 @@
 
 use crate::{
     constants::{
-        QUANTUM_FRACTAL_THRESHOLD,
+        HARMONY_FRACTAL_THRESHOLD,
         RESONANCE_FACTOR,
         CONVERGENCE_EPSILON,
         COMPLEX_ITERATION_LIMIT,
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
     },
     brot::{self, MandelbrotParams, MandelbrotState, MandelbrotVariant},
     julia::{self, JuliaParams, JuliaState, JuliaVariant},
@@ -36,7 +38,7 @@ impl Default for FractalParams {
         Self {
             max_iterations: COMPLEX_ITERATION_LIMIT,
             escape_radius: 2.0,
-            stability_threshold: QUANTUM_STABILITY_THRESHOLD,
+            stability_threshold: HARMONY_STABILITY_THRESHOLD,
             phase_shift: 0.0,
             stability_factor: RESONANCE_FACTOR,
         }
@@ -79,7 +81,7 @@ impl FractalState {
         match self {
             FractalState::Julia(state) => state.is_stable(),
             FractalState::Mandelbrot(state) => state.is_stable(),
-            FractalState::Custom(state) => state.stability >= QUANTUM_FRACTAL_THRESHOLD,
+            FractalState::Custom(state) => state.stability >= HARMONY_FRACTAL_THRESHOLD,
         }
     }
 }
@@ -141,9 +143,9 @@ pub fn generate_fractal(
                     break;
                 }
 
-                if custom_state.stability < QUANTUM_FRACTAL_THRESHOLD {
+                if custom_state.stability < HARMONY_FRACTAL_THRESHOLD {
                     return Err(MathError::FractalStabilityLoss(
-                        "Quantum stability lost during custom fractal iteration".to_string()
+                        "Harmony stability lost during custom fractal iteration".to_string()
                     ));
                 }
 

@@ -1,3 +1,5 @@
+// lib/magicmath/src/log.rs
+
 //! Natural Logarithm Operations for Crystal Lattice HPC Systems
 //! ==============================================
 //!
@@ -13,21 +15,21 @@ use crate::{
     constants::{
         MAX_LATTICE_SIZE,
         MIN_LATTICE_SIZE,
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
         RESONANCE_FACTOR,
         PHASE_LOGARITHM_FACTOR,
-        QUANTUM_CONTINUITY_THRESHOLD,
+        HARMONY_CONTINUITY_THRESHOLD,
         CONVERGENCE_THRESHOLD,
         E
     },
     traits::MeshValue,
 };
 
-/// Quantum-aware natural logarithm for crystal lattice values
+/// Harmony-aware natural logarithm for crystal lattice values
 /// Handles energy compression and phase continuity
-pub fn quantum_ln<T: MeshValue>(x: T) -> Result<T, MathError> {
+pub fn harmony_ln<T: MeshValue>(x: T) -> Result<T, MathError> {
     let coherence = calculate_compression(x)?;
-    if coherence < QUANTUM_STABILITY_THRESHOLD {
+    if coherence < HARMONY_STABILITY_THRESHOLD {
         return Err(MathError::CoherenceLoss);
     }
 
@@ -37,14 +39,14 @@ pub fn quantum_ln<T: MeshValue>(x: T) -> Result<T, MathError> {
     Ok(result)
 }
 
-/// Calculate natural logarithm with quantum continuity preservation
+/// Calculate natural logarithm with harmony continuity preservation
 pub fn continuous_ln<T: MeshValue>(x: T) -> Result<T, MathError> {
     let continuity = check_continuity(x)?;
     if !continuity.is_stable() {
         return Err(MathError::ContinuityLoss);
     }
 
-    quantum_ln(x)
+    harmony_ln(x)
 }
 
 /// Resonant natural logarithm with harmonic compression
@@ -52,7 +54,7 @@ pub fn harmonic_ln<T: MeshValue>(x: T) -> Result<T, MathError> {
     let harmonics = calculate_compression_harmonics(x)?;
     let compressed_result = apply_compression_harmonics(x, harmonics)?;
 
-    quantum_ln(compressed_result)
+    harmony_ln(compressed_result)
 }
 
 /// Calculate natural logarithm with phase compression
@@ -62,7 +64,7 @@ pub fn phase_ln<T: MeshValue>(x: T, phase: f64) -> Result<T, MathError> {
     }
 
     let phase_compressed = apply_phase_compression(x, phase)?;
-    quantum_ln(phase_compressed)
+    harmony_ln(phase_compressed)
 }
 
 // Internal helper functions
@@ -137,7 +139,7 @@ fn apply_phase_compression<T: MeshValue>(x: T, phase: f64) -> Result<T, MathErro
     x.phase_compress(compressed_phase)
 }
 
-/// Quantum continuity state for natural logarithm
+/// Harmony continuity state for natural logarithm
 #[derive(Debug, Clone, Copy)]
 pub struct ContinuityState {
     coherence: f64,
@@ -149,8 +151,8 @@ pub struct ContinuityState {
 impl ContinuityState {
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD &&
-        self.continuity >= QUANTUM_CONTINUITY_THRESHOLD
+        self.coherence >= HARMONY_STABILITY_THRESHOLD &&
+        self.continuity >= HARMONY_CONTINUITY_THRESHOLD
     }
 
     #[inline]
@@ -200,10 +202,10 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_ln() {
-        assert_eq!(quantum_ln(E).unwrap(), 1.0);
-        assert!(quantum_ln(-1.0).is_err());
-        assert!(quantum_ln(0.0).is_err());
+    fn test_harmony_ln() {
+        assert_eq!(harmony_ln(E).unwrap(), 1.0);
+        assert!(harmony_ln(-1.0).is_err());
+        assert!(harmony_ln(0.0).is_err());
     }
 
     #[test]
@@ -241,7 +243,7 @@ mod tests {
 
     #[test]
     fn test_convergence() {
-        let result = quantum_ln(2.0).unwrap();
+        let result = harmony_ln(2.0).unwrap();
         assert!((result.exp() - 2.0).abs() < CONVERGENCE_THRESHOLD);
     }
 }

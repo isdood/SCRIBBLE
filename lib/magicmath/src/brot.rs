@@ -1,3 +1,5 @@
+// lib/magicmath/src/brot.rs
+
 //! Mandelbrot Set Implementation for Crystal Lattice Systems
 //! ===============================================
 //!
@@ -9,13 +11,13 @@
 //! License: MIT
 
 use crate::constants::{
-    QUANTUM_MANDELBROT_THRESHOLD,
+    HARMONY_MANDELBROT_THRESHOLD,
     RESONANCE_FACTOR,
     CONVERGENCE_EPSILON,
     COMPLEX_ITERATION_LIMIT,
-    QUANTUM_STABILITY_THRESHOLD,
+    HARMONY_STABILITY_THRESHOLD,
 };
-use errors::core::MathError;
+use crate::errors::MathError;
 
 /// Parameters for Mandelbrot set calculation
 #[derive(Debug, Clone, Copy)]
@@ -30,7 +32,7 @@ impl Default for MandelbrotParams {
         Self {
             max_iterations: COMPLEX_ITERATION_LIMIT,
             escape_radius: 2.0,
-            stability_threshold: QUANTUM_STABILITY_THRESHOLD,
+            stability_threshold: HARMONY_STABILITY_THRESHOLD,
         }
     }
 }
@@ -67,7 +69,7 @@ impl MandelbrotState {
     /// Check if state is stable
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.stability >= QUANTUM_MANDELBROT_THRESHOLD
+        self.stability >= HARMONY_MANDELBROT_THRESHOLD
     }
 }
 
@@ -101,7 +103,7 @@ pub fn iterate_mandelbrot(
 
         let magnitude = z_real * z_real + z_imag * z_imag;
 
-        // Update quantum stability
+        // Update harmony stability
         state.stability *= RESONANCE_FACTOR;
         state.iterations = i + 1;
 
@@ -112,9 +114,9 @@ pub fn iterate_mandelbrot(
         }
 
         // Check for stability loss
-        if state.stability < QUANTUM_MANDELBROT_THRESHOLD {
+        if state.stability < HARMONY_MANDELBROT_THRESHOLD {
             return Err(MathError::MandelbrotStabilityLoss(
-                "Quantum stability lost during iteration".to_string()
+                "Harmony stability lost during iteration".to_string()
             ));
         }
 
@@ -137,4 +139,63 @@ pub fn iterate_mandelbrot(
     }
 
     Ok(state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mandelbrot_default_params() {
+        let params = MandelbrotParams::default();
+        assert_eq!(params.max_iterations, COMPLEX_ITERATION_LIMIT);
+        assert_eq!(params.escape_radius, 2.0);
+        assert_eq!(params.stability_threshold, HARMONY_STABILITY_THRESHOLD);
+    }
+
+    #[test]
+    fn test_mandelbrot_state_new() {
+        let state = MandelbrotState::new(0.0, 0.0);
+        assert_eq!(state.x, 0.0);
+        assert_eq!(state.y, 0.0);
+        assert_eq!(state.iterations, 0);
+        assert_eq!(state.stability, 1.0);
+        assert_eq!(state.escape_time, None);
+    }
+
+    #[test]
+    fn test_mandelbrot_escape_time() {
+        let state = MandelbrotState::new(0.0, 0.0);
+        assert_eq!(state.escape_time(), None);
+    }
+
+    #[test]
+    fn test_mandelbrot_is_stable() {
+        let state = MandelbrotState::new(0.0, 0.0);
+        assert!(state.is_stable());
+    }
+
+    #[test]
+    fn test_iterate_mandelbrot_standard() {
+        let params = MandelbrotParams::default();
+        let state = MandelbrotState::new(0.0, 0.0);
+        let result = iterate_mandelbrot(state, &params, MandelbrotVariant::Standard).unwrap();
+        assert!(result.is_stable());
+    }
+
+    #[test]
+    fn test_iterate_mandelbrot_optimized() {
+        let params = MandelbrotParams::default();
+        let state = MandelbrotState::new(0.0, 0.0);
+        let result = iterate_mandelbrot(state, &params, MandelbrotVariant::Optimized).unwrap();
+        assert!(result.is_stable());
+    }
+
+    #[test]
+    fn test_iterate_mandelbrot_high_precision() {
+        let params = MandelbrotParams::default();
+        let state = MandelbrotState::new(0.0, 0.0);
+        let result = iterate_mandelbrot(state, &params, MandelbrotVariant::HighPrecision).unwrap();
+        assert!(result.is_stable());
+    }
 }

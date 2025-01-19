@@ -10,6 +10,8 @@ pub mod executor;
 pub mod instruction;
 pub mod thread;
 pub mod fabric;
+pub mod mutex;
+pub mod async_runtime;
 
 // Re-exports
 pub use executor::CrystalMeshExecutor;

@@ -17,7 +17,7 @@ members = [
     "lib/magicmath",
     "lib/harmony_core",
     "lib/garnet",
-    "lib/crystal_thread",
+    "lib/quartz",
     "lib/scribe",
     "lib/errors"
 ]
@@ -32,7 +32,7 @@ edition = "2021"
 libm = "0.2.11"
 harmony_core = { path = "lib/harmony_core" }
 shard = { path = "lib/shard" }
-crystal_thread = { path = "lib/crystal_thread" }
+quartz = { path = "lib/quartz" }
 scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
 
@@ -48,5 +48,5 @@ errors = { path = "lib/errors" }
 # Metadata
 [package.metadata]
 created = "2025-01-19"
-updated = "2025-01-19 14:30:30"
+updated = "2025-01-19 16:03:45"
 current_user = "isdood"

@@ -1,9 +1,9 @@
 [package]
-name = "crystal_thread"
+name = "quartz"
 version = "0.1.0"
 edition = "2021"
 authors = ["Caleb J.D. Terkovics <isdood>"]
-description = "Crystal-based threading implementation for near-native workload distribution"
+description = "Crystal-based pattern compiler and async runtime for near-native workload distribution"
 repository = "https://github.com/isdood/scribble"
 license = "MIT"
 publish = false
@@ -12,6 +12,8 @@ publish = false
 harmony_core = { workspace = true }
 shard = { workspace = true }
 libm = { workspace = true }
+futures = "0.3"
+async-trait = "0.1"
 
 [features]
 default = []
@@ -20,7 +22,7 @@ experimental = []
 [package.metadata]
 created = "2025-01-19 13:56:19"
 creator = "isdood"
-last_updated = "2025-01-19 13:56:19"
+last_updated = "2025-01-19 16:03:19"
 last_updater = "isdood"
 
 [package.metadata.docs.rs]

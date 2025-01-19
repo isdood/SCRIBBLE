@@ -1,3 +1,5 @@
+// lib/magicmath/src/constants.rs
+
 //! Constants for Crystal Lattice HPC Systems
 //! ===============================
 //!
@@ -27,13 +29,13 @@ pub const SQRT_5: f64 = 2.236067977499790;
 pub const LN_2: f64 = std::f64::consts::LN_2;
 pub const LN_10: f64 = std::f64::consts::LN_10;
 
-// Quantum State Constants
-pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.1;
-pub const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.01;
-pub const QUANTUM_ENERGY_THRESHOLD: f64 = 0.001;
-pub const QUANTUM_PHASE_THRESHOLD: f64 = 0.0001;
-pub const QUANTUM_RESONANCE_THRESHOLD: f64 = 0.00001;
-pub const QUANTUM_ENTANGLEMENT_THRESHOLD: f64 = 0.000001;
+// Harmony State Constants
+pub const HARMONY_STABILITY_THRESHOLD: f64 = 0.1;
+pub const HARMONY_COHERENCE_THRESHOLD: f64 = 0.01;
+pub const HARMONY_ENERGY_THRESHOLD: f64 = 0.001;
+pub const HARMONY_PHASE_THRESHOLD: f64 = 0.0001;
+pub const HARMONY_RESONANCE_THRESHOLD: f64 = 0.00001;
+pub const HARMONY_ENTANGLEMENT_THRESHOLD: f64 = 0.000001;
 
 // Resonance Factors
 pub const RESONANCE_FACTOR: f64 = 0.999;
@@ -46,9 +48,9 @@ pub const STABILITY_RESONANCE_FACTOR: f64 = 0.9999999;
 pub const PHASE_FRACTAL_FACTOR: f64 = 0.1;
 pub const PHASE_JULIA_FACTOR: f64 = 0.01;
 pub const PHASE_MANDELBROT_FACTOR: f64 = 0.001;
-pub const QUANTUM_JULIA_THRESHOLD: f64 = 0.15;
-pub const QUANTUM_MANDELBROT_THRESHOLD: f64 = 0.2;
-pub const QUANTUM_FRACTAL_THRESHOLD: f64 = 0.25;
+pub const HARMONY_JULIA_THRESHOLD: f64 = 0.15;
+pub const HARMONY_MANDELBROT_THRESHOLD: f64 = 0.2;
+pub const HARMONY_FRACTAL_THRESHOLD: f64 = 0.25;
 pub const MAX_ORBIT_POINTS: usize = 1_000;
 pub const BULB_DETECTION_THRESHOLD: f64 = 0.0625;
 pub const CARDIOID_DETECTION_THRESHOLD: f64 = 0.25;
@@ -90,7 +92,7 @@ pub const SYSTEM_UPDATED: &str = "2025-01-19 10:39:51 UTC";
 pub const SYSTEM_LICENSE: &str = "MIT";
 
 // Module-specific Constants
-pub mod quantum {
+pub mod harmony {
     pub const MIN_COHERENCE: f64 = 0.0;
     pub const MAX_COHERENCE: f64 = 1.0;
     pub const MIN_ENERGY: f64 = 0.0;
@@ -127,10 +129,10 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_thresholds() {
-        assert!(QUANTUM_STABILITY_THRESHOLD > QUANTUM_COHERENCE_THRESHOLD);
-        assert!(QUANTUM_COHERENCE_THRESHOLD > QUANTUM_ENERGY_THRESHOLD);
-        assert!(QUANTUM_ENERGY_THRESHOLD > QUANTUM_PHASE_THRESHOLD);
+    fn test_harmony_thresholds() {
+        assert!(HARMONY_STABILITY_THRESHOLD > HARMONY_COHERENCE_THRESHOLD);
+        assert!(HARMONY_COHERENCE_THRESHOLD > HARMONY_ENERGY_THRESHOLD);
+        assert!(HARMONY_ENERGY_THRESHOLD > HARMONY_PHASE_THRESHOLD);
     }
 
     #[test]
@@ -143,8 +145,8 @@ mod tests {
 
     #[test]
     fn test_fractal_constants() {
-        assert!(QUANTUM_MANDELBROT_THRESHOLD > QUANTUM_JULIA_THRESHOLD);
-        assert!(QUANTUM_FRACTAL_THRESHOLD > QUANTUM_MANDELBROT_THRESHOLD);
+        assert!(HARMONY_MANDELBROT_THRESHOLD > HARMONY_JULIA_THRESHOLD);
+        assert!(HARMONY_FRACTAL_THRESHOLD > HARMONY_MANDELBROT_THRESHOLD);
         assert!(MAX_ORBIT_POINTS > 0);
     }
 
@@ -165,8 +167,8 @@ mod tests {
 
     #[test]
     fn test_module_constants() {
-        assert!(quantum::MAX_COHERENCE > quantum::MIN_COHERENCE);
-        assert!(quantum::MAX_ENERGY > quantum::MIN_ENERGY);
-        assert!(quantum::MAX_PHASE > quantum::MIN_PHASE);
+        assert!(harmony::MAX_COHERENCE > harmony::MIN_COHERENCE);
+        assert!(harmony::MAX_ENERGY > harmony::MIN_ENERGY);
+        assert!(harmony::MAX_PHASE > harmony::MIN_PHASE);
     }
 }

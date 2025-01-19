@@ -1,3 +1,5 @@
+// lib/magicmath/src/sqrt.rs
+
 //! Square Root Operations for Crystal Lattice HPC Systems
 //! ===========================================
 //!
@@ -13,20 +15,20 @@ use crate::{
     constants::{
         MAX_LATTICE_SIZE,
         MIN_LATTICE_SIZE,
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
         RESONANCE_FACTOR,
         PHASE_BIFURCATION_FACTOR,
-        QUANTUM_SYMMETRY_THRESHOLD,
+        HARMONY_SYMMETRY_THRESHOLD,
         CONVERGENCE_THRESHOLD
     },
     traits::MeshValue,
 };
 
-/// Quantum-aware square root for crystal lattice values
+/// Harmony-aware square root for crystal lattice values
 /// Handles energy bifurcation and phase symmetry
-pub fn quantum_sqrt<T: MeshValue>(x: T) -> Result<T, MathError> {
+pub fn harmony_sqrt<T: MeshValue>(x: T) -> Result<T, MathError> {
     let coherence = calculate_bifurcation(x)?;
-    if coherence < QUANTUM_STABILITY_THRESHOLD {
+    if coherence < HARMONY_STABILITY_THRESHOLD {
         return Err(MathError::CoherenceLoss);
     }
 
@@ -36,14 +38,14 @@ pub fn quantum_sqrt<T: MeshValue>(x: T) -> Result<T, MathError> {
     Ok(result)
 }
 
-/// Calculate square root with quantum symmetry preservation
+/// Calculate square root with harmony symmetry preservation
 pub fn symmetric_sqrt<T: MeshValue>(x: T) -> Result<T, MathError> {
     let symmetry = check_symmetry(x)?;
     if !symmetry.is_stable() {
         return Err(MathError::SymmetryLoss);
     }
 
-    quantum_sqrt(x)
+    harmony_sqrt(x)
 }
 
 /// Resonant square root with harmonic bifurcation
@@ -51,7 +53,7 @@ pub fn harmonic_sqrt<T: MeshValue>(x: T) -> Result<T, MathError> {
     let harmonics = calculate_bifurcation_harmonics(x)?;
     let bifurcated_result = apply_bifurcation_harmonics(x, harmonics)?;
 
-    quantum_sqrt(bifurcated_result)
+    harmony_sqrt(bifurcated_result)
 }
 
 /// Calculate square root with phase bifurcation
@@ -61,7 +63,7 @@ pub fn phase_sqrt<T: MeshValue>(x: T, phase: f64) -> Result<T, MathError> {
     }
 
     let phase_bifurcated = apply_phase_bifurcation(x, phase)?;
-    quantum_sqrt(phase_bifurcated)
+    harmony_sqrt(phase_bifurcated)
 }
 
 // Internal helper functions
@@ -144,7 +146,7 @@ fn apply_phase_bifurcation<T: MeshValue>(x: T, phase: f64) -> Result<T, MathErro
     x.phase_bifurcate(bifurcated_phase)
 }
 
-/// Quantum symmetry state for square root
+/// Harmony symmetry state for square root
 #[derive(Debug, Clone, Copy)]
 pub struct SymmetryState {
     coherence: f64,
@@ -156,8 +158,8 @@ pub struct SymmetryState {
 impl SymmetryState {
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD &&
-        self.symmetry >= QUANTUM_SYMMETRY_THRESHOLD
+        self.coherence >= HARMONY_STABILITY_THRESHOLD &&
+        self.symmetry >= HARMONY_SYMMETRY_THRESHOLD
     }
 
     #[inline]
@@ -203,9 +205,9 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_sqrt() {
-        assert_eq!(quantum_sqrt(4.0).unwrap(), 2.0);
-        assert!(quantum_sqrt(-1.0).is_err());
+    fn test_harmony_sqrt() {
+        assert_eq!(harmony_sqrt(4.0).unwrap(), 2.0);
+        assert!(harmony_sqrt(-1.0).is_err());
     }
 
     #[test]
@@ -243,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_convergence() {
-        let result = quantum_sqrt(2.0).unwrap();
+        let result = harmony_sqrt(2.0).unwrap();
         assert!((result * result - 2.0).abs() < CONVERGENCE_THRESHOLD);
     }
 }

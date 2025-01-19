@@ -1,3 +1,5 @@
+// lib/magicmath/src/julia.rs
+
 //! Julia Set Implementation for Crystal Lattice Systems
 //! ===============================================
 //!
@@ -9,11 +11,11 @@
 //! License: MIT
 
 use crate::constants::{
-    QUANTUM_JULIA_THRESHOLD,
+    HARMONY_JULIA_THRESHOLD,
     RESONANCE_FACTOR,
     CONVERGENCE_EPSILON,
     COMPLEX_ITERATION_LIMIT,
-    QUANTUM_STABILITY_THRESHOLD,
+    HARMONY_STABILITY_THRESHOLD,
 };
 use errors::core::MathError;
 
@@ -32,7 +34,7 @@ impl Default for JuliaParams {
         Self {
             max_iterations: COMPLEX_ITERATION_LIMIT,
             escape_radius: 2.0,
-            stability_threshold: QUANTUM_STABILITY_THRESHOLD,
+            stability_threshold: HARMONY_STABILITY_THRESHOLD,
             c_real: -0.4,
             c_imag: 0.6,
         }
@@ -71,7 +73,7 @@ impl JuliaState {
     /// Check if state is stable
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.stability >= QUANTUM_JULIA_THRESHOLD
+        self.stability >= HARMONY_JULIA_THRESHOLD
     }
 }
 
@@ -105,7 +107,7 @@ pub fn iterate_julia(
 
         let magnitude = z_real * z_real + z_imag * z_imag;
 
-        // Update quantum stability
+        // Update harmony stability
         state.stability *= RESONANCE_FACTOR;
         state.iterations = i + 1;
 
@@ -116,9 +118,9 @@ pub fn iterate_julia(
         }
 
         // Check for stability loss
-        if state.stability < QUANTUM_JULIA_THRESHOLD {
+        if state.stability < HARMONY_JULIA_THRESHOLD {
             return Err(MathError::JuliaStabilityLoss(
-                "Quantum stability lost during iteration".to_string()
+                "Harmony stability lost during iteration".to_string()
             ));
         }
 

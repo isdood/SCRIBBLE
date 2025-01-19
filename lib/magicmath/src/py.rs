@@ -1,3 +1,5 @@
+// lib/magicmath/src/py.rs
+
 //! Pythagorean Theorem Operations for Crystal Lattice HPC Systems
 //! ================================================
 //!
@@ -13,21 +15,21 @@ use crate::{
     constants::{
         MAX_LATTICE_SIZE,
         MIN_LATTICE_SIZE,
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
         RESONANCE_FACTOR,
         PHASE_ORTHOGONAL_FACTOR,
-        QUANTUM_ORTHOGONALITY_THRESHOLD,
+        HARMONY_ORTHOGONALITY_THRESHOLD,
         CONVERGENCE_THRESHOLD,
         DIMENSIONAL_COUPLING_CONSTANT
     },
     traits::MeshValue,
 };
 
-/// Quantum-aware Pythagorean theorem for crystal lattice values
+/// Harmony-aware Pythagorean theorem for crystal lattice values
 /// Handles dimensional coupling and orthogonal alignment
-pub fn quantum_pythagoras<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
+pub fn harmony_pythagoras<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     let coherence = calculate_orthogonality(a, b)?;
-    if coherence < QUANTUM_STABILITY_THRESHOLD {
+    if coherence < HARMONY_STABILITY_THRESHOLD {
         return Err(MathError::CoherenceLoss);
     }
 
@@ -37,14 +39,14 @@ pub fn quantum_pythagoras<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     Ok(result)
 }
 
-/// Calculate hypotenuse with quantum orthogonality preservation
+/// Calculate hypotenuse with harmony orthogonality preservation
 pub fn orthogonal_hypotenuse<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     let orthogonality = check_orthogonality(a, b)?;
     if !orthogonality.is_stable() {
         return Err(MathError::OrthogonalityLoss);
     }
 
-    quantum_pythagoras(a, b)
+    harmony_pythagoras(a, b)
 }
 
 /// Calculate leg with harmonic dimensional reduction
@@ -52,7 +54,7 @@ pub fn harmonic_leg<T: MeshValue>(hypotenuse: T, other_leg: T) -> Result<T, Math
     let harmonics = calculate_dimensional_harmonics(hypotenuse, other_leg)?;
     let reduced_result = apply_dimensional_reduction(hypotenuse, other_leg, harmonics)?;
 
-    quantum_pythagoras(reduced_result, T::unit())
+    harmony_pythagoras(reduced_result, T::unit())
 }
 
 /// Calculate Pythagorean triple verification with phase coupling
@@ -78,11 +80,11 @@ fn stabilized_pythagoras<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     let squared_a = a.raw_mul(a)?;
     let squared_b = b.raw_mul(b)?;
     let sum = squared_a.raw_add(squared_b)?;
-    quantum_sqrt(sum)
+    harmony_sqrt(sum)
 }
 
 #[inline]
-fn quantum_sqrt<T: MeshValue>(x: T) -> Result<T, MathError> {
+fn harmony_sqrt<T: MeshValue>(x: T) -> Result<T, MathError> {
     if x.is_negative() {
         return Err(MathError::ComplexDomain);
     }
@@ -142,7 +144,7 @@ fn apply_dimensional_reduction<T: MeshValue>(hyp: T, leg: T, harmonics: f64) -> 
     let squared_hyp = hyp.raw_mul(hyp)?;
     let squared_leg = leg.raw_mul(leg)?;
     let diff = squared_hyp.raw_sub(squared_leg)?;
-    quantum_sqrt(diff.scale(harmonics)?)
+    harmony_sqrt(diff.scale(harmonics)?)
 }
 
 #[inline]
@@ -151,9 +153,7 @@ fn is_valid_phase(phase: f64) -> bool {
 }
 
 #[inline]
-fn apply_phase_coupling<T: MeshValue>(a: T, b: T, c: T, phase: f64)
--> Result<(T, T, T), MathError>
-{
+fn apply_phase_coupling<T: MeshValue>(a: T, b: T, c: T, phase: f64) -> Result<(T, T, T), MathError> {
     let coupled_phase = phase * PHASE_ORTHOGONAL_FACTOR;
     let coupled_a = a.phase_couple(coupled_phase)?;
     let coupled_b = b.phase_couple(coupled_phase + DIMENSIONAL_COUPLING_CONSTANT)?;
@@ -171,7 +171,7 @@ fn verify_pythagorean_triple<T: MeshValue>(a: T, b: T, c: T) -> Result<bool, Mat
     Ok((sum.raw_sub(squared_c)?.magnitude()? < CONVERGENCE_THRESHOLD))
 }
 
-/// Quantum orthogonality state for Pythagorean calculations
+/// Harmony orthogonality state for Pythagorean calculations
 #[derive(Debug, Clone, Copy)]
 pub struct OrthogonalityState {
     coherence: f64,
@@ -183,8 +183,8 @@ pub struct OrthogonalityState {
 impl OrthogonalityState {
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD &&
-        self.orthogonality >= QUANTUM_ORTHOGONALITY_THRESHOLD
+        self.coherence >= HARMONY_STABILITY_THRESHOLD &&
+        self.orthogonality >= HARMONY_ORTHOGONALITY_THRESHOLD
     }
 
     #[inline]
@@ -231,8 +231,8 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_pythagoras() {
-        let result = quantum_pythagoras(3.0, 4.0).unwrap();
+    fn test_harmony_pythagoras() {
+        let result = harmony_pythagoras(3.0, 4.0).unwrap();
         assert!((result - 5.0).abs() < CONVERGENCE_THRESHOLD);
     }
 

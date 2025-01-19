@@ -1,3 +1,5 @@
+// lib/magicmath/src/mul.rs
+
 //! Multiplication Operations for Crystal Lattice HPC Systems
 //! =============================================
 //!
@@ -13,19 +15,19 @@ use crate::{
     constants::{
         MAX_LATTICE_SIZE,
         MIN_LATTICE_SIZE,
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
         RESONANCE_FACTOR,
         PHASE_AMPLIFICATION_FACTOR,
-        QUANTUM_ENTANGLEMENT_THRESHOLD
+        HARMONY_ENTANGLEMENT_THRESHOLD
     },
     traits::MeshValue,
 };
 
-/// Quantum-aware multiplication for crystal lattice values
+/// Harmony-aware multiplication for crystal lattice values
 /// Handles energy amplification and phase coupling
-pub fn quantum_mul<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
+pub fn harmony_mul<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     let coherence = calculate_amplification(a, b)?;
-    if coherence < QUANTUM_STABILITY_THRESHOLD {
+    if coherence < HARMONY_STABILITY_THRESHOLD {
         return Err(MathError::CoherenceLoss);
     }
 
@@ -35,14 +37,14 @@ pub fn quantum_mul<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     Ok(result)
 }
 
-/// Multiply values with quantum entanglement preservation
+/// Multiply values with harmony entanglement preservation
 pub fn entangled_mul<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     let entanglement = check_entanglement(a, b)?;
     if !entanglement.is_stable() {
         return Err(MathError::EntanglementLoss);
     }
 
-    quantum_mul(a, b)
+    harmony_mul(a, b)
 }
 
 /// Resonant multiplication with harmonic amplification
@@ -50,7 +52,7 @@ pub fn harmonic_mul<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
     let harmonics = calculate_harmonics(a, b)?;
     let amplified_result = apply_harmonics(a, b, harmonics)?;
 
-    quantum_mul(amplified_result, T::unit())
+    harmony_mul(amplified_result, T::unit())
 }
 
 /// Multiply lattice values with phase amplification
@@ -60,7 +62,7 @@ pub fn phase_mul<T: MeshValue>(a: T, b: T, phase: f64) -> Result<T, MathError> {
     }
 
     let phase_amplified = apply_phase_amplification(a, b, phase)?;
-    quantum_mul(phase_amplified.0, phase_amplified.1)
+    harmony_mul(phase_amplified.0, phase_amplified.1)
 }
 
 // Internal helper functions
@@ -126,7 +128,7 @@ fn apply_phase_amplification<T: MeshValue>(a: T, b: T, phase: f64) -> Result<(T,
     Ok((phase_a, phase_b))
 }
 
-/// Quantum entanglement state for multiplication
+/// Harmony entanglement state for multiplication
 #[derive(Debug, Clone, Copy)]
 pub struct EntanglementState {
     coherence: f64,
@@ -138,8 +140,8 @@ pub struct EntanglementState {
 impl EntanglementState {
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD &&
-        self.entanglement >= QUANTUM_ENTANGLEMENT_THRESHOLD
+        self.coherence >= HARMONY_STABILITY_THRESHOLD &&
+        self.entanglement >= HARMONY_ENTANGLEMENT_THRESHOLD
     }
 
     #[inline]
@@ -179,9 +181,9 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_mul() {
-        assert_eq!(quantum_mul(2.0, 3.0).unwrap(), 6.0);
-        assert!(quantum_mul(MAX_LATTICE_SIZE as f64, 2.0).is_err());
+    fn test_harmony_mul() {
+        assert_eq!(harmony_mul(2.0, 3.0).unwrap(), 6.0);
+        assert!(harmony_mul(MAX_LATTICE_SIZE as f64, 2.0).is_err());
     }
 
     #[test]

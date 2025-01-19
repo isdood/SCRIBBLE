@@ -7,7 +7,7 @@
 //! Last Updated: 2025-01-19 14:35:35 UTC
 //! Version: 0.1.0
 //! License: MIT
-
+//!
 //! A comprehensive library for quantum-aware mathematical operations
 //! on crystal lattice systems, providing high-precision calculations
 //! with quantum state preservation and stability monitoring.
@@ -23,35 +23,36 @@ pub mod derefmut;
 pub mod fractal;
 pub mod julia;
 pub mod brot;
+pub mod exp;  // Added exp module
 
 // Re-exports for convenient access
 pub use crate::core::{
-    QuantumMath,
-    QuantumState,
+    HarmonyMath,
+    HarmonyState,
     Operation,
-    quantum_add,
-    quantum_sub,
-    quantum_mul,
-    quantum_div,
-    quantum_sqrt,
-    quantum_ln,
-    quantum_pi,
-    quantum_phi,
-    quantum_pythagoras,
-    quantum_fibonacci,
+    harmony_add,
+    harmony_sub,
+    harmony_mul,
+    harmony_div,
+    harmony_sqrt,
+    harmony_ln,
+    harmony_pi,
+    harmony_phi,
+    harmony_pythagoras,
+    harmony_fibonacci,
 };
 
-pub use errors::core::{
+pub use crate::errors::{
     MathError,
     MathResult,
 };
 
 pub use crate::traits::{
     MeshValue,
-    ComplexQuantum,
+    ComplexHarmony,
     FractalValue,
-    QuantumState as QuantumStateTrait,
-    QuantumOperation,
+    HarmonyState as HarmonyStateTrait,
+    HarmonyOperation,
     Resonance,
 };
 
@@ -77,13 +78,13 @@ pub use crate::brot::{
 };
 
 pub use crate::deref::{
-    QuantumDeref,
-    QuantumDerefable,
+    HarmonyDeref,
+    HarmonyDerefable,
 };
 
 pub use crate::derefmut::{
-    QuantumDerefMut,
-    QuantumDerefMutable,
+    HarmonyDerefMut,
+    HarmonyDerefMutable,
 };
 
 /// Library configuration and version information
@@ -113,14 +114,14 @@ pub mod config {
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::{
-        QuantumMath,
-        QuantumState,
+        HarmonyMath,
+        HarmonyState,
         Operation,
         MeshValue,
-        ComplexQuantum,
+        ComplexHarmony,
         FractalValue,
-        QuantumStateTrait,
-        QuantumOperation,
+        HarmonyStateTrait,
+        HarmonyOperation,
         Resonance,
         FractalParams,
         FractalState,
@@ -134,22 +135,22 @@ pub mod prelude {
         MandelbrotState,
         MandelbrotVariant,
         iterate_mandelbrot,
-        QuantumDeref,
-        QuantumDerefable,
-        QuantumDerefMut,
-        QuantumDerefMutable,
-        quantum_add,
-        quantum_sub,
-        quantum_mul,
-        quantum_div,
-        quantum_sqrt,
-        quantum_ln,
-        quantum_pi,
-        quantum_phi,
-        quantum_pythagoras,
-        quantum_fibonacci,
+        HarmonyDeref,
+        HarmonyDerefable,
+        HarmonyDerefMut,
+        HarmonyDerefMutable,
+        harmony_add,
+        harmony_sub,
+        harmony_mul,
+        harmony_div,
+        harmony_sqrt,
+        harmony_ln,
+        harmony_pi,
+        harmony_phi,
+        harmony_pythagoras,
+        harmony_fibonacci,
     };
-    pub use errors::core::{MathError, MathResult};
+    pub use crate::errors::{MathError, MathResult};
 }
 
 // Version compatibility check
@@ -160,8 +161,8 @@ const _: () = {
     const CHECK_RUST_VERSION: () = ();
 };
 
-/// Create a new QuantumMath instance with default configuration
+/// Create a new HarmonyMath instance with default configuration
 #[inline]
-pub fn new() -> QuantumMath {
-    QuantumMath::new()
+pub fn new() -> HarmonyMath {
+    HarmonyMath::new()
 }

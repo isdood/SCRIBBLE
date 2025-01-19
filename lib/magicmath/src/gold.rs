@@ -1,3 +1,5 @@
+// lib/magicmath/src/gold.rs
+
 //! Golden Ratio Operations for Crystal Lattice HPC Systems
 //! ============================================
 //!
@@ -13,10 +15,10 @@ use crate::{
     constants::{
         MAX_LATTICE_SIZE,
         MIN_LATTICE_SIZE,
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
         RESONANCE_FACTOR,
         PHASE_GOLDEN_FACTOR,
-        QUANTUM_HARMONY_THRESHOLD,
+        HARMONY_HARMONY_THRESHOLD,
         CONVERGENCE_THRESHOLD,
         PHI,
         INV_PHI
@@ -24,11 +26,11 @@ use crate::{
     traits::MeshValue,
 };
 
-/// Quantum-aware golden ratio scaling for crystal lattice values
+/// Harmony-aware golden ratio scaling for crystal lattice values
 /// Handles energy harmonization and phase golden alignment
-pub fn quantum_phi<T: MeshValue>(x: T) -> Result<T, MathError> {
+pub fn harmony_phi<T: MeshValue>(x: T) -> Result<T, MathError> {
     let coherence = calculate_harmonization(x)?;
-    if coherence < QUANTUM_STABILITY_THRESHOLD {
+    if coherence < HARMONY_STABILITY_THRESHOLD {
         return Err(MathError::CoherenceLoss);
     }
 
@@ -38,14 +40,14 @@ pub fn quantum_phi<T: MeshValue>(x: T) -> Result<T, MathError> {
     Ok(result)
 }
 
-/// Calculate golden ratio with quantum harmony preservation
+/// Calculate golden ratio with harmony preservation
 pub fn harmonic_phi<T: MeshValue>(x: T) -> Result<T, MathError> {
     let harmony = check_harmony(x)?;
     if !harmony.is_stable() {
         return Err(MathError::HarmonyLoss);
     }
 
-    quantum_phi(x)
+    harmony_phi(x)
 }
 
 /// Fibonacci-based golden ratio calculation with recursive harmonics
@@ -53,7 +55,7 @@ pub fn fibonacci_phi<T: MeshValue>(x: T, iterations: usize) -> Result<T, MathErr
     let harmonics = calculate_fibonacci_harmonics(x, iterations)?;
     let harmonized_result = apply_fibonacci_harmonics(x, harmonics)?;
 
-    quantum_phi(harmonized_result)
+    harmony_phi(harmonized_result)
 }
 
 /// Calculate golden ratio with phase harmonization
@@ -63,7 +65,7 @@ pub fn phase_phi<T: MeshValue>(x: T, phase: f64) -> Result<T, MathError> {
     }
 
     let phase_harmonized = apply_phase_harmonization(x, phase)?;
-    quantum_phi(phase_harmonized)
+    harmony_phi(phase_harmonized)
 }
 
 // Internal helper functions
@@ -138,7 +140,7 @@ fn apply_phase_harmonization<T: MeshValue>(x: T, phase: f64) -> Result<T, MathEr
     x.phase_harmonize(harmonized_phase)
 }
 
-/// Calculate golden ratio powers with quantum stability
+/// Calculate golden ratio powers with harmony stability
 pub fn phi_power<T: MeshValue>(x: T, n: i32) -> Result<T, MathError> {
     if n == 0 {
         return Ok(T::unit());
@@ -155,7 +157,7 @@ pub fn phi_power<T: MeshValue>(x: T, n: i32) -> Result<T, MathError> {
     Ok(result)
 }
 
-/// Quantum harmony state for golden ratio calculations
+/// Harmony state for golden ratio calculations
 #[derive(Debug, Clone, Copy)]
 pub struct HarmonyState {
     coherence: f64,
@@ -168,8 +170,8 @@ pub struct HarmonyState {
 impl HarmonyState {
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD &&
-        self.harmony >= QUANTUM_HARMONY_THRESHOLD &&
+        self.coherence >= HARMONY_STABILITY_THRESHOLD &&
+        self.harmony >= HARMONY_HARMONY_THRESHOLD &&
         (self.golden_ratio - PHI).abs() < CONVERGENCE_THRESHOLD
     }
 
@@ -218,8 +220,8 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_phi() {
-        let result = quantum_phi(1.0).unwrap();
+    fn test_harmony_phi() {
+        let result = harmony_phi(1.0).unwrap();
         assert!((result - PHI).abs() < CONVERGENCE_THRESHOLD);
     }
 

@@ -1,3 +1,5 @@
+// lib/magicmath/src/core.rs
+
 //! Core Mathematical Operations for Crystal Lattice HPC Systems
 //! ===============================================
 //!
@@ -10,7 +12,7 @@
 
 use crate::{
     constants::{
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
         RESONANCE_FACTOR
     },
     traits::MeshValue,
@@ -20,9 +22,9 @@ use crate::{
 };
 use errors::core::MathError;
 
-/// Core quantum state tracking for all mathematical operations
+/// Core harmony state tracking for all mathematical operations
 #[derive(Debug, Clone, Copy)]
-pub struct QuantumState {
+pub struct HarmonyState {
     pub coherence: f64,
     pub phase: f64,
     pub energy: f64,
@@ -30,8 +32,8 @@ pub struct QuantumState {
     pub iterations: usize,
 }
 
-impl QuantumState {
-    /// Create new quantum state with initial values
+impl HarmonyState {
+    /// Create new harmony state with initial values
     #[inline]
     pub fn new() -> Self {
         Self {
@@ -43,14 +45,14 @@ impl QuantumState {
         }
     }
 
-    /// Check if quantum state is stable
+    /// Check if harmony state is stable
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD &&
-        self.stability >= QUANTUM_STABILITY_THRESHOLD
+        self.coherence >= HARMONY_STABILITY_THRESHOLD &&
+        self.stability >= HARMONY_STABILITY_THRESHOLD
     }
 
-    /// Update quantum state with new operation
+    /// Update harmony state with new operation
     #[inline]
     pub fn update(&mut self, operation: Operation) -> Result<(), MathError> {
         self.coherence *= operation.coherence_factor();
@@ -60,13 +62,13 @@ impl QuantumState {
         self.iterations += 1;
 
         if !self.is_stable() {
-            return Err(MathError::QuantumStateUnstable);
+            return Err(MathError::HarmonyStateUnstable);
         }
         Ok(())
     }
 }
 
-/// Mathematical operations with quantum properties
+/// Mathematical operations with harmony properties
 #[derive(Debug, Clone, Copy)]
 pub enum Operation {
     Add,
@@ -146,36 +148,36 @@ impl Operation {
     }
 }
 
-/// Core mathematical functions with quantum stability
-pub struct QuantumMath {
-    state: QuantumState,
+/// Core mathematical functions with harmony stability
+pub struct HarmonyMath {
+    state: HarmonyState,
 }
 
-impl QuantumMath {
-    /// Create new quantum math instance
+impl HarmonyMath {
+    /// Create new harmony math instance
     #[inline]
     pub fn new() -> Self {
         Self {
-            state: QuantumState::new(),
+            state: HarmonyState::new(),
         }
     }
 
-    /// Perform operation with quantum stability check
+    /// Perform operation with harmony stability check
     #[inline]
     pub fn operate<T: MeshValue + Copy>(&mut self, operation: Operation, value: T) -> Result<T, MathError> {
         self.state.update(operation)?;
 
         match operation {
-            Operation::Add => quantum_add(&value, &value),
-            Operation::Subtract => quantum_sub(&value, &value),
-            Operation::Multiply => quantum_mul(&value, &value),
-            Operation::Divide => quantum_div(&value, &value),
-            Operation::SquareRoot => quantum_sqrt(&value),
-            Operation::Logarithm => quantum_ln(&value),
-            Operation::Pi => quantum_pi(&value),
-            Operation::Golden => quantum_phi(&value),
-            Operation::Pythagorean => quantum_pythagoras(&value, &value),
-            Operation::Fibonacci => quantum_fibonacci(value.to_usize()?),
+            Operation::Add => harmony_add(&value, &value),
+            Operation::Subtract => harmony_sub(&value, &value),
+            Operation::Multiply => harmony_mul(&value, &value),
+            Operation::Divide => harmony_div(&value, &value),
+            Operation::SquareRoot => harmony_sqrt(&value),
+            Operation::Logarithm => harmony_ln(&value),
+            Operation::Pi => harmony_pi(&value),
+            Operation::Golden => harmony_phi(&value),
+            Operation::Pythagorean => harmony_pythagoras(&value, &value),
+            Operation::Fibonacci => harmony_fibonacci(value.to_usize()?),
             Operation::Julia => {
                 let state = julia::JuliaState::new(value.to_f64()?, 0.0);
                 let params = julia::JuliaParams::default();
@@ -204,37 +206,37 @@ impl QuantumMath {
         }
     }
 
-    /// Get current quantum state
+    /// Get current harmony state
     #[inline]
-    pub fn get_state(&self) -> QuantumState {
+    pub fn get_state(&self) -> HarmonyState {
         self.state
     }
 
-    /// Reset quantum state
+    /// Reset harmony state
     #[inline]
     pub fn reset_state(&mut self) {
-        self.state = QuantumState::new();
+        self.state = HarmonyState::new();
     }
 }
 
-// Core quantum operations
+// Core harmony operations
 #[inline]
-pub fn quantum_add<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_add<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
     Ok(T::from(a.to_f64()? + b.to_f64()?))
 }
 
 #[inline]
-pub fn quantum_sub<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_sub<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
     Ok(T::from(a.to_f64()? - b.to_f64()?))
 }
 
 #[inline]
-pub fn quantum_mul<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_mul<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
     Ok(T::from(a.to_f64()? * b.to_f64()?))
 }
 
 #[inline]
-pub fn quantum_div<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_div<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
     let b_val = b.to_f64()?;
     if b_val == 0.0 {
         return Err(MathError::DivisionByZero);
@@ -243,7 +245,7 @@ pub fn quantum_div<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
 }
 
 #[inline]
-pub fn quantum_sqrt<T: MeshValue>(a: &T) -> Result<T, MathError> {
+pub fn harmony_sqrt<T: MeshValue>(a: &T) -> Result<T, MathError> {
     let val = a.to_f64()?;
     if val < 0.0 {
         return Err(MathError::InvalidDomain("Square root of negative number".to_string()));
@@ -252,7 +254,7 @@ pub fn quantum_sqrt<T: MeshValue>(a: &T) -> Result<T, MathError> {
 }
 
 #[inline]
-pub fn quantum_ln<T: MeshValue>(a: &T) -> Result<T, MathError> {
+pub fn harmony_ln<T: MeshValue>(a: &T) -> Result<T, MathError> {
     let val = a.to_f64()?;
     if val <= 0.0 {
         return Err(MathError::LogarithmDomainError(val));
@@ -261,24 +263,24 @@ pub fn quantum_ln<T: MeshValue>(a: &T) -> Result<T, MathError> {
 }
 
 #[inline]
-pub fn quantum_pi<T: MeshValue>(scale: &T) -> Result<T, MathError> {
+pub fn harmony_pi<T: MeshValue>(scale: &T) -> Result<T, MathError> {
     Ok(T::from(core::f64::consts::PI * scale.to_f64()?))
 }
 
 #[inline]
-pub fn quantum_phi<T: MeshValue>(scale: &T) -> Result<T, MathError> {
+pub fn harmony_phi<T: MeshValue>(scale: &T) -> Result<T, MathError> {
     Ok(T::from(((1.0 + 5.0f64.sqrt()) / 2.0) * scale.to_f64()?))
 }
 
 #[inline]
-pub fn quantum_pythagoras<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_pythagoras<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
     let a_val = a.to_f64()?;
     let b_val = b.to_f64()?;
     Ok(T::from((a_val * a_val + b_val * b_val).sqrt()))
 }
 
 #[inline]
-pub fn quantum_fibonacci<T: MeshValue>(n: usize) -> Result<T, MathError> {
+pub fn harmony_fibonacci<T: MeshValue>(n: usize) -> Result<T, MathError> {
     if n <= 1 {
         return Ok(T::from(n as f64));
     }

@@ -1,4 +1,6 @@
-//! Quantum-Aware Deref Operations for Crystal Lattice Systems
+// lib/magicmath/src/deref.rs
+
+//! Harmony-Aware Deref Operations for Crystal Lattice Systems
 //! =====================================================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
@@ -10,24 +12,24 @@
 
 use crate::{
     constants::{
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
         RESONANCE_FACTOR,
-        QUANTUM_COHERENCE_THRESHOLD,
+        HARMONY_COHERENCE_THRESHOLD,
     },
     traits::MeshValue,
 };
 use errors::core::MathError;
 
-/// Quantum-aware dereferencing operations
+/// Harmony-aware dereferencing operations
 #[derive(Debug, Clone)]
-pub struct QuantumDeref<T: MeshValue> {
+pub struct HarmonyDeref<T: MeshValue> {
     value: T,
     coherence: f64,
     stability: f64,
 }
 
-impl<T: MeshValue> QuantumDeref<T> {
-    /// Create new quantum deref wrapper
+impl<T: MeshValue> HarmonyDeref<T> {
+    /// Create new harmony deref wrapper
     #[inline]
     pub fn new(value: T) -> Self {
         Self {
@@ -37,24 +39,24 @@ impl<T: MeshValue> QuantumDeref<T> {
         }
     }
 
-    /// Get reference to inner value with quantum stability check
+    /// Get reference to inner value with harmony stability check
     #[inline]
     pub fn get(&self) -> Result<&T, MathError> {
         if self.is_stable() {
             Ok(&self.value)
         } else {
-            Err(MathError::QuantumStateUnstable)
+            Err(MathError::HarmonyStateUnstable)
         }
     }
 
-    /// Check if quantum state is stable
+    /// Check if harmony state is stable
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD &&
-        self.stability >= QUANTUM_COHERENCE_THRESHOLD
+        self.coherence >= HARMONY_STABILITY_THRESHOLD &&
+        self.stability >= HARMONY_COHERENCE_THRESHOLD
     }
 
-    /// Update quantum state
+    /// Update harmony state
     #[inline]
     pub fn update(&mut self) {
         self.coherence *= RESONANCE_FACTOR;
@@ -62,15 +64,15 @@ impl<T: MeshValue> QuantumDeref<T> {
     }
 }
 
-/// Safe quantum dereferencing trait
-pub trait QuantumDerefable<T: MeshValue> {
-    /// Perform quantum-safe dereferencing
-    fn quantum_deref(&self) -> Result<&T, MathError>;
+/// Safe harmony dereferencing trait
+pub trait HarmonyDerefable<T: MeshValue> {
+    /// Perform harmony-safe dereferencing
+    fn harmony_deref(&self) -> Result<&T, MathError>;
 }
 
-impl<T: MeshValue> QuantumDerefable<T> for QuantumDeref<T> {
+impl<T: MeshValue> HarmonyDerefable<T> for HarmonyDeref<T> {
     #[inline]
-    fn quantum_deref(&self) -> Result<&T, MathError> {
+    fn harmony_deref(&self) -> Result<&T, MathError> {
         self.get()
     }
 }

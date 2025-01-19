@@ -1,3 +1,5 @@
+// lib/magicmath/src/pi.rs
+
 //! PI Operations for Crystal Lattice HPC Systems
 //! =========================================
 //!
@@ -13,10 +15,10 @@ use crate::{
     constants::{
         MAX_LATTICE_SIZE,
         MIN_LATTICE_SIZE,
-        QUANTUM_STABILITY_THRESHOLD,
+        HARMONY_STABILITY_THRESHOLD,
         RESONANCE_FACTOR,
         PHASE_CIRCULAR_FACTOR,
-        QUANTUM_CIRCULARITY_THRESHOLD,
+        HARMONY_CIRCULARITY_THRESHOLD,
         CONVERGENCE_THRESHOLD,
         PI,
         TAU
@@ -24,11 +26,11 @@ use crate::{
     traits::MeshValue,
 };
 
-/// Quantum-aware PI scaling for crystal lattice values
+/// Harmony-aware PI scaling for crystal lattice values
 /// Handles circular energy distribution and phase alignment
-pub fn quantum_pi<T: MeshValue>(x: T) -> Result<T, MathError> {
+pub fn harmony_pi<T: MeshValue>(x: T) -> Result<T, MathError> {
     let coherence = calculate_circularity(x)?;
-    if coherence < QUANTUM_STABILITY_THRESHOLD {
+    if coherence < HARMONY_STABILITY_THRESHOLD {
         return Err(MathError::CoherenceLoss);
     }
 
@@ -38,17 +40,17 @@ pub fn quantum_pi<T: MeshValue>(x: T) -> Result<T, MathError> {
     Ok(result)
 }
 
-/// Calculate PI-based values with quantum circularity preservation
+/// Calculate PI-based values with harmony circularity preservation
 pub fn circular_pi<T: MeshValue>(x: T) -> Result<T, MathError> {
     let circularity = check_circularity(x)?;
     if !circularity.is_stable() {
         return Err(MathError::CircularityLoss);
     }
 
-    quantum_pi(x)
+    harmony_pi(x)
 }
 
-/// Calculate PI approximation using quantum Leibniz series
+/// Calculate PI approximation using harmony-adapted Leibniz series
 pub fn leibniz_pi<T: MeshValue>(iterations: usize) -> Result<T, MathError> {
     let mut result = T::zero();
     let mut sign = T::unit();
@@ -64,14 +66,14 @@ pub fn leibniz_pi<T: MeshValue>(iterations: usize) -> Result<T, MathError> {
     Ok(result.raw_mul(T::from(4.0))?)
 }
 
-/// Ramanujan's quantum-adapted PI series
+/// Ramanujan's harmony-adapted PI series
 pub fn ramanujan_pi<T: MeshValue>(iterations: usize) -> Result<T, MathError> {
     let mut result = T::zero();
     let mut k = T::zero();
 
     for _ in 0..iterations {
         let numerator = factorial(4 * k.to_usize()?)? * (1103 + 26390 * k.to_usize()?);
-        let denominator = pow_factorial(k.to_usize()?, 4)? * pow(396, 4 * k.to_usize()?)?;
+        let denominator = pow_factorial(4 * k.to_usize()?)? * pow(396, 4 * k.to_usize()?)?;
 
         let term = T::from(numerator as f64).raw_div(T::from(denominator as f64))?;
         result = result.raw_add(term)?;
@@ -89,7 +91,7 @@ pub fn phase_circle<T: MeshValue>(x: T, phase: f64) -> Result<(T, T), MathError>
     }
 
     let phase_aligned = apply_phase_alignment(x, phase)?;
-    Ok((quantum_sin(phase_aligned)?, quantum_cos(phase_aligned)?))
+    Ok((harmony_sin(phase_aligned)?, harmony_cos(phase_aligned)?))
 }
 
 // Internal helper functions
@@ -145,7 +147,7 @@ fn apply_phase_alignment<T: MeshValue>(x: T, phase: f64) -> Result<T, MathError>
 }
 
 #[inline]
-fn quantum_sin<T: MeshValue>(x: T) -> Result<T, MathError> {
+fn harmony_sin<T: MeshValue>(x: T) -> Result<T, MathError> {
     let mut result = x;
     let mut term = x;
     let mut n = T::from(1.0);
@@ -162,7 +164,7 @@ fn quantum_sin<T: MeshValue>(x: T) -> Result<T, MathError> {
 }
 
 #[inline]
-fn quantum_cos<T: MeshValue>(x: T) -> Result<T, MathError> {
+fn harmony_cos<T: MeshValue>(x: T) -> Result<T, MathError> {
     let mut result = T::unit();
     let mut term = T::unit();
     let mut n = T::zero();
@@ -187,8 +189,8 @@ fn factorial(n: usize) -> Result<usize, MathError> {
 }
 
 #[inline]
-fn pow_factorial(n: usize, p: usize) -> Result<usize, MathError> {
-    Ok((0..p).map(|_| factorial(n).unwrap()).product())
+fn pow_factorial(n: usize) -> Result<usize, MathError> {
+    Ok((1..=n).map(|_| factorial(n).unwrap()).product())
 }
 
 #[inline]
@@ -196,7 +198,7 @@ fn pow(base: usize, exp: usize) -> Result<usize, MathError> {
     Ok((0..exp).fold(1, |acc, _| acc * base))
 }
 
-/// Quantum circularity state for PI calculations
+/// Harmony circularity state for PI calculations
 #[derive(Debug, Clone, Copy)]
 pub struct CircularityState {
     coherence: f64,
@@ -208,8 +210,8 @@ pub struct CircularityState {
 impl CircularityState {
     #[inline]
     pub fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD &&
-        self.circularity >= QUANTUM_CIRCULARITY_THRESHOLD
+        self.coherence >= HARMONY_STABILITY_THRESHOLD &&
+        self.circularity >= HARMONY_CIRCULARITY_THRESHOLD
     }
 
     #[inline]
@@ -256,8 +258,8 @@ mod tests {
     }
 
     #[test]
-    fn test_quantum_pi() {
-        let result = quantum_pi(1.0).unwrap();
+    fn test_harmony_pi() {
+        let result = harmony_pi(1.0).unwrap();
         assert!((result - PI).abs() < CONVERGENCE_THRESHOLD);
     }
 
