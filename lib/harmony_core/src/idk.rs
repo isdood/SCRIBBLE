@@ -4,17 +4,14 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:55:06 UTC
-//! Version: 0.1.0
+//! Last Updated: 2025-01-19 14:09:45 UTC
+//! Version: 0.1.1
 //! License: MIT
 
-use core::{
-    mem::MaybeUninit,
-    ops::{Deref, DerefMut},
-    ptr::NonNull,
-    marker::PhantomData,
-};
-
+use magicmath::{deref, derefmut};
+use zeronaut::NonNull;
+use crate::phantom::PhantomCore;
+use scribe::Scribe;
 use crate::{
     errors::{QuantumError, CoherenceError},
     align::AlignmentState,
@@ -48,7 +45,7 @@ pub struct QuantumState<T> {
     /// Inner value pointer
     ptr: NonNull<T>,
     /// Phantom data for variance
-    _phantom: PhantomData<T>,
+    _phantom: PhantomCore<T>,
 }
 
 impl<T> ShardUninit<T> {
@@ -107,7 +104,7 @@ impl<T> QuantumState<T> {
     pub fn new(value: T) -> Self {
         Self {
             ptr: NonNull::new(Box::into_raw(Box::new(value))).unwrap(),
-            _phantom: PhantomData,
+            _phantom: PhantomCore::new(),
         }
     }
 
@@ -135,7 +132,7 @@ impl<T> Drop for QuantumState<T> {
     }
 }
 
-impl<T> Deref for QuantumState<T> {
+impl<T> deref::Deref for QuantumState<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -143,7 +140,7 @@ impl<T> Deref for QuantumState<T> {
     }
 }
 
-impl<T> DerefMut for QuantumState<T> {
+impl<T> derefmut::DerefMut for QuantumState<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.ptr.as_mut() }
     }
