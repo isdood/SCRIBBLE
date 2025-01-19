@@ -4,19 +4,16 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:14:08 UTC
+//! Last Updated: 2025-01-19 09:48:03 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 #![no_std]
 #![feature(const_trait_impl)]
 
-extern crate alloc;
-
-use alloc::vec::Vec;
-use core::ops::{Add, Sub, Mul, Div, Neg};
-
+// Module declarations
 pub mod vector;
+pub mod harmony;
 pub mod idk;
 pub mod crystal;
 pub mod errors;
@@ -25,14 +22,18 @@ pub mod phantom;
 pub mod scribe;
 pub mod align;
 pub mod aether;
+pub mod cube;
 
 // Re-exports
-pub use crystal::{CrystalLattice, CrystalNode, CrystalCube};
+pub use crystal::{CrystalLattice, CrystalNode};
 pub use errors::{QuantumError, CoherenceError, QuantumResult, CoherenceResult};
-pub use vector::Vector3D;
+pub use vector::{Vector3D, Vector4D};
 pub use zeronaut::Zeronaut;
 pub use phantom::Phantom;
 pub use scribe::Scribe;
+pub use harmony::{Quantum, Phase, Resonance};
+pub use align::{Alignment, AlignmentState, AlignmentResult};
+pub use aether::AetherField;
 
 /// Constants for crystal computing operations
 pub mod constants {
@@ -56,65 +57,9 @@ pub mod constants {
 
     /// Aether resonance factor
     pub const AETHER_RESONANCE_FACTOR: f64 = 0.9;
-}
 
-/// Trait for quantum operations
-pub trait Quantum {
-    /// Check if quantum state is stable
-    fn is_stable(&self) -> bool;
-
-    /// Get coherence level
-    fn coherence(&self) -> f64;
-
-    /// Attempt to recohere quantum state
-    fn recohere(&mut self) -> QuantumResult<()>;
-
-    /// Force decoherence of quantum state
-    fn decohere(&mut self);
-}
-
-/// Crystal computing context
-#[derive(Debug)]
-pub struct CrystalContext {
-    /// Crystal lattice size
-    size: usize,
-    /// Phase coherence level
-    coherence: f64,
-    /// Crystal resonance
-    resonance: f64,
-}
-
-impl CrystalContext {
-    /// Create new crystal computing context
-    pub fn new(size: usize) -> Self {
-        Self {
-            size,
-            coherence: constants::MAX_PHASE_COHERENCE,
-            resonance: 1.0,
-        }
-    }
-
-    /// Get current coherence level
-    pub fn coherence(&self) -> f64 {
-        self.coherence
-    }
-
-    /// Get current resonance level
-    pub fn resonance(&self) -> f64 {
-        self.resonance
-    }
-
-    /// Check if context is stable
-    pub fn is_stable(&self) -> bool {
-        self.coherence >= constants::QUANTUM_STABILITY_THRESHOLD &&
-        self.resonance >= constants::CRYSTAL_RESONANCE_THRESHOLD
-    }
-}
-
-impl Default for CrystalContext {
-    fn default() -> Self {
-        Self::new(constants::MAX_QUANTUM_SIZE)
-    }
+    /// Alignment threshold for quantum operations
+    pub const ALIGNMENT_THRESHOLD: f64 = 0.95;
 }
 
 #[cfg(test)]
@@ -122,16 +67,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_crystal_context() {
-        let context = CrystalContext::default();
-        assert!(context.is_stable());
-        assert_eq!(context.coherence(), constants::MAX_PHASE_COHERENCE);
-    }
-
-    #[test]
-    fn test_quantum_constants() {
+    fn test_constants() {
         assert!(constants::QUANTUM_STABILITY_THRESHOLD > 0.0);
         assert!(constants::CRYSTAL_RESONANCE_THRESHOLD > 0.0);
         assert_eq!(constants::MAX_PHASE_COHERENCE, 1.0);
+        assert!(constants::MIN_PHASE_COHERENCE > 0.0);
+        assert!(constants::MIN_PHASE_COHERENCE < constants::MAX_PHASE_COHERENCE);
+        assert!(constants::AETHER_RESONANCE_FACTOR > 0.0);
+        assert!(constants::ALIGNMENT_THRESHOLD > 0.9);
     }
 }

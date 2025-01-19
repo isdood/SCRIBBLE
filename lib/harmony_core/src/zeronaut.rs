@@ -1,174 +1,193 @@
-//! Zeronaut - Crystal Lattice Navigator
-//! ==============================
+//! Zeronaut - Zero-Point Energy Operations
+//! =================================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:15:06 UTC
+//! Last Updated: 2025-01-19 09:59:58 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use core::f64::consts::PI;
-use alloc::string::String;
-use meshmath::{sqrt, floor};
+use meshmath::sqrt;
+use crate::{
+    vector::Vector3D,
+    crystal::CrystalNode,
+    errors::QuantumError,
+    constants::{
+        QUANTUM_STABILITY_THRESHOLD,
+        MAX_QUANTUM_SIZE,
+        QUANTUM_GOLDEN_RATIO
+    },
+    align::{Alignment, AlignmentState},
+    idk::ShardUninit,
+    harmony::Quantum,
+};
 
-use crate::vector::Vector3D;
-use crate::crystal::CrystalLattice;
-use crate::idk::ShardUninit;
-use crate::errors::CoherenceError;
-
-/// Crystal state configuration
-#[derive(Debug, Clone)]
-pub struct CrystalState {
-    /// Crystal resonance frequency
-    resonance: f64,
-    /// Crystal coupling strength
-    coupling: f64,
-    /// Phase alignment
-    phase: f64,
-}
-
-impl Default for CrystalState {
-    fn default() -> Self {
-        Self {
-            resonance: 1.0,
-            coupling: 0.5,
-            phase: 0.0,
-        }
-    }
-}
-
-/// Crystal lattice navigator
+/// Core zero-point energy state
 #[derive(Debug)]
-pub struct Zeronaut<T: Clone + Default + 'static> {
-    /// Position in crystal lattice
-    pos: Vector3D<f64>,
-    /// Quantum state data
-    data: ShardUninit<T>,
-    /// Crystal field strength
-    field_strength: f64,
-    /// Crystal state
-    crystal_state: CrystalState,
-    /// Associated crystal lattice
-    lattice: Option<CrystalLattice>,
+pub struct ZeroCore {
+    /// Energy level
+    energy: f64,
+    /// State storage
+    state: ShardUninit<[f64; MAX_QUANTUM_SIZE]>,
 }
 
-impl<T: Clone + Default + 'static> Zeronaut<T> {
-    /// Create a new Zeronaut at the origin
-    pub fn new() -> Self {
+/// Zero-point energy operator
+#[derive(Debug)]
+pub struct Zeronaut {
+    /// Core zero-point data
+    core: ZeroCore,
+    /// Position in quantum space
+    position: Vector3D<f64>,
+    /// Current coherence value
+    coherence: f64,
+    /// Quantum alignment
+    alignment: Alignment,
+}
+
+impl ZeroCore {
+    /// Create a new zero-point core
+    pub const fn new() -> Self {
         Self {
-            pos: Vector3D::zero(),
-            data: ShardUninit::uninit(),
-            field_strength: 1.0,
-            crystal_state: CrystalState::default(),
-            lattice: None,
+            energy: 0.0,
+            state: ShardUninit::new(),
         }
     }
 
-    /// Get current position in crystal lattice
+    /// Set energy level
+    pub fn set_energy(&mut self, value: f64) -> Result<(), QuantumError> {
+        if value < 0.0 || value > MAX_QUANTUM_SIZE as f64 {
+            return Err(QuantumError::InvalidState);
+        }
+        self.energy = value;
+        Ok(())
+    }
+
+    /// Get current energy level
+    pub fn energy(&self) -> f64 {
+        self.energy
+    }
+
+    /// Store state value
+    pub unsafe fn store_state(&mut self, index: usize, value: f64) -> Result<(), QuantumError> {
+        if index >= MAX_QUANTUM_SIZE {
+            return Err(QuantumError::BoundaryViolation);
+        }
+
+        let state = self.state.get_mut()
+        .ok_or(QuantumError::InvalidState)?;
+
+        state[index] = value;
+        Ok(())
+    }
+
+    /// Get stored state value
+    pub unsafe fn get_state(&self, index: usize) -> Result<f64, QuantumError> {
+        if index >= MAX_QUANTUM_SIZE {
+            return Err(QuantumError::BoundaryViolation);
+        }
+
+        let state = self.state.get_ref()
+        .ok_or(QuantumError::InvalidState)?;
+
+        Ok(state[index])
+    }
+}
+
+impl Zeronaut {
+    /// Create a new zeronaut
+    pub fn new(position: Vector3D<f64>) -> Self {
+        Self {
+            core: ZeroCore::new(),
+            position: position.clone(),
+            coherence: 1.0,
+            alignment: Alignment::new(position),
+        }
+    }
+
+    /// Get current position
     pub fn position(&self) -> &Vector3D<f64> {
-        &self.pos
+        &self.position
     }
 
-    /// Get crystal field strength
-    pub fn field_strength(&self) -> f64 {
-        self.field_strength
+    /// Set position
+    pub fn set_position(&mut self, pos: Vector3D<f64>) -> Result<(), QuantumError> {
+        if pos.magnitude()? > MAX_QUANTUM_SIZE as f64 {
+            return Err(QuantumError::BoundaryViolation);
+        }
+        self.position = pos;
+        Ok(())
     }
 
-    /// Get data reference with crystal verification
-    pub fn data(&self) -> Result<&T, CoherenceError> {
-        self.verify_crystal_coherence()?;
+    /// Calculate zero-point energy
+    pub fn calculate_zero_point(&self) -> Result<f64, QuantumError> {
+        if !self.is_stable() {
+            return Err(QuantumError::CoherenceLoss);
+        }
+
+        let energy = self.core.energy();
+        Ok(sqrt(energy * QUANTUM_GOLDEN_RATIO))
+    }
+
+    /// Measure quantum state
+    pub fn measure_state(&mut self) -> Result<f64, QuantumError> {
+        if !self.is_stable() {
+            return Err(QuantumError::CoherenceLoss);
+        }
+
+        let state = self.alignment.align_with(&self.position)?;
+        match state {
+            AlignmentState::Perfect => Ok(1.0),
+            AlignmentState::Partial(v) => Ok(v),
+            _ => Err(QuantumError::InvalidState),
+        }
+    }
+
+    /// Store quantum state
+    pub fn store_state(&mut self, value: f64) -> Result<(), QuantumError> {
+        if !self.is_stable() {
+            return Err(QuantumError::CoherenceLoss);
+        }
+
+        let index = floor(self.core.energy()) as usize;
         unsafe {
-            self.data.assume_init_ref()
-            .map_err(|_| CoherenceError::QuantumInstability)
+            self.core.store_state(index, value)
         }
     }
+}
 
-    /// Get mutable data reference with crystal verification
-    pub fn data_mut(&mut self) -> Result<&mut T, CoherenceError> {
-        self.verify_crystal_coherence()?;
-        unsafe {
-            self.data.assume_init_mut()
-            .map_err(|_| CoherenceError::QuantumInstability)
-        }
+impl Quantum for Zeronaut {
+    fn coherence(&self) -> f64 {
+        self.coherence
     }
 
-    /// Set position in crystal lattice
-    pub fn set_position(&mut self, pos: Vector3D<f64>) -> Result<(), CoherenceError> {
-        // Verify crystal boundaries
-        if let Some(ref lattice) = self.lattice {
-            if !lattice.is_valid_position(&pos) {
-                return Err(CoherenceError::BoundaryViolation);
-            }
+    fn recohere(&mut self) -> Result<(), QuantumError> {
+        if self.core.energy() < QUANTUM_STABILITY_THRESHOLD {
+            return Err(QuantumError::CoherenceLoss);
         }
-        self.pos = pos;
+        self.coherence = 1.0;
         Ok(())
     }
 
-    /// Set crystal field strength
-    pub fn set_field_strength(&mut self, strength: f64) -> Result<(), CoherenceError> {
-        if strength <= 0.0 {
-            return Err(CoherenceError::StructureFailure);
+    fn decohere(&mut self) {
+        self.coherence = 0.0;
+    }
+
+    fn phase_alignment(&self) -> f64 {
+        self.alignment.get_state().into()
+    }
+
+    fn align_with(&mut self, target: &CrystalNode) -> Result<(), QuantumError> {
+        let target_coherence = target.get_phase_coherence();
+        if target_coherence < QUANTUM_STABILITY_THRESHOLD {
+            return Err(QuantumError::PhaseMisalignment);
         }
-        self.field_strength = strength;
+        self.coherence = target_coherence;
         Ok(())
     }
 
-    /// Calculate distance to another position
-    pub fn distance_to(&self, other: &Vector3D<f64>) -> f64 {
-        let dx = self.pos.x - other.x;
-        let dy = self.pos.y - other.y;
-        let dz = self.pos.z - other.z;
-        sqrt(dx * dx + dy * dy + dz * dz)
-    }
-
-    /// Get discrete crystal lattice coordinates
-    pub fn lattice_position(&self) -> (usize, usize, usize) {
-        let x = floor(self.pos.x) as usize;
-        let y = floor(self.pos.y) as usize;
-        let z = floor(self.pos.z) as usize;
-        (x, y, z)
-    }
-
-    /// Project through crystal field
-    pub fn project(&mut self, target: &Vector3D<f64>) -> Result<(), CoherenceError> {
-        self.verify_crystal_coherence()?;
-
-        let current = self.position().clone();
-        let distance = self.distance_to(target);
-
-        if distance < self.field_strength {
-            self.set_position(target.clone())
-        } else {
-            // Calculate direction vector
-            let dx = target.x - current.x;
-            let dy = target.y - current.y;
-            let dz = target.z - current.z;
-
-            // Normalize and scale by field strength
-            let mag = sqrt(dx * dx + dy * dy + dz * dz);
-            let scale = self.field_strength * self.crystal_state.coupling / mag;
-
-            // Update position within crystal constraints
-            let new_pos = Vector3D::new(
-                current.x + dx * scale,
-                current.y + dy * scale,
-                current.z + dz * scale,
-            );
-
-            self.set_position(new_pos)
-        }
-    }
-
-    /// Verify crystal coherence state
-    fn verify_crystal_coherence(&self) -> Result<(), CoherenceError> {
-        if self.crystal_state.resonance < 0.1 {
-            return Err(CoherenceError::CrystalDecoherence);
-        }
-        if self.crystal_state.phase > 2.0 * PI {
-            return Err(CoherenceError::PhaseAlignmentFailure);
-        }
-        Ok(())
+    fn alignment_state(&self) -> AlignmentState {
+        self.alignment.get_state()
     }
 }
 
@@ -178,22 +197,28 @@ mod tests {
 
     #[test]
     fn test_zeronaut_creation() {
-        let nav = Zeronaut::<u8>::new();
-        assert_eq!(nav.field_strength(), 1.0);
-        assert_eq!(nav.position(), &Vector3D::zero());
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        let zeronaut = Zeronaut::new(pos);
+        assert!(zeronaut.is_stable());
     }
 
     #[test]
-    fn test_crystal_coherence() {
-        let nav = Zeronaut::<u8>::new();
-        assert!(nav.verify_crystal_coherence().is_ok());
+    fn test_zero_point_calculation() {
+        let zeronaut = Zeronaut::new(Vector3D::new(0.0, 0.0, 0.0));
+        assert!(zeronaut.calculate_zero_point().is_ok());
     }
 
     #[test]
-    fn test_position_update() {
-        let mut nav = Zeronaut::<u8>::new();
-        let new_pos = Vector3D::new(1.0, 1.0, 1.0);
-        assert!(nav.set_position(new_pos.clone()).is_ok());
-        assert_eq!(nav.position(), &new_pos);
+    fn test_state_measurement() {
+        let mut zeronaut = Zeronaut::new(Vector3D::new(0.0, 0.0, 0.0));
+        assert!(zeronaut.measure_state().is_ok());
+    }
+
+    #[test]
+    fn test_coherence_operations() {
+        let mut zeronaut = Zeronaut::new(Vector3D::new(0.0, 0.0, 0.0));
+        assert!(zeronaut.is_stable());
+        zeronaut.decohere();
+        assert!(!zeronaut.is_stable());
     }
 }

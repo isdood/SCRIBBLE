@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:36:43 UTC
+//! Last Updated: 2025-01-19 09:50:31 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -15,6 +15,7 @@ use crate::{
     phantom::Phantom,
     errors::QuantumError,
     constants::{QUANTUM_STABILITY_THRESHOLD, ALIGNMENT_THRESHOLD},
+    idk::ShardUninit,
 };
 
 /// Alignment state for quantum phase coherence
@@ -33,24 +34,53 @@ pub enum AlignmentState {
 /// Result type for alignment operations
 pub type AlignmentResult<T> = Result<T, QuantumError>;
 
+/// Core alignment type for crystal operations
+#[derive(Debug)]
+pub struct AlignmentCore {
+    /// Shard storage for aligned data
+    shard: ShardUninit<[f64; 3]>,
+    /// Current alignment state
+    state: AlignmentState,
+}
+
 /// Alignment calculations for crystal operations
 #[derive(Debug)]
 pub struct Alignment {
-    /// Current alignment state
-    state: AlignmentState,
+    /// Core alignment data
+    core: AlignmentCore,
     /// Reference vector for alignment
     reference: Vector3D<f64>,
-    /// Phantom state for quantum alignment
-    phantom: Phantom<f64>,
+    /// Current alignment state
+    state: AlignmentState,
+}
+
+impl AlignmentCore {
+    /// Create a new alignment core
+    pub const fn new() -> Self {
+        Self {
+            shard: ShardUninit::new(),
+            state: AlignmentState::Unknown,
+        }
+    }
+
+    /// Get current alignment state
+    pub fn state(&self) -> AlignmentState {
+        self.state
+    }
+
+    /// Set alignment state
+    pub fn set_state(&mut self, state: AlignmentState) {
+        self.state = state;
+    }
 }
 
 impl Alignment {
     /// Create new alignment calculator
     pub fn new(reference: Vector3D<f64>) -> Self {
         Self {
-            state: AlignmentState::Unknown,
+            core: AlignmentCore::new(),
             reference,
-            phantom: Phantom::<f64>::new(),
+            state: AlignmentState::Unknown,
         }
     }
 
@@ -70,14 +100,12 @@ impl Alignment {
             AlignmentState::Misaligned
         };
 
+        self.core.set_state(self.state);
         Ok(self.state)
     }
 
     /// Calculate quantum alignment with crystal cube
     pub fn align_quantum(&mut self, cube: &CrystalCube<f64>) -> AlignmentResult<AlignmentState> {
-        // First ensure phantom is in valid state
-        self.phantom.stabilize()?;
-
         // Get quantum state vector
         let state = Vector4D::new(
             self.reference.x,
@@ -97,6 +125,7 @@ impl Alignment {
             AlignmentState::Misaligned
         };
 
+        self.core.set_state(self.state);
         Ok(self.state)
     }
 
@@ -112,6 +141,11 @@ impl Alignment {
             AlignmentState::Partial(c) => c >= QUANTUM_STABILITY_THRESHOLD,
             _ => false
         }
+    }
+
+    /// Get reference vector
+    pub fn reference(&self) -> &Vector3D<f64> {
+        &self.reference
     }
 }
 
@@ -140,5 +174,13 @@ mod tests {
         let target = Vector3D::new(0.0, 1.0, 0.0);
         let state = alignment.align_with(&target).unwrap();
         assert_eq!(state, AlignmentState::Misaligned);
+    }
+
+    #[test]
+    fn test_alignment_stability() {
+        let mut alignment = Alignment::new(Vector3D::new(1.0, 0.0, 0.0));
+        let target = Vector3D::new(0.9, 0.1, 0.0);
+        alignment.align_with(&target).unwrap();
+        assert!(alignment.is_stable());
     }
 }

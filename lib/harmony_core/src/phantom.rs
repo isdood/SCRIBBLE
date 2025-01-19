@@ -1,208 +1,174 @@
-//! Phantom - Crystal State Observer
-//! ===========================
+//! Phantom - Quantum State Operations
+//! ============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:17:19 UTC
+//! Last Updated: 2025-01-19 09:56:27 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use alloc::vec::Vec;
-use core::f64::consts::PI;
-use meshmath::{sqrt, floor};
+use core::marker::PhantomData;
+use meshmath::{floor, sqrt};
+use crate::{
+    vector::Vector3D,
+    crystal::CrystalNode,
+    errors::{QuantumError, CoherenceError},
+    constants::{
+        QUANTUM_STABILITY_THRESHOLD,
+        MAX_QUANTUM_SIZE,
+    },
+    align::{Alignment, AlignmentState},
+    idk::ShardUninit,
+    harmony::Quantum,
+};
 
-use crate::idk::{ShardUninit, CoherenceError};
-use crate::vector::Vector3D;
-use crate::crystal::{CrystalLattice, CrystalNode};
-use crate::constants::{QUANTUM_STABILITY_THRESHOLD, MAX_PHASE_COHERENCE};
-
-/// Crystal observation parameters
-#[derive(Debug, Clone)]
-pub struct ObservationParams {
-    /// Crystal resonance frequency
-    resonance: f64,
-    /// Phase coherence level
-    coherence: f64,
-    /// Observation strength
-    strength: f64,
-    /// Crystal depth
-    depth: u32,
+/// Core phantom state for quantum operations
+#[derive(Debug)]
+pub struct PhantomCore<T> {
+    /// Core data storage
+    data: ShardUninit<T>,
+    /// State verification marker
+    _marker: PhantomData<T>,
 }
 
-impl Default for ObservationParams {
-    fn default() -> Self {
-        Self {
-            resonance: 1.0,
-            coherence: MAX_PHASE_COHERENCE,
-            strength: 0.5,
-            depth: 1,
-        }
-    }
-}
-
-/// Crystal state observer
+/// Phantom quantum state operator
 #[derive(Debug)]
 pub struct Phantom<T: Clone + Default + 'static> {
-    /// Position in crystal lattice
-    pos: Vector3D<f64>,
-    /// Quantum state data
-    data: ShardUninit<T>,
-    /// Observation parameters
-    params: ObservationParams,
-    /// Associated crystal lattice
-    lattice: Option<CrystalLattice>,
-    /// Observation history
-    history: Vec<ObservationRecord>,
+    /// Core phantom data
+    core: PhantomCore<T>,
+    /// Position in quantum space
+    position: Vector3D<f64>,
+    /// Current coherence value
+    coherence: f64,
+    /// Quantum alignment
+    alignment: Alignment,
 }
 
-/// Record of crystal state observation
-#[derive(Debug, Clone)]
-struct ObservationRecord {
-    /// Position in crystal lattice
-    position: Vector3D<f64>,
-    /// Timestamp of observation
-    timestamp: u64,
-    /// Achieved coherence
-    coherence: f64,
-    /// Crystal depth
-    depth: u32,
+impl<T> PhantomCore<T> {
+    /// Create a new phantom core
+    pub const fn new() -> Self {
+        Self {
+            data: ShardUninit::new(),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Check if core is initialized
+    pub fn is_initialized(&self) -> bool {
+        self.data.is_initialized()
+    }
+
+    /// Get reference to core data if initialized
+    pub unsafe fn get_ref(&self) -> Option<&T> {
+        self.data.get_ref()
+    }
+
+    /// Set core data
+    pub unsafe fn set(&mut self, value: T) {
+        self.data.set(value);
+    }
 }
 
 impl<T: Clone + Default + 'static> Phantom<T> {
-    /// Create a new crystal state observer
-    pub fn new() -> Self {
+    /// Create a new phantom
+    pub fn new(position: Vector3D<f64>) -> Self {
         Self {
-            pos: Vector3D::zero(),
-            data: ShardUninit::uninit(),
-            params: ObservationParams::default(),
-            lattice: None,
-            history: Vec::new(),
+            core: PhantomCore::new(),
+            position: position.clone(),
+            coherence: 1.0,
+            alignment: Alignment::new(position),
         }
     }
 
-    /// Initialize with crystal lattice
-    pub fn with_lattice(lattice: CrystalLattice) -> Self {
-        Self {
-            pos: Vector3D::zero(),
-            data: ShardUninit::uninit(),
-            params: ObservationParams::default(),
-            lattice: Some(lattice),
-            history: Vec::new(),
-        }
-    }
-
-    /// Get current position in crystal lattice
+    /// Get phantom position
     pub fn position(&self) -> &Vector3D<f64> {
-        &self.pos
+        &self.position
     }
 
-    /// Get observation parameters
-    pub fn observation_params(&self) -> &ObservationParams {
-        &self.params
-    }
-
-    /// Set position in crystal lattice
-    pub fn set_position(&mut self, pos: Vector3D<f64>) -> Result<(), CoherenceError> {
-        if let Some(ref lattice) = self.lattice {
-            if !lattice.is_valid_position(&pos) {
-                return Err(CoherenceError::BoundaryViolation);
-            }
+    /// Set phantom position
+    pub fn set_position(&mut self, pos: Vector3D<f64>) -> Result<(), QuantumError> {
+        if pos.magnitude()? > MAX_QUANTUM_SIZE as f64 {
+            return Err(QuantumError::BoundaryViolation);
         }
-        self.pos = pos;
+        self.position = pos;
         Ok(())
     }
 
-    /// Get discrete crystal lattice coordinates
-    pub fn lattice_position(&self) -> (usize, usize, usize) {
-        let x = floor(self.pos.x) as usize;
-        let y = floor(self.pos.y) as usize;
-        let z = floor(self.pos.z) as usize;
-        (x, y, z)
-    }
-
-    /// Observe crystal state at current position
-    pub fn observe(&mut self) -> Result<&T, CoherenceError> {
-        // Verify crystal coherence
-        self.verify_crystal_coherence()?;
-
-        let (x, y, z) = self.lattice_position();
-        if let Some(ref lattice) = self.lattice {
-            // Get crystal node state
-            let node = lattice.get_node(x, y, z)?;
-
-            // Perform non-destructive observation
-            self.perform_observation(node)?;
-
-            // Return observed state
-            unsafe {
-                self.data.assume_init_ref()
-                .map_err(|_| CoherenceError::QuantumInstability)
-            }
-        } else {
-            Err(CoherenceError::CrystalDecoherence)
+    /// Initialize phantom with value
+    pub fn initialize(&mut self, value: T) -> Result<(), QuantumError> {
+        if self.core.is_initialized() {
+            return Err(QuantumError::InvalidState);
         }
-    }
-
-    /// Perform non-destructive crystal observation
-    fn perform_observation(&mut self, node: &CrystalNode) -> Result<(), CoherenceError> {
-        // Calculate observation parameters
-        let coherence_factor = self.params.coherence *
-        self.params.strength *
-        node.get_phase_coherence();
-
-        if coherence_factor < QUANTUM_STABILITY_THRESHOLD {
-            return Err(CoherenceError::QuantumInstability);
-        }
-
-        // Adjust crystal resonance
-        self.params.resonance *= node.get_resonance_factor();
-
-        // Record observation
-        self.record_observation(coherence_factor);
-
-        Ok(())
-    }
-
-    /// Verify crystal coherence state
-    fn verify_crystal_coherence(&self) -> Result<(), CoherenceError> {
-        if self.params.resonance < 0.1 {
-            return Err(CoherenceError::CrystalDecoherence);
-        }
-        if self.params.coherence < QUANTUM_STABILITY_THRESHOLD {
-            return Err(CoherenceError::QuantumInstability);
-        }
-        if self.params.coherence > 2.0 * PI {
-            return Err(CoherenceError::PhaseAlignmentFailure);
+        unsafe {
+            self.core.set(value);
         }
         Ok(())
     }
 
-    /// Record successful observation
-    fn record_observation(&mut self, coherence: f64) {
-        let record = ObservationRecord {
-            position: self.pos.clone(),
-            timestamp: self.get_timestamp(),
-            coherence,
-            depth: self.params.depth,
-        };
-        self.history.push(record);
+    /// Get current value if initialized
+    pub fn value(&self) -> Result<&T, QuantumError> {
+        unsafe {
+            self.core.get_ref()
+            .ok_or(QuantumError::InvalidState)
+        }
     }
 
-    /// Get current timestamp
-    fn get_timestamp(&self) -> u64 {
-        // Implementation would use system time
-        0 // Placeholder
+    /// Perform quantum observation
+    pub fn observe(&mut self) -> Result<AlignmentState, QuantumError> {
+        if !self.is_stable() {
+            return Err(QuantumError::CoherenceLoss);
+        }
+
+        let state = self.alignment.align_with(&self.position)?;
+        Ok(state)
     }
 
-    /// Set observation parameters
-    pub fn set_params(&mut self, params: ObservationParams) {
-        self.params = params;
+    /// Calculate quantum projection
+    pub fn project(&self, target: &Vector3D<f64>) -> Result<f64, QuantumError> {
+        let dot = self.position.dot(target)?;
+        let mag = sqrt(dot * dot)?;
+
+        if mag < QUANTUM_STABILITY_THRESHOLD {
+            return Err(QuantumError::CoherenceLoss);
+        }
+
+        Ok(mag)
+    }
+}
+
+impl<T: Clone + Default + 'static> Quantum for Phantom<T> {
+    fn coherence(&self) -> f64 {
+        self.coherence
     }
 
-    /// Get observation history
-    pub fn get_history(&self) -> &[ObservationRecord] {
-        &self.history
+    fn recohere(&mut self) -> Result<(), QuantumError> {
+        if !self.core.is_initialized() {
+            return Err(QuantumError::InvalidState);
+        }
+        self.coherence = 1.0;
+        Ok(())
+    }
+
+    fn decohere(&mut self) {
+        self.coherence = 0.0;
+    }
+
+    fn phase_alignment(&self) -> f64 {
+        self.alignment.get_state().into()
+    }
+
+    fn align_with(&mut self, target: &CrystalNode) -> Result<(), QuantumError> {
+        let target_coherence = target.get_phase_coherence();
+        if target_coherence < QUANTUM_STABILITY_THRESHOLD {
+            return Err(QuantumError::PhaseMisalignment);
+        }
+        self.coherence = target_coherence;
+        Ok(())
+    }
+
+    fn alignment_state(&self) -> AlignmentState {
+        self.alignment.get_state()
     }
 }
 
@@ -212,20 +178,31 @@ mod tests {
 
     #[test]
     fn test_phantom_creation() {
-        let phantom = Phantom::<u8>::new();
-        assert_eq!(phantom.position(), &Vector3D::zero());
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        let phantom = Phantom::<f64>::new(pos);
+        assert!(phantom.is_stable());
     }
 
     #[test]
-    fn test_crystal_coherence() {
-        let phantom = Phantom::<u8>::new();
-        assert!(phantom.verify_crystal_coherence().is_ok());
+    fn test_phantom_initialization() {
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        let mut phantom = Phantom::<f64>::new(pos);
+        assert!(phantom.initialize(42.0).is_ok());
+        assert_eq!(*phantom.value().unwrap(), 42.0);
     }
 
     #[test]
-    fn test_observation_params() {
-        let params = ObservationParams::default();
-        assert!(params.strength > 0.0 && params.strength <= 1.0);
-        assert_eq!(params.coherence, MAX_PHASE_COHERENCE);
+    fn test_phantom_observation() {
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        let mut phantom = Phantom::<f64>::new(pos);
+        assert!(phantom.observe().is_ok());
+    }
+
+    #[test]
+    fn test_phantom_projection() {
+        let pos = Vector3D::new(1.0, 0.0, 0.0);
+        let phantom = Phantom::<f64>::new(pos);
+        let target = Vector3D::new(1.0, 0.0, 0.0);
+        assert!(phantom.project(&target).is_ok());
     }
 }

@@ -1,134 +1,158 @@
-//! Crystal - Crystal Lattice Structures
-//! ================================
+//! Crystal Computing Core Operations
+//! ============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:24:52 UTC
+//! Last Updated: 2025-01-19 09:51:41 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use alloc::vec;
-use alloc::vec::Vec;
-use core::fmt;
-use crate::vector::Vector3D;
-use crate::idk::CoherenceError;
+use core::ops::Index;
+use meshmath::{floor, sqrt};
+use crate::{
+    vector::Vector3D,
+    errors::{QuantumError, CoherenceError},
+    constants::{
+        MAX_QUANTUM_SIZE,
+        QUANTUM_STABILITY_THRESHOLD,
+        CRYSTAL_RESONANCE_THRESHOLD
+    },
+    align::{Alignment, AlignmentState},
+    idk::ShardUninit,
+};
+
+/// Core crystal node for quantum operations
+#[derive(Debug)]
+pub struct CrystalNode {
+    /// Position in crystal lattice
+    position: Vector3D<f64>,
+    /// Phase coherence value
+    coherence: f64,
+    /// Node alignment
+    alignment: Alignment,
+}
 
 /// Crystal lattice structure
 #[derive(Debug)]
 pub struct CrystalLattice {
+    /// Lattice nodes storage
+    nodes: [[ShardUninit<CrystalNode>; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE],
+    /// Lattice size
     size: usize,
-    nodes: Vec<Vec<Vec<CrystalNode>>>,
-}
-
-/// Node in crystal lattice
-#[derive(Debug, Clone)]
-pub struct CrystalNode {
-    phase: f64,
-    resonance: f64,
-    quantum_depth: u32,
-}
-
-impl CrystalLattice {
-    pub fn new(size: usize) -> Self {
-        let nodes = vec![vec![vec![CrystalNode::default(); size]; size]; size];
-        Self { size, nodes }
-    }
-
-    pub fn is_valid_position(&self, pos: &Vector3D<f64>) -> bool {
-        let x = pos.x.floor() as usize;
-        let y = pos.y.floor() as usize;
-        let z = pos.z.floor() as usize;
-        x < self.size && y < self.size && z < self.size
-    }
-
-    pub fn get_node(&self, x: usize, y: usize, z: usize) -> Result<&CrystalNode, CoherenceError> {
-        self.nodes.get(x)
-        .and_then(|yz| yz.get(y))
-        .and_then(|z_nodes| z_nodes.get(z))
-        .ok_or(CoherenceError::BoundaryViolation)
-    }
-
-    pub fn get_node_mut(&mut self, x: usize, y: usize, z: usize) -> Result<&mut CrystalNode, CoherenceError> {
-        self.nodes.get_mut(x)
-        .and_then(|yz| yz.get_mut(y))
-        .and_then(|z_nodes| z_nodes.get_mut(z))
-        .ok_or(CoherenceError::BoundaryViolation)
-    }
+    /// Lattice alignment
+    alignment: Alignment,
 }
 
 impl CrystalNode {
-    pub fn new(phase: f64, resonance: f64) -> Self {
+    /// Create a new crystal node
+    pub fn new(position: Vector3D<f64>) -> Self {
         Self {
-            phase,
-            resonance,
-            quantum_depth: 1,
+            position: position.clone(),
+            coherence: 1.0,
+            alignment: Alignment::new(position),
         }
     }
 
+    /// Get node's phase coherence
     pub fn get_phase_coherence(&self) -> f64 {
-        self.phase
+        self.coherence
     }
 
-    pub fn get_resonance_factor(&self) -> f64 {
-        self.resonance
-    }
-
-    pub fn get_quantum_depth(&self) -> u32 {
-        self.quantum_depth
-    }
-
-    pub fn set_quantum_depth(&mut self, depth: u32) {
-        self.quantum_depth = depth;
-    }
-
-    pub fn align_phase(&mut self, coherence: f64) -> Result<(), CoherenceError> {
-        if coherence <= 0.0 || coherence > 1.0 {
-            return Err(CoherenceError::PhaseAlignmentFailure);
+    /// Set node's phase coherence
+    pub fn set_phase_coherence(&mut self, value: f64) -> Result<(), CoherenceError> {
+        if value < 0.0 || value > 1.0 {
+            return Err(CoherenceError::InvalidValue);
         }
-        self.phase = coherence;
+        self.coherence = value;
         Ok(())
     }
-}
 
-impl Default for CrystalNode {
-    fn default() -> Self {
-        Self {
-            phase: 1.0,
-            resonance: 1.0,
-            quantum_depth: 1,
-        }
+    /// Get node's position
+    pub fn position(&self) -> &Vector3D<f64> {
+        &self.position
+    }
+
+    /// Get node's alignment state
+    pub fn alignment_state(&self) -> AlignmentState {
+        self.alignment.get_state()
     }
 }
 
-/// Crystal cube structure
-#[derive(Debug)]
-pub struct CrystalCube<T> {
-    size: usize,
-    data: Vec<Vec<Vec<T>>>,
-}
-
-impl<T: Default + Clone> CrystalCube<T> {
+impl CrystalLattice {
+    /// Create a new crystal lattice
     pub fn new(size: usize) -> Self {
-        let data = vec![vec![vec![T::default(); size]; size]; size];
-        Self { size, data }
-    }
+        let size = size.min(MAX_QUANTUM_SIZE);
+        let nodes = [[ShardUninit::new(); MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE];
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
 
-    pub fn get_state(&self, x: usize, y: usize, z: usize) -> Result<T, CoherenceError>
-    where T: Clone {
-        self.data.get(x)
-        .and_then(|yz| yz.get(y))
-        .and_then(|z_data| z_data.get(z))
-        .cloned()
-        .ok_or(CoherenceError::BoundaryViolation)
-    }
-
-    pub fn set_state(&mut self, x: usize, y: usize, z: usize, value: T) -> Result<(), CoherenceError> {
-        if x >= self.size || y >= self.size || z >= self.size {
-            return Err(CoherenceError::BoundaryViolation);
+        Self {
+            nodes,
+            size,
+            alignment: Alignment::new(origin),
         }
-        self.data[x][y][z] = value;
+    }
+
+    /// Get node at position
+    pub fn get_node(&self, pos: &Vector3D<f64>) -> Result<&CrystalNode, QuantumError> {
+        let x = floor(pos.x) as usize;
+        let y = floor(pos.y) as usize;
+        let z = floor(pos.z) as usize;
+
+        if x >= self.size || y >= self.size || z >= self.size {
+            return Err(QuantumError::BoundaryViolation);
+        }
+
+        unsafe {
+            self.nodes[x][y].get_ref()
+            .ok_or(QuantumError::InvalidState)
+        }
+    }
+
+    /// Set node at position
+    pub fn set_node(&mut self, pos: &Vector3D<f64>, node: CrystalNode) -> Result<(), QuantumError> {
+        let x = floor(pos.x) as usize;
+        let y = floor(pos.y) as usize;
+        let z = floor(pos.z) as usize;
+
+        if x >= self.size || y >= self.size || z >= self.size {
+            return Err(QuantumError::BoundaryViolation);
+        }
+
+        unsafe {
+            self.nodes[x][y].set(node);
+        }
         Ok(())
+    }
+
+    /// Calculate resonance at position
+    pub fn calculate_resonance(&self, pos: &Vector3D<f64>) -> Result<f64, QuantumError> {
+        let node = self.get_node(pos)?;
+        let coherence = node.get_phase_coherence();
+
+        if coherence < CRYSTAL_RESONANCE_THRESHOLD {
+            return Err(QuantumError::ResonanceFailure);
+        }
+
+        Ok(sqrt(coherence * QUANTUM_STABILITY_THRESHOLD))
+    }
+
+    /// Get lattice size
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    /// Get current alignment state
+    pub fn alignment_state(&self) -> AlignmentState {
+        self.alignment.get_state()
+    }
+}
+
+impl Index<usize> for CrystalLattice {
+    type Output = [ShardUninit<CrystalNode>; MAX_QUANTUM_SIZE];
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.nodes[index]
     }
 }
 
@@ -137,18 +161,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_crystal_lattice_creation() {
-        let lattice = CrystalLattice::new(2);
-        assert!(lattice.is_valid_position(&Vector3D::new(0.0, 0.0, 0.0)));
-        assert!(!lattice.is_valid_position(&Vector3D::new(2.0, 0.0, 0.0)));
+    fn test_crystal_node_creation() {
+        let pos = Vector3D::new(1.0, 2.0, 3.0);
+        let node = CrystalNode::new(pos);
+        assert_eq!(node.get_phase_coherence(), 1.0);
     }
 
     #[test]
-    fn test_crystal_node_operations() {
-        let mut node = CrystalNode::new(0.5, 0.8);
+    fn test_crystal_lattice_creation() {
+        let lattice = CrystalLattice::new(4);
+        assert_eq!(lattice.size(), 4);
+    }
+
+    #[test]
+    fn test_node_coherence() {
+        let mut node = CrystalNode::new(Vector3D::new(0.0, 0.0, 0.0));
+        assert!(node.set_phase_coherence(0.5).is_ok());
         assert_eq!(node.get_phase_coherence(), 0.5);
-        assert_eq!(node.get_resonance_factor(), 0.8);
-        assert!(node.align_phase(0.7).is_ok());
-        assert!(node.align_phase(1.5).is_err());
+    }
+
+    #[test]
+    fn test_resonance_calculation() {
+        let lattice = CrystalLattice::new(4);
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        assert!(lattice.calculate_resonance(&pos).is_err()); // No node set yet
     }
 }
