@@ -10,7 +10,6 @@
 
 use crate::traits::MeshValue;
 use errors::MathError;
-use scribe::native_string::String;
 
 /// Resonance mathematics operations and state management
 #[derive(Debug, Clone)]

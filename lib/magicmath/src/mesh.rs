@@ -17,8 +17,6 @@ use crate::constants::{
         STABILITY_THRESHOLD,
         COHERENCE_THRESHOLD,
         PRECISION_THRESHOLD,
-        CACHE_LINE_SIZE,
-        PREFETCH_DISTANCE,
     },
     HARMONY_STABILITY_THRESHOLD,
 };
@@ -42,10 +40,10 @@ impl MeshMath {
     /// Create new mesh math instance with specified resolution
     pub fn new(resolution: usize) -> MathResult<Self> {
         if resolution < RESOLUTION_MIN || resolution > RESOLUTION_MAX {
-            return Err(MathError::InvalidParameter(format!(
+            return Err(MathError::InvalidParameter(String::from(format!(
                 "Mesh resolution must be between {} and {}",
                 RESOLUTION_MIN, RESOLUTION_MAX
-            )));
+            ).as_str())));
         }
 
         Ok(Self {
@@ -60,7 +58,7 @@ impl MeshMath {
     pub fn set_precision(&mut self, precision: f64) -> MathResult<()> {
         if precision <= 0.0 || precision < PRECISION_THRESHOLD {
             return Err(MathError::InvalidParameter(
-                "Precision must be positive and above threshold".to_string()
+                String::from("Precision must be positive and above threshold")
             ));
         }
         self.precision = precision;
@@ -105,7 +103,7 @@ impl MeshMath {
         // Check for invalid values
         if val.is_nan() || val.is_infinite() {
             return Err(MathError::InvalidParameter(
-                "Cannot interpolate NaN or infinite value on crystal mesh".to_string()
+                String::from("Cannot interpolate NaN or infinite value on crystal mesh")
             ));
         }
 

@@ -4,12 +4,11 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19 09:38:17 UTC
-//! Last Updated: 2025-01-19 13:28:00 UTC
+//! Last Updated: 2025-01-19 20:59:16 UTC
 //! Version: 0.1.1
 //! License: MIT
 
-use magicmath::{MeshMath, QuantumMath, QuantumState};
-
+use magicmath::traits::MathOps;
 use crate::{
     errors::QuantumError,
     crystal::CrystalNode,
@@ -86,13 +85,13 @@ pub trait AlignmentOps {
 
     /// Check if aligned
     fn is_aligned(&self) -> bool {
-        matches!(self.alignment().get_state(),
+        matches!(self.alignment().state(),
                  AlignmentState::Perfect | AlignmentState::Partial(_))
     }
 }
 
-/// Arithmetic operations for quantum values using MeshMath
-pub trait QuantumArithmetic: Sized + MeshMath {
+/// Arithmetic operations for quantum values
+pub trait QuantumArithmetic: Sized + MathOps {
     /// Zero value
     fn zero() -> Self;
 
@@ -109,12 +108,10 @@ pub trait QuantumArithmetic: Sized + MeshMath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use magicmath::QuantumMath;
 
     struct TestQuantum {
         coherence_value: f64,
         alignment: Alignment,
-        quantum_math: QuantumMath,
     }
 
     impl TestQuantum {
@@ -123,7 +120,6 @@ mod tests {
             Self {
                 coherence_value: coherence,
                 alignment: Alignment::new(Vector3D::new(0.0, 0.0, 0.0)),
-                quantum_math: QuantumMath::new(),
             }
         }
     }
@@ -134,7 +130,7 @@ mod tests {
         }
 
         fn recohere(&mut self) -> Result<(), QuantumError> {
-            self.coherence_value = self.quantum_math.get_state().coherence_level();
+            self.coherence_value = 1.0;
             Ok(())
         }
 
@@ -143,7 +139,7 @@ mod tests {
         }
 
         fn phase_alignment(&self) -> f64 {
-            self.quantum_math.get_state().phase_alignment()
+            1.0
         }
 
         fn align_with(&mut self, _: &CrystalNode) -> Result<(), QuantumError> {
@@ -152,7 +148,7 @@ mod tests {
         }
 
         fn alignment_state(&self) -> AlignmentState {
-            self.alignment.get_state()
+            self.alignment.state()
         }
     }
 

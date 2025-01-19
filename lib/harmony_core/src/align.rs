@@ -4,14 +4,13 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 13:35:00 UTC
+//! Last Updated: 2025-01-19 20:56:36 UTC
 //! Version: 0.1.1
 //! License: MIT
 
-use magicmath::{sqrt, QuantumMath};
+use magicmath::{Operation, MathResult};
 use crate::{
-    vector::{Vector3D, Vector4D},
-    crystal::CrystalNode,
+    vector::Vector3D,
     errors::QuantumError,
     constants::{QUANTUM_STABILITY_THRESHOLD, ALIGNMENT_THRESHOLD},
     idk::ShardUninit,
@@ -85,8 +84,7 @@ impl Alignment {
 
     /// Calculate alignment with target vector
     pub fn align_with(&mut self, target: &Vector3D) -> AlignmentResult<AlignmentState> {
-        let mut qmath = QuantumMath::new();
-        let dot = qmath.operate(magicmath::Operation::DotProduct, self.reference.dot(target)?)?;
+        let dot = self.reference.dot(target)?;
         let mag_ref = self.reference.magnitude()?;
         let mag_target = target.magnitude()?;
 
@@ -105,7 +103,7 @@ impl Alignment {
     }
 
     /// Get current alignment state
-    pub fn get_state(&self) -> AlignmentState {
+    pub fn state(&self) -> AlignmentState {
         self.state
     }
 
@@ -127,13 +125,12 @@ impl Alignment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use magicmath::QuantumMath;
 
     #[test]
     fn test_alignment_creation() {
         let reference = Vector3D::new(1.0, 0.0, 0.0);
         let alignment = Alignment::new(reference);
-        assert_eq!(alignment.get_state(), AlignmentState::Unknown);
+        assert_eq!(alignment.state(), AlignmentState::Unknown);
     }
 
     #[test]

@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19 09:48:03 UTC
-//! Last Updated: 2025-01-19 17:59:37 UTC
+//! Last Updated: 2025-01-19 21:05:22 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -15,8 +15,9 @@ use crate::{
     constants::MAX_QUANTUM_SIZE,
     align::{Alignment, AlignmentState},
     scribe::Scribe,
-    native::{String, Box, vec, Vec}, // Use custom native types and macros
+    native::Box,
 };
+use scribe::native_string::String;
 
 /// A three-dimensional crystal cube structure
 #[derive(Debug)]
@@ -30,10 +31,17 @@ impl<T: Default + Clone + Scribe> CrystalCube<T> {
     /// Create a new crystal cube with given size
     pub fn new(size: usize) -> Self {
         let size = size.min(MAX_QUANTUM_SIZE);
-        let data = vec![
-            vec![vec![T::default(); size]; size];
-            size
-        ].into_boxed_slice();
+        let data = (0..size)
+        .map(|_| (0..size)
+        .map(|_| (0..size)
+        .map(|_| T::default())
+        .collect::<Vec<_>>()
+        .into_boxed_slice())
+        .collect::<Vec<_>>()
+        .into_boxed_slice())
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+
         let alignment = Alignment::new(Vector3D::new(0.0, 0.0, 0.0));
 
         Self { data, size, alignment }
@@ -79,13 +87,13 @@ impl<T: Default + Clone + Scribe> CrystalCube<T> {
 
     /// Get current alignment state
     pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.get_state()
+        self.alignment.state()
     }
 }
 
 impl<T: Default + Clone + Scribe> Scribe for CrystalCube<T> {
-    fn scribe(&self) -> crate::native::String {
-        let mut result = crate::native::String::new();
+    fn scribe(&self) -> String {
+        let mut result = String::new();
         for x in 0..self.size {
             for y in 0..self.size {
                 for z in 0..self.size {
@@ -111,10 +119,8 @@ mod tests {
     }
 
     impl Scribe for TestType {
-        fn scribe(&self) -> crate::native::String {
-            let mut result = crate::native::String::new();
-            result.push_str(&format!("{}", self.value));
-            result
+        fn scribe(&self) -> String {
+            format!("{}", self.value)
         }
     }
 
@@ -143,6 +149,6 @@ mod tests {
         let mut cube = CrystalCube::new(2);
         let test_value = TestType { value: 42 };
         cube.set_state(0, 0, 0, test_value.clone()).unwrap();
-        assert!(cube.scribe().as_str().contains("(0,0,0): 42"));
+        assert!(cube.scribe().contains("(0,0,0): 42"));
     }
 }

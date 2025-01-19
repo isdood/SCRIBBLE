@@ -4,20 +4,18 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 17:43:21 UTC
+//! Last Updated: 2025-01-19 21:00:34 UTC
 //! Version: 0.1.1
 //! License: MIT
 
 use core::ops::{Deref, DerefMut};
-use core::ptr::NonNull; // Corrected import for NonNull
-use crate::phantom::PhantomCore;
-use scribe::Scribe;
-use crate::{
-    errors::{QuantumError, CoherenceError},
-    align::AlignmentState,
-    cube::CubeBox, // Ensure CubeBox is correctly defined and imported
-};
+use core::ptr::NonNull;
 use core::mem::MaybeUninit;
+use crate::{
+    phantom::PhantomCore,
+    errors::CoherenceError,
+    align::AlignmentState,
+};
 
 /// Result type for coherence operations
 pub type CoherenceResult<T> = Result<T, CoherenceError>;
@@ -93,23 +91,23 @@ impl<T> ShardUninit<T> {
 impl<T> QuantumState<T> {
     /// Create a new quantum state
     pub fn new(value: T) -> Self {
-        let boxed = CubeBox::new(value);
         Self {
-            ptr: NonNull::new(boxed.value).unwrap(),
+            ptr: NonNull::new(Box::into_raw(Box::new(value))).unwrap(),
             _phantom: PhantomCore::new(),
         }
     }
 
     /// Get the inner value
     pub fn into_inner(self) -> T {
-        let value = CubeBox { value: self.ptr.as_ptr() }.into_inner();
+        let value = unsafe { Box::from_raw(self.ptr.as_ptr()) };
+        let result = *value;
         core::mem::forget(self);
-        value
+        result
     }
 
     /// Check coherence of the state
     pub fn check_coherence(&self) -> CoherenceResult<AlignmentState> {
-        if self.ptr.is_null() {
+        if self.ptr.as_ptr().is_null() {
             return Err(CoherenceError::InvalidState);
         }
         Ok(AlignmentState::Perfect)
@@ -119,7 +117,7 @@ impl<T> QuantumState<T> {
 impl<T> Drop for QuantumState<T> {
     fn drop(&mut self) {
         unsafe {
-            CubeBox { value: self.ptr.as_ptr() };
+            drop(Box::from_raw(self.ptr.as_ptr()));
         }
     }
 }
