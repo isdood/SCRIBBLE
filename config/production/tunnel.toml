@@ -1,0 +1,11 @@
+# config/production/tunnel.toml
+
+[tunnel]
+base_frequency = 432.0
+
+[monitoring]
+metrics_enabled = true
+log_level = "info"
+
+[resources]
+min_memory_threshold = 0.3  # Stricter in production

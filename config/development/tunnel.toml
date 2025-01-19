@@ -1,0 +1,11 @@
+# config/development/tunnel.toml
+
+[tunnel]
+base_frequency = 432.0
+
+[monitoring]
+metrics_enabled = true
+log_level = "debug"
+
+[resources]
+min_memory_threshold = 0.1  # More lenient in development

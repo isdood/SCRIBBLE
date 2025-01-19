@@ -1,0 +1,8 @@
+# config/config.toml
+[general]
+environment = "development"  # or "production"
+config_version = "1.0.0"
+
+[paths]
+config_dir = "config"
+default_config = "config/default"

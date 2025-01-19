@@ -1,0 +1,31 @@
+# config/default/tunnel.toml
+
+[tunnel]
+base_frequency = 432.0  # Crystal resonance frequency in Hz
+min_coherence = 0.87    # Minimum acceptable coherence
+phi_coefficient = 0.618033988749895  # Golden ratio inverse
+
+[resources]
+min_memory_threshold = 0.2  # 20% minimum free memory
+optimal_core_count = 8      # Optimal number of cores
+max_tunnel_count = 1000     # Maximum concurrent tunnels
+
+[scaling]
+enabled = true
+auto_adjust = true
+frequency_multiplier = 1.0
+
+[coherence]
+check_interval = 100        # Milliseconds
+recovery_threshold = 0.93
+reality_anchor_strength = 0.93
+
+[monitoring]
+metrics_enabled = true
+collect_interval = 1000     # Milliseconds
+log_level = "info"         # debug, info, warn, error
+
+[dream_layers]
+max_depth = 7
+coherence_threshold = 0.87
+tunnel_probability = 0.15
