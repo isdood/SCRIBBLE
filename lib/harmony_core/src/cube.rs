@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19 09:48:03 UTC
-//! Last Updated: 2025-01-19 17:50:50 UTC
+//! Last Updated: 2025-01-19 17:52:37 UTC
 //! Version: 0.1.0
 //! License: MIT
 

@@ -28,7 +28,7 @@ impl core::fmt::Debug for String {
     }
 }
 
-pub struct Box<T> {
+pub struct Box<T: ?Sized> {
     value: *mut T,
 }
 
@@ -47,6 +47,12 @@ impl<T> Box<T> {
 
     pub fn into_inner(self) -> T {
         unsafe { *self.value }
+    }
+}
+
+impl<T: ?Sized> Box<T> {
+    pub fn from_raw(raw: *mut T) -> Self {
+        Self { value: raw }
     }
 }
 
@@ -77,11 +83,12 @@ impl<T> Vec<T> {
     }
 
     pub fn into_boxed_slice(self) -> Box<[T]> {
-        Box::new(self.data.into_boxed_slice())
+        let boxed_slice = self.data.into_boxed_slice();
+        Box::from_raw(Box::into_raw(boxed_slice))
     }
 }
 
-impl<T> core::ops::Deref for Box<[T]> {
+impl<T: ?Sized> core::ops::Deref for Box<[T]> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
