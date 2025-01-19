@@ -88,14 +88,23 @@ impl ShardEmulator {
     /// Executes a 4D vector addition instruction
     #[inline(always)]
     fn execute_vadd4d(&mut self, inst: &ShardInstruction) -> Result<(), String> {
-        let src1 = self.regs.v_regs[inst.src1];
-        let src2 = self.regs.v_regs[inst.src2.ok_or("Missing src2 for VADD4D")?];
+        // Initialize vector operations with current Aether state
+        let mut vec_ops = ShardVectorOps::new(
+            self.regs.clone(),
+                                              self.aether_state.clone(),
+        );
 
-        // Apply quantum-crystal correction using fairy dust coefficient
-        let result = self.apply_quantum_correction(src1 + src2);
-        self.regs.v_regs[inst.dest] = result;
+        // Perform vector addition through crystal matrix
+        let result = vec_ops.execute_vector_op(
+            self.regs.v_regs[inst.src1],
+            self.regs.v_regs[inst.src2.ok_or("Missing src2")?],
+        )?;
 
-        Ok(())
+        // Update register through Aether grid
+        self.aether_state.through_crystal_matrix(|grid| {
+            self.regs.v_regs[inst.dest] = grid.apply_quantum_correction(result);
+            Ok(())
+        })
     }
 
     /// Executes a 4D vector rotation instruction

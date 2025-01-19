@@ -2,11 +2,12 @@
 name = "carve"
 version = "0.1.0"
 edition = "2021"
-authors = ["Caleb J.D. Terkovics"]
+authors = ["Caleb J.D. Terkovics <isdood>"]
 description = "Translation layer for the Scribble kernel"
+license = "MIT"
 
 [dependencies]
-unstable_matter = { path = "../unstable_matter" }
+harmony_core = { path = "../harmony_core" }
 
 [dev-dependencies]
 criterion = "0.5"

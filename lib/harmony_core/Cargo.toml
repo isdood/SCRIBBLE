@@ -9,3 +9,7 @@ license = "MIT"
 
 [dependencies]
 libm = "0.2.11"
+
+[[test]]
+name = "simd_tests"
+path = "tests/simd_tests.rs"

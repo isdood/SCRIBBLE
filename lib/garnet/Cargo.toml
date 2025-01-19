@@ -1,0 +1,21 @@
+[package]
+name = "garnet"
+version = "0.1.0"
+edition = "2021"
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "Terminal emulator library for the Scribble OS"
+license = "MIT"
+
+[lib]
+name = "garnet"
+path = "src/lib.rs"
+
+[dependencies]
+unstable_matter = { path = "../unstable_matter" }
+shard = { path = "../shard" }
+wanda = { path = "../wanda" }
+
+[features]
+default = ["std"]
+std = []
+no_std = []

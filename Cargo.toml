@@ -12,7 +12,9 @@ members = [
     "lib/unstable_matter",
     "lib/shard",
     "lib/wanda",
-    "lib/scribble"
+    "lib/scribble",
+    "lib/carve",
+    "lib/garnet"
 ]
 resolver = "2"
 

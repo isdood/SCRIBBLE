@@ -1,5 +1,5 @@
 /// Carve Translation Library
-/// Last Updated: 2025-01-15 03:57:55 UTC
+/// Last Updated: 2025-01-19 08:15:40 UTC
 /// Author: isdood
 /// Current User: isdood
 
@@ -19,6 +19,7 @@ pub mod java;
 pub mod js;
 pub mod pwr;
 pub mod go;
+pub mod zig;
 
 // Re-exports
 pub use html::HtmlTranslator;
@@ -34,17 +35,18 @@ pub use js::JsTranslator;
 pub use pwr::PwrTranslator;
 pub use assy::AssyTranslator;
 pub use go::GoTranslator;
+pub use zig::ZigTranslator;
 pub use spacemap::SpaceMap;
 
-use unstable_matter::{
+use harmony_core::{
     Quantum, ScribePrecision, Scribe, QuantumString,
-    Vector3D, UnstableDescriptor, QuantumState
+    Vector3D, cube::CrystalCube, harmony::MeshValue
 };
 
 /// Represents a translation state in quantum space
 #[derive(Debug)]
 pub struct TranslationState {
-    quantum_descriptor: UnstableDescriptor,
+    crystal_cube: CrystalCube<MeshValue>,
     source_coherence: f64,
     target_coherence: f64,
     translation_vector: Vector3D<f64>,
@@ -53,15 +55,15 @@ pub struct TranslationState {
 impl TranslationState {
     pub fn new() -> Self {
         Self {
-            quantum_descriptor: UnstableDescriptor::new(),
+            crystal_cube: CrystalCube::new(),
             source_coherence: 1.0,
             target_coherence: 1.0,
             translation_vector: Vector3D::new(0.0, 0.0, 0.0),
         }
     }
 
-    pub fn get_quantum_state(&self) -> QuantumState {
-        *self.quantum_descriptor.state.get()
+    pub fn get_quantum_state(&self) -> bool {
+        self.crystal_cube.is_stable()
     }
 
     pub fn get_coherence(&self) -> f64 {
@@ -71,7 +73,7 @@ impl TranslationState {
 
 impl Quantum for TranslationState {
     fn is_quantum_stable(&self) -> bool {
-        self.quantum_descriptor.is_stable() &&
+        self.crystal_cube.is_stable() &&
         self.source_coherence > 0.5 &&
         self.target_coherence > 0.5
     }
@@ -81,11 +83,11 @@ impl Quantum for TranslationState {
     }
 
     fn decay_coherence(&self) {
-        self.quantum_descriptor.decay_coherence();
+        self.crystal_cube.decay();
     }
 
     fn reset_coherence(&self) {
-        self.quantum_descriptor.reset();
+        self.crystal_cube.reset();
     }
 }
 
@@ -121,6 +123,7 @@ impl UnifiedTranslator {
         translators.insert("assy".to_string(), Box::new(AssyTranslator::new()));
         translators.insert("php".to_string(), Box::new(PhpTranslator::new()));
         translators.insert("go".to_string(), Box::new(GoTranslator::new()));
+        translators.insert("zig".to_string(), Box::new(ZigTranslator::new()));
 
         Self { translators }
     }
@@ -210,8 +213,9 @@ impl_translator!(
     PwrTranslator,
     HtmlTranslator,
     PhpTranslator,
-    AssyTranslator
-    GoTranslator
+    AssyTranslator,
+    GoTranslator,
+    ZigTranslator
 );
 
 #[cfg(test)]
@@ -259,5 +263,14 @@ mod tests {
         let source = "!sql! SELECT * FROM users";
         let result = translator.translate(source);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_zig_translation() {
+        let mut translator = UnifiedTranslator::new();
+        let source = "!zig! fn main() => void { const x := 42; } !zig!";
+        let result = translator.translate(source).unwrap();
+        assert!(result.contains("pub fn main() void {"));
+        assert!(result.contains("const x = 42;"));
     }
 }

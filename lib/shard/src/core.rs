@@ -61,45 +61,50 @@ pub struct ShardRegisterFile {
     qf: u64,
 }
 
-/// Multi-level quantum-aware cache hierarchy
-#[derive(Debug, Clone)]
+/// Multi-level quantum-aware cache hierarchy with crystal resonance
 pub struct ShardMemory {
-    /// L1 Quantum Cache
-    /// Fastest access, stores quantum state vectors
-    /// Key: 4D memory address
-    /// Value: Quantum state amplitude
+    /// L1 Quantum Cache - Fastest access, stores quantum state vectors
     l1q: QuantumHashMap<Vector4D, f64>,
-
-    /// L2 Crystal Cache
-    /// Medium access, stores crystalline structure data
-    /// Key: 4D lattice coordinate
-    /// Value: Crystal node energy
-    l2c: QuantumHashMap<Vector4D, f64>,
-
-    /// L3 Hyperspace Cache
-    /// Slowest access, stores higher-dimensional data
-    /// Key: 4D hyperspace coordinate
-    /// Value: Reality projection coefficient
-    l3h: QuantumHashMap<Vector4D, f64>,
+    /// L2 Crystal Cache - Medium access, stores crystalline structure
+    l2c: CrystalLattice,
+    /// L3 Hyperspace Cache - Slowest access, higher-dimensional data
+    l3h: HyperGrid,
+    /// Aether state tracker
+    aether_state: AetherGrid,
 }
 
 impl ShardMemory {
-    /// Creates a new ShardMemory instance with initialized caches
-    ///
-    /// # Returns
-    /// * `ShardMemory` - Initialized memory hierarchy with quantum-aware caches
     pub fn new() -> Self {
-        let config = HashBrownConfig {
-            quantum_threshold: QUANTUM_COHERENCE_THRESHOLD,
-            max_entries: CACHE_MAX_ENTRIES,
+        let config = CrystalConfig {
+            coherence_threshold: QUANTUM_COHERENCE_THRESHOLD,
+            crystal_growth_rate: CRYSTAL_GROWTH_RATE,
             creator: b"isdood".to_vec(),
         };
 
         Self {
-            l1q: QuantumHashMap::new(config.clone()),
-            l2c: QuantumHashMap::new(config.clone()),
-            l3h: QuantumHashMap::new(config),
+            l1q: QuantumHashMap::with_capacity(L1_CACHE_SIZE),
+            l2c: CrystalLattice::new(config.clone()),
+            l3h: HyperGrid::new(config.clone()),
+            aether_state: AetherGrid::new(config),
         }
+    }
+
+    #[inline(always)]
+    pub fn cache_read(&self, addr: Vector4D) -> Option<f64> {
+        // Try L1 cache first
+        if let Some(value) = self.l1q.get(&addr) {
+            return Some(*value);
+        }
+
+        // Try L2 crystal cache
+        if let Some(value) = self.l2c.query_lattice(&addr) {
+            // Promote to L1
+            self.l1q.insert(addr, *value);
+            return Some(*value);
+        }
+
+        // Finally try L3 hyperspace
+        self.l3h.query_hyperpoint(&addr)
     }
 }
 

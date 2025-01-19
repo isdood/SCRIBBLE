@@ -1,183 +1,228 @@
-//! Crystalline Alignment Implementation
-//! ==============================
+//! Crystal-Aligned Memory Management
+//! ================================
+//! Native quantum alignment layer
 //!
-//! Core quantum alignment operations through crystalline
-//! structures with harmonic resonance tracking.
-//!
-//! Author: Caleb J.D. Terkovics <isdood>
+//! Author: isdood
 //! Current User: isdood
-//! Created: 2025-01-18
-//! Last Updated: 2025-01-18 21:12:37 UTC
+//! Last Updated: 2025-01-19 08:24:12 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use core::ops::Deref;
-use libm::floor;
 use crate::{
-    constants::{
-        QUANTUM_GOLDEN_RATIO,
-        QUANTUM_STABILITY_THRESHOLD,
-        MAX_QUANTUM_SIZE
-    },
+    Vector4D,
+    cube::CrystalCube,
+    phantom::{Phantom, PhantomState},
     harmony::Quantum,
-    vector::Vector3D,
-    zeronaut::Zeronaut
+    constants::QUANTUM_STABILITY_THRESHOLD,
+    constants::QUANTUM_GOLDEN_RATIO,
 };
 
-/// Alignment status for quantum grid
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum AlignmentStatus {
-    /// Perfectly aligned
-    Perfect,
-    /// Partially aligned
-    Partial,
-    /// Misaligned
-    Misaligned,
-}
-
-/// A quantum alignment grid
-#[derive(Clone)]
-pub struct AlignmentGrid {
-    /// Grid dimensions
-    dimensions: Vector3D<u64>,
-    /// Alignment values
-    values: Vec<Vec<Vec<f64>>>,
-    /// Current status
-    status: AlignmentStatus,
-    /// Quantum coherence
+/// Quantum-aware alignment cell
+pub struct AlignmentCell<T: Clone + Default + 'static> {
+    /// Value phantom for quantum state tracking
+    phantom: Phantom<T>,
+    /// Current coherence level
     coherence: f64,
 }
 
-impl AlignmentGrid {
-    /// Creates a new alignment grid
-    pub fn new(x: u64, y: u64, z: u64) -> Option<Self> {
-        if x as usize > MAX_QUANTUM_SIZE ||
-            y as usize > MAX_QUANTUM_SIZE ||
-            z as usize > MAX_QUANTUM_SIZE {
-                return None;
-            }
-
-            let mut values = Vec::with_capacity(x as usize);
-        for _ in 0..x as usize {
-            let mut yvec = Vec::with_capacity(y as usize);
-            for _ in 0..y as usize {
-                let zvec = vec![QUANTUM_GOLDEN_RATIO; z as usize];
-                yvec.push(zvec);
-            }
-            values.push(yvec);
+impl<T: Clone + Default + 'static> Clone for AlignmentCell<T> {
+    fn clone(&self) -> Self {
+        Self {
+            phantom: self.phantom.clone(),
+            coherence: self.coherence,
         }
+    }
+}
 
-        let mut grid = Self {
-            dimensions: Vector3D::new(x, y, z),
-            values,
-            status: AlignmentStatus::Perfect,
+impl<T: Clone + Default + 'static> AlignmentCell<T> {
+    /// Creates a new alignment cell
+    #[inline]
+    pub fn new(value: T) -> Self {
+        Self {
+            phantom: Phantom::<T>::new_positioned(value, 0.0, 0.0, 0.0, QUANTUM_GOLDEN_RATIO),
             coherence: 1.0,
-        };
-
-        grid.update_status();
-        Some(grid)
+        }
     }
 
-    /// Gets the grid dimensions
-    pub fn dimensions(&self) -> &Vector3D<u64> {
+    /// Gets current value
+    #[inline]
+    pub fn get(&self) -> T {
+        let data: &T = self.phantom.data();
+        data.clone()
+    }
+
+    /// Sets new value
+    #[inline]
+    pub fn set(&mut self, value: T) -> bool {
+        if !AlignmentCell::<T>::is_quantum_stable(self) {
+            return false;
+        }
+        *self.phantom.data_mut() = value;
+        self.decay_coherence();
+        true
+    }
+
+    /// Gets current coherence
+    #[inline]
+    pub fn get_coherence(&self) -> f64 {
+        let phantom_ref: &Phantom<T> = &self.phantom;
+        self.coherence * phantom_ref.coherence()
+    }
+
+    /// Checks quantum stability
+    #[inline]
+    pub fn is_quantum_stable(&self) -> bool {
+        let phantom_ref: &Phantom<T> = &self.phantom;
+        AlignmentCell::<T>::get_coherence(self) > QUANTUM_STABILITY_THRESHOLD &&
+        phantom_ref.state() == PhantomState::Materialized
+    }
+
+    /// Applies quantum decoherence
+    #[inline]
+    fn decay_coherence(&mut self) {
+        self.coherence *= 0.99;
+        let phantom_mut: &mut Phantom<T> = &mut self.phantom;
+        phantom_mut.decohere();
+    }
+}
+
+impl<T: Clone + Default + 'static> Default for AlignmentCell<T> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
+/// 4D Crystal alignment grid
+pub struct AlignmentGrid<T: Clone + Default + 'static> {
+    /// 4D crystal grid
+    grid: CrystalCube<AlignmentCell<T>>,
+    /// Grid dimensionality
+    dimensions: Vector4D<f64>,
+    /// Grid quantum state tracking
+    phantom: Phantom<bool>,
+}
+
+impl<T: Clone + Default + 'static> AlignmentGrid<T> {
+    /// Creates a new alignment grid
+    pub fn new(dimensions: Vector4D<f64>) -> Self {
+        let grid = CrystalCube::<AlignmentCell<T>>::new(
+            dimensions.x as u64,
+            dimensions.y as u64,
+            dimensions.z as u64,
+        ).expect("Failed to create crystal grid");
+
+        let mut this = Self {
+            grid,
+            dimensions,
+            phantom: Phantom::<bool>::new_positioned(true, 0.0, 0.0, 0.0, QUANTUM_GOLDEN_RATIO),
+        };
+
+        // Initialize cells
+        for z in 0..dimensions.z as usize {
+            for y in 0..dimensions.y as usize {
+                for x in 0..dimensions.x as usize {
+                    let cell: AlignmentCell<T> = AlignmentCell::<T>::default();
+                    this.grid.set(x, y, z, cell)
+                    .expect("Failed to initialize grid cell");
+                }
+            }
+        }
+
+        this
+    }
+
+    /// Gets value at 4D coordinates
+    pub fn get(&self, pos: &Vector4D<f64>) -> Option<T> {
+        if !AlignmentGrid::<T>::is_valid_position(self, pos) || !AlignmentGrid::<T>::is_quantum_stable(self) {
+            return None;
+        }
+
+        self.grid.get(pos.x as usize, pos.y as usize, pos.z as usize)
+        .map(|cell: &AlignmentCell<T>| cell.get())
+    }
+
+    /// Sets value at 4D coordinates
+    pub fn set(&mut self, pos: &Vector4D<f64>, value: T) -> bool {
+        if !AlignmentGrid::<T>::is_valid_position(self, pos) || !AlignmentGrid::<T>::is_quantum_stable(self) {
+            return false;
+        }
+
+        if let Some(cell) = self.grid.get_mut(pos.x as usize, pos.y as usize, pos.z as usize) {
+            let success = cell.set(value);
+            if success {
+                self.decay_coherence();
+            }
+            success
+        } else {
+            false
+        }
+    }
+
+    /// Gets grid dimensions
+    #[inline]
+    pub fn dimensions(&self) -> &Vector4D<f64> {
         &self.dimensions
     }
 
-    /// Gets the current alignment status
-    pub fn status(&self) -> AlignmentStatus {
-        self.status
+    /// Verifies position validity
+    #[inline]
+    fn is_valid_position(&self, pos: &Vector4D<f64>) -> bool {
+        pos.x >= 0.0 && pos.x < self.dimensions.x &&
+        pos.y >= 0.0 && pos.y < self.dimensions.y &&
+        pos.z >= 0.0 && pos.z < self.dimensions.z &&
+        pos.w.abs() <= QUANTUM_GOLDEN_RATIO
     }
 
-    /// Gets an alignment value
-    pub fn get_value(&self, x: usize, y: usize, z: usize) -> Option<f64> {
-        if x >= self.dimensions.x as usize ||
-            y >= self.dimensions.y as usize ||
-            z >= self.dimensions.z as usize {
-                return None;
-            }
-            Some(self.values[x][y][z])
+    /// Gets quantum coherence at position
+    pub fn get_coherence(&self, pos: &Vector4D<f64>) -> Option<f64> {
+        if !AlignmentGrid::<T>::is_valid_position(self, pos) {
+            return None;
+        }
+
+        self.grid.get(pos.x as usize, pos.y as usize, pos.z as usize)
+        .map(|cell: &AlignmentCell<T>| cell.get_coherence())
     }
 
-    /// Sets an alignment value
-    pub fn set_value(&mut self, x: usize, y: usize, z: usize, value: f64) -> Result<(), &'static str> {
-        if x >= self.dimensions.x as usize ||
-            y >= self.dimensions.y as usize ||
-            z >= self.dimensions.z as usize {
-                return Err("Coordinates out of bounds");
-            }
-
-            self.values[x][y][z] = value;
-        self.update_status();
-        self.decohere();
-        Ok(())
+    /// Checks quantum stability
+    #[inline]
+    pub fn is_quantum_stable(&self) -> bool {
+        let phantom_ref: &Phantom<bool> = &self.phantom;
+        phantom_ref.coherence() > QUANTUM_STABILITY_THRESHOLD &&
+        phantom_ref.state() == PhantomState::Materialized
     }
 
-    /// Updates alignment status based on current values
-    fn update_status(&mut self) {
-        let mut perfect_count = 0;
-        let mut misaligned_count = 0;
-        let total_cells = (self.dimensions.x * self.dimensions.y * self.dimensions.z) as usize;
+    /// Apply quantum decoherence
+    #[inline]
+    fn decay_coherence(&mut self) {
+        let phantom_mut: &mut Phantom<bool> = &mut self.phantom;
+        phantom_mut.decohere();
+    }
 
-        for x in 0..self.dimensions.x as usize {
+    /// Attempt quantum stabilization
+    pub fn stabilize(&mut self) -> bool {
+        if !self.phantom.is_stable() {
+            return false;
+        }
+
+        let mut success = true;
+        for z in 0..self.dimensions.z as usize {
             for y in 0..self.dimensions.y as usize {
-                for z in 0..self.dimensions.z as usize {
-                    let value = self.values[x][y][z];
-                    if libm::fabs(value - QUANTUM_GOLDEN_RATIO) < 1e-10 {
-                        perfect_count += 1;
-                    } else if value < QUANTUM_STABILITY_THRESHOLD {
-                        misaligned_count += 1;
+                for x in 0..self.dimensions.x as usize {
+                    if let Some(cell) = self.grid.get(x, y, z) {
+                        if !AlignmentCell::<T>::is_quantum_stable(cell) {
+                            success = false;
+                            break;
+                        }
                     }
                 }
             }
         }
 
-        self.status = if perfect_count == total_cells {
-            AlignmentStatus::Perfect
-        } else if misaligned_count > 0 {
-            AlignmentStatus::Misaligned
-        } else {
-            AlignmentStatus::Partial
-        };
-    }
-
-    /// Aligns a zeronaut with the grid
-    pub fn align_zeronaut(&mut self, zeronaut: &mut Zeronaut<f64>) -> Result<(), &'static str> {
-        let pos = zeronaut.position();
-        let x = floor(pos.x) as usize;
-        let y = floor(pos.y) as usize;
-        let z = floor(pos.z) as usize;
-
-        if let Some(value) = self.get_value(x, y, z) {
-            *zeronaut.data_mut() = value;
-            zeronaut.decohere();
-            self.decohere();
-            Ok(())
-        } else {
-            Err("Zeronaut position out of grid bounds")
+        if success {
+            *self.phantom.data_mut() = true;
+            self.phantom.recohere();
         }
-    }
-}
-
-impl Quantum for AlignmentGrid {
-    fn coherence(&self) -> f64 {
-        self.coherence
-    }
-
-    fn is_stable(&self) -> bool {
-        self.coherence >= QUANTUM_STABILITY_THRESHOLD
-    }
-
-    fn decohere(&mut self) {
-        self.coherence *= 0.9;
-        if self.coherence < QUANTUM_STABILITY_THRESHOLD {
-            self.coherence = QUANTUM_STABILITY_THRESHOLD;
-            self.status = AlignmentStatus::Misaligned;
-        }
-    }
-
-    fn recohere(&mut self) {
-        self.coherence = 1.0;
-        self.update_status();
+        success
     }
 }
 
@@ -186,38 +231,38 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_alignment_grid_creation() {
-        let grid = AlignmentGrid::new(2, 2, 2);
-        assert!(grid.is_some());
+    fn test_alignment_cell() {
+        let mut cell: AlignmentCell<u64> = AlignmentCell::new(42);
+        assert_eq!(cell.get(), 42);
+        assert!(cell.is_quantum_stable());
 
-        let grid = grid.unwrap();
-        assert_eq!(grid.dimensions(), &Vector3D::new(2, 2, 2));
-        assert_eq!(grid.status(), AlignmentStatus::Perfect);
-        assert!(grid.is_stable());
+        assert!(cell.set(84));
+        assert_eq!(cell.get(), 84);
+        assert!(cell.get_coherence() < 1.0);
     }
 
     #[test]
-    fn test_alignment_grid_bounds() {
-        let grid = AlignmentGrid::new(MAX_QUANTUM_SIZE as u64 + 1, 2, 2);
-        assert!(grid.is_none());
+    fn test_alignment_grid() {
+        let mut grid: AlignmentGrid<u64> = AlignmentGrid::new(Vector4D::new(4.0, 4.0, 4.0, 4.0));
+        let pos = Vector4D::new(1.0, 1.0, 1.0, 1.0);
+
+        assert!(grid.set(&pos, 42));
+        assert_eq!(grid.get(&pos), Some(42));
+        assert!(grid.is_quantum_stable());
     }
 
     #[test]
-    fn test_alignment_values() {
-        let mut grid = AlignmentGrid::new(2, 2, 2).unwrap();
-        assert!(grid.set_value(0, 0, 0, 1.0).is_ok());
-        assert!(grid.set_value(2, 2, 2, 1.0).is_err());
+    fn test_quantum_decoherence() {
+        let mut grid: AlignmentGrid<u64> = AlignmentGrid::new(Vector4D::new(2.0, 2.0, 2.0, 2.0));
+        let pos = Vector4D::new(0.0, 0.0, 0.0, 0.0);
 
-        assert_eq!(grid.get_value(0, 0, 0), Some(1.0));
-        assert_eq!(grid.status(), AlignmentStatus::Partial);
-    }
+        // Force quantum decoherence
+        for i in 0..100 {
+            grid.set(&pos, i);
+        }
 
-    #[test]
-    fn test_zeronaut_alignment() {
-        let mut grid = AlignmentGrid::new(2, 2, 2).unwrap();
-        let mut zeronaut = Zeronaut::new_positioned(0.0, 0.0, 0.0, 0.0);
-
-        assert!(grid.align_zeronaut(&mut zeronaut).is_ok());
-        assert_eq!(*zeronaut.data(), QUANTUM_GOLDEN_RATIO);
+        assert!(!grid.is_quantum_stable());
+        let coherence = grid.get_coherence(&pos).unwrap();
+        assert!(coherence < QUANTUM_STABILITY_THRESHOLD);
     }
 }
