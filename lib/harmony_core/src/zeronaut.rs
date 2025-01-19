@@ -1,108 +1,70 @@
-//! Zeronaut - Zero-Point Energy Operations
-//! =================================
+//! Zeronaut Quantum State Management
+//! ==============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:59:58 UTC
+//! Created: 2025-01-19
+//! Last Updated: 2025-01-19 21:30:14 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use magicmath::{sqrt, floor};
-use crate::{
-    vector::Vector3D,
-    crystal::CrystalNode,
-    errors::QuantumError,
-    constants::{
-        QUANTUM_STABILITY_THRESHOLD,
-        MAX_QUANTUM_SIZE,
-        QUANTUM_GOLDEN_RATIO
-    },
-    align::{Alignment, AlignmentState},
-    idk::ShardUninit,
-    harmony::Quantum,
+use magicmath::{
+    traits::MeshValue,
+    math::{Field, Mesh},
+    errors::MathError,
 };
 
-/// Core zero-point energy state
-#[derive(Debug)]
-pub struct ZeroCore {
-    /// Energy level
-    energy: f64,
-    /// State storage
-    state: ShardUninit<[f64; MAX_QUANTUM_SIZE]>,
-}
+use crate::{
+    errors::QuantumError,
+    vector::Vector3D,
+    resonance::{Quantum, Phase, Resonance},
+    scribe::Scribe,
+    native::{Box, Vec},
+};
 
-/// Zero-point energy operator
+/// Zero-point energy state handler
 #[derive(Debug)]
-pub struct Zeronaut {
-    /// Core zero-point data
-    core: ZeroCore,
-    /// Position in quantum space
+pub struct Zeronaut<T> {
+    field: Field,
+    mesh: Mesh<T>,
+    resonance: Resonance,
     position: Vector3D,
-    /// Current coherence value
-    coherence: f64,
-    /// Quantum alignment
-    alignment: Alignment,
 }
 
-impl ZeroCore {
-    /// Create a new zero-point core
-    pub const fn new() -> Self {
+impl<T: Default + Clone + MeshValue> Zeronaut<T> {
+    /// Create a new zeronaut handler
+    pub fn new(size: usize) -> Self {
         Self {
-            energy: 0.0,
-            state: ShardUninit::new(),
+            field: Field::default(),
+            mesh: Mesh::new(size),
+            resonance: Resonance::new(),
+            position: Vector3D::new(0.0, 0.0, 0.0),
         }
     }
 
-    /// Set energy level
-    pub fn set_energy(&mut self, value: f64) -> Result<(), QuantumError> {
-        if value < 0.0 || value > MAX_QUANTUM_SIZE as f64 {
-            return Err(QuantumError::InvalidState);
-        }
-        self.energy = value;
+    /// Get the zero-point state at position
+    pub fn get_state(&self, pos: &Vector3D) -> Result<T, QuantumError> {
+        self.mesh.get_value_at(pos)
+        .map_err(|_| QuantumError::BoundaryViolation)
+    }
+
+    /// Set the zero-point state at position
+    pub fn set_state(&mut self, pos: &Vector3D, value: T) -> Result<(), QuantumError> {
+        self.mesh.set_value_at(pos, value)
+        .map_err(|_| QuantumError::BoundaryViolation)
+    }
+
+    /// Apply field transformation at current position
+    pub fn apply_field(&mut self) -> Result<(), MathError> {
+        self.field.transform(&self.position)?;
+        self.resonance.set_position(self.position);
         Ok(())
     }
 
-    /// Get current energy level
-    pub fn energy(&self) -> f64 {
-        self.energy
-    }
-
-    /// Store state value
-    pub unsafe fn store_state(&mut self, index: usize, value: f64) -> Result<(), QuantumError> {
-        if index >= MAX_QUANTUM_SIZE {
-            return Err(QuantumError::BoundaryViolation);
-        }
-
-        let state = self.state.get_mut()
-        .ok_or(QuantumError::InvalidState)?;
-
-        state[index] = value;
-        Ok(())
-    }
-
-    /// Get stored state value
-    pub unsafe fn get_state(&self, index: usize) -> Result<f64, QuantumError> {
-        if index >= MAX_QUANTUM_SIZE {
-            return Err(QuantumError::BoundaryViolation);
-        }
-
-        let state = self.state.get_ref()
-        .ok_or(QuantumError::InvalidState)?;
-
-        Ok(state[index])
-    }
-}
-
-impl Zeronaut {
-    /// Create a new zeronaut
-    pub fn new(position: Vector3D) -> Self {
-        Self {
-            core: ZeroCore::new(),
-            position: position.clone(),
-            coherence: 1.0,
-            alignment: Alignment::new(position),
-        }
+    /// Move to new position
+    pub fn move_to(&mut self, pos: Vector3D) -> Result<(), MathError> {
+        self.position = pos;
+        self.apply_field()
     }
 
     /// Get current position
@@ -110,84 +72,46 @@ impl Zeronaut {
         &self.position
     }
 
-    /// Set position
-    pub fn set_position(&mut self, pos: Vector3D) -> Result<(), QuantumError> {
-        if pos.magnitude()? > MAX_QUANTUM_SIZE as f64 {
-            return Err(QuantumError::BoundaryViolation);
-        }
-        self.position = pos;
-        Ok(())
+    /// Get current resonance state
+    pub fn resonance(&self) -> &Resonance {
+        &self.resonance
     }
 
     /// Calculate zero-point energy
-    pub fn calculate_zero_point(&self) -> Result<f64, QuantumError> {
-        if !self.is_stable() {
-            return Err(QuantumError::CoherenceLoss);
-        }
-
-        let energy = self.core.energy();
-        Ok(sqrt(energy * QUANTUM_GOLDEN_RATIO))
-    }
-
-    /// Measure quantum state
-    pub fn measure_state(&mut self) -> Result<f64, QuantumError> {
-        if !self.is_stable() {
-            return Err(QuantumError::CoherenceLoss);
-        }
-
-        let state = self.alignment.align_with(&self.position)?;
-        match state {
-            AlignmentState::Perfect => Ok(1.0),
-            AlignmentState::Partial(v) => Ok(v),
-            _ => Err(QuantumError::InvalidState),
-        }
-    }
-
-    /// Store quantum state
-    pub fn store_state(&mut self, value: f64) -> Result<(), QuantumError> {
-        if !self.is_stable() {
-            return Err(QuantumError::CoherenceLoss);
-        }
-
-        let index = floor(self.core.energy()) as usize;
-        unsafe {
-            self.core.store_state(index, value)
-        }
+    pub fn zero_point_energy(&self) -> Result<f64, MathError> {
+        let field_energy = self.field.energy()?;
+        let resonance_energy = self.resonance.energy()?;
+        Ok(0.5 * (field_energy + resonance_energy))
     }
 }
 
-impl Quantum for Zeronaut {
-    fn coherence(&self) -> f64 {
-        self.coherence
+impl<T: MeshValue> Quantum for Zeronaut<T> {
+    fn energy(&self) -> Result<f64, MathError> {
+        self.zero_point_energy()
     }
 
-    fn recohere(&mut self) -> Result<(), QuantumError> {
-        if self.core.energy() < QUANTUM_STABILITY_THRESHOLD {
-            return Err(QuantumError::CoherenceLoss);
-        }
-        self.coherence = 1.0;
-        Ok(())
+    fn phase(&self) -> Result<f64, MathError> {
+        self.resonance.phase()
     }
+}
 
-    fn decohere(&mut self) {
-        self.coherence = 0.0;
+impl<T: MeshValue> Phase for Zeronaut<T> {
+    fn phase_shift(&mut self, shift: f64) -> Result<(), MathError> {
+        self.resonance.phase_shift(shift)
     }
+}
 
-    fn phase_alignment(&self) -> f64 {
-        self.alignment.get_state().into()
-    }
-
-    fn align_with(&mut self, target: &CrystalNode) -> Result<(), QuantumError> {
-        let target_coherence = target.get_phase_coherence();
-        if target_coherence < QUANTUM_STABILITY_THRESHOLD {
-            return Err(QuantumError::PhaseMisalignment);
-        }
-        self.coherence = target_coherence;
-        Ok(())
-    }
-
-    fn alignment_state(&self) -> AlignmentState {
-        self.alignment.get_state()
+impl<T: MeshValue + Scribe> Scribe for Zeronaut<T> {
+    fn scribe(&self) -> String {
+        let mut result = String::new();
+        write_str!(result, "Zeronaut State:\n");
+        write_str!(result, "Position: ");
+        write_str!(result, &self.position.scribe());
+        write_str!(result, "\nResonance: ");
+        write_str!(result, &self.resonance.scribe());
+        write_str!(result, "\nField Energy: ");
+        write_str!(result, &self.field.energy().unwrap_or(0.0).scribe());
+        result
     }
 }
 
@@ -195,30 +119,64 @@ impl Quantum for Zeronaut {
 mod tests {
     use super::*;
 
+    #[derive(Debug, Clone, Default)]
+    struct TestZero {
+        value: f64,
+    }
+
+    impl MeshValue for TestZero {
+        fn to_f64(&self) -> Result<f64, MathError> {
+            Ok(self.value)
+        }
+
+        fn from(value: f64) -> Self {
+            Self { value }
+        }
+    }
+
+    impl Scribe for TestZero {
+        fn scribe(&self) -> String {
+            let mut result = String::new();
+            write_str!(result, &self.value.scribe());
+            result
+        }
+    }
+
     #[test]
     fn test_zeronaut_creation() {
-        let pos = Vector3D::new(0.0, 0.0, 0.0);
-        let zeronaut = Zeronaut::new(pos);
-        assert!(zeronaut.is_stable());
+        let zeronaut = Zeronaut::<TestZero>::new(4);
+        assert_eq!(zeronaut.position().x, 0.0);
     }
 
     #[test]
-    fn test_zero_point_calculation() {
-        let zeronaut = Zeronaut::new(Vector3D::new(0.0, 0.0, 0.0));
-        assert!(zeronaut.calculate_zero_point().is_ok());
+    fn test_zeronaut_movement() {
+        let mut zeronaut = Zeronaut::<TestZero>::new(4);
+        let pos = Vector3D::new(1.0, 1.0, 1.0);
+        assert!(zeronaut.move_to(pos).is_ok());
+        assert_eq!(zeronaut.position(), &pos);
     }
 
     #[test]
-    fn test_state_measurement() {
-        let mut zeronaut = Zeronaut::new(Vector3D::new(0.0, 0.0, 0.0));
-        assert!(zeronaut.measure_state().is_ok());
+    fn test_state_access() {
+        let mut zeronaut = Zeronaut::<TestZero>::new(4);
+        let pos = Vector3D::new(1.0, 1.0, 1.0);
+        let value = TestZero { value: 42.0 };
+
+        assert!(zeronaut.set_state(&pos, value).is_ok());
+        assert_eq!(zeronaut.get_state(&pos).unwrap().value, 42.0);
     }
 
     #[test]
-    fn test_coherence_operations() {
-        let mut zeronaut = Zeronaut::new(Vector3D::new(0.0, 0.0, 0.0));
-        assert!(zeronaut.is_stable());
-        zeronaut.decohere();
-        assert!(!zeronaut.is_stable());
+    fn test_zero_point_energy() {
+        let zeronaut = Zeronaut::<TestZero>::new(4);
+        assert!(zeronaut.zero_point_energy().is_ok());
+    }
+
+    #[test]
+    fn test_quantum_traits() {
+        let mut zeronaut = Zeronaut::<TestZero>::new(4);
+        assert!(zeronaut.energy().is_ok());
+        assert!(zeronaut.phase().is_ok());
+        assert!(zeronaut.phase_shift(0.5).is_ok());
     }
 }

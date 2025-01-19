@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19 09:48:03 UTC
-//! Last Updated: 2025-01-19 21:05:22 UTC
+//! Last Updated: 2025-01-19 21:22:00 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -15,19 +15,50 @@ use crate::{
     constants::MAX_QUANTUM_SIZE,
     align::{Alignment, AlignmentState},
     scribe::Scribe,
-    native::Box,
+    native::{Box, Vec},
 };
 use scribe::native_string::String;
+use scribe::string::WriteStr;
 
 /// A three-dimensional crystal cube structure
 #[derive(Debug)]
-pub struct CrystalCube<T> {
+pub struct Cube<T> {
     alignment: Alignment,
     data: Box<[Box<[Box<[T]>]>]>,  // Use nested arrays managed by Box
     size: usize,
 }
 
-impl<T: Default + Clone + Scribe> CrystalCube<T> {
+/// Storage for boxed cube values
+#[derive(Debug)]
+pub struct CubeBox<T> {
+    value: T,
+}
+
+impl<T> CubeBox<T> {
+    /// Create a new cube box with given value
+    pub fn new(value: T) -> Self {
+        Self { value }
+    }
+
+    /// Get the inner value
+    pub fn into_inner(self) -> T {
+        self.value
+    }
+
+    /// Convert into raw pointer
+    pub fn into_raw(self) -> *mut T {
+        Box::into_raw(Box::new(self.value))
+    }
+
+    /// Create from raw pointer
+    pub unsafe fn from_raw(ptr: *mut T) -> Self {
+        Self {
+            value: *Box::from_raw(ptr)
+        }
+    }
+}
+
+impl<T: Default + Clone + Scribe> Cube<T> {
     /// Create a new crystal cube with given size
     pub fn new(size: usize) -> Self {
         let size = size.min(MAX_QUANTUM_SIZE);
@@ -91,17 +122,21 @@ impl<T: Default + Clone + Scribe> CrystalCube<T> {
     }
 }
 
-impl<T: Default + Clone + Scribe> Scribe for CrystalCube<T> {
+impl<T: Default + Clone + Scribe> Scribe for Cube<T> {
     fn scribe(&self) -> String {
         let mut result = String::new();
         for x in 0..self.size {
             for y in 0..self.size {
                 for z in 0..self.size {
-                    result.push_str(&format!(
-                        "({},{},{}): {}\n",
-                                             x, y, z,
-                                             self.data[x][y][z].scribe()
-                    ));
+                    result.write_str("(").unwrap();
+                    result.write_str(&x.scribe()).unwrap();
+                    result.write_str(",").unwrap();
+                    result.write_str(&y.scribe()).unwrap();
+                    result.write_str(",").unwrap();
+                    result.write_str(&z.scribe()).unwrap();
+                    result.write_str("): ").unwrap();
+                    result.write_str(&self.data[x][y][z].scribe()).unwrap();
+                    result.write_str("\n").unwrap();
                 }
             }
         }
@@ -113,42 +148,51 @@ impl<T: Default + Clone + Scribe> Scribe for CrystalCube<T> {
 mod tests {
     use super::*;
 
-    #[derive(Default, Clone, Debug)]
-    struct TestType {
+    #[derive(Debug, Clone, Default)]
+    struct TestValue {
         value: i32,
     }
 
-    impl Scribe for TestType {
+    impl Scribe for TestValue {
         fn scribe(&self) -> String {
-            format!("{}", self.value)
+            let mut result = String::new();
+            result.write_str(&self.value.scribe()).unwrap();
+            result
         }
     }
 
     #[test]
     fn test_cube_creation() {
-        let cube: CrystalCube<TestType> = CrystalCube::new(4);
+        let cube: Cube<TestValue> = Cube::new(4);
         assert_eq!(cube.size(), 4);
     }
 
     #[test]
     fn test_state_access() {
-        let mut cube = CrystalCube::new(4);
-        let test_value = TestType { value: 42 };
+        let mut cube = Cube::new(4);
+        let test_value = TestValue { value: 42 };
         assert!(cube.set_state(0, 0, 0, test_value.clone()).is_ok());
         assert_eq!(cube.get_state(0, 0, 0).unwrap().value, 42);
     }
 
     #[test]
     fn test_boundary_violation() {
-        let cube = CrystalCube::<TestType>::new(4);
+        let cube = Cube::<TestValue>::new(4);
         assert!(cube.get_state(4, 0, 0).is_err());
     }
 
     #[test]
     fn test_cube_scribe() {
-        let mut cube = CrystalCube::new(2);
-        let test_value = TestType { value: 42 };
+        let mut cube = Cube::new(2);
+        let test_value = TestValue { value: 42 };
         cube.set_state(0, 0, 0, test_value.clone()).unwrap();
         assert!(cube.scribe().contains("(0,0,0): 42"));
+    }
+
+    #[test]
+    fn test_cube_box() {
+        let value = TestValue { value: 42 };
+        let cube_box = CubeBox::new(value);
+        assert_eq!(cube_box.into_inner().value, 42);
     }
 }

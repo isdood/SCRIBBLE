@@ -1,121 +1,131 @@
-//! Aether - Quantum Field Operations
-//! ============================
+//! Aether Field Operations
+//! ====================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-19 09:38:17 UTC
-//! Last Updated: 2025-01-19 09:49:33 UTC
+//! Created: 2025-01-19
+//! Last Updated: 2025-01-19 21:34:35 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use magicmath::sqrt;
-use crate::{
-    constants::{
-        QUANTUM_STABILITY_THRESHOLD,
-        MAX_QUANTUM_SIZE,
-        AETHER_RESONANCE_FACTOR
-    },
-    errors::QuantumError,
-    crystal::CrystalNode,
-    vector::Vector3D,
-    align::{Alignment, AlignmentState},
+use magicmath::{
+    traits::MeshValue,
+    math::{Field, Mesh, PhaseField, AetherField},
+    errors::MathError,
 };
 
-/// Aether field for quantum operations
+use crate::{
+    errors::QuantumError,
+    vector::{Vector3D, Vector4D},
+    resonance::{Quantum, Phase, Resonance},
+    scribe::Scribe,
+    native::{Box, Vec},
+};
+
+/// Aether field state handler
 #[derive(Debug)]
-pub struct AetherField {
-    /// Field strength
-    strength: f64,
-    /// Field coherence
-    coherence: f64,
-    /// Field position
-    position: Vector3D,
-    /// Field alignment
-    alignment: Alignment,
+pub struct Aether<T> {
+    field: AetherField,
+    phase_field: PhaseField,
+    mesh: Mesh<T>,
+    resonance: Resonance,
+    position: Vector4D,
+    density: f64,
 }
 
-impl AetherField {
-    /// Create a new aether field
-    pub fn new(position: Vector3D) -> Self {
+impl<T: Default + Clone + MeshValue> Aether<T> {
+    /// Create a new aether field handler
+    pub fn new(size: usize, density: f64) -> Self {
         Self {
-            strength: 1.0,
-            coherence: 1.0,
-            position: position.clone(),
-            alignment: Alignment::new(position),
+            field: AetherField::new(density),
+            phase_field: PhaseField::new(),
+            mesh: Mesh::new(size),
+            resonance: Resonance::new(),
+            position: Vector4D::new(0.0, 0.0, 0.0, 1.0),
+            density,
         }
     }
 
-    /// Get field strength at point
-    pub fn strength_at(&self, point: &Vector3D) -> Result<f64, QuantumError> {
-        let distance = self.position.dot(point)?;
-        if distance > MAX_QUANTUM_SIZE as f64 {
-            return Err(QuantumError::BoundaryViolation);
-        }
-
-        Ok(self.strength * sqrt(AETHER_RESONANCE_FACTOR / (distance + 1.0)))
+    /// Get the aether state at position
+    pub fn get_state(&self, pos: &Vector4D) -> Result<T, QuantumError> {
+        self.mesh.get_value_at(&Vector3D::new(pos.x, pos.y, pos.z))
+        .map_err(|_| QuantumError::BoundaryViolation)
     }
 
-    /// Set field strength
-    pub fn set_strength(&mut self, value: f64) -> Result<(), QuantumError> {
-        if value <= 0.0 || value > MAX_QUANTUM_SIZE as f64 {
-            return Err(QuantumError::InvalidState);
-        }
-        self.strength = value;
+    /// Set the aether state at position
+    pub fn set_state(&mut self, pos: &Vector4D, value: T) -> Result<(), QuantumError> {
+        self.mesh.set_value_at(&Vector3D::new(pos.x, pos.y, pos.z), value)
+        .map_err(|_| QuantumError::BoundaryViolation)
+    }
+
+    /// Apply aether field transformation
+    pub fn apply_field(&mut self) -> Result<(), MathError> {
+        self.field.transform(&self.position)?;
+        let phase = self.field.phase()?;
+        self.phase_field.apply_shift(phase)?;
+        self.resonance.phase_shift(phase)?;
         Ok(())
     }
 
-    /// Get current field coherence
-    pub fn get_coherence(&self) -> f64 {
-        self.coherence
+    /// Move to new 4D position
+    pub fn move_to(&mut self, pos: Vector4D) -> Result<(), MathError> {
+        self.position = pos;
+        self.apply_field()
     }
 
-    /// Get current field alignment state
-    pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.get_state()
+    /// Get current density
+    pub fn density(&self) -> f64 {
+        self.density
     }
 
-    /// Align field with target position
-    pub fn align_with_position(&mut self, target: &Vector3D) -> Result<(), QuantumError> {
-        let state = self.alignment.align_with(target)?;
-        match state {
-            AlignmentState::Perfect | AlignmentState::Partial(_) => Ok(()),
-            _ => Err(QuantumError::AlignmentFailure),
+    /// Set new density
+    pub fn set_density(&mut self, density: f64) -> Result<(), MathError> {
+        if density <= 0.0 {
+            return Err(MathError::InvalidValue);
         }
+        self.density = density;
+        self.field.set_density(density);
+        Ok(())
+    }
+
+    /// Calculate aether potential
+    pub fn potential(&self) -> Result<f64, MathError> {
+        let field_energy = self.field.energy()?;
+        let density_factor = self.density.sqrt();
+        Ok(field_energy * density_factor)
     }
 }
 
-impl crate::harmony::Quantum for AetherField {
-    fn coherence(&self) -> f64 {
-        self.coherence
+impl<T: MeshValue> Quantum for Aether<T> {
+    fn energy(&self) -> Result<f64, MathError> {
+        self.potential()
     }
 
-    fn recohere(&mut self) -> Result<(), QuantumError> {
-        if self.strength < QUANTUM_STABILITY_THRESHOLD {
-            return Err(QuantumError::CoherenceLoss);
-        }
-        self.coherence = self.strength * AETHER_RESONANCE_FACTOR;
-        Ok(())
+    fn phase(&self) -> Result<f64, MathError> {
+        self.field.phase()
     }
+}
 
-    fn decohere(&mut self) {
-        self.coherence = 0.0;
+impl<T: MeshValue> Phase for Aether<T> {
+    fn phase_shift(&mut self, shift: f64) -> Result<(), MathError> {
+        self.phase_field.apply_shift(shift)?;
+        self.resonance.phase_shift(shift)
     }
+}
 
-    fn phase_alignment(&self) -> f64 {
-        self.coherence * AETHER_RESONANCE_FACTOR
-    }
-
-    fn align_with(&mut self, target: &CrystalNode) -> Result<(), QuantumError> {
-        let target_phase = target.get_phase_coherence();
-        if target_phase < QUANTUM_STABILITY_THRESHOLD {
-            return Err(QuantumError::PhaseMisalignment);
-        }
-        self.coherence = target_phase * AETHER_RESONANCE_FACTOR;
-        Ok(())
-    }
-
-    fn alignment_state(&self) -> AlignmentState {
-        self.alignment.get_state()
+impl<T: MeshValue + Scribe> Scribe for Aether<T> {
+    fn scribe(&self) -> String {
+        let mut result = String::new();
+        write_str!(result, "Aether Field State:\n");
+        write_str!(result, "Position: ");
+        write_str!(result, &self.position.scribe());
+        write_str!(result, "\nDensity: ");
+        write_str!(result, &self.density.scribe());
+        write_str!(result, "\nPotential: ");
+        write_str!(result, &self.potential().unwrap_or(0.0).scribe());
+        write_str!(result, "\nResonance: ");
+        write_str!(result, &self.resonance.scribe());
+        result
     }
 }
 
@@ -123,33 +133,64 @@ impl crate::harmony::Quantum for AetherField {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_aether_field_creation() {
-        let position = Vector3D::new(0.0, 0.0, 0.0);
-        let field = AetherField::new(position);
-        assert!(field.coherence() >= QUANTUM_STABILITY_THRESHOLD);
-        assert_eq!(field.alignment_state(), AlignmentState::Unknown);
+    #[derive(Debug, Clone, Default)]
+    struct TestAether {
+        value: f64,
+    }
+
+    impl MeshValue for TestAether {
+        fn to_f64(&self) -> Result<f64, MathError> {
+            Ok(self.value)
+        }
+
+        fn from(value: f64) -> Self {
+            Self { value }
+        }
+    }
+
+    impl Scribe for TestAether {
+        fn scribe(&self) -> String {
+            let mut result = String::new();
+            write_str!(result, &self.value.scribe());
+            result
+        }
     }
 
     #[test]
-    fn test_field_strength_calculation() {
-        let field = AetherField::new(Vector3D::new(0.0, 0.0, 0.0));
-        let point = Vector3D::new(1.0, 1.0, 1.0);
-        assert!(field.strength_at(&point).is_ok());
+    fn test_aether_creation() {
+        let aether = Aether::<TestAether>::new(4, 1.0);
+        assert_eq!(aether.density(), 1.0);
     }
 
     #[test]
-    fn test_coherence_operations() {
-        let mut field = AetherField::new(Vector3D::new(0.0, 0.0, 0.0));
-        assert!(field.coherence() >= QUANTUM_STABILITY_THRESHOLD);
-        field.decohere();
-        assert!(field.coherence() == 0.0);
+    fn test_density_update() {
+        let mut aether = Aether::<TestAether>::new(4, 1.0);
+        assert!(aether.set_density(2.0).is_ok());
+        assert_eq!(aether.density(), 2.0);
+        assert!(aether.set_density(0.0).is_err());
     }
 
     #[test]
-    fn test_alignment() {
-        let mut field = AetherField::new(Vector3D::new(0.0, 0.0, 0.0));
-        let target = Vector3D::new(1.0, 0.0, 0.0);
-        assert!(field.align_with_position(&target).is_ok());
+    fn test_state_access() {
+        let mut aether = Aether::<TestAether>::new(4, 1.0);
+        let pos = Vector4D::new(1.0, 1.0, 1.0, 1.0);
+        let value = TestAether { value: 42.0 };
+
+        assert!(aether.set_state(&pos, value).is_ok());
+        assert_eq!(aether.get_state(&pos).unwrap().value, 42.0);
+    }
+
+    #[test]
+    fn test_field_application() {
+        let mut aether = Aether::<TestAether>::new(4, 1.0);
+        assert!(aether.apply_field().is_ok());
+    }
+
+    #[test]
+    fn test_quantum_traits() {
+        let mut aether = Aether::<TestAether>::new(4, 1.0);
+        assert!(aether.energy().is_ok());
+        assert!(aether.phase().is_ok());
+        assert!(aether.phase_shift(0.5).is_ok());
     }
 }

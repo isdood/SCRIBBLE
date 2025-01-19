@@ -8,7 +8,8 @@
 //! Version: 0.1.1
 //! License: MIT
 
-use magicmath::{floor, sqrt, QuantumMath};
+use magicmath::{floor, sqrt};
+use magicmath::resonance::{ResonanceMath, ResonanceState};
 use crate::{
     vector::Vector3D,
     errors::{QuantumError, CoherenceError},
@@ -150,7 +151,7 @@ impl CrystalLattice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use magicmath::QuantumMath;
+    use magicmath::resonance::{ResonanceMath, ResonanceState};
 
     #[test]
     fn test_crystal_node_creation() {

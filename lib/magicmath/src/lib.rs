@@ -20,6 +20,11 @@ pub mod derefmut;
 pub mod floor;
 pub mod resonance;
 pub mod mesh;
+pub mod vector;
+pub mod add; // Include the add module
+pub mod sub; // Include the sub module
+pub mod div; // Include the div module
+pub mod mul; // Include the mul module
 
 // Feature modules
 pub mod fractal;
@@ -46,8 +51,9 @@ pub use crate::core::{
 
 // Re-export resonance types
 pub use crate::resonance::{
-    ResonanceMath,
-    ResonanceState,
+    Resonance,
+    Quantum,
+    Phase,
 };
 
 // Re-export mesh types
@@ -55,8 +61,16 @@ pub use crate::mesh::MeshMath;
 
 // Import the errors module
 pub use errors::{
+    CrystalError,
     MathError,
     MathResult,
+    QuantumError,
+    QuantumResult,
+    VectorError,
+    VectorResult,
+    CoherenceError,
+    CoherenceResult,
+    CrystalResult,
 };
 
 pub use crate::traits::{
@@ -65,7 +79,6 @@ pub use crate::traits::{
     FractalValue,
     HarmonyState as HarmonyStateTrait,
     HarmonyOperation,
-    Resonance,
 };
 
 pub use crate::fractal::{
@@ -139,8 +152,8 @@ pub mod prelude {
         HarmonyStateTrait,
         HarmonyOperation,
         Resonance,
-        ResonanceMath,
-        ResonanceState,
+        Quantum,
+        Phase,
         MeshMath,
         FractalParams,
         FractalState,
@@ -171,7 +184,10 @@ pub mod prelude {
         floor,
         sqrt,
     };
-    pub use errors::{MathError, MathResult};
+    pub use errors::{
+        CrystalError, MathError, MathResult, QuantumError, QuantumResult, VectorError, VectorResult,
+        CoherenceError, CoherenceResult, CrystalResult,
+    };
 }
 
 // Version compatibility check
