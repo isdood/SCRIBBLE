@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 19:04:45 UTC
+//! Last Updated: 2025-01-19 22:23:47 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -34,6 +34,13 @@ pub const HARMONY_ENERGY_THRESHOLD: f64 = 0.001;
 pub const HARMONY_PHASE_THRESHOLD: f64 = 0.0001;
 pub const HARMONY_RESONANCE_THRESHOLD: f64 = 0.00001;
 pub const HARMONY_ENTANGLEMENT_THRESHOLD: f64 = 0.000001;
+
+// Phase Operation Constants
+pub const PHASE_COUPLING_CONSTANT: f64 = 0.95;      // For addition
+pub const PHASE_DECOUPLING_CONSTANT: f64 = 0.90;    // For subtraction
+pub const PHASE_AMPLIFICATION_FACTOR: f64 = 1.05;   // For multiplication
+pub const PHASE_ATTENUATION_FACTOR: f64 = 0.85;     // For division
+pub const SINGULARITY_THRESHOLD: f64 = 1e-15;       // For division near zero
 
 // Resonance Factors
 pub const RESONANCE_FACTOR: f64 = 0.999;
@@ -86,7 +93,7 @@ pub const SYSTEM_VERSION: &str = "0.1.0";
 pub const SYSTEM_NAME: &str = "MagicMath Crystal Lattice HPC";
 pub const SYSTEM_AUTHOR: &str = "Caleb J.D. Terkovics <isdood>";
 pub const SYSTEM_CREATED: &str = "2025-01-19";
-pub const SYSTEM_UPDATED: &str = "2025-01-19 19:04:45 UTC";
+pub const SYSTEM_UPDATED: &str = "2025-01-19 22:23:47 UTC";
 pub const SYSTEM_LICENSE: &str = "MIT";
 
 // Module-specific Constants
@@ -153,6 +160,14 @@ mod tests {
         assert!(HARMONY_STABILITY_THRESHOLD > HARMONY_COHERENCE_THRESHOLD);
         assert!(HARMONY_COHERENCE_THRESHOLD > HARMONY_ENERGY_THRESHOLD);
         assert!(HARMONY_ENERGY_THRESHOLD > HARMONY_PHASE_THRESHOLD);
+    }
+
+    #[test]
+    fn test_phase_operation_constants() {
+        assert!(PHASE_AMPLIFICATION_FACTOR > 1.0);
+        assert!(PHASE_ATTENUATION_FACTOR < 1.0);
+        assert!(PHASE_COUPLING_CONSTANT < 1.0);
+        assert!(PHASE_DECOUPLING_CONSTANT < PHASE_COUPLING_CONSTANT);
     }
 
     #[test]

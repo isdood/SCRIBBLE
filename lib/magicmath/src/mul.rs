@@ -1,157 +1,77 @@
-// lib/magicmath/src/mul.rs
-
-//! Multiplication Operations for Crystal Lattice HPC Systems
-//! =============================================
+//! Native Multiplication operations for Crystal Lattice HPC Systems
+//! ===============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 10:09:55 UTC
+//! Last Updated: 2025-01-19 22:20:40 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::{
-    errors::MathError,
-    constants::{
-        MAX_LATTICE_SIZE,
-        MIN_LATTICE_SIZE,
-        HARMONY_STABILITY_THRESHOLD,
-        RESONANCE_FACTOR,
-        PHASE_AMPLIFICATION_FACTOR,
-        HARMONY_ENTANGLEMENT_THRESHOLD
-    },
-    traits::MeshValue,
+use crate::traits::MeshValue;
+use crate::core::HarmonyState;
+use crate::constants::{
+    HARMONY_STABILITY_THRESHOLD,
+    RESONANCE_FACTOR,
+    PHASE_AMPLIFICATION_FACTOR,
+    HARMONY_COHERENCE_THRESHOLD,
+    HARMONY_ENERGY_THRESHOLD
 };
 
-/// Harmony-aware multiplication for crystal lattice values
-/// Handles energy amplification and phase coupling
-pub fn harmony_mul<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
-    let coherence = calculate_amplification(a, b)?;
-    if coherence < HARMONY_STABILITY_THRESHOLD {
-        return Err(MathError::CoherenceLoss);
-    }
-
-    let result = stabilized_mul(a, b)?;
-    validate_lattice_bounds(result)?;
-
-    Ok(result)
+/// Native implementation of harmony-aware multiplication
+#[derive(Debug, Clone)]
+pub struct HarmonyMul<T: MeshValue> {
+    pub value: T,
+    pub state: HarmonyState,
 }
 
-/// Multiply values with harmony entanglement preservation
-pub fn entangled_mul<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
-    let entanglement = check_entanglement(a, b)?;
-    if !entanglement.is_stable() {
-        return Err(MathError::EntanglementLoss);
-    }
-
-    harmony_mul(a, b)
-}
-
-/// Resonant multiplication with harmonic amplification
-pub fn harmonic_mul<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
-    let harmonics = calculate_harmonics(a, b)?;
-    let amplified_result = apply_harmonics(a, b, harmonics)?;
-
-    harmony_mul(amplified_result, T::unit())
-}
-
-/// Multiply lattice values with phase amplification
-pub fn phase_mul<T: MeshValue>(a: T, b: T, phase: f64) -> Result<T, MathError> {
-    if !is_valid_phase(phase) {
-        return Err(MathError::PhaseError);
-    }
-
-    let phase_amplified = apply_phase_amplification(a, b, phase)?;
-    harmony_mul(phase_amplified.0, phase_amplified.1)
-}
-
-// Internal helper functions
-
-#[inline]
-fn calculate_amplification<T: MeshValue>(a: T, b: T) -> Result<f64, MathError> {
-    let base_coherence = (a.coherence()? * b.coherence()?).sqrt();
-    Ok(base_coherence * RESONANCE_FACTOR)
-}
-
-#[inline]
-fn stabilized_mul<T: MeshValue>(a: T, b: T) -> Result<T, MathError> {
-    if would_exceed_bounds(a, b)? {
-        return Err(MathError::LatticeOverflow);
-    }
-    Ok(a.raw_mul(b))
-}
-
-#[inline]
-fn validate_lattice_bounds<T: MeshValue>(value: T) -> Result<(), MathError> {
-    let mag = value.magnitude()?;
-    if mag < MIN_LATTICE_SIZE as f64 || mag > MAX_LATTICE_SIZE as f64 {
-        return Err(MathError::LatticeBoundsError);
-    }
-    Ok(())
-}
-
-#[inline]
-fn would_exceed_bounds<T: MeshValue>(a: T, b: T) -> Result<bool, MathError> {
-    let product_energy = a.energy()? * b.energy()?;
-    Ok(product_energy > MAX_LATTICE_SIZE as f64)
-}
-
-#[inline]
-fn check_entanglement<T: MeshValue>(a: T, b: T) -> Result<EntanglementState, MathError> {
-    let entanglement = a.entanglement_state()?.combine(b.entanglement_state()?);
-    Ok(entanglement)
-}
-
-#[inline]
-fn calculate_harmonics<T: MeshValue>(a: T, b: T) -> Result<f64, MathError> {
-    let base_harmonics = (a.energy()? * b.energy()?).sqrt();
-    Ok(base_harmonics * RESONANCE_FACTOR)
-}
-
-#[inline]
-fn apply_harmonics<T: MeshValue>(a: T, b: T, harmonics: f64) -> Result<T, MathError> {
-    let amplified_a = a.amplify(harmonics)?;
-    let amplified_b = b.amplify(harmonics)?;
-    Ok(amplified_a.raw_mul(amplified_b))
-}
-
-#[inline]
-fn is_valid_phase(phase: f64) -> bool {
-    phase >= 0.0 && phase <= 2.0 * core::f64::consts::PI
-}
-
-#[inline]
-fn apply_phase_amplification<T: MeshValue>(a: T, b: T, phase: f64) -> Result<(T, T), MathError> {
-    let amplified_phase = phase * PHASE_AMPLIFICATION_FACTOR;
-    let phase_a = a.phase_amplify(amplified_phase)?;
-    let phase_b = b.phase_amplify(amplified_phase)?;
-    Ok((phase_a, phase_b))
-}
-
-/// Harmony entanglement state for multiplication
-#[derive(Debug, Clone, Copy)]
-pub struct EntanglementState {
-    coherence: f64,
-    phase: f64,
-    energy: f64,
-    entanglement: f64,
-}
-
-impl EntanglementState {
+impl<T: MeshValue> HarmonyMul<T> {
+    /// Creates a new HarmonyMul instance
     #[inline]
-    pub fn is_stable(&self) -> bool {
-        self.coherence >= HARMONY_STABILITY_THRESHOLD &&
-        self.entanglement >= HARMONY_ENTANGLEMENT_THRESHOLD
-    }
-
-    #[inline]
-    pub fn combine(&self, other: EntanglementState) -> Self {
+    pub fn new(value: T) -> Self {
         Self {
-            coherence: (self.coherence * other.coherence).sqrt(),
-            phase: self.phase * other.phase,
-            energy: self.energy * other.energy,
-            entanglement: (self.entanglement + other.entanglement) * RESONANCE_FACTOR,
+            value,
+            state: HarmonyState::new(),
         }
+    }
+
+    /// Performs harmony-aware multiplication
+    #[inline]
+    pub fn mul(&self, rhs: &Self) -> Result<Self, String> {
+        if self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
+            rhs.state.coherence >= HARMONY_COHERENCE_THRESHOLD &&
+            self.state.energy * rhs.state.energy >= HARMONY_ENERGY_THRESHOLD {
+
+                let new_value = self.value.mul(&rhs.value)?;
+                let new_phase = (self.state.phase * rhs.state.phase) * PHASE_AMPLIFICATION_FACTOR;
+
+                Ok(Self {
+                    value: new_value,
+                    state: HarmonyState {
+                        coherence: (self.state.coherence * rhs.state.coherence).sqrt() * RESONANCE_FACTOR,
+                   phase: new_phase,
+                   energy: self.state.energy * rhs.state.energy,
+                   stability: (self.state.stability * rhs.state.stability).sqrt(),
+                   iterations: self.state.iterations + 1,
+                    },
+                })
+            } else {
+                Err("Multiplication operation failed: harmony state unstable or energy too low".to_string())
+            }
+    }
+
+    /// Checks if the multiplication would maintain harmony
+    #[inline]
+    pub fn would_maintain_harmony(&self, rhs: &Self) -> bool {
+        self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
+        rhs.state.coherence >= HARMONY_COHERENCE_THRESHOLD &&
+        self.state.energy * rhs.state.energy >= HARMONY_ENERGY_THRESHOLD
+    }
+
+    /// Gets the projected energy level after multiplication
+    #[inline]
+    pub fn projected_energy(&self, rhs: &Self) -> f64 {
+        self.state.energy * rhs.state.energy
     }
 }
 
@@ -159,63 +79,48 @@ impl EntanglementState {
 mod tests {
     use super::*;
 
-    // Test implementation of MeshValue for f64
-    impl MeshValue for f64 {
-        fn coherence(&self) -> Result<f64, MathError> { Ok(1.0) }
-        fn energy(&self) -> Result<f64, MathError> { Ok(*self) }
-        fn magnitude(&self) -> Result<f64, MathError> { Ok(self.abs()) }
-        fn raw_mul(&self, other: Self) -> Self { self * other }
-        fn amplify(&self, factor: f64) -> Result<Self, MathError> { Ok(self * factor.sqrt()) }
-        fn phase_amplify(&self, phase: f64) -> Result<Self, MathError> {
-            Ok(self * (phase * PHASE_AMPLIFICATION_FACTOR).cos())
-        }
-        fn entanglement_state(&self) -> Result<EntanglementState, MathError> {
-            Ok(EntanglementState {
-                coherence: 1.0,
-                phase: 0.0,
-                energy: *self,
-                entanglement: 1.0,
-            })
-        }
-        fn unit() -> Self { 1.0 }
-    }
-
     #[test]
     fn test_harmony_mul() {
-        assert_eq!(harmony_mul(2.0, 3.0).unwrap(), 6.0);
-        assert!(harmony_mul(MAX_LATTICE_SIZE as f64, 2.0).is_err());
+        let a = HarmonyMul::new(5.0f64);
+        let b = HarmonyMul::new(3.0f64);
+        let result = a.mul(&b).unwrap();
+        assert_eq!(result.value, 15.0);
+        assert!(result.state.coherence < 1.0);
+        assert!(result.state.stability > 0.0);
     }
 
     #[test]
-    fn test_entangled_mul() {
-        assert_eq!(entangled_mul(2.0, 3.0).unwrap(), 6.0);
+    fn test_harmony_mul_failure() {
+        let mut a = HarmonyMul::new(5.0f64);
+        a.state.coherence = 0.0;
+        let b = HarmonyMul::new(3.0f64);
+        assert!(a.mul(&b).is_err());
     }
 
     #[test]
-    fn test_harmonic_mul() {
-        let result = harmonic_mul(2.0, 2.0).unwrap();
-        assert!(result > 4.0); // Due to harmonic amplification
+    fn test_harmony_mul_phase_amplification() {
+        let mut a = HarmonyMul::new(2.0f64);
+        let mut b = HarmonyMul::new(3.0f64);
+        a.state.phase = 0.5;
+        b.state.phase = 0.3;
+        let result = a.mul(&b).unwrap();
+        assert!(result.state.phase > 0.0);
+        assert!(result.state.phase < a.state.phase * b.state.phase);
     }
 
     #[test]
-    fn test_phase_mul() {
-        let result = phase_mul(2.0, 2.0, 0.0).unwrap();
-        assert_eq!(result, 4.0);
-
-        assert!(phase_mul(2.0, 2.0, -1.0).is_err()); // Invalid phase
+    fn test_harmony_mul_energy_threshold() {
+        let mut a = HarmonyMul::new(2.0f64);
+        let mut b = HarmonyMul::new(3.0f64);
+        a.state.energy = 0.0;
+        b.state.energy = 0.0;
+        assert!(a.mul(&b).is_err());
     }
 
     #[test]
-    fn test_entanglement_state() {
-        let state = EntanglementState {
-            coherence: 1.0,
-            phase: 0.0,
-            energy: 1.0,
-            entanglement: 1.0,
-        };
-        assert!(state.is_stable());
-
-        let combined = state.combine(state);
-        assert!(combined.entanglement > 1.0);
+    fn test_projected_energy() {
+        let a = HarmonyMul::new(2.0f64);
+        let b = HarmonyMul::new(3.0f64);
+        assert_eq!(a.projected_energy(&b), 1.0); // Default energy values are 1.0
     }
 }

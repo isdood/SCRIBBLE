@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 18:57:54 UTC
+//! Last Updated: 2025-01-19 22:22:52 UTC
 //! Version: 0.1.0
 //! License: MIT
 //!
@@ -12,6 +12,7 @@
 //! on crystal lattice systems, providing high-precision calculations
 //! with harmony state preservation and stability monitoring.
 
+// Core modules
 pub mod core;
 pub mod constants;
 pub mod traits;
@@ -21,16 +22,24 @@ pub mod floor;
 pub mod resonance;
 pub mod mesh;
 pub mod vector;
-pub mod add; // Include the add module
-pub mod sub; // Include the sub module
-pub mod div; // Include the div module
-pub mod mul; // Include the mul module
+
+// Arithmetic operation modules
+pub mod add;
+pub mod sub;
+pub mod div;
+pub mod mul;
 
 // Feature modules
 pub mod fractal;
 pub mod julia;
 pub mod brot;
 pub mod exp;
+
+// Re-export native arithmetic operations
+pub use crate::add::HarmonyAdd;
+pub use crate::sub::HarmonySub;
+pub use crate::mul::HarmonyMul;
+pub use crate::div::HarmonyDiv;
 
 // Re-exports for convenient access
 pub use crate::core::{
@@ -59,7 +68,7 @@ pub use crate::resonance::{
 // Re-export mesh types
 pub use crate::mesh::MeshMath;
 
-// Import the errors module
+// Re-export error types
 pub use errors::{
     CrystalError,
     MathError,
@@ -134,7 +143,7 @@ pub mod config {
     pub const CREATED: &str = "2025-01-19";
 
     /// Last update timestamp
-    pub const UPDATED: &str = "2025-01-19 18:57:54 UTC";
+    pub const UPDATED: &str = "2025-01-19 22:22:52 UTC";
 
     /// Current user
     pub const CURRENT_USER: &str = "isdood";
@@ -143,6 +152,12 @@ pub mod config {
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::{
+        // Native arithmetic operations
+        HarmonyAdd,
+        HarmonySub,
+        HarmonyMul,
+        HarmonyDiv,
+        // Core types and traits
         HarmonyMath,
         HarmonyState,
         Operation,
@@ -155,6 +170,7 @@ pub mod prelude {
         Quantum,
         Phase,
         MeshMath,
+        // Feature types
         FractalParams,
         FractalState,
         FractalType,
@@ -167,10 +183,12 @@ pub mod prelude {
         MandelbrotState,
         MandelbrotVariant,
         iterate_mandelbrot,
+        // Utility traits
         HarmonyDeref,
         HarmonyDerefable,
         HarmonyDerefMut,
         HarmonyDerefMutable,
+        // Core functions
         harmony_add,
         harmony_sub,
         harmony_mul,
@@ -184,9 +202,18 @@ pub mod prelude {
         floor,
         sqrt,
     };
+
     pub use errors::{
-        CrystalError, MathError, MathResult, QuantumError, QuantumResult, VectorError, VectorResult,
-        CoherenceError, CoherenceResult, CrystalResult,
+        CrystalError,
+        MathError,
+        MathResult,
+        QuantumError,
+        QuantumResult,
+        VectorError,
+        VectorResult,
+        CoherenceError,
+        CoherenceResult,
+        CrystalResult,
     };
 }
 
