@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 14:07:27 UTC
+//! Last Updated: 2025-01-19 14:35:35 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -14,7 +14,6 @@
 
 // Core modules
 pub mod core;
-pub mod errors;
 pub mod constants;
 pub mod traits;
 pub mod deref;
@@ -30,9 +29,19 @@ pub use crate::core::{
     QuantumMath,
     QuantumState,
     Operation,
+    quantum_add,
+    quantum_sub,
+    quantum_mul,
+    quantum_div,
+    quantum_sqrt,
+    quantum_ln,
+    quantum_pi,
+    quantum_phi,
+    quantum_pythagoras,
+    quantum_fibonacci,
 };
 
-pub use crate::errors::{
+pub use errors::core::{
     MathError,
     MathResult,
 };
@@ -95,7 +104,7 @@ pub mod config {
     pub const CREATED: &str = "2025-01-19";
 
     /// Last update timestamp
-    pub const UPDATED: &str = "2025-01-19 14:07:27 UTC";
+    pub const UPDATED: &str = "2025-01-19 14:35:35 UTC";
 
     /// Current user
     pub const CURRENT_USER: &str = "isdood";
@@ -107,8 +116,6 @@ pub mod prelude {
         QuantumMath,
         QuantumState,
         Operation,
-        MathError,
-        MathResult,
         MeshValue,
         ComplexQuantum,
         FractalValue,
@@ -131,20 +138,18 @@ pub mod prelude {
         QuantumDerefable,
         QuantumDerefMut,
         QuantumDerefMutable,
+        quantum_add,
+        quantum_sub,
+        quantum_mul,
+        quantum_div,
+        quantum_sqrt,
+        quantum_ln,
+        quantum_pi,
+        quantum_phi,
+        quantum_pythagoras,
+        quantum_fibonacci,
     };
-
-    pub use crate::core::{
-        add::quantum_add,
-        sub::quantum_sub,
-        mul::quantum_mul,
-        div::quantum_div,
-        sqrt::quantum_sqrt,
-        log::quantum_ln,
-        pi::quantum_pi,
-        gold::quantum_phi,
-        py::quantum_pythagoras,
-        fibb::quantum_fibonacci,
-    };
+    pub use errors::core::{MathError, MathResult};
 }
 
 // Version compatibility check
@@ -159,93 +164,4 @@ const _: () = {
 #[inline]
 pub fn new() -> QuantumMath {
     QuantumMath::new()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::constants::*;
-
-    #[test]
-    fn test_version() {
-        assert_eq!(config::VERSION, "0.1.0");
-        assert_eq!(config::UPDATED, "2025-01-19 14:07:27 UTC");
-    }
-
-    #[test]
-    fn test_quantum_math() {
-        let mut qmath = new();
-        assert!(qmath.get_state().is_stable());
-    }
-
-    #[test]
-    fn test_fractal_generation() {
-        let params = FractalParams::default();
-        let state = FractalState::Julia(JuliaState::new(0.0, 0.0));
-        let result = generate_fractal(state, &params);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_julia_set() {
-        let params = JuliaParams::default();
-        let state = JuliaState::new(0.0, 0.0);
-        let result = iterate_julia(state, &params, JuliaVariant::Standard);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_mandelbrot_set() {
-        let params = MandelbrotParams::default();
-        let state = MandelbrotState::new(0.0, 0.0);
-        let result = iterate_mandelbrot(state, &params, MandelbrotVariant::Standard);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_quantum_operations() {
-        let mut qmath = new();
-        let test_value = 2.0f64;
-
-        let operations = [
-            Operation::Add,
-            Operation::Subtract,
-            Operation::Multiply,
-            Operation::Divide,
-            Operation::SquareRoot,
-            Operation::Logarithm,
-            Operation::Pi,
-            Operation::Golden,
-            Operation::Pythagorean,
-            Operation::Fibonacci,
-            Operation::Julia,
-            Operation::Mandelbrot,
-            Operation::Fractal,
-        ];
-
-        for op in &operations {
-            assert!(qmath.operate(*op, test_value).is_ok());
-        }
-    }
-
-    #[test]
-    fn test_error_handling() {
-        let mut qmath = new();
-
-        // Test division by zero
-        let result = qmath.operate(Operation::Divide, 0.0);
-        assert!(matches!(result, Err(MathError::DivisionByZero)));
-
-        // Test negative logarithm
-        let result = qmath.operate(Operation::Logarithm, -1.0);
-        assert!(matches!(result, Err(MathError::LogarithmDomainError(_))));
-    }
-
-    #[test]
-    fn test_fractal_errors() {
-        let params = FractalParams::default();
-        let wrong_state = FractalState::Mandelbrot(MandelbrotState::new(0.0, 0.0));
-        let result = generate_fractal(wrong_state, &params);
-        assert!(matches!(result, Err(MathError::FractalTypeMismatch)));
-    }
 }

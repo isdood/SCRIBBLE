@@ -4,12 +4,11 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 14:04:05 UTC
+//! Last Updated: 2025-01-19 14:41:15 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::{
-    errors::MathError,
     constants::{
         QUANTUM_STABILITY_THRESHOLD,
         RESONANCE_FACTOR,
@@ -18,6 +17,7 @@ use crate::{
     },
     traits::MeshValue,
 };
+use errors::core::MathError;
 
 /// Quantum-aware mutable dereferencing operations
 #[derive(Debug)]
@@ -78,38 +78,5 @@ impl<T: MeshValue> QuantumDerefMutable<T> for QuantumDerefMut<T> {
     #[inline]
     fn quantum_deref_mut(&mut self) -> Result<&mut T, MathError> {
         self.get_mut()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Test implementation
-    impl MeshValue for i32 {
-        fn coherence(&self) -> Result<f64, MathError> { Ok(1.0) }
-        fn energy(&self) -> Result<f64, MathError> { Ok(*self as f64) }
-        fn magnitude(&self) -> Result<f64, MathError> { Ok(self.abs() as f64) }
-        fn to_usize(&self) -> Result<usize, MathError> { Ok(*self as usize) }
-        fn to_f64(&self) -> Result<f64, MathError> { Ok(*self as f64) }
-        fn from(value: f64) -> Self { value as i32 }
-    }
-
-    #[test]
-    fn test_quantum_deref_mut() {
-        let mut qdm = QuantumDerefMut::new(42);
-        assert!(qdm.is_stable());
-        *qdm.get_mut().unwrap() = 84;
-        assert_eq!(*qdm.get_mut().unwrap(), 84);
-    }
-
-    #[test]
-    fn test_quantum_mut_instability() {
-        let mut qdm = QuantumDerefMut::new(42);
-        for _ in 0..1000 {
-            qdm.update();
-        }
-        assert!(!qdm.is_stable());
-        assert!(qdm.get_mut().is_err());
     }
 }

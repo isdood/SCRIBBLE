@@ -4,43 +4,30 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 14:01:07 UTC
+//! Last Updated: 2025-01-19 14:45:42 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-pub mod add;
-pub mod sub;
-pub mod mul;
-pub mod div;
-pub mod sqrt;
-pub mod log;
-pub mod pi;
-pub mod gold;
-pub mod py;
-pub mod fibb;
-pub mod fractal;
-pub mod julia;
-
 use crate::{
-    errors::MathError,
     constants::{
-        MAX_LATTICE_SIZE,
-        MIN_LATTICE_SIZE,
         QUANTUM_STABILITY_THRESHOLD,
         RESONANCE_FACTOR
     },
     traits::MeshValue,
+    fractal,
+    julia,
     brot,
 };
+use errors::core::MathError;
 
 /// Core quantum state tracking for all mathematical operations
 #[derive(Debug, Clone, Copy)]
 pub struct QuantumState {
-    coherence: f64,
-    phase: f64,
-    energy: f64,
-    stability: f64,
-    iterations: usize,
+    pub coherence: f64,
+    pub phase: f64,
+    pub energy: f64,
+    pub stability: f64,
+    pub iterations: usize,
 }
 
 impl QuantumState {
@@ -175,20 +162,20 @@ impl QuantumMath {
 
     /// Perform operation with quantum stability check
     #[inline]
-    pub fn operate<T: MeshValue>(&mut self, operation: Operation, value: T) -> Result<T, MathError> {
+    pub fn operate<T: MeshValue + Copy>(&mut self, operation: Operation, value: T) -> Result<T, MathError> {
         self.state.update(operation)?;
 
         match operation {
-            Operation::Add => add::quantum_add(value, value),
-            Operation::Subtract => sub::quantum_sub(value, value),
-            Operation::Multiply => mul::quantum_mul(value, value),
-            Operation::Divide => div::quantum_div(value, value),
-            Operation::SquareRoot => sqrt::quantum_sqrt(value),
-            Operation::Logarithm => log::quantum_ln(value),
-            Operation::Pi => pi::quantum_pi(value),
-            Operation::Golden => gold::quantum_phi(value),
-            Operation::Pythagorean => py::quantum_pythagoras(value, value),
-            Operation::Fibonacci => fibb::quantum_fibonacci(value.to_usize()?),
+            Operation::Add => quantum_add(&value, &value),
+            Operation::Subtract => quantum_sub(&value, &value),
+            Operation::Multiply => quantum_mul(&value, &value),
+            Operation::Divide => quantum_div(&value, &value),
+            Operation::SquareRoot => quantum_sqrt(&value),
+            Operation::Logarithm => quantum_ln(&value),
+            Operation::Pi => quantum_pi(&value),
+            Operation::Golden => quantum_phi(&value),
+            Operation::Pythagorean => quantum_pythagoras(&value, &value),
+            Operation::Fibonacci => quantum_fibonacci(value.to_usize()?),
             Operation::Julia => {
                 let state = julia::JuliaState::new(value.to_f64()?, 0.0);
                 let params = julia::JuliaParams::default();
@@ -228,4 +215,79 @@ impl QuantumMath {
     pub fn reset_state(&mut self) {
         self.state = QuantumState::new();
     }
+}
+
+// Core quantum operations
+#[inline]
+pub fn quantum_add<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+    Ok(T::from(a.to_f64()? + b.to_f64()?))
+}
+
+#[inline]
+pub fn quantum_sub<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+    Ok(T::from(a.to_f64()? - b.to_f64()?))
+}
+
+#[inline]
+pub fn quantum_mul<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+    Ok(T::from(a.to_f64()? * b.to_f64()?))
+}
+
+#[inline]
+pub fn quantum_div<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+    let b_val = b.to_f64()?;
+    if b_val == 0.0 {
+        return Err(MathError::DivisionByZero);
+    }
+    Ok(T::from(a.to_f64()? / b_val))
+}
+
+#[inline]
+pub fn quantum_sqrt<T: MeshValue>(a: &T) -> Result<T, MathError> {
+    let val = a.to_f64()?;
+    if val < 0.0 {
+        return Err(MathError::InvalidDomain("Square root of negative number".to_string()));
+    }
+    Ok(T::from(val.sqrt()))
+}
+
+#[inline]
+pub fn quantum_ln<T: MeshValue>(a: &T) -> Result<T, MathError> {
+    let val = a.to_f64()?;
+    if val <= 0.0 {
+        return Err(MathError::LogarithmDomainError(val));
+    }
+    Ok(T::from(val.ln()))
+}
+
+#[inline]
+pub fn quantum_pi<T: MeshValue>(scale: &T) -> Result<T, MathError> {
+    Ok(T::from(core::f64::consts::PI * scale.to_f64()?))
+}
+
+#[inline]
+pub fn quantum_phi<T: MeshValue>(scale: &T) -> Result<T, MathError> {
+    Ok(T::from(((1.0 + 5.0f64.sqrt()) / 2.0) * scale.to_f64()?))
+}
+
+#[inline]
+pub fn quantum_pythagoras<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+    let a_val = a.to_f64()?;
+    let b_val = b.to_f64()?;
+    Ok(T::from((a_val * a_val + b_val * b_val).sqrt()))
+}
+
+#[inline]
+pub fn quantum_fibonacci<T: MeshValue>(n: usize) -> Result<T, MathError> {
+    if n <= 1 {
+        return Ok(T::from(n as f64));
+    }
+    let mut a = 0.0;
+    let mut b = 1.0;
+    for _ in 2..=n {
+        let c = a + b;
+        a = b;
+        b = c;
+    }
+    Ok(T::from(b))
 }
