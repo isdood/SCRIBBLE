@@ -6,7 +6,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 14:39:17 UTC
+//! Last Updated: 2025-01-19 18:52:09 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -18,6 +18,7 @@ use crate::constants::{
     HARMONY_STABILITY_THRESHOLD,
 };
 use errors::core::MathError;
+use scribe::native_string::String;
 
 /// Parameters for Julia set calculation
 #[derive(Debug, Clone, Copy)]
@@ -120,7 +121,7 @@ pub fn iterate_julia(
         // Check for stability loss
         if state.stability < HARMONY_JULIA_THRESHOLD {
             return Err(MathError::JuliaStabilityLoss(
-                "Harmony stability lost during iteration".to_string()
+                String::from("Harmony stability lost during iteration")
             ));
         }
 

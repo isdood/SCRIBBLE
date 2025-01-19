@@ -1,12 +1,10 @@
-// lib/magicmath/src/fractal.rs
-
 //! Fractal Generation for Crystal Lattice Systems
 //! ===============================================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 14:36:40 UTC
+//! Last Updated: 2025-01-19 18:51:07 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -22,6 +20,7 @@ use crate::{
     julia::{self, JuliaParams, JuliaState, JuliaVariant},
 };
 use errors::core::MathError;
+use scribe::native_string::String;
 
 /// Parameters for fractal generation
 #[derive(Debug, Clone, Copy)]
@@ -145,7 +144,7 @@ pub fn generate_fractal(
 
                 if custom_state.stability < HARMONY_FRACTAL_THRESHOLD {
                     return Err(MathError::FractalStabilityLoss(
-                        "Harmony stability lost during custom fractal iteration".to_string()
+                        String::from("Harmony stability lost during custom fractal iteration")
                     ));
                 }
 

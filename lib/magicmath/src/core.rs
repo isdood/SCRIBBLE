@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 14:45:42 UTC
+//! Last Updated: 2025-01-19 18:49:41 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -247,7 +247,7 @@ pub fn harmony_div<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
 pub fn harmony_sqrt<T: MeshValue>(a: &T) -> Result<T, MathError> {
     let val = a.to_f64()?;
     if val < 0.0 {
-        return Err(MathError::InvalidDomain(String::from("Square root of negative number"))); // Convert to custom String
+        return Err(MathError::InvalidDomain(String::from("Square root of negative number")));
     }
     Ok(T::from(val.sqrt()))
 }
