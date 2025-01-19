@@ -33,10 +33,16 @@ Specialized mathematical operations optimized for crystalline computing:
 - Phase-preserving operations
 
 #### 💎 Crystal_Thread Library
-Manages the flow of computations through crystal lattice structures.
+Manages the flow of computations through crystal lattice structures:
+- Crystal lattice-based task scheduling
+- Multi-threaded lattice synchronization
+- Harmony state maintenance across threads
 
 #### 🌟 Harmony_Core
-Ensures perfect alignment and resonance across all computational systems.
+Ensures perfect alignment and resonance across all computational systems:
+- Global harmony state tracking
+- Resonance optimization algorithms
+- Coherence and stability monitoring
 
 ### Technical Architecture
 
@@ -101,4 +107,6 @@ MIT
 
 Created with 💎 by [@isdood](https://github.com/isdood)
 
-_"In the dance of crystals, we found our computational rhythm."_
+_"Data dancing through prisms."_
+
+---
