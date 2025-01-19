@@ -7,4 +7,3 @@ description = "Math operations for mesh-based quantum computations"
 license = "MIT"
 
 [dependencies]
-libm = "0.2.11"
