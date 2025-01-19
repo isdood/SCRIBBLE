@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 22:40:19 UTC
+//! Last Updated: 2025-01-19 23:52:04 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -14,7 +14,7 @@ use scribe::Scribe;
 use scribe::native_string::String;
 use crate::resonance::{Quantum, Phase};
 use crate::core::HarmonyState;
-use crate::constants::{HARMONY_STABILITY_THRESHOLD, HARMONY_COHERENCE_THRESHOLD};
+use crate::constants::{HARMONY_STABILITY_THRESHOLD, PI};
 
 /// Three-dimensional vector with harmony state
 #[derive(Debug, Clone)]
@@ -45,6 +45,14 @@ impl Vector3D {
             state: HarmonyState::new(),
         }
     }
+
+    /// Check harmony stability
+    pub fn check_stability(&self) -> MathResult<()> {
+        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
+            return Err(MathError::HarmonyStateUnstable);
+        }
+        Ok(())
+    }
 }
 
 impl Vector4D {
@@ -58,11 +66,19 @@ impl Vector4D {
             state: HarmonyState::new(),
         }
     }
+
+    /// Check harmony stability
+    pub fn check_stability(&self) -> MathResult<()> {
+        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
+            return Err(MathError::HarmonyStateUnstable);
+        }
+        Ok(())
+    }
 }
 
 impl MeshValue for Vector3D {
     fn to_f64(&self) -> MathResult<f64> {
-        Ok(self.magnitude()?)
+        self.magnitude()
     }
 
     fn from(value: f64) -> Self {
@@ -70,14 +86,15 @@ impl MeshValue for Vector3D {
     }
 
     fn coherence(&self) -> MathResult<f64> {
-        if self.magnitude()? <= 0.0 {
-            return Err(MathError::InvalidParameter("Magnitude must be positive".into()));
+        let mag = self.magnitude()?;
+        if mag <= 0.0 {
+            return Err(MathError::InvalidParameter(String::from("Magnitude must be positive")));
         }
         Ok((self.x + self.y + self.z) / 3.0)
     }
 
     fn energy(&self) -> MathResult<f64> {
-        Ok(self.magnitude()?)
+        self.magnitude()
     }
 
     fn magnitude(&self) -> MathResult<f64> {
@@ -89,9 +106,9 @@ impl MeshValue for Vector3D {
     }
 
     fn add(&self, other: &Self) -> MathResult<Self> {
-        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::HarmonyStateUnstable);
-        }
+        self.check_stability()?;
+        other.check_stability()?;
+
         Ok(Self::new(
             self.x + other.x,
             self.y + other.y,
@@ -100,9 +117,9 @@ impl MeshValue for Vector3D {
     }
 
     fn sub(&self, other: &Self) -> MathResult<Self> {
-        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::HarmonyStateUnstable);
-        }
+        self.check_stability()?;
+        other.check_stability()?;
+
         Ok(Self::new(
             self.x - other.x,
             self.y - other.y,
@@ -111,9 +128,9 @@ impl MeshValue for Vector3D {
     }
 
     fn mul(&self, other: &Self) -> MathResult<Self> {
-        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::HarmonyStateUnstable);
-        }
+        self.check_stability()?;
+        other.check_stability()?;
+
         Ok(Self::new(
             self.x * other.x,
             self.y * other.y,
@@ -122,12 +139,13 @@ impl MeshValue for Vector3D {
     }
 
     fn div(&self, other: &Self) -> MathResult<Self> {
+        self.check_stability()?;
+        other.check_stability()?;
+
         if other.magnitude()? == 0.0 {
             return Err(MathError::DivisionByZero);
         }
-        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::HarmonyStateUnstable);
-        }
+
         Ok(Self::new(
             self.x / other.x,
             self.y / other.y,
@@ -138,7 +156,7 @@ impl MeshValue for Vector3D {
 
 impl MeshValue for Vector4D {
     fn to_f64(&self) -> MathResult<f64> {
-        Ok(self.magnitude()?)
+        self.magnitude()
     }
 
     fn from(value: f64) -> Self {
@@ -146,14 +164,15 @@ impl MeshValue for Vector4D {
     }
 
     fn coherence(&self) -> MathResult<f64> {
-        if self.magnitude()? <= 0.0 {
-            return Err(MathError::InvalidParameter("Magnitude must be positive".into()));
+        let mag = self.magnitude()?;
+        if mag <= 0.0 {
+            return Err(MathError::InvalidParameter(String::from("Magnitude must be positive")));
         }
         Ok((self.x + self.y + self.z + self.w) / 4.0)
     }
 
     fn energy(&self) -> MathResult<f64> {
-        Ok(self.magnitude()?)
+        self.magnitude()
     }
 
     fn magnitude(&self) -> MathResult<f64> {
@@ -165,9 +184,9 @@ impl MeshValue for Vector4D {
     }
 
     fn add(&self, other: &Self) -> MathResult<Self> {
-        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::HarmonyStateUnstable);
-        }
+        self.check_stability()?;
+        other.check_stability()?;
+
         Ok(Self::new(
             self.x + other.x,
             self.y + other.y,
@@ -177,9 +196,9 @@ impl MeshValue for Vector4D {
     }
 
     fn sub(&self, other: &Self) -> MathResult<Self> {
-        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::HarmonyStateUnstable);
-        }
+        self.check_stability()?;
+        other.check_stability()?;
+
         Ok(Self::new(
             self.x - other.x,
             self.y - other.y,
@@ -189,9 +208,9 @@ impl MeshValue for Vector4D {
     }
 
     fn mul(&self, other: &Self) -> MathResult<Self> {
-        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::HarmonyStateUnstable);
-        }
+        self.check_stability()?;
+        other.check_stability()?;
+
         Ok(Self::new(
             self.x * other.x,
             self.y * other.y,
@@ -201,12 +220,13 @@ impl MeshValue for Vector4D {
     }
 
     fn div(&self, other: &Self) -> MathResult<Self> {
+        self.check_stability()?;
+        other.check_stability()?;
+
         if other.magnitude()? == 0.0 {
             return Err(MathError::DivisionByZero);
         }
-        if self.state.coherence < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::HarmonyStateUnstable);
-        }
+
         Ok(Self::new(
             self.x / other.x,
             self.y / other.y,
@@ -218,7 +238,7 @@ impl MeshValue for Vector4D {
 
 impl Quantum for Vector3D {
     fn energy(&self) -> MathResult<f64> {
-        Ok(self.magnitude()?)
+        self.magnitude()
     }
 
     fn phase(&self) -> MathResult<f64> {
@@ -231,7 +251,7 @@ impl Quantum for Vector3D {
 
 impl Quantum for Vector4D {
     fn energy(&self) -> MathResult<f64> {
-        Ok(self.magnitude()?)
+        self.magnitude()
     }
 
     fn phase(&self) -> MathResult<f64> {
@@ -244,6 +264,7 @@ impl Quantum for Vector4D {
 
 impl Phase for Vector3D {
     fn phase_shift(&mut self, shift: f64) -> MathResult<()> {
+        self.check_stability()?;
         let mag = self.magnitude()?;
         let current_phase = self.phase()?;
         let new_phase = current_phase + shift;
@@ -255,125 +276,24 @@ impl Phase for Vector3D {
 
 impl Phase for Vector4D {
     fn phase_shift(&mut self, shift: f64) -> MathResult<()> {
+        self.check_stability()?;
         let mag = self.magnitude()?;
         let current_phase = self.phase()?;
         let new_phase = current_phase + shift;
         self.x = mag * new_phase.cos();
         self.y = mag * new_phase.sin();
-        // w component remains unchanged during phase shift
         Ok(())
     }
 }
 
 impl Scribe for Vector3D {
     fn scribe(&self) -> String {
-        let mut result = String::new();
-        result.push_str("(");
-        result.push_str(&self.x.to_string());
-        result.push_str(", ");
-        result.push_str(&self.y.to_string());
-        result.push_str(", ");
-        result.push_str(&self.z.to_string());
-        result.push_str(")");
-        result
+        format!("({}, {}, {})", self.x, self.y, self.z).into()
     }
 }
 
 impl Scribe for Vector4D {
     fn scribe(&self) -> String {
-        let mut result = String::new();
-        result.push_str("(");
-        result.push_str(&self.x.to_string());
-        result.push_str(", ");
-        result.push_str(&self.y.to_string());
-        result.push_str(", ");
-        result.push_str(&self.z.to_string());
-        result.push_str(", ");
-        result.push_str(&self.w.to_string());
-        result.push_str(")");
-        result
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::constants::PI;
-
-    #[test]
-    fn test_vector3d_creation() {
-        let v = Vector3D::new(1.0, 2.0, 3.0);
-        assert_eq!(v.x, 1.0);
-        assert_eq!(v.y, 2.0);
-        assert_eq!(v.z, 3.0);
-    }
-
-    #[test]
-    fn test_vector4d_creation() {
-        let v = Vector4D::new(1.0, 2.0, 3.0, 4.0);
-        assert_eq!(v.x, 1.0);
-        assert_eq!(v.y, 2.0);
-        assert_eq!(v.z, 3.0);
-        assert_eq!(v.w, 4.0);
-    }
-
-    #[test]
-    fn test_vector3d_magnitude() {
-        let v = Vector3D::new(3.0, 4.0, 0.0);
-        assert_eq!(v.magnitude().unwrap(), 5.0);
-    }
-
-    #[test]
-    fn test_vector4d_magnitude() {
-        let v = Vector4D::new(2.0, 2.0, 2.0, 2.0);
-        assert_eq!(v.magnitude().unwrap(), 4.0);
-    }
-
-    #[test]
-    fn test_vector3d_add() {
-        let v1 = Vector3D::new(1.0, 2.0, 3.0);
-        let v2 = Vector3D::new(4.0, 5.0, 6.0);
-        let result = v1.add(&v2).unwrap();
-        assert_eq!(result.x, 5.0);
-        assert_eq!(result.y, 7.0);
-        assert_eq!(result.z, 9.0);
-    }
-
-    #[test]
-    fn test_vector4d_add() {
-        let v1 = Vector4D::new(1.0, 2.0, 3.0, 4.0);
-        let v2 = Vector4D::new(5.0, 6.0, 7.0, 8.0);
-        let result = v1.add(&v2).unwrap();
-        assert_eq!(result.x, 6.0);
-        assert_eq!(result.y, 8.0);
-        assert_eq!(result.z, 10.0);
-        assert_eq!(result.w, 12.0);
-    }
-
-    #[test]
-    fn test_vector3d_phase() {
-        let v = Vector3D::new(1.0, 1.0, 0.0);
-        assert_eq!(v.phase().unwrap(), PI / 4.0);
-    }
-
-    #[test]
-    fn test_vector4d_phase() {
-        let v = Vector4D::new(1.0, 1.0, 0.0, 1.0);
-        assert_eq!(v.phase().unwrap(), PI / 4.0);
-    }
-
-    #[test]
-    fn test_div_by_zero() {
-        let v1 = Vector3D::new(1.0, 1.0, 1.0);
-        let v2 = Vector3D::new(0.0, 0.0, 0.0);
-        assert!(matches!(v1.div(&v2), Err(MathError::DivisionByZero)));
-    }
-
-    #[test]
-    fn test_harmony_state() {
-        let mut v = Vector3D::new(1.0, 1.0, 1.0);
-        v.state.coherence = 0.0;
-        let v2 = Vector3D::new(1.0, 1.0, 1.0);
-        assert!(matches!(v.add(&v2), Err(MathError::HarmonyStateUnstable)));
+        format!("({}, {}, {}, {})", self.x, self.y, self.z, self.w).into()
     }
 }

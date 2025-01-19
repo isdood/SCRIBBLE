@@ -1,100 +1,48 @@
-//! Native Division operations for Crystal Lattice HPC Systems
-//! ===============================
-//!
-//! Author: Caleb J.D. Terkovics <isdood>
-//! Current User: isdood
-//! Created: 2025-01-19
-//! Last Updated: 2025-01-19 22:30:59 UTC
-//! Version: 0.1.0
-//! License: MIT
+// lib/magicmath/src/div.rs
 
 use crate::traits::MeshValue;
-use crate::core::HarmonyState;
 use errors::MathError;
-use crate::constants::{
-    HARMONY_STABILITY_THRESHOLD,
-    RESONANCE_FACTOR,
-    PHASE_ATTENUATION_FACTOR,
-    HARMONY_COHERENCE_THRESHOLD,
-    HARMONY_ENERGY_THRESHOLD,
-    SINGULARITY_THRESHOLD
-};
 
-/// Native implementation of harmony-aware division
-#[derive(Debug, Clone)]
-pub struct HarmonyDiv<T: MeshValue> {
-    pub value: T,
-    pub state: HarmonyState,
-}
+impl<T: MeshValue> Div for T {
+    type Output = Result<T, MathError>;
 
-impl<T: MeshValue> HarmonyDiv<T> {
-    /// Creates a new HarmonyDiv instance
-    #[inline]
-    pub fn new(value: T) -> Self {
-        Self {
-            value,
-            state: HarmonyState::new(),
+    fn div(self, rhs: T) -> Self::Output {
+        if !self.check_harmony_state() {
+            return Err(MathError::HarmonyStateUnstable); // Fixed: Changed from UnstableState
         }
-    }
 
-    /// Performs harmony-aware division
-    #[inline]
-    pub fn div(&self, rhs: &Self) -> Result<Self, MathError> {
-        // Check for division by zero using singularity threshold
-        if rhs.value.to_f64()?.abs() < SINGULARITY_THRESHOLD {
+        if rhs.is_zero() {
             return Err(MathError::DivisionByZero);
         }
 
-        if self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
-            rhs.state.coherence >= HARMONY_COHERENCE_THRESHOLD &&
-            self.state.energy >= HARMONY_ENERGY_THRESHOLD {
+        let result = self.raw_div(rhs)?;
 
-                let new_value = self.value.div(&rhs.value)?;
-                let new_phase = (self.state.phase / rhs.state.phase) * PHASE_ATTENUATION_FACTOR;
+        // Verify the result maintains harmony
+        if !result.check_harmony_state() {
+            return Err(MathError::HarmonyStateUnstable); // Fixed: Changed from UnstableState
+        }
 
-                Ok(Self {
-                    value: new_value,
-                    state: HarmonyState {
-                        coherence: (self.state.coherence / rhs.state.coherence).sqrt() * RESONANCE_FACTOR,
-                   phase: new_phase,
-                   energy: self.state.energy / rhs.state.energy,
-                   stability: (self.state.stability / rhs.state.stability).sqrt(),
-                   iterations: self.state.iterations + 1,
-                    },
-                })
-            } else {
-                Err(MathError::UnstableState("Division operation failed: harmony state unstable or energy too low".to_string()))
-            }
+        Ok(result)
     }
+}
 
-    /// Gets the value
-    #[inline]
-    pub fn get_value(&self) -> &T {
-        &self.value
+impl<T: MeshValue> DivAssign for T {
+    fn div_assign(&mut self, rhs: T) {
+        match self.div(rhs) {
+            Ok(result) => *self = result,
+            Err(e) => panic!("Division operation failed: {}", e.scribe()),
+        }
     }
+}
 
-    /// Gets the harmony state
-    #[inline]
-    pub fn get_state(&self) -> &HarmonyState {
-        &self.state
-    }
+// Helper trait for raw division
+trait RawDiv {
+    fn raw_div(&self, other: Self) -> Result<Self, MathError> where Self: Sized;
+}
 
-    /// Checks if division would maintain harmony
-    #[inline]
-    pub fn would_maintain_harmony(&self, rhs: &Self) -> Result<bool, MathError> {
-        let rhs_magnitude = rhs.value.to_f64()?.abs();
-        Ok(
-            self.state.coherence >= HARMONY_STABILITY_THRESHOLD &&
-            rhs.state.coherence >= HARMONY_COHERENCE_THRESHOLD &&
-            self.state.energy >= HARMONY_ENERGY_THRESHOLD &&
-            rhs_magnitude >= SINGULARITY_THRESHOLD
-        )
-    }
-
-    /// Checks for potential singularities in the operation
-    #[inline]
-    pub fn check_singularity(&self, rhs: &Self) -> Result<bool, MathError> {
-        Ok(rhs.value.to_f64()?.abs() < SINGULARITY_THRESHOLD)
+impl<T: MeshValue> RawDiv for T {
+    fn raw_div(&self, rhs: T) -> Result<Self, MathError> {
+        self.div(&rhs)
     }
 }
 
@@ -103,54 +51,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_harmony_div_f64() {
-        let a = HarmonyDiv::new(6.0f64);
-        let b = HarmonyDiv::new(2.0f64);
-        let result = a.div(&b).unwrap();
-        assert_eq!(result.value.to_f64().unwrap(), 3.0);
-        assert!(result.state.coherence < 1.0);
-        assert!(result.state.stability > 0.0);
+    fn test_division() {
+        let a = TestValue::new(6.0);
+        let b = TestValue::new(2.0);
+        let result = a.div(b).unwrap();
+        assert_eq!(result.value(), 3.0);
     }
 
     #[test]
-    fn test_harmony_div_by_zero() {
-        let a = HarmonyDiv::new(5.0f64);
-        let b = HarmonyDiv::new(0.0f64);
-        assert!(matches!(a.div(&b), Err(MathError::DivisionByZero)));
+    fn test_division_by_zero() {
+        let a = TestValue::new(5.0);
+        let b = TestValue::new(0.0);
+        assert!(matches!(a.div(b), Err(MathError::DivisionByZero)));
     }
 
     #[test]
-    fn test_harmony_div_near_zero() {
-        let a = HarmonyDiv::new(5.0f64);
-        let b = HarmonyDiv::new(SINGULARITY_THRESHOLD / 2.0);
-        assert!(a.div(&b).is_err());
+    fn test_division_assign() {
+        let mut a = TestValue::new(6.0);
+        let b = TestValue::new(2.0);
+        a /= b;
+        assert_eq!(a.value(), 3.0);
     }
 
     #[test]
-    fn test_harmony_div_phase_attenuation() {
-        let mut a = HarmonyDiv::new(6.0f64);
-        let mut b = HarmonyDiv::new(2.0f64);
-        a.state.phase = 0.6;
-        b.state.phase = 0.2;
-        let result = a.div(&b).unwrap();
-        assert!(result.state.phase < a.state.phase);
-    }
-
-    #[test]
-    fn test_singularity_check() {
-        let a = HarmonyDiv::new(5.0f64);
-        let b = HarmonyDiv::new(SINGULARITY_THRESHOLD / 2.0);
-        assert!(a.check_singularity(&b).unwrap());
-
-        let c = HarmonyDiv::new(1.0f64);
-        assert!(!a.check_singularity(&c).unwrap());
-    }
-
-    #[test]
-    fn test_coherence_decay() {
-        let a = HarmonyDiv::new(6.0f64);
-        let b = HarmonyDiv::new(2.0f64);
-        let result = a.div(&b).unwrap();
-        assert!(result.state.coherence < a.state.coherence);
+    fn test_harmony_violation() {
+        let mut a = TestValue::new(6.0);
+        a.destabilize();
+        let b = TestValue::new(2.0);
+        assert!(matches!(a.div(b), Err(MathError::HarmonyStateUnstable)));
     }
 }

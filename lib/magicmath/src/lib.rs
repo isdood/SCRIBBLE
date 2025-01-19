@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 22:42:17 UTC
+//! Last Updated: 2025-01-19 23:54:38 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -19,84 +19,23 @@ pub mod sub;
 pub mod mul;
 pub mod div;
 
-// Quantum and Resonance
-pub mod quantum;
+// Vector and Resonance Operations
+pub mod vector;
 pub mod resonance;
 
-// Vector and Matrix Operations
-pub mod vector;
-pub mod matrix;
-
-// Complex Number Operations
-pub mod complex;
-
-// Fractal Operations
-pub mod fractal;
-
-// Harmony Operations
-pub mod harmony;
-
-// Utility Modules
-pub mod utils;
-
 // Re-exports for convenient access
-pub use crate::core::{
-    HarmonyState,
-    ResonanceState,
-    QuantumState,
-    ComplexState,
-    FractalState,
-};
+pub use crate::core::HarmonyState;
 
 pub use crate::traits::{
     MeshValue,
     Quantum,
     Phase,
     Resonance,
-    Harmony,
-    Complex,
-    Fractal,
 };
 
 pub use crate::vector::{
     Vector3D,
     Vector4D,
-};
-
-pub use crate::matrix::{
-    Matrix2D,
-    Matrix3D,
-    Matrix4D,
-};
-
-pub use crate::complex::{
-    ComplexNumber,
-    ComplexOperations,
-};
-
-pub use crate::fractal::{
-    FractalPoint,
-    FractalSet,
-    JuliaSet,
-    MandelbrotSet,
-};
-
-pub use crate::harmony::{
-    HarmonyOperation,
-    HarmonyTransform,
-    HarmonyField,
-};
-
-pub use crate::quantum::{
-    QuantumState,
-    QuantumField,
-    QuantumOperator,
-};
-
-pub use crate::resonance::{
-    ResonanceField,
-    ResonanceOperator,
-    ResonanceTransform,
 };
 
 // Version Information
@@ -105,11 +44,7 @@ pub const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 pub const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 
 /// Initialize the library with default configuration
-pub fn init() {
-    // Initialize logging if needed
-    #[cfg(feature = "logging")]
-    crate::utils::logging::init_logger();
-}
+pub fn init() {}
 
 /// Get the library version
 pub fn version() -> &'static str {
@@ -143,11 +78,5 @@ mod tests {
     #[test]
     fn test_description() {
         assert!(!description().is_empty());
-    }
-
-    #[test]
-    fn test_init() {
-        init();
-        // Add assertions for successful initialization
     }
 }

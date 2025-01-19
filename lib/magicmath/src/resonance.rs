@@ -4,17 +4,18 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 21:39:56 UTC
+//! Last Updated: 2025-01-19 23:49:52 UTC // Updated timestamp
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::vector::Vector3D; // Import Vector3D from the local vector module
+use crate::vector::Vector3D;
 use scribe::Scribe;
-use scribe::native_string::String; // Import the correct String type from scribe
+use scribe::native_string::String;
 use errors::MathError;
-use crate::constants::PI; // Correct import for PI from magicmath
+use crate::constants::PI;
 
 /// Newtype wrapper for `f64` to implement `Scribe`
+#[derive(Debug, Clone, Copy)]
 struct WrappedF64(f64);
 
 impl From<f64> for WrappedF64 {
@@ -88,7 +89,7 @@ impl Resonance {
 
     /// Get current position
     pub fn position(&self) -> Vector3D {
-        self.position
+        self.position.clone() // Added .clone() here
     }
 
     /// Set new position
@@ -100,6 +101,24 @@ impl Resonance {
 impl Default for Resonance {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// Implement Quantum trait
+impl Quantum for Resonance {
+    fn energy(&self) -> Result<f64, MathError> {
+        self.energy()
+    }
+
+    fn phase(&self) -> Result<f64, MathError> {
+        self.phase()
+    }
+}
+
+// Implement Phase trait
+impl Phase for Resonance {
+    fn phase_shift(&mut self, shift: f64) -> Result<(), MathError> {
+        self.phase_shift(shift)
     }
 }
 
@@ -155,16 +174,25 @@ mod tests {
     fn test_position() {
         let mut res = Resonance::new();
         let pos = Vector3D::new(1.0, 2.0, 3.0);
-        res.set_position(pos);
-        assert_eq!(res.position().x, 1.0);
-        assert_eq!(res.position().y, 2.0);
-        assert_eq!(res.position().z, 3.0);
+        res.set_position(pos.clone()); // Added .clone()
+        let retrieved_pos = res.position();
+        assert_eq!(retrieved_pos.x, 1.0);
+        assert_eq!(retrieved_pos.y, 2.0);
+        assert_eq!(retrieved_pos.z, 3.0);
     }
 
     #[test]
-    fn test_vector_magnitude() {
-        let v = Vector3D::new(3.0, 4.0, 0.0);
-        assert_eq!(v.magnitude(), 5.0);
+    fn test_quantum_trait() {
+        let res = Resonance::new();
+        assert_eq!(Quantum::energy(&res).unwrap(), 1.0);
+        assert_eq!(Quantum::phase(&res).unwrap(), 0.0);
+    }
+
+    #[test]
+    fn test_phase_trait() {
+        let mut res = Resonance::new();
+        assert!(Phase::phase_shift(&mut res, PI).is_ok());
+        assert_eq!(res.phase().unwrap(), PI);
     }
 
     #[test]
