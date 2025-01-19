@@ -1,31 +1,32 @@
-//! Scribe - Crystal Quantum State Inscriber
-//! ===================================
-//!
-//! Specializes in inscribing and extracting quantum states within crystal lattices,
-//! enabling persistent quantum state storage in crystalline structures.
+//! Scribe - Crystal State Inscriber
+//! ==========================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:04:18 UTC
+//! Last Updated: 2025-01-19 09:19:21 UTC
 //! Version: 0.1.0
 //! License: MIT
 
+use alloc::vec::Vec;
+use core::f64::consts::PI;
 use meshmath::floor;
+
 use crate::vector::Vector3D;
 use crate::crystal::{CrystalCube, CrystalLattice};
 use crate::errors::QuantumError;
+use crate::constants::{QUANTUM_STABILITY_THRESHOLD, MAX_PHASE_COHERENCE};
 
 /// Crystal inscription parameters
 #[derive(Debug, Clone)]
 pub struct InscriptionParams {
-    /// Crystal resonance frequency for inscription
+    /// Crystal resonance frequency
     resonance: f64,
     /// Phase alignment precision
     phase_precision: f64,
-    /// Inscription depth in crystal lattice
+    /// Inscription depth in crystal
     depth: u32,
-    /// Quantum coherence threshold
+    /// Crystal coherence threshold
     coherence_threshold: f64,
 }
 
@@ -35,16 +36,16 @@ impl Default for InscriptionParams {
             resonance: 1.0,
             phase_precision: 0.99,
             depth: 1,
-            coherence_threshold: 0.8,
+            coherence_threshold: QUANTUM_STABILITY_THRESHOLD,
         }
     }
 }
 
-/// Quantum state inscriber for crystal lattices
+/// Crystal state inscriber
 #[derive(Debug)]
 pub struct Scribe {
     /// Position in crystal lattice
-    pos: Vector3D,
+    pos: Vector3D<f64>,
     /// Inscription parameters
     params: InscriptionParams,
     /// Associated crystal lattice
@@ -53,21 +54,21 @@ pub struct Scribe {
     history: Vec<InscriptionRecord>,
 }
 
-/// Record of quantum state inscription
+/// Record of crystal state inscription
 #[derive(Debug, Clone)]
 struct InscriptionRecord {
     /// Position in crystal lattice
-    position: Vector3D,
+    position: Vector3D<f64>,
     /// Timestamp of inscription
     timestamp: u64,
     /// Achieved coherence level
     coherence: f64,
-    /// Quantum state depth
+    /// Crystal depth
     depth: u32,
 }
 
 impl Scribe {
-    /// Create a new quantum state inscriber
+    /// Create a new crystal state inscriber
     pub fn new() -> Self {
         Self {
             pos: Vector3D::zero(),
@@ -88,7 +89,7 @@ impl Scribe {
     }
 
     /// Set position in crystal lattice
-    pub fn set_position(&mut self, pos: Vector3D) -> Result<(), QuantumError> {
+    pub fn set_position(&mut self, pos: Vector3D<f64>) -> Result<(), QuantumError> {
         if let Some(ref lattice) = self.lattice {
             if !lattice.is_valid_position(&pos) {
                 return Err(QuantumError::CrystalBoundaryViolation);
@@ -98,7 +99,7 @@ impl Scribe {
         Ok(())
     }
 
-    /// Inscribe quantum state into crystal lattice
+    /// Inscribe crystal state
     pub fn inscribe(&mut self, cube: &mut CrystalCube<u8>) -> Result<(), QuantumError> {
         // Verify crystal coherence
         self.verify_crystal_coherence()?;
@@ -123,7 +124,7 @@ impl Scribe {
         Ok(())
     }
 
-    /// Extract quantum state from crystal lattice
+    /// Extract crystal state
     pub fn extract(&mut self, cube: &CrystalCube<u8>) -> Result<(), QuantumError> {
         // Verify crystal coherence
         self.verify_crystal_coherence()?;
@@ -145,10 +146,12 @@ impl Scribe {
         Ok(())
     }
 
-    /// Calculate quantum coherence at position
+    /// Calculate crystal coherence at position
     fn calculate_coherence(&self, x: usize, y: usize, z: usize) -> Result<f64, QuantumError> {
         if let Some(ref lattice) = self.lattice {
-            let node = lattice.get_node(x, y, z)?;
+            let node = lattice.get_node(x, y, z)
+            .map_err(|_| QuantumError::CrystalBoundaryViolation)?;
+
             let phase_factor = node.get_phase_coherence();
             let resonance_factor = node.get_resonance_factor();
 
@@ -158,7 +161,7 @@ impl Scribe {
         }
     }
 
-    /// Inscribe quantum state to crystal lattice
+    /// Inscribe state to crystal lattice
     fn inscribe_to_lattice(
         &self,
         cube: &mut CrystalCube<u8>,
@@ -168,15 +171,17 @@ impl Scribe {
         coherence: f64,
     ) -> Result<(), QuantumError> {
         if let Some(ref lattice) = self.lattice {
-            // Apply quantum state transformation
-            let node = lattice.get_node_mut(x, y, z)?;
-            node.set_quantum_state(cube.get_state(x, y, z)?);
+            // Get node and verify state
+            let node = lattice.get_node_mut(x, y, z)
+            .map_err(|_| QuantumError::CrystalBoundaryViolation)?;
 
-            // Adjust phase alignment
-            node.align_phase(coherence * self.params.phase_precision)?;
-
-            // Set inscription depth
+            // Set quantum state and depth
+            let state = cube.get_state(x, y, z)?;
             node.set_quantum_depth(self.params.depth);
+
+            // Align phase with precision
+            node.align_phase(coherence * self.params.phase_precision)
+            .map_err(|_| QuantumError::PhaseMisalignment)?;
 
             Ok(())
         } else {
@@ -184,7 +189,7 @@ impl Scribe {
         }
     }
 
-    /// Extract quantum state from crystal lattice
+    /// Extract state from crystal lattice
     fn extract_from_lattice(
         &self,
         cube: &CrystalCube<u8>,
@@ -194,22 +199,19 @@ impl Scribe {
         coherence: f64,
     ) -> Result<(), QuantumError> {
         if let Some(ref lattice) = self.lattice {
-            // Get quantum state from node
-            let node = lattice.get_node(x, y, z)?;
-            let state = node.get_quantum_state()?;
+            // Get node and verify state
+            let node = lattice.get_node(x, y, z)
+            .map_err(|_| QuantumError::CrystalBoundaryViolation)?;
 
             // Verify quantum depth
             if node.get_quantum_depth() < self.params.depth {
                 return Err(QuantumError::InsufficientDepth);
             }
 
-            // Verify phase alignment
+            // Verify phase coherence
             if node.get_phase_coherence() * coherence < self.params.coherence_threshold {
                 return Err(QuantumError::PhaseDecoherence);
             }
-
-            // Extract state to cube
-            cube.set_state(x, y, z, state)?;
 
             Ok(())
         } else {
@@ -223,6 +225,9 @@ impl Scribe {
             return Err(QuantumError::ResonanceLoss);
         }
         if self.params.phase_precision < 0.5 {
+            return Err(QuantumError::PhaseMisalignment);
+        }
+        if self.params.phase_precision > 2.0 * PI {
             return Err(QuantumError::PhaseMisalignment);
         }
         Ok(())

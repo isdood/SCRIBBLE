@@ -1,112 +1,119 @@
-//! Crystalline Harmony Core
-//! ====================
-//!
-//! Core quantum computing framework implemented through crystalline
-//! data structures with harmonic resonance tracking.
+//! Harmony Core - Crystal Computing Core Operations
+//! =========================================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:57:45 UTC
+//! Last Updated: 2025-01-19 09:14:08 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 #![no_std]
-#![cfg_attr(test, no_main)]
+#![feature(const_trait_impl)]
 
-extern crate core;
+extern crate alloc;
 
-// Core modules
-pub mod constants;
+use alloc::vec::Vec;
+use core::ops::{Add, Sub, Mul, Div, Neg};
+
 pub mod vector;
-pub mod harmony;
-pub mod aether;
-pub mod cube;
+pub mod idk;
+pub mod crystal;
+pub mod errors;
 pub mod zeronaut;
 pub mod phantom;
 pub mod scribe;
 pub mod align;
-pub mod idk;
+pub mod aether;
 
-// Re-exports for convenience
-pub use self::{
-    cube::CrystalCube,
-    zeronaut::Zeronaut,
-    harmony::{Quantum, MeshValue, MeshOps},
-    vector::{Vector3D, Vector4D},
-};
+// Re-exports
+pub use crystal::{CrystalLattice, CrystalNode, CrystalCube};
+pub use errors::{QuantumError, CoherenceError, QuantumResult, CoherenceResult};
+pub use vector::Vector3D;
+pub use zeronaut::Zeronaut;
+pub use phantom::Phantom;
+pub use scribe::Scribe;
 
-/// A quantum-safe array implementation
-#[derive(Clone)]
-pub struct CrystalArray<T: Clone + 'static> {
-    /// Internal data buffer
-    data: [T; 1024], // Fixed size for no_std
-    /// Current length
-    len: usize,
+/// Constants for crystal computing operations
+pub mod constants {
+    /// Maximum size of a quantum dimension
+    pub const MAX_QUANTUM_SIZE: usize = 256;
+
+    /// Quantum stability threshold
+    pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.8;
+
+    /// Crystal resonance threshold
+    pub const CRYSTAL_RESONANCE_THRESHOLD: f64 = 0.7;
+
+    /// Golden ratio for quantum operations
+    pub const QUANTUM_GOLDEN_RATIO: f64 = 1.618033988749895;
+
+    /// Maximum phase coherence level
+    pub const MAX_PHASE_COHERENCE: f64 = 1.0;
+
+    /// Minimum phase coherence level
+    pub const MIN_PHASE_COHERENCE: f64 = 0.1;
+
+    /// Aether resonance factor
+    pub const AETHER_RESONANCE_FACTOR: f64 = 0.9;
 }
 
-impl<T: Clone + 'static> CrystalArray<T> {
-    /// Creates a new empty CrystalArray
-    pub const fn new() -> Self where T: Copy {
+/// Trait for quantum operations
+pub trait Quantum {
+    /// Check if quantum state is stable
+    fn is_stable(&self) -> bool;
+
+    /// Get coherence level
+    fn coherence(&self) -> f64;
+
+    /// Attempt to recohere quantum state
+    fn recohere(&mut self) -> QuantumResult<()>;
+
+    /// Force decoherence of quantum state
+    fn decohere(&mut self);
+}
+
+/// Crystal computing context
+#[derive(Debug)]
+pub struct CrystalContext {
+    /// Crystal lattice size
+    size: usize,
+    /// Phase coherence level
+    coherence: f64,
+    /// Crystal resonance
+    resonance: f64,
+}
+
+impl CrystalContext {
+    /// Create new crystal computing context
+    pub fn new(size: usize) -> Self {
         Self {
-            data: [unsafe { core::mem::zeroed() }; 1024],
-            len: 0,
+            size,
+            coherence: constants::MAX_PHASE_COHERENCE,
+            resonance: 1.0,
         }
     }
 
-    /// Creates a new CrystalArray with given capacity (ignored in no_std)
-    pub const fn with_capacity(_capacity: usize) -> Self where T: Copy {
-        Self::new()
+    /// Get current coherence level
+    pub fn coherence(&self) -> f64 {
+        self.coherence
     }
 
-    /// Gets the current length
-    pub const fn len(&self) -> usize {
-        self.len
+    /// Get current resonance level
+    pub fn resonance(&self) -> f64 {
+        self.resonance
     }
 
-    /// Checks if empty
-    pub const fn is_empty(&self) -> bool {
-        self.len == 0
+    /// Check if context is stable
+    pub fn is_stable(&self) -> bool {
+        self.coherence >= constants::QUANTUM_STABILITY_THRESHOLD &&
+        self.resonance >= constants::CRYSTAL_RESONANCE_THRESHOLD
     }
+}
 
-    /// Gets the current capacity
-    pub const fn capacity(&self) -> usize {
-        1024
-    }
-
-    /// Gets a reference to the raw pointer
-    pub fn as_ptr(&self) -> *const T {
-        self.data.as_ptr()
-    }
-
-    /// Gets a mutable reference to the raw pointer
-    pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.data.as_mut_ptr()
-    }
-
-    /// Pushes an element if there's space
-    pub fn push(&mut self, value: T) -> Result<(), &'static str> {
-        if self.len >= self.capacity() {
-            return Err("Array is full");
-        }
-        self.data[self.len] = value;
-        self.len += 1;
-        Ok(())
-    }
-
-    /// Pops an element
-    pub fn pop(&mut self) -> Option<T> {
-        if self.is_empty() {
-            None
-        } else {
-            self.len -= 1;
-            Some(self.data[self.len].clone())
-        }
-    }
-
-    /// Clears the array
-    pub fn clear(&mut self) {
-        self.len = 0;
+impl Default for CrystalContext {
+    fn default() -> Self {
+        Self::new(constants::MAX_QUANTUM_SIZE)
     }
 }
 
@@ -115,36 +122,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_crystal_array_basics() {
-        let mut array = CrystalArray::<u8>::new();
-        assert!(array.is_empty());
-        assert_eq!(array.len(), 0);
-        assert_eq!(array.capacity(), 1024);
-
-        array.push(42).unwrap();
-        assert_eq!(array.len(), 1);
-        assert!(!array.is_empty());
-
-        let value = array.pop();
-        assert_eq!(value, Some(42));
-        assert!(array.is_empty());
+    fn test_crystal_context() {
+        let context = CrystalContext::default();
+        assert!(context.is_stable());
+        assert_eq!(context.coherence(), constants::MAX_PHASE_COHERENCE);
     }
 
     #[test]
-    fn test_crystal_array_capacity() {
-        let mut array = CrystalArray::<u8>::new();
-        for i in 0..1024 {
-            array.push(i as u8).unwrap();
-        }
-        assert!(array.push(0).is_err());
-    }
-
-    #[test]
-    fn test_crystal_array_clear() {
-        let mut array = CrystalArray::<u8>::new();
-        array.push(1).unwrap();
-        array.push(2).unwrap();
-        array.clear();
-        assert!(array.is_empty());
+    fn test_quantum_constants() {
+        assert!(constants::QUANTUM_STABILITY_THRESHOLD > 0.0);
+        assert!(constants::CRYSTAL_RESONANCE_THRESHOLD > 0.0);
+        assert_eq!(constants::MAX_PHASE_COHERENCE, 1.0);
     }
 }

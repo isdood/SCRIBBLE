@@ -1,182 +1,65 @@
-//! Crystalline Harmony Implementation
-//! ============================
-//!
-//! Core quantum harmony traits with crystalline resonance
-//! tracking and mesh value operations.
+//! Harmony Core - Crystal Computing Core Operations
+//! =========================================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-18 20:59:23 UTC
+//! Last Updated: 2025-01-19 09:30:34 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use core::ops::{Add, Sub, Mul, Div, Neg};
-use crate::constants::QUANTUM_STABILITY_THRESHOLD;
+#![no_std]
+#![feature(const_trait_impl)]
 
-/// Core quantum trait for crystalline coherence
-pub trait Quantum {
-    /// Gets the current quantum coherence value
-    fn coherence(&self) -> f64;
+extern crate align;
 
-    /// Checks if the quantum state is stable
-    fn is_stable(&self) -> bool {
-        self.coherence() >= QUANTUM_STABILITY_THRESHOLD
-    }
+// Module declarations
+pub mod vector;
+pub mod harmony;
+pub mod idk;
+pub mod crystal;
+pub mod errors;
+pub mod zeronaut;
+pub mod phantom;
+pub mod scribe;
+pub mod align;
+pub mod aether;
 
-    /// Applies quantum decoherence
-    fn decohere(&mut self);
+// Re-exports from our own modules
+pub use crystal::{CrystalLattice, CrystalNode, CrystalCube};
+pub use errors::{QuantumError, CoherenceError, QuantumResult, CoherenceResult};
+pub use vector::{Vector3D, Vector4D};
+pub use zeronaut::Zeronaut;
+pub use phantom::Phantom;
+pub use scribe::Scribe;
+pub use harmony::{MeshValue, MeshOps, Quantum, Resonance, Phase};
+pub use align::{AlignmentError, AlignmentResult};
 
-    /// Restores quantum coherence
-    fn recohere(&mut self);
-}
+/// Constants for crystal computing operations
+pub mod constants {
+    /// Maximum size of a quantum dimension
+    pub const MAX_QUANTUM_SIZE: usize = 256;
 
-/// Trait for quantum mesh operations
-pub trait MeshOps {
-    /// Output type for mesh operations
-    type Output;
+    /// Quantum stability threshold
+    pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.8;
 
-    /// Performs mesh addition
-    fn mesh_add(&self, rhs: &Self) -> Self::Output;
+    /// Crystal resonance threshold
+    pub const CRYSTAL_RESONANCE_THRESHOLD: f64 = 0.7;
 
-    /// Performs mesh subtraction
-    fn mesh_sub(&self, rhs: &Self) -> Self::Output;
+    /// Golden ratio for quantum operations
+    pub const QUANTUM_GOLDEN_RATIO: f64 = 1.618033988749895;
 
-    /// Performs mesh multiplication by scalar
-    fn mesh_mul(&self, scalar: &f64) -> Self::Output;
+    /// Maximum phase coherence level
+    pub const MAX_PHASE_COHERENCE: f64 = 1.0;
 
-    /// Performs mesh division by scalar
-    fn mesh_div(&self, scalar: &f64) -> Self::Output;
+    /// Minimum phase coherence level
+    pub const MIN_PHASE_COHERENCE: f64 = 0.1;
 
-    /// Performs mesh negation
-    fn mesh_neg(&self) -> Self::Output;
-}
+    /// Aether resonance factor
+    pub const AETHER_RESONANCE_FACTOR: f64 = 0.9;
 
-/// Trait for quantum mesh values
-pub trait MeshValue: Clone + 'static + Sized {
-    /// Creates a zero value
-    fn zero() -> Self;
-
-    /// Converts from f64
-    fn from_f64(v: f64) -> Option<Self>;
-
-    /// Converts to f64
-    fn to_f64(&self) -> f64;
-
-    /// Performs mesh addition
-    fn mesh_add(&self, rhs: &Self) -> Self;
-
-    /// Performs mesh subtraction
-    fn mesh_sub(&self, rhs: &Self) -> Self;
-
-    /// Performs mesh multiplication
-    fn mesh_mul(&self, rhs: &Self) -> Self;
-
-    /// Performs mesh division
-    fn mesh_div(&self, rhs: &Self) -> Self;
-
-    /// Performs mesh negation
-    fn mesh_neg(&self) -> Self;
-}
-
-impl MeshValue for f64 {
-    fn zero() -> Self { 0.0 }
-
-    fn from_f64(v: f64) -> Option<Self> {
-        Some(v)
-    }
-
-    fn to_f64(&self) -> f64 {
-        *self
-    }
-
-    fn mesh_add(&self, rhs: &Self) -> Self {
-        self + rhs
-    }
-
-    fn mesh_sub(&self, rhs: &Self) -> Self {
-        self - rhs
-    }
-
-    fn mesh_mul(&self, rhs: &Self) -> Self {
-        self * rhs
-    }
-
-    fn mesh_div(&self, rhs: &Self) -> Self {
-        if *rhs != 0.0 { self / rhs } else { 0.0 }
-    }
-
-    fn mesh_neg(&self) -> Self {
-        -self
-    }
-}
-
-impl MeshValue for i64 {
-    fn zero() -> Self { 0 }
-
-    fn from_f64(v: f64) -> Option<Self> {
-        Some(libm::round(v) as i64)
-    }
-
-    fn to_f64(&self) -> f64 {
-        *self as f64
-    }
-
-    fn mesh_add(&self, rhs: &Self) -> Self {
-        self.saturating_add(*rhs)
-    }
-
-    fn mesh_sub(&self, rhs: &Self) -> Self {
-        self.saturating_sub(*rhs)
-    }
-
-    fn mesh_mul(&self, rhs: &Self) -> Self {
-        self.saturating_mul(*rhs)
-    }
-
-    fn mesh_div(&self, rhs: &Self) -> Self {
-        if *rhs != 0 { self.saturating_div(*rhs) } else { 0 }
-    }
-
-    fn mesh_neg(&self) -> Self {
-        self.saturating_neg()
-    }
-}
-
-impl MeshValue for u64 {
-    fn zero() -> Self { 0 }
-
-    fn from_f64(v: f64) -> Option<Self> {
-        if v >= 0.0 {
-            Some(libm::round(v) as u64)
-        } else {
-            None
-        }
-    }
-
-    fn to_f64(&self) -> f64 {
-        *self as f64
-    }
-
-    fn mesh_add(&self, rhs: &Self) -> Self {
-        self.saturating_add(*rhs)
-    }
-
-    fn mesh_sub(&self, rhs: &Self) -> Self {
-        self.saturating_sub(*rhs)
-    }
-
-    fn mesh_mul(&self, rhs: &Self) -> Self {
-        self.saturating_mul(*rhs)
-    }
-
-    fn mesh_div(&self, rhs: &Self) -> Self {
-        if *rhs != 0 { self.saturating_div(*rhs) } else { 0 }
-    }
-
-    fn mesh_neg(&self) -> Self {
-        0
-    }
+    /// Crystal alignment threshold
+    pub const ALIGNMENT_THRESHOLD: f64 = 0.95;
 }
 
 #[cfg(test)]
@@ -184,38 +67,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_f64_mesh_ops() {
-        let a = 42.0f64;
-        let b = 7.0f64;
-
-        assert_eq!(a.mesh_add(&b), 49.0);
-        assert_eq!(a.mesh_sub(&b), 35.0);
-        assert_eq!(a.mesh_mul(&b), 294.0);
-        assert_eq!(a.mesh_div(&b), 6.0);
-        assert_eq!(a.mesh_neg(), -42.0);
-    }
-
-    #[test]
-    fn test_i64_mesh_ops() {
-        let a = 42i64;
-        let b = 7i64;
-
-        assert_eq!(a.mesh_add(&b), 49);
-        assert_eq!(a.mesh_sub(&b), 35);
-        assert_eq!(a.mesh_mul(&b), 294);
-        assert_eq!(a.mesh_div(&b), 6);
-        assert_eq!(a.mesh_neg(), -42);
-    }
-
-    #[test]
-    fn test_u64_mesh_ops() {
-        let a = 42u64;
-        let b = 7u64;
-
-        assert_eq!(a.mesh_add(&b), 49);
-        assert_eq!(a.mesh_sub(&b), 35);
-        assert_eq!(a.mesh_mul(&b), 294);
-        assert_eq!(a.mesh_div(&b), 6);
-        assert_eq!(a.mesh_neg(), 0);
+    fn test_constants() {
+        assert!(constants::QUANTUM_STABILITY_THRESHOLD > 0.0);
+        assert!(constants::CRYSTAL_RESONANCE_THRESHOLD > 0.0);
+        assert_eq!(constants::MAX_PHASE_COHERENCE, 1.0);
+        assert!(constants::AETHER_RESONANCE_FACTOR > 0.0);
+        assert!(constants::ALIGNMENT_THRESHOLD > 0.9);
     }
 }
