@@ -4,12 +4,11 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:51:41 UTC
-//! Version: 0.1.0
+//! Last Updated: 2025-01-19 13:35:00 UTC
+//! Version: 0.1.1
 //! License: MIT
 
-use core::ops::Index;
-use meshmath::{floor, sqrt};
+use magicmath::{floor, sqrt, QuantumMath};
 use crate::{
     vector::Vector3D,
     errors::{QuantumError, CoherenceError},
@@ -26,27 +25,16 @@ use crate::{
 #[derive(Debug)]
 pub struct CrystalNode {
     /// Position in crystal lattice
-    position: Vector3D<f64>,
+    position: Vector3D,
     /// Phase coherence value
     coherence: f64,
     /// Node alignment
     alignment: Alignment,
 }
 
-/// Crystal lattice structure
-#[derive(Debug)]
-pub struct CrystalLattice {
-    /// Lattice nodes storage
-    nodes: [[ShardUninit<CrystalNode>; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE],
-    /// Lattice size
-    size: usize,
-    /// Lattice alignment
-    alignment: Alignment,
-}
-
 impl CrystalNode {
     /// Create a new crystal node
-    pub fn new(position: Vector3D<f64>) -> Self {
+    pub fn new(position: Vector3D) -> Self {
         Self {
             position: position.clone(),
             coherence: 1.0,
@@ -69,7 +57,7 @@ impl CrystalNode {
     }
 
     /// Get node's position
-    pub fn position(&self) -> &Vector3D<f64> {
+    pub fn position(&self) -> &Vector3D {
         &self.position
     }
 
@@ -77,6 +65,17 @@ impl CrystalNode {
     pub fn alignment_state(&self) -> AlignmentState {
         self.alignment.get_state()
     }
+}
+
+/// Crystal lattice structure
+#[derive(Debug)]
+pub struct CrystalLattice {
+    /// Lattice nodes storage
+    nodes: [[ShardUninit<CrystalNode>; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE],
+    /// Lattice size
+    size: usize,
+    /// Lattice alignment
+    alignment: Alignment,
 }
 
 impl CrystalLattice {
@@ -94,7 +93,7 @@ impl CrystalLattice {
     }
 
     /// Get node at position
-    pub fn get_node(&self, pos: &Vector3D<f64>) -> Result<&CrystalNode, QuantumError> {
+    pub fn get_node(&self, pos: &Vector3D) -> Result<&CrystalNode, QuantumError> {
         let x = floor(pos.x) as usize;
         let y = floor(pos.y) as usize;
         let z = floor(pos.z) as usize;
@@ -110,7 +109,7 @@ impl CrystalLattice {
     }
 
     /// Set node at position
-    pub fn set_node(&mut self, pos: &Vector3D<f64>, node: CrystalNode) -> Result<(), QuantumError> {
+    pub fn set_node(&mut self, pos: &Vector3D, node: CrystalNode) -> Result<(), QuantumError> {
         let x = floor(pos.x) as usize;
         let y = floor(pos.y) as usize;
         let z = floor(pos.z) as usize;
@@ -126,7 +125,7 @@ impl CrystalLattice {
     }
 
     /// Calculate resonance at position
-    pub fn calculate_resonance(&self, pos: &Vector3D<f64>) -> Result<f64, QuantumError> {
+    pub fn calculate_resonance(&self, pos: &Vector3D) -> Result<f64, QuantumError> {
         let node = self.get_node(pos)?;
         let coherence = node.get_phase_coherence();
 
@@ -148,17 +147,10 @@ impl CrystalLattice {
     }
 }
 
-impl Index<usize> for CrystalLattice {
-    type Output = [ShardUninit<CrystalNode>; MAX_QUANTUM_SIZE];
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.nodes[index]
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use magicmath::QuantumMath;
 
     #[test]
     fn test_crystal_node_creation() {

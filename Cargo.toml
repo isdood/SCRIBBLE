@@ -14,9 +14,10 @@ members = [
     "lib/wanda",
     "lib/scribble",
     "lib/carve",
-    "lib/meshmath",
+    "lib/magicmath",
     "lib/harmony_core",
-    "lib/garnet"
+    "lib/garnet",
+    "lib/crystal_thread"
 ]
 resolver = "2"
 
@@ -27,6 +28,9 @@ edition = "2021"
 
 [workspace.dependencies]
 libm = "0.2.11"
+harmony_core = { path = "lib/harmony_core" }
+shard = { path = "lib/shard" }
+crystal_thread = { path = "lib/crystal_thread" }
 
 [lib]
 path = "src/lib.rs"

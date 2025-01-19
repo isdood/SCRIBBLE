@@ -1,6 +1,6 @@
 [package]
 name = "harmony_core"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Caleb J.D. Terkovics <isdood>"]
 description = "Harmonic core functionality for scribble"
@@ -9,7 +9,7 @@ license = "MIT"
 
 [dependencies]
 libm = "0.2.11"
-meshmath = { path = "../meshmath" }
+magicmath = { path = "../magicmath" }
 
 [[test]]
 name = "simd_tests"

@@ -1,0 +1,28 @@
+[package]
+name = "crystal_thread"
+version = "0.1.0"
+edition = "2021"
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "Crystal-based threading implementation for near-native workload distribution"
+repository = "https://github.com/isdood/scribble"
+license = "MIT"
+publish = false
+
+[dependencies]
+harmony_core = { workspace = true }
+shard = { workspace = true }
+libm = { workspace = true }
+
+[features]
+default = []
+experimental = []
+
+[package.metadata]
+created = "2025-01-19 13:56:19"
+creator = "isdood"
+last_updated = "2025-01-19 13:56:19"
+last_updater = "isdood"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

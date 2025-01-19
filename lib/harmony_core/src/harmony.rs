@@ -4,11 +4,12 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19 09:38:17 UTC
-//! Last Updated: 2025-01-19 09:54:13 UTC
-//! Version: 0.1.0
+//! Last Updated: 2025-01-19 13:28:00 UTC
+//! Version: 0.1.1
 //! License: MIT
 
-use core::ops::{Add, Sub, Mul, Div};
+use magicmath::{MeshMath, QuantumMath, QuantumState};
+
 use crate::{
     errors::QuantumError,
     crystal::CrystalNode,
@@ -90,8 +91,8 @@ pub trait AlignmentOps {
     }
 }
 
-/// Arithmetic operations for quantum values
-pub trait QuantumArithmetic: Sized + Add<Output = Self> + Sub<Output = Self> + Mul<Output = Self> + Div<Output = Self> {
+/// Arithmetic operations for quantum values using MeshMath
+pub trait QuantumArithmetic: Sized + MeshMath {
     /// Zero value
     fn zero() -> Self;
 
@@ -108,10 +109,12 @@ pub trait QuantumArithmetic: Sized + Add<Output = Self> + Sub<Output = Self> + M
 #[cfg(test)]
 mod tests {
     use super::*;
+    use magicmath::QuantumMath;
 
     struct TestQuantum {
         coherence_value: f64,
         alignment: Alignment,
+        quantum_math: QuantumMath,
     }
 
     impl TestQuantum {
@@ -120,6 +123,7 @@ mod tests {
             Self {
                 coherence_value: coherence,
                 alignment: Alignment::new(Vector3D::new(0.0, 0.0, 0.0)),
+                quantum_math: QuantumMath::new(),
             }
         }
     }
@@ -130,6 +134,7 @@ mod tests {
         }
 
         fn recohere(&mut self) -> Result<(), QuantumError> {
+            self.coherence_value = self.quantum_math.get_state().coherence_level();
             Ok(())
         }
 
@@ -138,10 +143,11 @@ mod tests {
         }
 
         fn phase_alignment(&self) -> f64 {
-            1.0
+            self.quantum_math.get_state().phase_alignment()
         }
 
         fn align_with(&mut self, _: &CrystalNode) -> Result<(), QuantumError> {
+            self.alignment.set_state(AlignmentState::Perfect);
             Ok(())
         }
 
@@ -165,5 +171,27 @@ mod tests {
         assert!(quantum.is_stable());
         quantum.decohere();
         assert!(!quantum.is_stable());
+    }
+
+    #[test]
+    fn test_quantum_recoherence() {
+        let mut quantum = TestQuantum::new(0.5);
+        assert!(!quantum.is_stable());
+        quantum.recohere().unwrap();
+        assert!(quantum.is_stable());
+    }
+
+    #[test]
+    fn test_phase_alignment() {
+        let quantum = TestQuantum::new(1.0);
+        assert_eq!(quantum.phase_alignment(), 1.0);
+    }
+
+    #[test]
+    fn test_alignment_state() {
+        let mut quantum = TestQuantum::new(0.9);
+        let node = CrystalNode::new();
+        quantum.align_with(&node).unwrap();
+        assert_eq!(quantum.alignment_state(), AlignmentState::Perfect);
     }
 }

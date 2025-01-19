@@ -4,15 +4,14 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 09:50:31 UTC
-//! Version: 0.1.0
+//! Last Updated: 2025-01-19 13:35:00 UTC
+//! Version: 0.1.1
 //! License: MIT
 
-use meshmath::sqrt;
+use magicmath::{sqrt, QuantumMath};
 use crate::{
     vector::{Vector3D, Vector4D},
     crystal::CrystalCube,
-    phantom::Phantom,
     errors::QuantumError,
     constants::{QUANTUM_STABILITY_THRESHOLD, ALIGNMENT_THRESHOLD},
     idk::ShardUninit,
@@ -49,7 +48,7 @@ pub struct Alignment {
     /// Core alignment data
     core: AlignmentCore,
     /// Reference vector for alignment
-    reference: Vector3D<f64>,
+    reference: Vector3D,
     /// Current alignment state
     state: AlignmentState,
 }
@@ -76,7 +75,7 @@ impl AlignmentCore {
 
 impl Alignment {
     /// Create new alignment calculator
-    pub fn new(reference: Vector3D<f64>) -> Self {
+    pub fn new(reference: Vector3D) -> Self {
         Self {
             core: AlignmentCore::new(),
             reference,
@@ -85,8 +84,9 @@ impl Alignment {
     }
 
     /// Calculate alignment with target vector
-    pub fn align_with(&mut self, target: &Vector3D<f64>) -> AlignmentResult<AlignmentState> {
-        let dot = self.reference.dot(target)?;
+    pub fn align_with(&mut self, target: &Vector3D) -> AlignmentResult<AlignmentState> {
+        let mut qmath = QuantumMath::new();
+        let dot = qmath.operate(magicmath::Operation::DotProduct, self.reference.dot(target)?)?;
         let mag_ref = self.reference.magnitude()?;
         let mag_target = target.magnitude()?;
 
@@ -105,7 +105,8 @@ impl Alignment {
     }
 
     /// Calculate quantum alignment with crystal cube
-    pub fn align_quantum(&mut self, cube: &CrystalCube<f64>) -> AlignmentResult<AlignmentState> {
+    pub fn align_quantum(&mut self, cube: &CrystalCube) -> AlignmentResult<AlignmentState> {
+        let mut qmath = QuantumMath::new();
         // Get quantum state vector
         let state = Vector4D::new(
             self.reference.x,
@@ -144,7 +145,7 @@ impl Alignment {
     }
 
     /// Get reference vector
-    pub fn reference(&self) -> &Vector3D<f64> {
+    pub fn reference(&self) -> &Vector3D {
         &self.reference
     }
 }
@@ -152,6 +153,7 @@ impl Alignment {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use magicmath::QuantumMath;
 
     #[test]
     fn test_alignment_creation() {
