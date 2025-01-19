@@ -4,16 +4,25 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 19:02:24 UTC
+//! Last Updated: 2025-01-19 20:47:51 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::traits::MeshValue;
 use crate::constants::{
+    mesh::{
+        RESOLUTION_MIN,
+        RESOLUTION_MAX,
+        PRECISION_DEFAULT,
+        STABILITY_THRESHOLD,
+        COHERENCE_THRESHOLD,
+        PRECISION_THRESHOLD,
+        CACHE_LINE_SIZE,
+        PREFETCH_DISTANCE,
+    },
     HARMONY_STABILITY_THRESHOLD,
-    mesh::{RESOLUTION_MIN, RESOLUTION_MAX, PRECISION_DEFAULT},
 };
-use errors::core::{Error as MathError, ErrorKind};
+use errors::{MathError, MathResult};
 use scribe::native_string::String;
 
 /// Mesh mathematics operations for crystal lattice systems
@@ -25,31 +34,33 @@ pub struct MeshMath {
     precision: f64,
     /// Current stability factor
     stability: f64,
+    /// Current coherence level
+    coherence: f64,
 }
 
 impl MeshMath {
     /// Create new mesh math instance with specified resolution
-    pub fn new(resolution: usize) -> Result<Self, MathError> {
+    pub fn new(resolution: usize) -> MathResult<Self> {
         if resolution < RESOLUTION_MIN || resolution > RESOLUTION_MAX {
-            return Err(MathError::new(
-                ErrorKind::InvalidInput,
-                String::from("Mesh resolution out of valid range")
-            ));
+            return Err(MathError::InvalidParameter(format!(
+                "Mesh resolution must be between {} and {}",
+                RESOLUTION_MIN, RESOLUTION_MAX
+            )));
         }
 
         Ok(Self {
             resolution,
             precision: PRECISION_DEFAULT,
             stability: 1.0,
+            coherence: 1.0,
         })
     }
 
     /// Set mesh precision for calculations
-    pub fn set_precision(&mut self, precision: f64) -> Result<(), MathError> {
-        if precision <= 0.0 {
-            return Err(MathError::new(
-                ErrorKind::InvalidInput,
-                String::from("Precision must be positive")
+    pub fn set_precision(&mut self, precision: f64) -> MathResult<()> {
+        if precision <= 0.0 || precision < PRECISION_THRESHOLD {
+            return Err(MathError::InvalidParameter(
+                "Precision must be positive and above threshold".to_string()
             ));
         }
         self.precision = precision;
@@ -57,39 +68,54 @@ impl MeshMath {
     }
 
     /// Get current mesh resolution
+    #[inline]
     pub fn resolution(&self) -> usize {
         self.resolution
     }
 
     /// Get current precision setting
+    #[inline]
     pub fn precision(&self) -> f64 {
         self.precision
     }
 
     /// Get current stability factor
+    #[inline]
     pub fn stability(&self) -> f64 {
         self.stability
     }
 
+    /// Get current coherence level
+    #[inline]
+    pub fn coherence(&self) -> f64 {
+        self.coherence
+    }
+
+    /// Check if mesh state is stable
+    #[inline]
+    pub fn is_stable(&self) -> bool {
+        self.stability >= STABILITY_THRESHOLD &&
+        self.coherence >= COHERENCE_THRESHOLD
+    }
+
     /// Interpolate value on crystal mesh
-    pub fn interpolate<T: MeshValue>(&mut self, value: T) -> Result<T, MathError> {
+    pub fn interpolate<T: MeshValue>(&mut self, value: T) -> MathResult<T> {
         let val = value.to_f64()?;
 
         // Check for invalid values
         if val.is_nan() || val.is_infinite() {
-            return Err(MathError::new(
-                ErrorKind::InvalidInput,
-                String::from("Cannot interpolate NaN or infinite value on crystal mesh")
+            return Err(MathError::InvalidParameter(
+                "Cannot interpolate NaN or infinite value on crystal mesh".to_string()
             ));
         }
 
-        // Update stability based on operation
-        self.stability *= 0.99;
-        if self.stability < HARMONY_STABILITY_THRESHOLD {
-            return Err(MathError::new(
-                ErrorKind::StabilityLoss,
-                String::from("Crystal mesh stability lost during interpolation")
-            ));
+        // Update stability and coherence
+        self.stability *= HARMONY_STABILITY_THRESHOLD.sqrt();
+        self.coherence *= 0.99;
+
+        // Check stability conditions
+        if !self.is_stable() {
+            return Err(MathError::HarmonyStateUnstable);
         }
 
         // Perform mesh-aligned rounding
@@ -101,15 +127,22 @@ impl MeshMath {
         Ok(T::from(rounded))
     }
 
-    /// Reset mesh stability
-    pub fn reset_stability(&mut self) {
+    /// Reset mesh stability and coherence
+    pub fn reset_state(&mut self) {
         self.stability = 1.0;
+        self.coherence = 1.0;
+    }
+
+    /// Prefetch mesh data into cache (noop in stable rust)
+    #[inline]
+    pub fn prefetch(&self, _index: usize) {
+        // Prefetching disabled in stable rust
     }
 }
 
 impl Default for MeshMath {
     fn default() -> Self {
-        Self::new(100).expect("Default mesh resolution should be valid") // 100x100 default mesh
+        Self::new(100).expect("Default mesh resolution should be valid")
     }
 }
 
@@ -121,7 +154,7 @@ mod tests {
     fn test_mesh_creation() {
         assert!(MeshMath::new(50).is_ok());
         assert!(MeshMath::new(0).is_err());
-        assert!(MeshMath::new(10001).is_err());
+        assert!(MeshMath::new(RESOLUTION_MAX + 1).is_err());
     }
 
     #[test]
@@ -143,11 +176,17 @@ mod tests {
     #[test]
     fn test_stability_tracking() {
         let mut mesh = MeshMath::default();
+        assert!(mesh.is_stable());
+
         for _ in 0..100 {
             let _ = mesh.interpolate(1.0f64);
         }
+
         assert!(mesh.stability() < 1.0);
-        mesh.reset_stability();
+        assert!(mesh.coherence() < 1.0);
+
+        mesh.reset_state();
         assert_eq!(mesh.stability(), 1.0);
+        assert_eq!(mesh.coherence(), 1.0);
     }
 }

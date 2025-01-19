@@ -64,15 +64,12 @@ impl ResonanceMath {
     /// Perform resonance operation
     pub fn operate<T: MeshValue>(&mut self, value: T) -> Result<T, MathError> {
         if !self.state.is_stable() {
-            return Err(MathError::HarmonyStateUnstable(
-                String::from("Crystal resonance state unstable during operation")
-            ));
+            return Err(MathError::HarmonyStateUnstable);
         }
 
         // Apply resonance transformation
         let result = value.to_f64()?;
-        let transformed = result * self.state.harmony *
-        (1.0 + self.state.resonance);
+        let transformed = result * self.state.harmony * (1.0 + self.state.resonance);
 
         Ok(T::from(transformed))
     }
@@ -81,5 +78,44 @@ impl ResonanceMath {
 impl Default for ResonanceMath {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resonance_state_creation() {
+        let state = ResonanceState::new();
+        assert_eq!(state.harmony, 1.0);
+        assert_eq!(state.phase, 0.0);
+        assert_eq!(state.resonance, 0.0);
+    }
+
+    #[test]
+    fn test_resonance_state_stability() {
+        let state = ResonanceState { harmony: 0.6, phase: 0.0, resonance: 0.1 };
+        assert!(state.is_stable());
+
+        let unstable_state = ResonanceState { harmony: 0.4, phase: 0.0, resonance: 0.1 };
+        assert!(!unstable_state.is_stable());
+    }
+
+    #[test]
+    fn test_resonance_math_creation() {
+        let resonance_math = ResonanceMath::new();
+        assert_eq!(resonance_math.get_state().harmony, 1.0);
+    }
+
+    #[test]
+    fn test_resonance_operation() {
+        let mut resonance_math = ResonanceMath::new();
+        let result = resonance_math.operate(1.0f64);
+        assert!(result.is_ok());
+
+        resonance_math.state.harmony = 0.4;
+        let result = resonance_math.operate(1.0f64);
+        assert!(result.is_err());
     }
 }
