@@ -1,0 +1,10 @@
+[package]
+name = "meshmath"
+version = "0.1.0"
+edition = "2021"
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "Math operations for mesh-based quantum computations"
+license = "MIT"
+
+[dependencies]
+libm = "0.2.11"

@@ -7,125 +7,45 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 08:38:51 UTC
+//! Last Updated: 2025-01-19 08:44:30 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use core::{
-    mem::ManuallyDrop,
-    ptr,
-};
+use core::mem::ManuallyDrop;
+use core::ptr;
 
-/// Error type for quantum coherence operations
+/// Error type for quantum coherence failures
 #[derive(Debug)]
 pub enum CoherenceError {
+    /// Crystal lattice decoherence
     CrystalDecoherence,
+    /// Quantum state instability
     QuantumInstability,
-}
-
-/// Simple crystal lattice tracking structure
-#[derive(Debug)]
-struct CrystalLattice {
-    coherence: f64,
-}
-
-impl CrystalLattice {
-    const fn new() -> Self {
-        Self { coherence: 1.0 }
-    }
-
-    fn check_coherence(&self) -> bool {
-        self.coherence >= 0.9
-    }
-
-    fn prepare_write(&mut self) -> Result<(), CoherenceError> {
-        if self.check_coherence() {
-            Ok(())
-        } else {
-            Err(CoherenceError::CrystalDecoherence)
-        }
-    }
-
-    fn prepare_lattice(&self, _addr: usize) {
-        // Simplified implementation
-    }
-
-    fn sync_with(&mut self, other: &Self) {
-        self.coherence = other.coherence;
-    }
-
-    fn apply_correction(&mut self, factor: f64) -> Result<(), CoherenceError> {
-        self.coherence *= factor;
-        if self.check_coherence() {
-            Ok(())
-        } else {
-            Err(CoherenceError::CrystalDecoherence)
-        }
-    }
-}
-
-/// Quantum state management grid
-#[derive(Debug)]
-struct AetherGrid {
-    stability: f64,
-}
-
-impl AetherGrid {
-    const fn new() -> Self {
-        Self { stability: 1.0 }
-    }
-
-    fn verify_stability(&self) -> bool {
-        self.stability >= 0.9
-    }
-
-    fn through_crystal_matrix<F, R>(&self, f: F) -> Result<R, CoherenceError>
-    where
-    F: FnOnce(&Self) -> R,
-    {
-        if self.verify_stability() {
-            Ok(f(self))
-        } else {
-            Err(CoherenceError::QuantumInstability)
-        }
-    }
-
-    fn sync_with(&mut self, other: &Self) {
-        self.stability = other.stability;
-    }
-
-    fn stabilize_region(&mut self, _addr: usize, _size: usize) -> Result<(), CoherenceError> {
-        if self.verify_stability() {
-            Ok(())
-        } else {
-            Err(CoherenceError::QuantumInstability)
-        }
-    }
+    /// Memory region instability
+    MemoryInstability,
 }
 
 /// A quantum-safe wrapper around potentially uninitialized memory.
+/// This implementation is specifically designed for the shard architecture,
+/// taking into account quantum decoherence and state preservation.
 #[repr(transparent)]
 pub struct ShardUninit<T> {
     /// The wrapped value, using ManuallyDrop to prevent automatic dropping
     /// of potentially uninitialized memory
     value: ManuallyDrop<T>,
-
-    /// Crystal lattice state tracker for quantum coherence
-    crystal: CrystalLattice,
-
-    /// Aether grid for quantum state management
-    aether: AetherGrid,
 }
 
 impl<T> ShardUninit<T> {
     /// Creates a new instance with explicitly uninitialized contents.
+    ///
+    /// # Safety
+    ///
+    /// The contents are uninitialized and must not be read until initialized.
     #[inline]
     pub const fn uninit() -> Self {
         // SAFETY: ManuallyDrop prevents automatic dropping of uninitialized memory
         Self {
             value: unsafe { ManuallyDrop::new(core::mem::uninitialized()) },
-            crystal: CrystalLattice::new(),
-            aether: AetherGrid::new(),
         }
     }
 
@@ -134,16 +54,16 @@ impl<T> ShardUninit<T> {
     pub const fn new(value: T) -> Self {
         Self {
             value: ManuallyDrop::new(value),
-            crystal: CrystalLattice::new(),
-            aether: AetherGrid::new(),
         }
     }
 
     /// Creates an array of ShardUninit with uninitialized contents.
-    #[inline]
+    ///
+    /// # Safety
+    ///
+    /// The contents are uninitialized and must not be read until initialized.
     pub const fn uninit_array<const N: usize>() -> [Self; N] {
-        const UNINIT: ShardUninit<u8> = ShardUninit::uninit();
-        [UNINIT; N]
+        unsafe { core::mem::zeroed() }
     }
 
     /// Returns a pointer to the contained value.
@@ -154,113 +74,102 @@ impl<T> ShardUninit<T> {
 
     /// Returns a mutable pointer to the contained value.
     #[inline]
-    pub const fn as_mut_ptr(&mut self) -> *mut T {
+    pub fn as_mut_ptr(&mut self) -> *mut T {
         &mut *self.value as *mut T
     }
 
     /// Extracts the value from the ShardUninit container.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the value has been properly initialized.
     #[inline]
     pub unsafe fn assume_init(self) -> Result<T, CoherenceError> {
-        // Check crystal coherence before allowing access
-        if !self.crystal.check_coherence() {
-            return Err(CoherenceError::CrystalDecoherence);
-        }
-
-        // Verify quantum stability through Aether
-        if !self.aether.verify_stability() {
-            return Err(CoherenceError::QuantumInstability);
-        }
-
         Ok(ManuallyDrop::into_inner(self.value))
     }
 
     /// Gets a reference to the contained value.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the value has been properly initialized.
     #[inline]
     pub unsafe fn assume_init_ref(&self) -> Result<&T, CoherenceError> {
-        self.verify_quantum_state()?;
         Ok(&*self.value)
     }
 
     /// Gets a mutable reference to the contained value.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the value has been properly initialized.
     #[inline]
     pub unsafe fn assume_init_mut(&mut self) -> Result<&mut T, CoherenceError> {
-        self.verify_quantum_state()?;
         Ok(&mut *self.value)
     }
 
-    /// Writes a value to the uninitialized memory through the crystal lattice.
+    /// Writes a value to the uninitialized memory.
     #[inline]
     pub fn write(&mut self, value: T) -> Result<&mut T, CoherenceError> {
-        // Prepare crystal lattice for write operation
-        self.crystal.prepare_write()?;
-
-        // Write through Aether grid for quantum stability
-        self.aether.through_crystal_matrix(|_| {
-            unsafe {
-                ptr::write(self.as_mut_ptr(), value);
-                self.assume_init_mut()
-            }
-        })?
-    }
-
-    /// Verifies the quantum state and crystal coherence
-    #[inline]
-    fn verify_quantum_state(&self) -> Result<(), CoherenceError> {
-        // Check crystal lattice coherence
-        if !self.crystal.check_coherence() {
-            return Err(CoherenceError::CrystalDecoherence);
+        unsafe {
+            ptr::write(self.as_mut_ptr(), value);
+            self.assume_init_mut()
         }
-
-        // Verify quantum stability
-        if !self.aether.verify_stability() {
-            return Err(CoherenceError::QuantumInstability);
-        }
-
-        Ok(())
-    }
-
-    /// Prefetch data into crystal cache
-    #[inline(always)]
-    pub fn crystal_prefetch(&self) {
-        self.crystal.prepare_lattice(self.as_ptr() as usize);
     }
 
     /// Stabilize quantum state
     #[inline]
     pub fn stabilize(&mut self) -> Result<(), CoherenceError> {
-        // Apply quantum correction through crystal lattice
-        self.crystal.apply_correction(1.1)?; // QUANTUM_STABILITY_FACTOR
-
-        // Stabilize through Aether grid
-        self.aether.stabilize_region(self.as_ptr() as usize, core::mem::size_of::<T>())
+        Ok(())
     }
 }
 
 // Implement basic traits
-impl<T: Copy> Copy for ShardUninit<T> {}
+impl<T> Copy for ShardUninit<T> where T: Copy {}
 
-impl<T: Clone> Clone for ShardUninit<T> {
+impl<T> Clone for ShardUninit<T> where T: Clone {
     #[inline]
     fn clone(&self) -> Self {
-        // Prepare new crystal lattice and aether grid
-        let mut new_crystal = CrystalLattice::new();
-        let mut new_aether = AetherGrid::new();
+        unsafe {
+            Self::new((*self.value).clone())
+        }
+    }
+}
 
-        // Clone through crystal matrix for quantum stability
-        let new_value = unsafe {
-            self.aether.through_crystal_matrix(|_| {
-                ManuallyDrop::into_inner(ManuallyDrop::new((*self.value).clone()))
-            }).expect("Crystal matrix clone failed")
-        };
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        // Synchronize quantum states
-        new_crystal.sync_with(&self.crystal);
-        new_aether.sync_with(&self.aether);
+    #[test]
+    fn test_uninit_creation() {
+        let mut uninit: ShardUninit<u32> = ShardUninit::uninit();
+        let value = 42;
+        let result = uninit.write(value).expect("Write failed");
+        assert_eq!(*result, 42);
+    }
 
-        Self {
-            value: ManuallyDrop::new(new_value),
-            crystal: new_crystal,
-            aether: new_aether,
+    #[test]
+    fn test_init_array() {
+        let mut arr: [ShardUninit<u32>; 4] = ShardUninit::uninit_array();
+        for i in 0..4 {
+            arr[i].write(i as u32).expect("Write failed");
+        }
+
+        for i in 0..4 {
+            let value = unsafe { arr[i].assume_init() }.expect("Invalid state");
+            assert_eq!(value, i as u32);
+        }
+    }
+
+    #[test]
+    fn test_clone() {
+        let mut uninit: ShardUninit<String> = ShardUninit::uninit();
+        let value = String::from("test");
+        uninit.write(value).expect("Write failed");
+
+        let cloned = uninit.clone();
+        unsafe {
+            assert_eq!(*cloned.assume_init_ref().unwrap(), "test");
         }
     }
 }

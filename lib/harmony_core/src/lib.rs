@@ -26,6 +26,7 @@ pub mod zeronaut;
 pub mod phantom;
 pub mod scribe;
 pub mod align;
+pub mod idk;
 
 // Re-exports for convenience
 pub use self::{

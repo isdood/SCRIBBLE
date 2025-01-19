@@ -9,6 +9,7 @@ license = "MIT"
 
 [dependencies]
 libm = "0.2.11"
+meshmath = "0.1.0" # Added meshmath dependency
 
 [[test]]
 name = "simd_tests"
