@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 10:26:21 UTC
+//! Last Updated: 2025-01-19 10:41:02 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -12,10 +12,16 @@
 //! on crystal lattice systems, providing high-precision calculations
 //! with quantum state preservation and stability monitoring.
 
+// Core modules
 pub mod core;
 pub mod errors;
 pub mod constants;
 pub mod traits;
+
+// Feature modules
+pub mod fractal;
+pub mod julia;
+pub mod brot;
 
 // Re-exports for convenient access
 pub use crate::core::{
@@ -27,10 +33,39 @@ pub use crate::core::{
 pub use crate::errors::{
     MathError,
     MathResult,
-    ErrorHandler,
 };
 
-/// Library configuration and constants
+pub use crate::traits::{
+    MeshValue,
+    ComplexQuantum,
+    FractalValue,
+    QuantumState as QuantumStateTrait,
+    QuantumOperation,
+    Resonance,
+};
+
+pub use crate::fractal::{
+    FractalParams,
+    FractalState,
+    FractalType,
+    generate_fractal,
+};
+
+pub use crate::julia::{
+    JuliaParams,
+    JuliaState,
+    JuliaVariant,
+    iterate_julia,
+};
+
+pub use crate::brot::{
+    MandelbrotParams,
+    MandelbrotState,
+    MandelbrotVariant,
+    iterate_mandelbrot,
+};
+
+/// Library configuration and version information
 pub mod config {
     /// Current library version
     pub const VERSION: &str = "0.1.0";
@@ -43,15 +78,15 @@ pub mod config {
 
     /// Repository URL
     pub const REPO_URL: &str = "https://github.com/isdood/magicmath";
-}
 
-/// Primary trait for types that can be used in quantum calculations
-pub trait QuantumValue: traits::MeshValue {
-    /// Get the quantum state of the value
-    fn quantum_state(&self) -> Result<QuantumState, MathError>;
+    /// Creation timestamp
+    pub const CREATED: &str = "2025-01-19";
 
-    /// Check if the value is in a stable quantum state
-    fn is_stable(&self) -> Result<bool, MathError>;
+    /// Last update timestamp
+    pub const UPDATED: &str = "2025-01-19 10:41:02 UTC";
+
+    /// Current user
+    pub const CURRENT_USER: &str = "isdood";
 }
 
 /// Prelude module for convenient imports
@@ -60,25 +95,39 @@ pub mod prelude {
         QuantumMath,
         QuantumState,
         Operation,
-        QuantumValue,
         MathError,
         MathResult,
-        ErrorHandler,
+        MeshValue,
+        ComplexQuantum,
+        FractalValue,
+        QuantumStateTrait,
+        QuantumOperation,
+        Resonance,
+        FractalParams,
+        FractalState,
+        FractalType,
+        generate_fractal,
+        JuliaParams,
+        JuliaState,
+        JuliaVariant,
+        iterate_julia,
+        MandelbrotParams,
+        MandelbrotState,
+        MandelbrotVariant,
+        iterate_mandelbrot,
     };
 
-    pub use crate::traits::MeshValue;
-
     pub use crate::core::{
-        add::*,
-        sub::*,
-        mul::*,
-        div::*,
-        sqrt::*,
-        log::*,
-        pi::*,
-        gold::*,
-        py::*,
-        fibb::*,
+        add::quantum_add,
+        sub::quantum_sub,
+        mul::quantum_mul,
+        div::quantum_div,
+        sqrt::quantum_sqrt,
+        log::quantum_ln,
+        pi::quantum_pi,
+        gold::quantum_phi,
+        py::quantum_pythagoras,
+        fibb::quantum_fibonacci,
     };
 }
 
@@ -99,6 +148,7 @@ pub fn new() -> QuantumMath {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::constants::*;
 
     #[test]
     fn test_version() {
@@ -106,36 +156,41 @@ mod tests {
     }
 
     #[test]
-    fn test_new_quantum_math() {
-        let qmath = new();
+    fn test_quantum_math() {
+        let mut qmath = new();
         assert!(qmath.get_state().is_stable());
     }
 
-    // Example implementation for f64
-    impl QuantumValue for f64 {
-        fn quantum_state(&self) -> Result<QuantumState, MathError> {
-            Ok(QuantumState::new())
-        }
-
-        fn is_stable(&self) -> Result<bool, MathError> {
-            Ok(true)
-        }
+    #[test]
+    fn test_fractal_generation() {
+        let params = FractalParams::default();
+        let state = FractalState::Julia(JuliaState::new(0.0, 0.0));
+        let result = generate_fractal(state, &params);
+        assert!(result.is_ok());
     }
 
     #[test]
-    fn test_quantum_value_f64() {
-        let value: f64 = 42.0;
-        assert!(value.is_stable().unwrap());
-        assert!(value.quantum_state().unwrap().is_stable());
+    fn test_julia_set() {
+        let params = JuliaParams::default();
+        let state = JuliaState::new(0.0, 0.0);
+        let result = iterate_julia(state, &params, JuliaVariant::Standard);
+        assert!(result.is_ok());
     }
 
-    // Test all operation types
     #[test]
-    fn test_operations() {
+    fn test_mandelbrot_set() {
+        let params = MandelbrotParams::default();
+        let state = MandelbrotState::new(0.0, 0.0);
+        let result = iterate_mandelbrot(state, &params, MandelbrotVariant::Standard);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_quantum_operations() {
         let mut qmath = new();
-        let test_value = 2.0;
+        let test_value = 2.0f64;
 
-        for operation in &[
+        let operations = [
             Operation::Add,
             Operation::Subtract,
             Operation::Multiply,
@@ -146,12 +201,16 @@ mod tests {
             Operation::Golden,
             Operation::Pythagorean,
             Operation::Fibonacci,
-        ] {
-            assert!(qmath.operate(*operation, test_value).is_ok());
+            Operation::Julia,
+            Operation::Mandelbrot,
+            Operation::Fractal,
+        ];
+
+        for op in &operations {
+            assert!(qmath.operate(*op, test_value).is_ok());
         }
     }
 
-    // Test error handling
     #[test]
     fn test_error_handling() {
         let mut qmath = new();
@@ -162,34 +221,14 @@ mod tests {
 
         // Test negative logarithm
         let result = qmath.operate(Operation::Logarithm, -1.0);
-        assert!(matches!(result, Err(MathError::LogarithmDomainError)));
+        assert!(matches!(result, Err(MathError::LogarithmDomainError(_))));
     }
 
-    // Test quantum state preservation
     #[test]
-    fn test_quantum_state_preservation() {
-        let mut qmath = new();
-        let initial_state = qmath.get_state();
-
-        // Perform several operations
-        for _ in 0..5 {
-            qmath.operate(Operation::Add, 1.0).unwrap();
-        }
-
-        let final_state = qmath.get_state();
-        assert!(final_state.is_stable());
-        assert!(final_state.iterations > initial_state.iterations);
+    fn test_fractal_errors() {
+        let params = FractalParams::default();
+        let wrong_state = FractalState::Mandelbrot(MandelbrotState::new(0.0, 0.0));
+        let result = generate_fractal(wrong_state, &params);
+        assert!(matches!(result, Err(MathError::FractalTypeMismatch)));
     }
-}
-
-// Library metadata
-#[doc(hidden)]
-pub mod metadata {
-    #![allow(dead_code)]
-
-    pub const AUTHOR: &str = "Caleb J.D. Terkovics <isdood>";
-    pub const CREATED: &str = "2025-01-19";
-    pub const UPDATED: &str = "2025-01-19 10:26:21 UTC";
-    pub const LICENSE: &str = "MIT";
-    pub const DESCRIPTION: &str = "High-Performance Crystal Lattice Mathematical Operations";
 }

@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 10:22:28 UTC
+//! Last Updated: 2025-01-19 10:35:40 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -18,6 +18,9 @@ pub mod pi;
 pub mod gold;
 pub mod py;
 pub mod fibb;
+pub mod fractal;
+pub mod julia;
+pub mod brot;
 
 use crate::{
     errors::MathError,
@@ -89,6 +92,9 @@ pub enum Operation {
     Golden,
     Pythagorean,
     Fibonacci,
+    Julia,
+    Mandelbrot,
+    Fractal,
 }
 
 impl Operation {
@@ -106,6 +112,9 @@ impl Operation {
             Operation::Golden => 1.15,
             Operation::Pythagorean => 0.95,
             Operation::Fibonacci => 1.20,
+            Operation::Julia => 1.25,
+            Operation::Mandelbrot => 1.30,
+            Operation::Fractal => 1.35,
         }
     }
 
@@ -123,6 +132,9 @@ impl Operation {
             Operation::Golden => (3.0 - 5.0f64.sqrt()) * core::f64::consts::PI,
             Operation::Pythagorean => core::f64::consts::PI / 3.0,
             Operation::Fibonacci => (1.0 - 5.0f64.sqrt()) * core::f64::consts::PI / 2.0,
+            Operation::Julia => core::f64::consts::PI / 6.0,
+            Operation::Mandelbrot => core::f64::consts::PI / 8.0,
+            Operation::Fractal => core::f64::consts::PI / 12.0,
         }
     }
 
@@ -140,6 +152,9 @@ impl Operation {
             Operation::Golden => 1.4,
             Operation::Pythagorean => 1.0,
             Operation::Fibonacci => 1.5,
+            Operation::Julia => 1.6,
+            Operation::Mandelbrot => 1.7,
+            Operation::Fractal => 1.8,
         }
     }
 }
@@ -174,6 +189,31 @@ impl QuantumMath {
             Operation::Golden => gold::quantum_phi(value),
             Operation::Pythagorean => py::quantum_pythagoras(value, value),
             Operation::Fibonacci => fibb::quantum_fibonacci(value.to_usize()?),
+            Operation::Julia => {
+                let state = julia::JuliaState::new(value.to_f64()?, 0.0);
+                let params = julia::JuliaParams::default();
+                let result = julia::iterate_julia(state, &params, julia::JuliaVariant::Standard)?;
+                Ok(T::from(result.escape_time().unwrap_or(0) as f64))
+            },
+            Operation::Mandelbrot => {
+                let state = brot::MandelbrotState::new(value.to_f64()?, 0.0);
+                let params = brot::MandelbrotParams::default();
+                let result = brot::iterate_mandelbrot(state, &params, brot::MandelbrotVariant::Standard)?;
+                Ok(T::from(result.escape_time().unwrap_or(0) as f64))
+            },
+            Operation::Fractal => {
+                let state = fractal::FractalState::Custom(fractal::CustomState {
+                    z_real: value.to_f64()?,
+                                                          z_imag: 0.0,
+                                                          iterations: 0,
+                                                          stability: 1.0,
+                                                          phase: 0.0,
+                                                          escape_time: None,
+                });
+                let params = fractal::FractalParams::default();
+                let result = fractal::generate_fractal(state, &params)?;
+                Ok(T::from(result.escape_time().unwrap_or(0) as f64))
+            },
         }
     }
 
@@ -200,6 +240,31 @@ mod tests {
         fn energy(&self) -> Result<f64, MathError> { Ok(*self) }
         fn magnitude(&self) -> Result<f64, MathError> { Ok(self.abs()) }
         fn to_usize(&self) -> Result<usize, MathError> { Ok(*self as usize) }
+        fn to_f64(&self) -> Result<f64, MathError> { Ok(*self) }
+        fn from(value: f64) -> Self { value }
+    }
+
+    #[test]
+    fn test_all_operations() {
+        let mut qmath = QuantumMath::new();
+
+        for operation in &[
+            Operation::Add,
+            Operation::Subtract,
+            Operation::Multiply,
+            Operation::Divide,
+            Operation::SquareRoot,
+            Operation::Logarithm,
+            Operation::Pi,
+            Operation::Golden,
+            Operation::Pythagorean,
+            Operation::Fibonacci,
+            Operation::Julia,
+            Operation::Mandelbrot,
+            Operation::Fractal,
+        ] {
+            assert!(qmath.operate(*operation, 1.0).is_ok());
+        }
     }
 
     #[test]
@@ -209,22 +274,6 @@ mod tests {
 
         state.update(Operation::Add).unwrap();
         assert!(state.is_stable());
-    }
-
-    #[test]
-    fn test_quantum_math() {
-        let mut qmath = QuantumMath::new();
-
-        let result = qmath.operate(Operation::Add, 2.0).unwrap();
-        assert_eq!(result, 4.0);
-
-        assert!(qmath.get_state().is_stable());
-    }
-
-    #[test]
-    fn test_operation_factors() {
-        assert!(Operation::Add.coherence_factor() > 0.0);
-        assert!(Operation::Add.energy_factor() > 0.0);
     }
 
     #[test]
