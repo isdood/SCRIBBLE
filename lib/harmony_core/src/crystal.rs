@@ -23,7 +23,7 @@ use crate::{
     constants::{
         MAX_QUANTUM_SIZE,
         QUANTUM_STABILITY_THRESHOLD,
-        CRYSTAL_RESONANCE_THRESHOLD
+        CRYSTAL_RESONANCE_THRESHOLD,
     },
     align::{Alignment, AlignmentState},
     idk::ShardUninit,
@@ -71,7 +71,7 @@ impl CrystalNode {
 
     /// Get node's alignment state
     pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.get_state()
+        self.alignment.state() // Fix: Correcting method call
     }
 }
 
@@ -79,7 +79,7 @@ impl CrystalNode {
 #[derive(Debug)]
 pub struct CrystalLattice {
     /// Lattice nodes storage
-    nodes: [[Option<CrystalNode>; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE], // Fix: Changing to Option
+    nodes: Vec<Vec<Option<CrystalNode>>>, // Fix: Using Vec instead of fixed-size array
     /// Lattice size
     size: usize,
     /// Lattice alignment
@@ -90,7 +90,7 @@ impl CrystalLattice {
     /// Create a new crystal lattice
     pub fn new(size: usize) -> Self {
         let size = size.min(MAX_QUANTUM_SIZE);
-        let nodes = [[None; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE]; // Fix: Changing to Option
+        let nodes = vec![vec![None; size]; size]; // Fix: Using Vec instead of fixed-size array
         let origin = Vector3D::new(0.0, 0.0, 0.0);
 
         Self {
@@ -104,9 +104,8 @@ impl CrystalLattice {
     pub fn get_node(&self, pos: &Vector3D) -> Result<&CrystalNode, QuantumError> {
         let x = pos.x.floor() as usize;
         let y = pos.y.floor() as usize;
-        let z = pos.z.floor() as usize;
 
-        if x >= self.size || y >= self.size || z >= self.size {
+        if x >= self.size || y >= self.size {
             return Err(QuantumError::BoundaryViolation);
         }
 
@@ -117,9 +116,8 @@ impl CrystalLattice {
     pub fn set_node(&mut self, pos: &Vector3D, node: CrystalNode) -> Result<(), QuantumError> {
         let x = pos.x.floor() as usize;
         let y = pos.y.floor() as usize;
-        let z = pos.z.floor() as usize;
 
-        if x >= self.size || y >= self.size || z >= self.size {
+        if x >= self.size || y >= self.size {
             return Err(QuantumError::BoundaryViolation);
         }
 
@@ -146,7 +144,7 @@ impl CrystalLattice {
 
     /// Get current alignment state
     pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.get_state()
+        self.alignment.state() // Fix: Correcting method call
     }
 }
 

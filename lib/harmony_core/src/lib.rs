@@ -1,92 +1,169 @@
-//! Harmony Core - Crystal Computing Core Operations
-//! =========================================
+//! Harmony Core Library
+//! =====================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:57:59 UTC
+//! Last Updated: 2025-01-20 21:08:54 UTC
 //! Version: 0.1.1
 //! License: MIT
 
-#![no_std]
-#![feature(const_trait_impl)]
+mod align;
+mod crystal;
+mod idk;
+mod aether;
+mod cube;
+mod growth;
+mod harmony;
+mod phantom;
+mod zeronaut;
 
-// External crates
-extern crate magicmath;
-extern crate errors;
-extern crate scribe;
+pub use align::*;
+pub use crystal::*;
+pub use idk::*;
+pub use aether::*;
+pub use cube::*;
+pub use growth::*;
+pub use harmony::*;
+pub use phantom::*;
+pub use zeronaut::*;
 
-// Module declarations
-pub mod align;
-pub mod crystal;
-pub mod cube;
-pub mod growth;
-pub mod harmony;
-pub mod idk;
-pub mod phantom;
-pub mod zeronaut;
-pub mod aether;
-
-// Re-export common types from magicmath
-pub use magicmath::{
-    // Core traits
+use crate::align::{Alignment, AlignmentState};
+use crate::constants::{
+    MAX_QUANTUM_SIZE,
+    QUANTUM_STABILITY_THRESHOLD,
+    CRYSTAL_RESONANCE_THRESHOLD,
+};
+use crate::errors::{MathError, QuantumError};
+use crate::idk::ShardUninit;
+use crate::magicmath::{
     MeshValue,
-    CrystalAdd,
-    CrystalSub,
-    CrystalMul,
-    CrystalDiv,
-    // Core types
-    resonance::{
-        Resonance,
-        Phase,
-        Quantum,
-    },
     Vector3D,
-    Vector4D,
+    resonance::Resonance,
 };
 
-// Re-exports from errors
-pub use errors::{
-    MathError,
-    QuantumError,
-    core::Result as MathResult, // Fix: Correcting import for Result
-};
+/// Core result type for mathematical operations
+pub type MathResult<T> = Result<T, MathError>;
 
-// Re-exports from core
-pub use core::{
-    fmt::{self, Write, Formatter, Result as FmtResult},
-    result::Result, // Fix: Correcting import for Result
-    mem::MaybeUninit, // Fix: Correcting import for Box
-};
-
-// Re-exports from align
-pub use self::align::{
-    string::{String, ToString}, // Fix: Correcting module paths
-    collections::Vec, // Fix: Correcting module paths
-};
-
-// Constants module
-pub mod constants {
-    pub const MAX_QUANTUM_SIZE: usize = 256;
-    pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.8;
-    pub const CRYSTAL_RESONANCE_THRESHOLD: f64 = 0.7;
-    pub const QUANTUM_GOLDEN_RATIO: f64 = 1.618033988749895;
-    pub const MAX_PHASE_COHERENCE: f64 = 1.0;
-    pub const MIN_PHASE_COHERENCE: f64 = 0.1;
-    pub const AETHER_RESONANCE_FACTOR: f64 = 0.9;
-    pub const ALIGNMENT_THRESHOLD: f64 = 0.95;
-    pub const GROWTH_RATE_FACTOR: f64 = 0.5;
-    pub const MAX_FRACTAL_DEPTH: usize = 64;
-    pub const JULIA_GROWTH_REAL: f64 = -0.4;
-    pub const JULIA_GROWTH_IMAG: f64 = 0.6;
+/// Core crystal node for quantum operations
+#[derive(Debug)]
+pub struct CrystalNode {
+    /// Position in crystal lattice
+    position: Vector3D,
+    /// Phase coherence value
+    coherence: f64,
+    /// Node alignment
+    alignment: Alignment,
 }
 
-/// Initialize fractal parameters for crystal growth
-pub fn create_growth_params() -> Resonance {
-    let mut params = Resonance::new();
-    params.set_value(constants::CRYSTAL_RESONANCE_THRESHOLD); // Fix: Correcting method call
-    params.set_phase(0.0); // Fix: Correcting method call
-    params
+impl CrystalNode {
+    /// Create a new crystal node
+    pub fn new(position: Vector3D) -> Self {
+        Self {
+            position: position.clone(),
+            coherence: 1.0,
+            alignment: Alignment::new(position),
+        }
+    }
+
+    /// Get node's phase coherence
+    pub fn get_phase_coherence(&self) -> f64 {
+        self.coherence
+    }
+
+    /// Set node's phase coherence
+    pub fn set_phase_coherence(&mut self, value: f64) -> Result<(), MathError> {
+        if value < 0.0 || value > 1.0 {
+            return Err(MathError::InvalidRange);
+        }
+        self.coherence = value;
+        Ok(())
+    }
+
+    /// Get node's position
+    pub fn position(&self) -> &Vector3D {
+        &self.position
+    }
+
+    /// Get node's alignment state
+    pub fn alignment_state(&self) -> AlignmentState {
+        self.alignment.state()
+    }
+}
+
+/// Crystal lattice structure
+#[derive(Debug)]
+pub struct CrystalLattice {
+    /// Lattice nodes storage
+    nodes: Vec<Vec<Option<CrystalNode>>>,
+    /// Lattice size
+    size: usize,
+    /// Lattice alignment
+    alignment: Alignment,
+}
+
+impl CrystalLattice {
+    /// Create a new crystal lattice
+    pub fn new(size: usize) -> Self {
+        let size = size.min(MAX_QUANTUM_SIZE);
+        let nodes = vec![vec![None; size]; size];
+        let origin = Vector3D::new(0.0, 0.0, 0.0);
+
+        Self {
+            nodes,
+            size,
+            alignment: Alignment::new(origin),
+        }
+    }
+
+    /// Get node at position
+    pub fn get_node(&self, pos: &Vector3D) -> Result<&CrystalNode, QuantumError> {
+        let x = pos.x.floor() as usize;
+        let y = pos.y.floor() as usize;
+        let z = pos.z.floor() as usize;
+
+        if x >= self.size || y >= self.size || z >= self.size {
+            return Err(QuantumError::BoundaryViolation);
+        }
+
+        self.nodes[x][y].as_ref().ok_or(QuantumError::InvalidState)
+    }
+
+    /// Set node at position
+    pub fn set_node(&mut self, pos: &Vector3D, node: CrystalNode) -> Result<(), QuantumError> {
+        let x = pos.x.floor() as usize;
+        let y = pos.y.floor() as usize;
+        let z = pos.z.floor() as usize;
+
+        if x >= self.size || y >= self.size || z >= self.size {
+            return Err(QuantumError::BoundaryViolation);
+        }
+
+        self.nodes[x][y] = Some(node);
+        Ok(())
+    }
+
+    /// Calculate resonance at position
+    pub fn calculate_resonance(&self, pos: &Vector3D) -> Result<f64, QuantumError> {
+        let node = self.get_node(pos)?;
+        let coherence = node.get_phase_coherence();
+
+        if coherence < CRYSTAL_RESONANCE_THRESHOLD {
+            return Err(QuantumError::ResonanceFailure);
+        }
+
+        Ok((coherence * QUANTUM_STABILITY_THRESHOLD).sqrt())
+    }
+
+    /// Get lattice size
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    /// Get current alignment state
+    pub fn alignment_state(&self) -> AlignmentState {
+        self.alignment.state()
+    }
 }
 
 #[cfg(test)]
@@ -94,26 +171,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_constants() {
-        assert!(constants::QUANTUM_STABILITY_THRESHOLD > 0.0);
-        assert!(constants::CRYSTAL_RESONANCE_THRESHOLD > 0.0);
-        assert_eq!(constants::MAX_PHASE_COHERENCE, 1.0);
-        assert!(constants::MIN_PHASE_COHERENCE > 0.0);
-        assert!(constants::MIN_PHASE_COHERENCE < constants::MAX_PHASE_COHERENCE);
-        assert!(constants::AETHER_RESONANCE_FACTOR > 0.0);
-        assert!(constants::ALIGNMENT_THRESHOLD > 0.9);
+    fn test_crystal_node_creation() {
+        let pos = Vector3D::new(1.0, 2.0, 3.0);
+        let node = CrystalNode::new(pos);
+        assert_eq!(node.get_phase_coherence(), 1.0);
     }
 
     #[test]
-    fn test_growth_params() {
-        let params = create_growth_params();
-        assert_eq!(params.value(), constants::CRYSTAL_RESONANCE_THRESHOLD);
-        assert_eq!(params.phase(), 0.0);
+    fn test_crystal_lattice_creation() {
+        let lattice = CrystalLattice::new(4);
+        assert_eq!(lattice.size(), 4);
     }
 
     #[test]
-    fn test_julia_constants() {
-        assert!((-2.0..=2.0).contains(&constants::JULIA_GROWTH_REAL));
-        assert!((-2.0..=2.0).contains(&constants::JULIA_GROWTH_IMAG));
+    fn test_node_coherence() {
+        let mut node = CrystalNode::new(Vector3D::new(0.0, 0.0, 0.0));
+        assert!(node.set_phase_coherence(0.5).is_ok());
+        assert_eq!(node.get_phase_coherence(), 0.5);
+    }
+
+    #[test]
+    fn test_resonance_calculation() {
+        let lattice = CrystalLattice::new(4);
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        assert!(lattice.calculate_resonance(&pos).is_err());
     }
 }
