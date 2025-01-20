@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 16:38:04 UTC
+//! Last Updated: 2025-01-20 16:42:34 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -29,12 +29,17 @@ pub mod aether;
 
 // Re-export common types from magicmath
 pub use magicmath::{
+    // Core types
     core::Field,
-    traits::{CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
+    traits::{CrystalAdd, CrystalSub, CrystalMul, CrystalDiv, MeshValue},
     vector3d::Vector3D,
     vector4d::Vector4D,
-    resonance::{ResonanceMath, ResonanceState},
+    resonance::{Resonance as ResonanceMath, ResonanceState},
     HarmonyState,
+    // Math operations
+    add, sub, mul, div,
+    // Constants
+    constants::HARMONY_STABILITY_THRESHOLD,
 };
 
 // Re-exports from errors
@@ -48,7 +53,11 @@ pub use errors::core::{
 // Re-exports from scribe
 pub use scribe::{
     Write as Scribe,
-    string::String
+    native::{
+        String,
+        Vec,
+        Box,
+    }
 };
 
 // Constants module
@@ -68,8 +77,8 @@ pub mod constants {
 }
 
 /// Initialize fractal parameters for crystal growth
-pub fn create_growth_params() -> magicmath::resonance::FractalParams {
-    magicmath::resonance::FractalParams::default()
+pub fn create_growth_params() -> magicmath::resonance::Resonance {
+    magicmath::resonance::Resonance::new()
     .with_max_iterations(constants::MAX_FRACTAL_DEPTH)
     .with_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD)
 }

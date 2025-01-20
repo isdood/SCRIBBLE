@@ -4,20 +4,20 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 16:14:19 UTC
+//! Last Updated: 2025-01-20 16:48:09 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
-    math::{Field, Mesh, PhaseField, AetherField},
+    core::{Field, Mesh, PhaseField, AetherField},
     traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
-    Vector3D,
-    Vector4D,
+    vector3d::Vector3D,
+    vector4d::Vector4D,
     resonance::{Quantum, Phase, Resonance}
 };
 
 use errors::core::{MathError, QuantumError};
-use scribe::{Scribe, native_string::String, collections::Vec};
+use scribe::{Write as Scribe, native::String, native::Vec};
 
 /// Aether field state handler
 #[derive(Debug)]
@@ -111,18 +111,17 @@ impl<T: MeshValue> Phase for Aether<T> {
 }
 
 impl<T: MeshValue + Scribe> Scribe for Aether<T> {
-    fn scribe(&self) -> String {
-        let mut result = String::new();
-        result.push_str("Aether Field State:\n");
-        result.push_str("Position: ");
-        result.push_str(&self.position.scribe().to_str());
-        result.push_str("\nDensity: ");
-        result.push_str(&self.density.to_string());
-        result.push_str("\nPotential: ");
-        result.push_str(&self.potential().unwrap_or(0.0).to_string());
-        result.push_str("\nResonance: ");
-        result.push_str(&self.resonance.scribe().to_str());
-        result
+    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+        f.write_str("Aether Field State:\n")?;
+        f.write_str("Position: ")?;
+        self.position.write(f)?;
+        f.write_str("\nDensity: ")?;
+        write!(f, "{}", self.density)?;
+        f.write_str("\nPotential: ")?;
+        write!(f, "{}", self.potential().unwrap_or(0.0))?;
+        f.write_str("\nResonance: ")?;
+        self.resonance.write(f)?;
+        Ok(())
     }
 }
 
@@ -169,17 +168,32 @@ mod tests {
         fn add(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value + other.value })
         }
+
+        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value += other.value;
+            Ok(())
+        }
     }
 
     impl CrystalSub for TestAether {
         fn sub(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value - other.value })
         }
+
+        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value -= other.value;
+            Ok(())
+        }
     }
 
     impl CrystalMul for TestAether {
         fn mul(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value * other.value })
+        }
+
+        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value *= other.value;
+            Ok(())
         }
     }
 
@@ -190,13 +204,19 @@ mod tests {
             }
             Ok(Self { value: self.value / other.value })
         }
+
+        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            if other.value == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            self.value /= other.value;
+            Ok(())
+        }
     }
 
     impl Scribe for TestAether {
-        fn scribe(&self) -> String {
-            let mut result = String::new();
-            result.push_str(&self.value.to_string());
-            result
+        fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+            write!(f, "{}", self.value)
         }
     }
 

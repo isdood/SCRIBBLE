@@ -3,8 +3,8 @@
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-19
-//! Last Updated: 2025-01-20 16:38:32 UTC
+//! Created: 2025-01-20
+//! Last Updated: 2025-01-20 16:47:24 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -56,8 +56,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .current_dir(project_root)
     .args(&[
         "build",
+        "-Doptimize=ReleaseSafe",
         "--prefix", build_dir.to_str().unwrap(),
-          "--library-directory", build_dir.to_str().unwrap(),
     ])
     .status()
     .map_err(|e| format!("Failed to execute zig build: {}", e))?;

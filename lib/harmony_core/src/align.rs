@@ -4,13 +4,17 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 20:56:36 UTC
+//! Last Updated: 2025-01-20 16:43:47 UTC
 //! Version: 0.1.1
 //! License: MIT
 
-use magicmath::{Operation, MathResult};
+use magicmath::{
+    core::Operation,
+    vector3d::Vector3D,
+    traits::MathResult,
+};
+
 use crate::{
-    vector::Vector3D,
     errors::QuantumError,
     constants::{QUANTUM_STABILITY_THRESHOLD, ALIGNMENT_THRESHOLD},
     idk::ShardUninit,
