@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:41:57 UTC
+//! Last Updated: 2025-01-20 17:55:27 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -15,7 +15,6 @@
 extern crate magicmath;
 extern crate errors;
 extern crate scribe;
-extern crate align;
 
 // Module declarations
 pub mod align;
@@ -30,45 +29,39 @@ pub mod aether;
 
 // Re-export common types from magicmath
 pub use magicmath::{
-    // Core traits
-    traits::MeshValue,
-    // Core types
-    Field,
-    Mesh,
-    PhaseField,
-    AetherField,
-    // Math operations
-    CrystalAdd,
-    CrystalSub,
-    CrystalMul,
-    CrystalDiv,
-    // Vectors
-    Vector3D,
-    Vector4D,
-    // Resonance
-    Resonance,
-    // Math functions
-    floor,
-    sqrt,
-    // Fractal types
-    fractal::{
-        FractalParams,
-        FractalState,
-        JuliaParams,
-        JuliaState,
-        JuliaVariant,
-        MandelbrotParams,
-        MandelbrotState,
-        MandelbrotVariant,
-        generate_fractal,
-        iterate_julia,
-        iterate_mandelbrot,
+    traits::{
+        MeshValue,
+        CrystalAdd,
+        CrystalSub,
+        CrystalMul,
+        CrystalDiv,
+    },
+    resonance::{
+        Resonance,
+        ResonanceParams,
+        Phase,
+        Quantum,
+    },
+    operations::{
+        Field,
+        Mesh,
+        PhaseField,
+        AetherField,
+    },
+    vectors::{
+        Vector3D,
+        Vector4D,
+    },
+    math::{
+        sqrt,
+        floor,
     },
 };
 
 // Re-exports from errors
-pub use errors::{
+pub use errors::core::{
     Error as MathError,
+    Result as MathResult,
     QuantumError,
 };
 
@@ -78,11 +71,11 @@ pub use core::{
     result::Result,
 };
 
-// Re-exports from align
-pub use align::{
+// Re-exports from scribe
+pub use scribe::{
+    Scribe,
     string::String,
     collections::Vec,
-    boxed::Box,
 };
 
 // Constants module
@@ -102,8 +95,8 @@ pub mod constants {
 }
 
 /// Initialize fractal parameters for crystal growth
-pub fn create_growth_params() -> Resonance {
-    let mut params = Resonance::new();
+pub fn create_growth_params() -> ResonanceParams {
+    let mut params = ResonanceParams::new();
     params.set_max_iterations(constants::MAX_FRACTAL_DEPTH);
     params.set_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD);
     params

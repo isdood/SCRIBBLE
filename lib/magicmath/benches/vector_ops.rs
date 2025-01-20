@@ -1,10 +1,10 @@
 //! MagicMath Vector Operations Benchmarks
-//! ====================================
+//! ===================================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-20
-//! Last Updated: 2025-01-20 17:40:13 UTC
+//! Last Updated: 2025-01-20 17:52:34 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -51,10 +51,9 @@ fn dot_product(c: &mut Criterion) {
                 let v2 = Vector3D::new(x2, y2, z2);
                 let id = format!("v{}·v{}", i + 1, j + 1);
                 group.bench_function(id, |b| {
-                    b.iter_with_setup(
-                        || (v1, v2),  // Now works because Vector3D implements Copy
-                                      |(v1, v2)| criterion::black_box(v1.dot(&v2))
-                    )
+                    b.iter(|| {
+                        criterion::black_box(v1.dot(&v2))
+                    })
                 });
             }
         }
@@ -69,10 +68,9 @@ fn magnitude(c: &mut Criterion) {
         let v = Vector3D::new(x, y, z);
         let id = format!("v{}", i + 1);
         group.bench_function(id, |b| {
-            b.iter_with_setup(
-                || v,  // Now works because Vector3D implements Copy
-                |v| criterion::black_box(v.magnitude())
-            )
+            b.iter(|| {
+                criterion::black_box(v.magnitude())
+            })
         });
     }
     group.finish();
