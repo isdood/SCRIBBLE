@@ -2,8 +2,6 @@
 name = "error_derive"
 version = "0.1.0"
 edition = "2021"
-authors = ["Caleb J.D. Terkovics <isdood>"]
-description = "Proc-macro implementations for Scribble's error handling system"
 
 [lib]
 proc-macro = true
@@ -14,6 +12,6 @@ quote = "1.0"
 proc-macro2 = "1.0"
 darling = "0.20"
 
-[dev-dependencies]
-error_core = { path = "../error_core" }
-trybuild = "1.0"
+[dependencies.error_core]
+path = "../error_core"
+

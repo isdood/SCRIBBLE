@@ -1,159 +1,179 @@
-//! Aether Field Operations
-//! ====================
+//! Aether - Quantum Field Interface
+//! ===========================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-19
-//! Last Updated: 2025-01-20 17:59:37 UTC
-//! Version: 0.1.0
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-20 20:39:33 UTC
+//! Version: 0.1.1
 //! License: MIT
 
-#![no_std]
-
-use core::fmt::{Display, Formatter, Result as FmtResult};
+use core::{
+    fmt::{self, Display},
+    result::Result,
+};
 
 use magicmath::{
-    traits::MeshValue,
-    field::{
-        Field,
-        Mesh,
-        PhaseField,
-        AetherField,
-    },
-    resonance::{
-        Quantum,
-        Phase,
-        Resonance,
-    },
-    vector::{Vector3D, Vector4D},
-    math::sqrt,
+    MeshValue,
+    Vector3D,
+    Vector4D,
+    resonance::Resonance,
 };
 
-use errors::{
-    core::Error as MathError,
-    quantum::QuantumError,
-};
+use errors::MathError;
 
-use scribe::native_string::String;
+/// A quantum field density
+#[derive(Debug, Clone, Copy)]
+pub struct Density(f64);
 
-/// Aether field state handler
+impl Density {
+    /// Create new density value
+    pub fn new(value: f64) -> Result<Self, MathError> {
+        if value < 0.0 {
+            return Err(MathError::InvalidRange);
+        }
+        Ok(Self(value))
+    }
+
+    /// Get density value
+    pub fn value(&self) -> f64 {
+        self.0
+    }
+}
+
+/// A quantum field interface
 #[derive(Debug)]
 pub struct Aether<T> {
-    field: AetherField,
-    phase_field: PhaseField,
-    mesh: Mesh<T>,
+    /// Field position
+    position: Vector3D,
+    /// Field momentum
+    momentum: Vector4D,
+    /// Field density
+    density: Density,
+    /// Quantum resonance
     resonance: Resonance,
-    position: Vector4D,
-    density: f64,
+    /// Field value
+    value: T,
 }
 
 impl<T: Default + Clone + MeshValue> Aether<T> {
-    /// Create a new aether field handler
-    pub fn new(size: usize, density: f64) -> Self {
-        Self {
-            field: AetherField::new(density),
-            phase_field: PhaseField::new(),
-            mesh: Mesh::new(size),
-            resonance: Resonance::new(),
-            position: Vector4D::new(0.0, 0.0, 0.0, 1.0),
-            density,
-        }
+    /// Create new quantum field
+    pub fn new() -> Result<Self, MathError> {
+        Ok(Self {
+            position: Vector3D::new(0.0, 0.0, 0.0),
+           momentum: Vector4D::new(0.0, 0.0, 0.0, 0.0),
+           density: Density::new(1.0)?,
+           resonance: Resonance::new(),
+           value: T::default(),
+        })
     }
 
-    /// Get the aether state at position
-    pub fn get_state(&self, pos: &Vector4D) -> Result<T, QuantumError> {
-        self.mesh.get_value_at(&Vector3D::new(pos.x, pos.y, pos.z))
-        .map_err(|_| QuantumError::BoundaryViolation)
+    /// Get field position
+    pub fn position(&self) -> &Vector3D {
+        &self.position
     }
 
-    /// Set the aether state at position
-    pub fn set_state(&mut self, pos: &Vector4D, value: T) -> Result<(), QuantumError> {
-        self.mesh.set_value_at(&Vector3D::new(pos.x, pos.y, pos.z), value)
-        .map_err(|_| QuantumError::BoundaryViolation)
+    /// Get field momentum
+    pub fn momentum(&self) -> &Vector4D {
+        &self.momentum
     }
 
-    /// Apply aether field transformation
-    pub fn apply_field(&mut self) -> Result<(), MathError> {
-        self.field.transform(&self.position)?;
-        let phase = self.field.phase()?;
-        self.phase_field.apply_shift(phase)?;
-        self.resonance.phase_shift(phase)?;
-        Ok(())
-    }
-
-    /// Move to new 4D position
-    pub fn move_to(&mut self, pos: Vector4D) -> Result<(), MathError> {
-        self.position = pos;
-        self.apply_field()
-    }
-
-    /// Get current density
+    /// Get field density
     pub fn density(&self) -> f64 {
-        self.density
+        self.density.value()
     }
 
-    /// Set new density
-    pub fn set_density(&mut self, density: f64) -> Result<(), MathError> {
-        if density <= 0.0 {
-            return Err(MathError::InvalidValue);
-        }
-        self.density = density;
-        self.field.set_density(density);
-        Ok(())
+    /// Set field position
+    pub fn set_position(&mut self, pos: Vector3D) {
+        self.position = pos;
     }
 
-    /// Calculate aether potential
-    pub fn potential(&self) -> Result<f64, MathError> {
-        let field_energy = self.field.energy()?;
-        let density_factor = sqrt(self.density);
-        Ok(field_energy * density_factor)
+    /// Calculate field energy
+    pub fn energy(&self) -> Result<f64, MathError> {
+        let pos_mag = self.position.magnitude()?;
+        let mom_mag = self.momentum.magnitude()?;
+        Ok(pos_mag * pos_mag + mom_mag * mom_mag)
     }
 }
 
-impl<T: MeshValue> Quantum for Aether<T> {
-    fn energy(&self) -> Result<f64, MathError> {
-        self.potential()
-    }
-
-    fn phase(&self) -> Result<f64, MathError> {
-        self.field.phase()
-    }
-}
-
-impl<T: MeshValue> Phase for Aether<T> {
-    fn phase_shift(&mut self, shift: f64) -> Result<(), MathError> {
-        self.phase_field.apply_shift(shift)?;
-        self.resonance.phase_shift(shift)
-    }
-}
-
-impl<T: MeshValue> Display for Aether<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        writeln!(f, "Aether Field State:")?;
-        writeln!(f, "Position: {}", self.position)?;
-        writeln!(f, "Density: {}", self.density)?;
-        writeln!(f, "Potential: {}", self.potential().unwrap_or(0.0))?;
-        write!(f, "Resonance: {}", self.resonance)
+impl<T: MeshValue + Display> Display for Aether<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Quantum Field:")?;
+        writeln!(f, "Position: {:?}", self.position)?;
+        writeln!(f, "Momentum: {:?}", self.momentum)?;
+        writeln!(f, "Density: {}", self.density.value())?;
+        write!(f, "Resonance: {:?}", self.resonance)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use magicmath::traits::{CrystalAdd, CrystalSub, CrystalMul, CrystalDiv};
 
     #[derive(Debug, Clone, Default)]
-    struct TestAether {
-        value: f64,
+    struct TestField(f64);
+
+    impl CrystalAdd for TestField {
+        fn add(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self(self.0 + other.0))
+        }
+
+        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.0 += other.0;
+            Ok(())
+        }
     }
 
-    impl MeshValue for TestAether {
+    impl CrystalSub for TestField {
+        fn sub(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self(self.0 - other.0))
+        }
+
+        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.0 -= other.0;
+            Ok(())
+        }
+    }
+
+    impl CrystalMul for TestField {
+        fn mul(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self(self.0 * other.0))
+        }
+
+        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.0 *= other.0;
+            Ok(())
+        }
+    }
+
+    impl CrystalDiv for TestField {
+        fn div(&self, other: &Self) -> Result<Self, MathError> {
+            if other.0 == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            Ok(Self(self.0 / other.0))
+        }
+
+        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            if other.0 == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            self.0 /= other.0;
+            Ok(())
+        }
+    }
+
+    impl MeshValue for TestField {
         fn to_f64(&self) -> Result<f64, MathError> {
-            Ok(self.value)
+            Ok(self.0)
         }
 
         fn from(value: f64) -> Self {
-            Self { value }
+            Self(value)
+        }
+
+        fn magnitude(&self) -> Result<f64, MathError> {
+            Ok(self.0.abs())
         }
 
         fn coherence(&self) -> Result<f64, MathError> {
@@ -161,113 +181,50 @@ mod tests {
         }
 
         fn energy(&self) -> Result<f64, MathError> {
-            Ok(self.value.abs())
-        }
-
-        fn magnitude(&self) -> Result<f64, MathError> {
-            Ok(self.value.abs())
+            Ok(self.0 * self.0)
         }
 
         fn to_usize(&self) -> Result<usize, MathError> {
-            Ok(self.value as usize)
+            Ok(self.0 as usize)
         }
 
         fn check_harmony_state(&self) -> bool {
-            true
+            self.0 >= 0.0
         }
     }
 
-    impl CrystalAdd for TestAether {
-        fn add(&self, other: &Self) -> Result<Self, MathError> {
-            Ok(Self { value: self.value + other.value })
-        }
-
-        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
-            self.value += other.value;
-            Ok(())
-        }
-    }
-
-    impl CrystalSub for TestAether {
-        fn sub(&self, other: &Self) -> Result<Self, MathError> {
-            Ok(Self { value: self.value - other.value })
-        }
-
-        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
-            self.value -= other.value;
-            Ok(())
-        }
-    }
-
-    impl CrystalMul for TestAether {
-        fn mul(&self, other: &Self) -> Result<Self, MathError> {
-            Ok(Self { value: self.value * other.value })
-        }
-
-        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
-            self.value *= other.value;
-            Ok(())
-        }
-    }
-
-    impl CrystalDiv for TestAether {
-        fn div(&self, other: &Self) -> Result<Self, MathError> {
-            if other.value == 0.0 {
-                return Err(MathError::DivisionByZero);
-            }
-            Ok(Self { value: self.value / other.value })
-        }
-
-        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
-            if other.value == 0.0 {
-                return Err(MathError::DivisionByZero);
-            }
-            self.value /= other.value;
-            Ok(())
-        }
-    }
-
-    impl Display for TestAether {
-        fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-            write!(f, "{}", self.value)
+    impl Display for TestField {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
         }
     }
 
     #[test]
-    fn test_aether_creation() {
-        let aether = Aether::<TestAether>::new(4, 1.0);
-        assert_eq!(aether.density(), 1.0);
+    fn test_field_creation() -> Result<(), MathError> {
+        let field: Aether<TestField> = Aether::new()?;
+        assert!(field.density() > 0.0);
+        Ok(())
     }
 
     #[test]
-    fn test_density_update() {
-        let mut aether = Aether::<TestAether>::new(4, 1.0);
-        assert!(aether.set_density(2.0).is_ok());
-        assert_eq!(aether.density(), 2.0);
-        assert!(aether.set_density(0.0).is_err());
+    fn test_field_position() -> Result<(), MathError> {
+        let mut field: Aether<TestField> = Aether::new()?;
+        let pos = Vector3D::new(1.0, 0.0, 0.0);
+        field.set_position(pos);
+        assert_eq!(format!("{:?}", field.position()), format!("{:?}", &pos));
+        Ok(())
     }
 
     #[test]
-    fn test_state_access() {
-        let mut aether = Aether::<TestAether>::new(4, 1.0);
-        let pos = Vector4D::new(1.0, 1.0, 1.0, 1.0);
-        let value = TestAether { value: 42.0 };
-
-        assert!(aether.set_state(&pos, value).is_ok());
-        assert_eq!(aether.get_state(&pos).unwrap().value, 42.0);
+    fn test_field_energy() -> Result<(), MathError> {
+        let field: Aether<TestField> = Aether::new()?;
+        assert!(field.energy()? >= 0.0);
+        Ok(())
     }
 
     #[test]
-    fn test_field_application() {
-        let mut aether = Aether::<TestAether>::new(4, 1.0);
-        assert!(aether.apply_field().is_ok());
-    }
-
-    #[test]
-    fn test_quantum_traits() {
-        let mut aether = Aether::<TestAether>::new(4, 1.0);
-        assert!(aether.energy().is_ok());
-        assert!(aether.phase().is_ok());
-        assert!(aether.phase_shift(0.5).is_ok());
+    fn test_density_limits() {
+        assert!(Density::new(-1.0).is_err());
+        assert!(Density::new(1.0).is_ok());
     }
 }

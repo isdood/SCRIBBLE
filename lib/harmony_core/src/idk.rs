@@ -1,156 +1,129 @@
-//! IDK - Internal Data Kernel
-//! ======================
+//! IDK (Intermediate Data Kernel) Module
+//! ===================================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-18
-//! Last Updated: 2025-01-20 20:29:06 UTC
-//! Version: 0.1.1
+//! Created: 2025-01-19
+//! Last Updated: 2025-01-20 20:41:18 UTC
+//! Version: 0.1.0
 //! License: MIT
 
-use core::{
-    fmt::{self, Display},
-    marker::PhantomData,
-    mem::MaybeUninit,
-};
+use core::fmt::{self, Display, Debug};
 
 use magicmath::{
-    MeshValue,
-    Vector3D,
+    traits::MeshValue,
+    base::{Field, FieldValue},
+    resonance::Resonance,
+    spatial::Vector3D,
 };
 
-use errors::MathError;
+use errors::{
+    core::MathError,
+    core::Result as MathResult,
+};
 
-/// Uninitialized shard type
+use scribe::{
+    Scribe,
+    native_string::String,
+};
+
+/// Uninitialized shard state
 #[derive(Debug)]
 pub struct ShardUninit<T> {
-    data: MaybeUninit<T>,
+    value: T,
     initialized: bool,
-    _marker: PhantomData<T>,
 }
 
-impl<T> ShardUninit<T> {
+impl<T: Default> ShardUninit<T> {
     /// Create new uninitialized shard
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            data: MaybeUninit::uninit(),
+            value: T::default(),
             initialized: false,
-            _marker: PhantomData,
         }
     }
 
-    /// Get reference to initialized data
-    /// # Safety
-    /// Caller must ensure data is initialized
-    pub unsafe fn get_ref(&self) -> Option<&T> {
+    /// Initialize shard with value
+    pub fn init(&mut self, value: T) {
+        self.value = value;
+        self.initialized = true;
+    }
+
+    /// Check if shard is initialized
+    pub fn is_init(&self) -> bool {
+        self.initialized
+    }
+
+    /// Get value if initialized
+    pub fn value(&self) -> Option<&T> {
         if self.initialized {
-            Some(&*self.data.as_ptr())
+            Some(&self.value)
         } else {
             None
         }
     }
-
-    /// Set data value
-    /// # Safety
-    /// Previous value is dropped if initialized
-    pub unsafe fn set(&mut self, value: T) {
-        if self.initialized {
-            self.data.assume_init_drop();
-        }
-        self.data.write(value);
-        self.initialized = true;
-    }
-
-    /// Check if data is initialized
-    pub fn is_initialized(&self) -> bool {
-        self.initialized
-    }
 }
 
-/// Quantum harmony state
-#[derive(Debug, Clone)]
+/// Harmony state container
+#[derive(Debug)]
 pub struct HarmonyState<T> {
-    /// State value
     value: T,
-    /// Position in lattice
     position: Vector3D,
-}
-
-impl<T: Default> Default for HarmonyState<T> {
-    fn default() -> Self {
-        Self {
-            value: T::default(),
-            position: Vector3D::new(0.0, 0.0, 0.0),
-        }
-    }
+    field: Field,
+    resonance: Resonance,
 }
 
 impl<T: MeshValue + Display> HarmonyState<T> {
     /// Create new harmony state
     pub fn new(value: T, position: Vector3D) -> Self {
-        Self { value, position }
+        Self {
+            value,
+            position,
+            field: Field::default(),
+            resonance: Resonance::new(),
+        }
     }
 
-    /// Get state value
+    /// Get current value
     pub fn value(&self) -> &T {
         &self.value
     }
 
-    /// Get position
+    /// Get current position
     pub fn position(&self) -> &Vector3D {
         &self.position
     }
 
-    /// Set position
-    pub fn set_position(&mut self, pos: Vector3D) {
-        self.position = pos;
+    /// Update field state
+    pub fn update_field(&mut self) -> MathResult<()> {
+        self.field.transform(&self.position)?;
+        Ok(())
     }
 
-    /// Calculate state energy
-    pub fn energy(&self) -> Result<f64, MathError> {
-        self.value.energy()
-    }
-
-    /// Calculate state coherence
-    pub fn coherence(&self) -> Result<f64, MathError> {
-        self.value.coherence()
+    /// Calculate total energy
+    pub fn energy(&self) -> MathResult<f64> {
+        let field_energy = self.field.energy()?;
+        let value_energy = self.value.energy()?;
+        Ok(field_energy + value_energy)
     }
 }
 
-impl<T: Display> Display for HarmonyState<T> {
+impl<T: MeshValue + Display> Display for HarmonyState<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "State({}) at {}", self.value, self.position)
+        write!(f, "State({}) at {:?}", self.value, self.position)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_shard_uninit() {
-        let mut shard: ShardUninit<i32> = ShardUninit::new();
-        assert!(!shard.is_initialized());
-
-        unsafe {
-            shard.set(42);
-            assert!(shard.is_initialized());
-            assert_eq!(*shard.get_ref().unwrap(), 42);
-        }
-    }
-
-    #[test]
-    fn test_harmony_state() {
-        let pos = Vector3D::new(1.0, 2.0, 3.0);
-        let state = HarmonyState::new(42.0, pos.clone());
-        assert_eq!(*state.value(), 42.0);
-        assert_eq!(*state.position(), pos);
-    }
-
-    #[test]
-    fn test_harmony_state_default() {
-        let state: HarmonyState<f64> = HarmonyState::default();
-        assert_eq!(*state.value(), 0.0);
-        assert_eq!(*state.position(), Vector3D::new(0.0, 0.0, 0.0));
+impl<T: MeshValue + Display> Scribe for HarmonyState<T> {
+    fn scribe(&self) -> String {
+        let mut result = String::new();
+        result.push_str("Harmony State:\n");
+        result.push_str("Value: ");
+        result.push_str(&self.value.to_string());
+        result.push_str("\nPosition: ");
+        result.push_str(&format!("{:?}", self.position));
+        result.push_str("\nField Energy: ");
+        result.push_str(&self.field.energy().unwrap_or(0.0).to_string());
+        result
     }
 }

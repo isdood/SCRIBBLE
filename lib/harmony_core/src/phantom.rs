@@ -1,124 +1,155 @@
-//! Phantom State Management
-//! ======================
+//! Phantom - Quantum Phase Handler
+//! =========================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-19
-//! Last Updated: 2025-01-20 20:37:40 UTC
-//! Version: 0.1.0
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-20 20:41:14 UTC
+//! Version: 0.1.1
 //! License: MIT
 
+use core::{
+    fmt::{self, Display, Formatter, Result as FmtResult},
+    result::Result,
+};
+
 use magicmath::{
-    traits::MeshValue,
-    base::{Field, Mesh, PhaseField},
-    vectors::{Vector3D, Vector4D},
-    resonance::{Resonance, Phase},
+    Vector3D,
+    Vector4D,
+    resonance::Resonance,
+    field::PhaseField,
 };
 
-use errors::{
-    core::{Error as MathError, Result as MathResult},
-    quantum::QuantumError,
-};
+use errors::MathError;
 
-use scribe::{
-    Scribe,
-    native_string::String,
-};
-
-use crate::constants;
-
-/// Phantom state container for quantum field manipulation
+/// A phantom field error
 #[derive(Debug)]
-pub struct PhantomState<T> {
-    field: PhaseField,
-    mesh: Mesh<T>,
-    resonance: Resonance,
-    position: Vector3D,
-    momentum: Vector4D,
+pub enum PhaseError {
+    /// Invalid quantum state
+    InvalidState,
+    /// Phase coherence lost
+    CoherenceLost,
+    /// Field boundary violation
+    BoundaryViolation,
 }
 
-impl<T: Default + Clone + MeshValue> PhantomState<T> {
-    /// Create new phantom state
-    pub fn new(size: usize) -> Self {
+/// Result type for phantom operations
+pub type PhaseResult<T> = Result<T, PhaseError>;
+
+/// A phantom quantum field
+#[derive(Debug)]
+pub struct PhantomField {
+    /// Position in 3D space
+    position: Vector3D,
+    /// Momentum in 4D space-time
+    momentum: Vector4D,
+    /// Phase field
+    field: PhaseField,
+    /// Quantum resonance
+    resonance: Resonance,
+    /// Energy level
+    energy: f64,
+}
+
+impl PhantomField {
+    /// Create new phantom field
+    pub fn new(position: Vector3D, momentum: Vector4D) -> Self {
         Self {
-            field: PhaseField::new(constants::PHANTOM_PHASE_SHIFT),
-            mesh: Mesh::new(size),
+            position,
+            momentum,
+            field: PhaseField::new(),
             resonance: Resonance::new(),
-            position: Vector3D::new(0.0, 0.0, 0.0),
-            momentum: Vector4D::new(0.0, 0.0, 0.0, 1.0),
+            energy: 0.0,
         }
     }
 
-    /// Get current position
+    /// Get field position
     pub fn position(&self) -> &Vector3D {
         &self.position
     }
 
-    /// Get current momentum
+    /// Get field momentum
     pub fn momentum(&self) -> &Vector4D {
         &self.momentum
     }
 
-    /// Get phase field state
-    pub fn field(&self) -> &PhaseField {
-        &self.field
+    /// Get field energy
+    pub fn energy(&self) -> Result<f64, MathError> {
+        Ok(self.energy)
     }
 
-    /// Get resonance state
-    pub fn resonance(&self) -> &Resonance {
-        &self.resonance
-    }
-
-    /// Set new position
-    pub fn set_position(&mut self, pos: Vector3D) -> MathResult<()> {
-        self.position = pos;
-        self.update_field()
-    }
-
-    /// Set new momentum
-    pub fn set_momentum(&mut self, mom: Vector4D) -> MathResult<()> {
-        self.momentum = mom;
-        self.update_field()
-    }
-
-    /// Update field state
-    fn update_field(&mut self) -> MathResult<()> {
-        self.field.transform(&self.position)?;
-        self.field.adjust_phase(self.momentum.w())?;
-        self.resonance.phase_shift(self.field.phase()?)?;
+    /// Set field energy
+    pub fn set_energy(&mut self, value: f64) -> PhaseResult<()> {
+        if value < 0.0 {
+            return Err(PhaseError::InvalidState);
+        }
+        self.energy = value;
         Ok(())
     }
 
-    /// Calculate total energy
-    pub fn energy(&self) -> MathResult<f64> {
-        let field_energy = self.field.energy()?;
-        let resonance_energy = self.resonance.energy()?;
-        Ok(field_energy + resonance_energy)
+    /// Apply phase shift
+    pub fn apply_phase_shift(&mut self, shift: f64) -> Result<(), MathError> {
+        self.field.phase_shift(shift)
+    }
+
+    /// Check if field is stable
+    pub fn is_stable(&self) -> bool {
+        self.energy >= 0.0
     }
 }
 
-impl<T: MeshValue> Phase for PhantomState<T> {
-    fn phase_shift(&mut self, shift: f64) -> MathResult<()> {
-        self.field.adjust_phase(shift)?;
-        self.resonance.phase_shift(shift)?;
-        Ok(())
+impl Display for PhantomField {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        writeln!(f, "Phantom Field:")?;
+        writeln!(f, "Position: {:?}", self.position)?;
+        writeln!(f, "Momentum: {:?}", self.momentum)?;
+        writeln!(f, "Phase: {:?}", self.field)?;
+        writeln!(f, "Resonance: {:?}", self.resonance)?;
+        write!(f, "Energy: {}", self.energy)
     }
 }
 
-impl<T: MeshValue> Scribe for PhantomState<T> {
-    fn scribe(&self) -> String {
-        let mut result = String::new();
-        result.push_str("Phantom State:\n");
-        result.push_str("Position: ");
-        result.push_str(&format!("{:?}", self.position));
-        result.push_str("\nMomentum: ");
-        result.push_str(&format!("{:?}", self.momentum));
-        result.push_str("\nPhase: ");
-        result.push_str(&format!("{:?}", self.field.phase()));
-        result.push_str("\nResonance: ");
-        result.push_str(&format!("{:?}", self.resonance));
-        result.push_str("\nEnergy: ");
-        result.push_str(&self.energy().unwrap_or(0.0).to_string());
-        result
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_phantom_field() {
+        let pos = Vector3D::new(1.0, 0.0, 0.0);
+        let mom = Vector4D::new(1.0, 0.0, 0.0, 0.0);
+        let field = PhantomField::new(pos, mom);
+
+        assert!(field.is_stable());
+        assert_eq!(field.energy().unwrap(), 0.0);
+    }
+
+    #[test]
+    fn test_energy_limits() {
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        let mom = Vector4D::new(0.0, 0.0, 0.0, 0.0);
+        let mut field = PhantomField::new(pos, mom);
+
+        assert!(field.set_energy(1.0).is_ok());
+        assert!(field.set_energy(-1.0).is_err());
+    }
+
+    #[test]
+    fn test_phase_shift() {
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        let mom = Vector4D::new(0.0, 0.0, 0.0, 0.0);
+        let mut field = PhantomField::new(pos, mom);
+
+        assert!(field.apply_phase_shift(0.5).is_ok());
+    }
+
+    #[test]
+    fn test_field_comparison() {
+        let pos = Vector3D::new(1.0, 0.0, 0.0);
+        let mom = Vector4D::new(1.0, 0.0, 0.0, 0.0);
+        let field = PhantomField::new(pos.clone(), mom.clone());
+
+        // Compare using Debug format since Vector types don't implement PartialEq
+        assert_eq!(format!("{:?}", field.position()), format!("{:?}", &pos));
+        assert_eq!(format!("{:?}", field.momentum()), format!("{:?}", &mom));
     }
 }
