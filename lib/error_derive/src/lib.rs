@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, parse::Parse, parse::ParseStream};
-use darling::{FromDeriveInput, FromMeta, FromVariant};
+use syn::{parse_macro_input, DeriveInput, Lit, Meta, NestedMeta};
+use darling::{FromDeriveInput, FromMeta};
 
 #[derive(Debug, FromMeta)]
 struct DiagnoseOpts {
@@ -10,55 +10,16 @@ struct DiagnoseOpts {
     quick_fix: String,
 }
 
-// Implement Parse for DiagnoseOpts
-impl Parse for DiagnoseOpts {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let content;
-        syn::parenthesized!(content in input);
-        Ok(DiagnoseOpts {
-            detect: content.parse()?,
-           suggestion: {
-               content.parse::<syn::Token![,]>()?;
-               content.parse()?
-           },
-           quick_fix: {
-               content.parse::<syn::Token![,]>()?;
-               content.parse()?
-           },
-        })
-    }
-}
-
-#[derive(Debug, FromVariant)]
-#[darling(attributes(diagnose))]
-struct DiagnoseVariant {
-    ident: syn::Ident,
-    attrs: Vec<syn::Attribute>,
-}
-
 #[derive(Debug, FromDeriveInput)]
 #[darling(supports(enum_any), attributes(error_path))]
 struct ErrorDeriveOpts {
     ident: syn::Ident,
-    data: darling::ast::Data<DiagnoseVariant, ()>,
-    path: Option<String>,
+    data: darling::ast::Data<(), ()>,
+    #[darling(default)]
+    error_path: Option<String>,
 }
 
 /// Derives the Diagnose trait for error types
-///
-/// # Example
-///
-/// ```rust
-/// use error_derive::Diagnose;
-/// use error_core::Diagnose as _;
-///
-/// #[derive(Debug, Diagnose)]
-/// #[error_path(path = "quantum/errors")]
-/// pub enum QuantumError {
-///     #[diagnose(detect = "quantum_state < 0.5", suggestion = "Consider increasing coherence threshold", quick_fix = "set_min_coherence(0.5)")]
-///     InvalidState,
-/// }
-/// ```
 #[proc_macro_derive(Diagnose, attributes(diagnose, error_path))]
 pub fn derive_diagnose(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -69,38 +30,51 @@ pub fn derive_diagnose(input: TokenStream) -> TokenStream {
     };
 
     let name = &opts.ident;
-    let error_path = opts.path.unwrap_or_default();
+    let error_path = opts.error_path.unwrap_or_default();
 
-    let variants = match opts.data {
-        darling::ast::Data::Enum(variants) => variants,
-        _ => panic!("Diagnose can only be derived for enums"),
+    // Get enum variants
+    let variants = if let syn::Data::Enum(data) = &input.data {
+        &data.variants
+    } else {
+        panic!("Diagnose can only be derived for enums");
     };
 
-    let match_arms = variants.into_iter().map(|variant| {
+    let match_arms = variants.iter().map(|variant| {
         let variant_name = &variant.ident;
-        let diagnose_attr = variant.attrs.iter().find(|attr| attr.path().is_ident("diagnose"));
+        let mut detect = String::new();
+        let mut suggestion = String::new();
+        let mut quick_fix = String::new();
 
-        if let Some(attr) = diagnose_attr {
-            if let Ok(meta) = attr.parse_args::<DiagnoseOpts>() {
-                let detect = &meta.detect;
-                let suggestion = &meta.suggestion;
-                let quick_fix = &meta.quick_fix;
+        // Parse diagnose attributes
+        for attr in &variant.attrs {
+            if attr.path().is_ident("diagnose") {
+                attr.parse_nested_meta(|meta| {
+                    let path = meta.path.get_ident().unwrap().to_string();
+                    let value = meta.value()?;
+                    let str_val = value.parse::<syn::LitStr>()?.value();
 
-                quote! {
-                    Self::#variant_name => {
-                        let mut report = error_core::DiagnosticReport::new();
-                        report.message = format!("Detected condition: {}", #detect);
-                        report.suggestions.push(#suggestion.to_string());
-                        report.quick_fixes.push(error_core::QuickFix {
-                            description: #suggestion.to_string(),
-                                                code: #quick_fix.to_string(),
-                        });
-                        report
+                    match path.as_str() {
+                        "detect" => detect = str_val,
+                        "suggestion" => suggestion = str_val,
+                        "quick_fix" => quick_fix = str_val,
+                        _ => {}
                     }
-                }
-            } else {
-                quote! {
-                    Self::#variant_name => error_core::DiagnosticReport::new()
+                    Ok(())
+                }).unwrap_or_default();
+            }
+        }
+
+        if !detect.is_empty() {
+            quote! {
+                Self::#variant_name => {
+                    let mut report = error_core::DiagnosticReport::new();
+                    report.message = format!("Detected condition: {}", #detect);
+                    report.suggestions.push(#suggestion.to_string());
+                    report.quick_fixes.push(error_core::QuickFix {
+                        description: #suggestion.to_string(),
+                                            code: #quick_fix.to_string(),
+                    });
+                    report
                 }
             }
         } else {
