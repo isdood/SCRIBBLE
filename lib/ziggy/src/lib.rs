@@ -1,16 +1,35 @@
-// lib/ziggy/src/lib.rs
-use std::os::raw::c_double;
+use thiserror::Error;
+use scribe::Write;
+
+#[derive(Debug, Error)]
+pub enum ZiggyError {
+    #[error("Vector operation failed")]
+    VectorError,
+}
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug)]
 pub struct Vector3D {
-    x: c_double,
-    y: c_double,
-    z: c_double,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+impl Write for Vector3D {
+    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+        f.write_str("Vector3D(")?;
+        self.x.write(f)?;
+        f.write_str(", ")?;
+        self.y.write(f)?;
+        f.write_str(", ")?;
+        self.z.write(f)?;
+        f.write_str(")")
+    }
 }
 
 extern "C" {
-    fn vector3d_dot(v1: Vector3D, v2: Vector3D) -> c_double;
-    fn vector3d_magnitude(v: Vector3D) -> c_double;
+    fn vector3d_dot(v1: Vector3D, v2: Vector3D) -> f64;
+    fn vector3d_magnitude(v: Vector3D) -> f64;
 }
 
 impl Vector3D {
@@ -27,7 +46,6 @@ impl Vector3D {
     }
 }
 
-// lib/ziggy/src/lib.rs (continued)
 #[cfg(test)]
 mod tests {
     use super::*;

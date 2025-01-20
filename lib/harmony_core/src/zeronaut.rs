@@ -4,20 +4,19 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 16:05:53 UTC
+//! Last Updated: 2025-01-20 16:20:41 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
-    core::{Field, Mesh},
-    traits::MeshValue,
+    math::{Field, Mesh},
+    traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
     Vector3D,
     resonance::{Quantum, Phase, Resonance}
 };
 
 use errors::core::{MathError, QuantumError};
-use scribe::{Scribe, native_string::String};
-use native::{Box, Vec};
+use scribe::{Scribe, native_string::String, collections::Vec};
 
 /// Zero-point energy state handler
 #[derive(Debug)]
@@ -128,6 +127,53 @@ mod tests {
 
         fn from(value: f64) -> Self {
             Self { value }
+        }
+
+        fn coherence(&self) -> Result<f64, MathError> {
+            Ok(1.0)
+        }
+
+        fn energy(&self) -> Result<f64, MathError> {
+            Ok(self.value.abs())
+        }
+
+        fn magnitude(&self) -> Result<f64, MathError> {
+            Ok(self.value.abs())
+        }
+
+        fn to_usize(&self) -> Result<usize, MathError> {
+            Ok(self.value as usize)
+        }
+
+        fn check_harmony_state(&self) -> bool {
+            true
+        }
+    }
+
+    impl CrystalAdd for TestZero {
+        fn add(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self { value: self.value + other.value })
+        }
+    }
+
+    impl CrystalSub for TestZero {
+        fn sub(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self { value: self.value - other.value })
+        }
+    }
+
+    impl CrystalMul for TestZero {
+        fn mul(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self { value: self.value * other.value })
+        }
+    }
+
+    impl CrystalDiv for TestZero {
+        fn div(&self, other: &Self) -> Result<Self, MathError> {
+            if other.value == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            Ok(Self { value: self.value / other.value })
         }
     }
 

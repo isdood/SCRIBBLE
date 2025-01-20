@@ -1,59 +1,50 @@
 const std = @import("std");
-const testing = std.testing;
 
-// Mark the struct as extern and packed for C ABI compatibility
-pub const Vector3D = extern struct {
-    x: f64,
-    y: f64,
-    z: f64,
+pub fn build(b: *std.Build) !void {
+    // Standard target options allows the person running `zig build` to choose
+    // what target to build for. Here we do not override the defaults, which
+    // means any target is allowed, and the default is native.
+    const target = b.standardTargetOptions(.{});
 
-    const Self = @This();
+    // Standard optimization options allow the person running `zig build` to select
+    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
+    const optimize = b.standardOptimizeOption(.{});
 
-    pub fn init(x: f64, y: f64, z: f64) Self {
-        return Self{
-            .x = x,
-            .y = y,
-            .z = z,
-        };
-    }
+    const lib = b.addStaticLibrary(.{
+        .name = "ziggy",
+        .root_source_file = .{ .cwd_relative = "src/vector3d.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
 
-    pub fn dot(self: Self, other: Self) f64 {
-        return self.x * other.x +
-        self.y * other.y +
-        self.z * other.z;
-    }
+    // This declares intent for the library to be installed into the standard
+    // location when the user invokes the "install" step (the default step when
+    // running `zig build`).
+    b.installArtifact(lib);
 
-    pub fn magnitude(self: Self) f64 {
-        return @sqrt(self.dot(self));
-    }
-};
+    // Creates a step for unit testing.
+    const main_tests = b.addTest(.{
+        .root_source_file = .{ .cwd_relative = "src/vector3d.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
 
-// Export these functions with explicit parameter types for C ABI
-export fn vector3d_dot(v1: extern struct { x: f64, y: f64, z: f64 },
-                       v2: extern struct { x: f64, y: f64, z: f64 }) f64 {
-                           const vec1 = Vector3D{ .x = v1.x, .y = v1.y, .z = v1.z };
-                           const vec2 = Vector3D{ .x = v2.x, .y = v2.y, .z = v2.z };
-                           return vec1.dot(vec2);
-                       }
+    const run_main_tests = b.addRunArtifact(main_tests);
 
-                       export fn vector3d_magnitude(v: extern struct { x: f64, y: f64, z: f64 }) f64 {
-                           const vec = Vector3D{ .x = v.x, .y = v.y, .z = v.z };
-                           return vec.magnitude();
-                       }
+    // This creates a build step. It will be visible in the `zig build --help` menu,
+    // and can be selected like this: `zig build test`
+    const test_step = b.step("test", "Run library tests");
+    test_step.dependOn(&run_main_tests.step);
 
-                       // Tests
-                       test "vector3d basic operations" {
-                           const v1 = Vector3D.init(1.0, 2.0, 3.0);
-                           const v2 = Vector3D.init(4.0, 5.0, 6.0);
-
-                           try testing.expectApproxEqAbs(v1.dot(v2), 32.0, 0.0001);
-                           try testing.expectApproxEqAbs(v1.magnitude(), 3.7416573867739413, 0.0001);
-                       }
-
-                       test "C ABI functions" {
-                           const v1 = .{ .x = 1.0, .y = 2.0, .z = 3.0 };
-                           const v2 = .{ .x = 4.0, .y = 5.0, .z = 6.0 };
-
-                           try testing.expectApproxEqAbs(vector3d_dot(v1, v2), 32.0, 0.0001);
-                           try testing.expectApproxEqAbs(vector3d_magnitude(v1), 3.7416573867739413, 0.0001);
-                       }
+    // Add a custom step that prints a completion message
+    const print_step = b.step("complete", "Print completion message");
+    const print_cmd = b.addSystemCommand(&[_][]const u8{
+        "sh", "-c",
+        \\echo -e "\033[32mBuild completed successfully!\033[0m"
+        \\echo "Time: 2025-01-20 16:23:55 UTC"
+        \\echo "User: isdood"
+        \\echo -e "Ziggy is ready to rock! 🚀\n"
+    });
+    print_step.dependOn(&print_cmd.step);
+    b.getInstallStep().dependOn(print_step);
+}

@@ -20,7 +20,7 @@ members = [
     "lib/quartz",
     "lib/scribe",
     "lib/errors",
-    "lib/ziggy"  # Added new Zig integration module
+    "lib/ziggy"
 ]
 resolver = "2"
 
@@ -36,8 +36,8 @@ shard = { path = "lib/shard" }
 quartz = { path = "lib/quartz" }
 scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
-ziggy = { path = "lib/ziggy" }  # Added Zig integration library
-criterion = "0.5"  # Added for benchmarking
+ziggy = { path = "lib/ziggy" }
+criterion = "0.5"
 
 [lib]
 path = "src/lib.rs"
@@ -47,19 +47,13 @@ libm = "0.2.11"
 scribble = { path = "lib/scribble" }
 scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
-ziggy = { path = "lib/ziggy" }  # Added Zig integration dependency
+ziggy = { path = "lib/ziggy" }
 
-# Dev dependencies for benchmarking
 [dev-dependencies]
 criterion = "0.5"
 
 # Metadata
 [package.metadata]
 created = "2025-01-19"
-updated = "2025-01-20 16:13:24"  # Updated to current timestamp
+updated = "2025-01-20 16:31:10"
 current_user = "isdood"
-
-# Benchmark configuration
-[[bench]]
-name = "vector_ops"
-harness = false

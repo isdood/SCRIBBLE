@@ -10,8 +10,21 @@ license = "MIT"
 name = "ziggy"
 path = "src/lib.rs"
 
-[dependencies]
-approx = "0.5"  # For float comparisons in tests
+[[bench]]
+name = "vector_ops"
+harness = false
 
-[build-dependencies]
-cc = "1.0"  # For building Zig code
+[dependencies]
+libc = "0.2"
+thiserror = "1.0"
+approx = "0.5"
+scribe = { path = "../scribe" }
+
+[dev-dependencies]
+criterion = "0.5"
+
+# Metadata
+[package.metadata]
+created = "2025-01-20"
+updated = "2025-01-20 16:29:45"
+current_user = "isdood"
