@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-20
-//! Last Updated: 2025-01-20 02:06:32 UTC
+//! Last Updated: 2025-01-20 17:54:42 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -15,7 +15,7 @@ use errors::{MathError, MathResult};
 use scribe::{Scribe, native_string::String};
 
 /// Three-dimensional vector with harmony state tracking
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]  // Added Copy trait
 pub struct Vector3D {
     pub x: f64,
     pub y: f64,

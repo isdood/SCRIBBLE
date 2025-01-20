@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:55:27 UTC
+//! Last Updated: 2025-01-20 17:56:36 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -28,41 +28,31 @@ pub mod zeronaut;
 pub mod aether;
 
 // Re-export common types from magicmath
-pub use magicmath::{
-    traits::{
-        MeshValue,
-        CrystalAdd,
-        CrystalSub,
-        CrystalMul,
-        CrystalDiv,
-    },
-    resonance::{
-        Resonance,
-        ResonanceParams,
-        Phase,
-        Quantum,
-    },
-    operations::{
-        Field,
-        Mesh,
-        PhaseField,
-        AetherField,
-    },
-    vectors::{
-        Vector3D,
-        Vector4D,
-    },
-    math::{
-        sqrt,
-        floor,
-    },
+pub use magicmath::traits::{
+    MeshValue,
+    CrystalAdd,
+    CrystalSub,
+    CrystalMul,
+    CrystalDiv,
+    Field,
+    Mesh,
+    PhaseField,
+    AetherField,
+    Vector3D,
+    Vector4D,
+};
+
+pub use magicmath::resonance::{
+    Resonance,
+    Phase,
+    Quantum,
 };
 
 // Re-exports from errors
-pub use errors::core::{
-    Error as MathError,
-    Result as MathResult,
+pub use errors::{
+    MathError,
     QuantumError,
+    MathResult,
 };
 
 // Re-exports from core
@@ -72,10 +62,16 @@ pub use core::{
 };
 
 // Re-exports from scribe
-pub use scribe::{
-    Scribe,
-    string::String,
-    collections::Vec,
+pub use scribe::fmt::{
+    Write as ScribeWrite,
+    Result as ScribeResult,
+};
+
+// Expose our own types
+pub use crate::align::{
+    text::String,
+    data::Vec,
+    mem::Box,
 };
 
 // Constants module
@@ -95,8 +91,8 @@ pub mod constants {
 }
 
 /// Initialize fractal parameters for crystal growth
-pub fn create_growth_params() -> ResonanceParams {
-    let mut params = ResonanceParams::new();
+pub fn create_growth_params() -> impl Phase {
+    let mut params = Resonance::new();
     params.set_max_iterations(constants::MAX_FRACTAL_DEPTH);
     params.set_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD);
     params
