@@ -4,28 +4,24 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:59:18 UTC
+//! Last Updated: 2025-01-20 23:38:27 UTC
 //! Version: 0.1.1
 //! License: MIT
 
-use magicmath::{
-    Vector3D,
-};
+use magicmath::Vector3D;
 
-use errors::{
-    MathError,
-    QuantumError,
-};
+use errors::{MathError, QuantumError};
 
 use magicmath::constants::{
     HARMONY_RESONANCE_THRESHOLD,
     HARMONY_STABILITY_THRESHOLD,
+    MAX_QUANTUM_SIZE,  // Added this constant
 };
 
 use crate::align::{Alignment, AlignmentState};
 
 /// Core crystal node for quantum operations
-#[derive(Clone)]
+#[derive(Debug, Clone)]  // Added Debug derive
 pub struct CrystalNode {
     /// Position in crystal lattice
     position: Vector3D,
@@ -51,9 +47,16 @@ impl CrystalNode {
     }
 
     /// Set node's phase coherence
+    ///
+    /// # Parameters
+    /// * `value` - Phase coherence value between 0.0 and 1.0
+    ///
+    /// # Returns
+    /// * `Ok(())` if the value was set successfully
+    /// * `Err(MathError::InvalidRange)` if value is outside [0.0, 1.0]
     pub fn set_phase_coherence(&mut self, value: f64) -> Result<(), MathError> {
         if value < 0.0 || value > 1.0 {
-            return Err(MathError::InvalidRange); // Fix: Correcting error variant
+            return Err(MathError::InvalidRange);
         }
         self.coherence = value;
         Ok(())
@@ -66,7 +69,7 @@ impl CrystalNode {
 
     /// Get node's alignment state
     pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.state() // Fix: Correcting method call
+        self.alignment.state()
     }
 }
 
@@ -74,7 +77,7 @@ impl CrystalNode {
 #[derive(Debug)]
 pub struct CrystalLattice {
     /// Lattice nodes storage
-    nodes: Vec<Vec<Option<CrystalNode>>>, // Fix: Using Vec instead of fixed-size array
+    nodes: Vec<Vec<Option<CrystalNode>>>,
     /// Lattice size
     size: usize,
     /// Lattice alignment
@@ -83,9 +86,12 @@ pub struct CrystalLattice {
 
 impl CrystalLattice {
     /// Create a new crystal lattice
+    ///
+    /// # Parameters
+    /// * `size` - Size of the lattice (will be capped at MAX_QUANTUM_SIZE)
     pub fn new(size: usize) -> Self {
-        let size = size.min(HARMONY_STABILITY_THRESHOLD); // Adjusted to use a valid constant
-        let nodes = vec![vec![None; size]; size]; // Fix: Using Vec instead of fixed-size array
+        let size = size.min(MAX_QUANTUM_SIZE);  // Use MAX_QUANTUM_SIZE instead
+        let nodes = vec![vec![None; size]; size];
         let origin = Vector3D::new(0.0, 0.0, 0.0);
 
         Self {
@@ -96,6 +102,11 @@ impl CrystalLattice {
     }
 
     /// Get node at position
+    ///
+    /// # Returns
+    /// * `Ok(&CrystalNode)` if node exists at position
+    /// * `Err(QuantumError::BoundaryViolation)` if position is outside lattice bounds
+    /// * `Err(QuantumError::InvalidState)` if no node exists at position
     pub fn get_node(&self, pos: &Vector3D) -> Result<&CrystalNode, QuantumError> {
         let x = pos.x.floor() as usize;
         let y = pos.y.floor() as usize;
@@ -104,10 +115,14 @@ impl CrystalLattice {
             return Err(QuantumError::BoundaryViolation);
         }
 
-        self.nodes[x][y].as_ref().ok_or(QuantumError::InvalidState) // Fix: Using Option
+        self.nodes[x][y].as_ref().ok_or(QuantumError::InvalidState)
     }
 
     /// Set node at position
+    ///
+    /// # Returns
+    /// * `Ok(())` if node was set successfully
+    /// * `Err(QuantumError::BoundaryViolation)` if position is outside lattice bounds
     pub fn set_node(&mut self, pos: &Vector3D, node: CrystalNode) -> Result<(), QuantumError> {
         let x = pos.x.floor() as usize;
         let y = pos.y.floor() as usize;
@@ -116,11 +131,15 @@ impl CrystalLattice {
             return Err(QuantumError::BoundaryViolation);
         }
 
-        self.nodes[x][y] = Some(node); // Fix: Using Option
+        self.nodes[x][y] = Some(node);
         Ok(())
     }
 
     /// Calculate resonance at position
+    ///
+    /// # Returns
+    /// * `Ok(f64)` containing the resonance value if calculation succeeds
+    /// * `Err(QuantumError::ResonanceFailure)` if coherence is below threshold
     pub fn calculate_resonance(&self, pos: &Vector3D) -> Result<f64, QuantumError> {
         let node = self.get_node(pos)?;
         let coherence = node.get_phase_coherence();
@@ -139,7 +158,7 @@ impl CrystalLattice {
 
     /// Get current alignment state
     pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.state() // Fix: Correcting method call
+        self.alignment.state()
     }
 }
 
@@ -172,5 +191,22 @@ mod tests {
         let lattice = CrystalLattice::new(4);
         let pos = Vector3D::new(0.0, 0.0, 0.0);
         assert!(lattice.calculate_resonance(&pos).is_err()); // No node set yet
+    }
+
+    #[test]
+    fn test_invalid_coherence() {
+        let mut node = CrystalNode::new(Vector3D::new(0.0, 0.0, 0.0));
+        assert!(node.set_phase_coherence(1.5).is_err());
+        assert!(node.set_phase_coherence(-0.5).is_err());
+    }
+
+    #[test]
+    fn test_boundary_violation() {
+        let lattice = CrystalLattice::new(4);
+        let pos = Vector3D::new(5.0, 5.0, 0.0);
+        assert!(matches!(
+            lattice.get_node(&pos),
+                         Err(QuantumError::BoundaryViolation)
+        ));
     }
 }

@@ -1,6 +1,62 @@
-//! Error reporting module for structured error handling
-//! Created: 2025-01-20 22:13:32
+//! Error integration module for structured error handling and reporting
+//!
+//! Created: 2025-01-20 23:35:51
 //! Author: isdood
+//!
+//! This module provides tools for capturing, contextualizing, and reporting errors
+//! in a structured way. It includes:
+//!
+//! - Error context tracking with file, line, and module information
+//! - Structured error reporting with statistics
+//! - Integration with diagnostic information
+//!
+//! # Examples
+//!
+//! ```
+//! use error_integration::{ErrorContext, DefaultErrorReporter, ErrorReporter};
+//! use thiserror::Error;
+//! use error_derive::Diagnose;
+//!
+//! #[derive(Debug, Error, Diagnose)]
+//! #[error("custom error: {msg}")]
+//! struct CustomError {
+//!     msg: String,
+//! }
+//!
+//! // Create a reporter
+//! let reporter = DefaultErrorReporter::default();
+//!
+//! // Create an error with context
+//! let error = CustomError {
+//!     msg: "something went wrong".to_string()
+//! };
+//! let context = ErrorContext::current()
+//!     .with_extra("additional details");
+//!
+//! // Report the error
+//! reporter.report_error(&error, &context);
+//!
+//! // Get error statistics
+//! let stats = reporter.get_stats();
+//! assert_eq!(stats.total_errors, 1);
+//! ```
+//!
+//! # Features
+//!
+//! - Location tracking: Automatically captures file, line, and module information
+//! - Timing information: Records when errors occur and tracks elapsed time
+//! - Statistics: Maintains error counts by type and module
+//! - Context: Supports additional contextual information
+//! - Display formatting: Implements Display for human-readable output
+//!
+//! # Usage
+//!
+//! The main types you'll work with are:
+//!
+//! - [`ErrorContext`]: Captures where and when an error occurred
+//! - [`ErrorReporter`]: Trait for implementing error reporters
+//! - [`DefaultErrorReporter`]: Standard implementation of error reporting
+//! - [`ReporterConfig`]: Configuration for error reporters
 
 use crate::context::ErrorContext;
 use error_core::{Diagnose, DiagnosticReport};

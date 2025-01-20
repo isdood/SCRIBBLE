@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-20
-//! Last Updated: 2025-01-20 02:07:58 UTC
+//! Last Updated: 2025-01-20 23:51:15 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -15,7 +15,7 @@ use errors::{MathError, MathResult};
 use scribe::{Scribe, native_string::String};
 
 /// Four-dimensional vector with harmony state tracking
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]  // Added Copy and PartialEq traits for consistency
 pub struct Vector4D {
     pub x: f64,
     pub y: f64,
@@ -67,7 +67,7 @@ impl MeshValue for Vector4D {
     fn coherence(&self) -> MathResult<f64> {
         let mag = self.magnitude()?;
         if mag <= 0.0 {
-            return Err(MathError::InvalidParameter(String::from("Magnitude must be positive")));
+            return Err(MathError::InvalidRange);  // Changed from InvalidParameter
         }
         Ok((self.x + self.y + self.z + self.w) / 4.0)
     }

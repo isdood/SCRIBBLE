@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 01:43:40 UTC
+//! Last Updated: 2025-01-20 23:44:05 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -205,7 +205,7 @@ pub fn harmony_div<T: MeshValue>(a: &T, b: &T) -> MathResult<T> {
 pub fn harmony_sqrt<T: MeshValue>(a: &T) -> MathResult<T> {
     let val = a.to_f64()?;
     if val < 0.0 {
-        return Err(MathError::InvalidDomain(String::from("Square root of negative number")));
+        return Err(MathError::InvalidRange);  // Changed from InvalidDomain
     }
     Ok(T::from(val.sqrt()))
 }
@@ -214,7 +214,7 @@ pub fn harmony_sqrt<T: MeshValue>(a: &T) -> MathResult<T> {
 pub fn harmony_ln<T: MeshValue>(a: &T) -> MathResult<T> {
     let val = a.to_f64()?;
     if val <= 0.0 {
-        return Err(MathError::LogarithmDomainError(val));
+        return Err(MathError::InvalidRange);  // Changed from LogarithmDomainError
     }
     Ok(T::from(val.ln()))
 }

@@ -1,5 +1,5 @@
 //! Error context module providing location and timing information
-//! Created: 2025-01-20 22:12:40
+//! Created: 2025-01-20 23:33:02
 //! Author: isdood
 
 use chrono::{DateTime, Utc};
@@ -31,12 +31,14 @@ impl ErrorContext {
     /// Creates a new ErrorContext with the current time and location information
     #[track_caller]
     pub fn new(file: impl Into<String>, line: u32, column: u32) -> Self {
+        let module_path = Some(String::from(std::module_path!()));
+
         Self {
             timestamp: Utc::now(),
             file: file.into(),
             line,
             column,
-            module_path: Some(std::module_path!().to_string()),
+            module_path,
             extra: None,
         }
     }
@@ -138,7 +140,12 @@ mod tests {
     #[test]
     fn test_context_module_path() {
         let context = ErrorContext::current();
-        assert!(context.module_path().is_some());
-        assert!(context.module_path().unwrap().contains("tests"));
+        assert!(context.module_path.is_some());
+        let module_path = context.module_path().unwrap();
+        assert!(
+            module_path.contains("error_integration::context"),
+                "Expected module path '{}' to contain 'error_integration::context'",
+                module_path
+        );
     }
 }

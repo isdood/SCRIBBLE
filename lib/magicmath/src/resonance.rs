@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 17:44:14 UTC
+//! Last Updated: 2025-01-20 23:42:56 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -12,7 +12,7 @@ use crate::vector3d::Vector3D;
 use scribe::Scribe;
 use scribe::native_string::String;
 use errors::MathError;
-use crate::constants::PI;
+use crate::constants::{PI, HARMONY_STABILITY_THRESHOLD};
 
 /// Newtype wrapper for `f64` to implement `Scribe`
 #[derive(Debug, Clone, Copy)]
@@ -80,7 +80,7 @@ impl Resonance {
     /// Get current energy level
     pub fn energy(&self) -> Result<f64, MathError> {
         if self.energy <= 0.0 {
-            return Err(MathError::InvalidParameter(String::from("Energy must be positive")));
+            return Err(MathError::InvalidRange); // Changed from InvalidParameter
         }
         Ok(self.energy)
     }
@@ -88,7 +88,7 @@ impl Resonance {
     /// Set energy level
     pub fn set_energy(&mut self, energy: f64) -> Result<(), MathError> {
         if energy <= 0.0 {
-            return Err(MathError::InvalidParameter(String::from("Energy must be positive")));
+            return Err(MathError::InvalidRange); // Changed from InvalidParameter
         }
         self.energy = energy;
         Ok(())
@@ -119,7 +119,7 @@ impl Resonance {
     pub fn coherence(&self) -> Result<f64, MathError> {
         let mag = self.position.magnitude()?;
         if mag <= 0.0 {
-            return Err(MathError::InvalidParameter(String::from("Magnitude must be positive")));
+            return Err(MathError::InvalidRange); // Changed from InvalidParameter
         }
         Ok(mag / HARMONY_STABILITY_THRESHOLD)
     }

@@ -1,5 +1,5 @@
 //! Error integration module
-//! Created: 2025-01-20 22:17:33
+//! Created: 2025-01-20 23:23:08
 //! Author: isdood
 
 use chrono::{DateTime, Utc};
@@ -78,9 +78,25 @@ mod tests {
         let error = TestError::Test;
         let diagnostic = error.diagnose();
 
+        // Clone context before moving it into metadata
+        let context_clone = context.clone();
         let metadata = ErrorMetadata::new(context, diagnostic);
 
-        assert_eq!(metadata.context().file, context.file);
+        assert_eq!(metadata.context().file, context_clone.file);
         assert!(!metadata.diagnostic().suggestions.is_empty());
+    }
+
+    #[test]
+    fn test_metadata_creation_time() {
+        let context = ErrorContext::current();
+        let error = TestError::Test;
+        let diagnostic = error.diagnose();
+
+        let before = Utc::now();
+        let metadata = ErrorMetadata::new(context, diagnostic);
+        let after = Utc::now();
+
+        assert!(metadata.created() >= before);
+        assert!(metadata.created() <= after);
     }
 }
