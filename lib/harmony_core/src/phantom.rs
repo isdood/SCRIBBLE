@@ -4,24 +4,21 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 21:31:34 UTC
+//! Last Updated: 2025-01-20 16:08:04 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
+    core::{Field, Mesh, PhaseField},
     traits::MeshValue,
-    math::{Field, Mesh, PhaseField},
-    errors::MathError,
+    Vector3D,
+    Vector4D,
+    resonance::{Quantum, Phase, Resonance}
 };
 
-use crate::{
-    errors::QuantumError,
-    vector::{Vector3D, Vector4D},
-    resonance::{Quantum, Phase, Resonance},
-    native::{Box, Vec},
-};
-
+use errors::core::{MathError, QuantumError};
 use scribe::{Scribe, native_string::String};
+use native::{Box, Vec};
 
 /// Phantom state handler for higher-dimensional operations
 #[derive(Debug)]
@@ -120,15 +117,15 @@ impl<T: MeshValue> Phase for Phantom<T> {
 impl<T: MeshValue + Scribe> Scribe for Phantom<T> {
     fn scribe(&self) -> String {
         let mut result = String::new();
-        write_str!(result, "Phantom State:\n");
-        write_str!(result, "4D Position: ");
-        write_str!(result, &self.position.scribe());
-        write_str!(result, "\n3D Projection: ");
-        write_str!(result, &self.project().scribe());
-        write_str!(result, "\nResonance: ");
-        write_str!(result, &self.resonance.scribe());
-        write_str!(result, "\nPhase Field: ");
-        write_str!(result, &self.phase_field.scribe());
+        result.push_str("Phantom State:\n");
+        result.push_str("4D Position: ");
+        result.push_str(&self.position.scribe().to_str());
+        result.push_str("\n3D Projection: ");
+        result.push_str(&self.project().scribe().to_str());
+        result.push_str("\nResonance: ");
+        result.push_str(&self.resonance.scribe().to_str());
+        result.push_str("\nPhase Field: ");
+        result.push_str(&self.phase_field.scribe().to_str());
         result
     }
 }
@@ -155,7 +152,7 @@ mod tests {
     impl Scribe for TestPhantom {
         fn scribe(&self) -> String {
             let mut result = String::new();
-            write_str!(result, &self.value.scribe());
+            result.push_str(&self.value.to_string());
             result
         }
     }
