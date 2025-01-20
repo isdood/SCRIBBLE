@@ -114,6 +114,15 @@ impl Resonance {
     pub fn set_position(&mut self, pos: Vector3D) {
         self.position = pos;
     }
+
+    /// Get coherence level
+    pub fn coherence(&self) -> Result<f64, MathError> {
+        let mag = self.position.magnitude()?;
+        if mag <= 0.0 {
+            return Err(MathError::InvalidParameter(String::from("Magnitude must be positive")));
+        }
+        Ok(mag / HARMONY_STABILITY_THRESHOLD)
+    }
 }
 
 impl Default for Resonance {

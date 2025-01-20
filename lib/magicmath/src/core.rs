@@ -17,7 +17,7 @@ use errors::{MathError, MathResult};
 use scribe::native_string::String;
 
 /// Core harmony state tracking for all mathematical operations
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct HarmonyState {
     pub coherence: f64,
     pub phase: f64,

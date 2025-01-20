@@ -22,7 +22,7 @@ use core::{
 use magicmath::constants::{
     HARMONY_STABILITY_THRESHOLD,
     HARMONY_RESONANCE_THRESHOLD,
-    MAX_FRACTAL_DEPTH,
+    MAX_QUANTUM_SIZE, // Updated to use a valid constant
 };
 
 /// Crystal growth pattern types
@@ -118,7 +118,7 @@ impl GrowthState {
 
     /// Increment iteration count
     pub fn increment_iterations(&mut self) -> Result<(), QuantumError> {
-        if self.iteration_count >= MAX_FRACTAL_DEPTH {
+        if self.iteration_count >= MAX_QUANTUM_SIZE { // Updated to use a valid constant
             return Err(QuantumError::IterationLimit); // Fix: Correcting error variant
         }
         self.iteration_count += 1;
@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn test_iteration_limit() {
         let mut state = GrowthState::new(GrowthPattern::Fractal);
-        for _ in 0..MAX_FRACTAL_DEPTH {
+        for _ in 0..MAX_QUANTUM_SIZE { // Updated to use a valid constant
             assert!(state.increment_iterations().is_ok());
         }
         assert!(state.increment_iterations().is_err());

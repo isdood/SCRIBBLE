@@ -69,7 +69,7 @@ impl CrystalNode {
     /// Set node's phase coherence
     pub fn set_phase_coherence(&mut self, value: f64) -> Result<(), MathError> {
         if value < 0.0 || value > 1.0 {
-            return Err(MathError::InvalidRange); // Fix: Correcting error variant
+            return Err(MathError::InvalidParameter(String::from("Phase coherence value must be between 0 and 1"))); // Correcting error variant
         }
         self.coherence = value;
         Ok(())
@@ -82,7 +82,7 @@ impl CrystalNode {
 
     /// Get node's alignment state
     pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.state() // Fix: Correcting method call
+        self.alignment.state() // Correcting method call
     }
 }
 
@@ -90,7 +90,7 @@ impl CrystalNode {
 #[derive(Debug)]
 pub struct CrystalLattice {
     /// Lattice nodes storage
-    nodes: Vec<Vec<Option<CrystalNode>>>, // Fix: Using Vec instead of fixed-size array
+    nodes: Vec<Vec<Option<CrystalNode>>>, // Using Vec instead of fixed-size array
     /// Lattice size
     size: usize,
     /// Lattice alignment
@@ -100,8 +100,8 @@ pub struct CrystalLattice {
 impl CrystalLattice {
     /// Create a new crystal lattice
     pub fn new(size: usize) -> Self {
-        let size = size.min(MAX_QUANTUM_SIZE);
-        let nodes = vec![vec![None; size]; size]; // Fix: Using Vec instead of fixed-size array
+        let size = size.min(MAX_QUANTUM_SIZE); // Adjusted to use a valid constant
+        let nodes = vec![vec![None; size]; size]; // Using Vec instead of fixed-size array
         let origin = Vector3D::new(0.0, 0.0, 0.0);
 
         Self {
@@ -120,7 +120,7 @@ impl CrystalLattice {
             return Err(QuantumError::BoundaryViolation);
         }
 
-        self.nodes[x][y].as_ref().ok_or(QuantumError::InvalidState) // Fix: Using Option
+        self.nodes[x][y].as_ref().ok_or(QuantumError::InvalidState) // Using Option
     }
 
     /// Set node at position
@@ -132,7 +132,7 @@ impl CrystalLattice {
             return Err(QuantumError::BoundaryViolation);
         }
 
-        self.nodes[x][y] = Some(node); // Fix: Using Option
+        self.nodes[x][y] = Some(node); // Using Option
         Ok(())
     }
 
@@ -155,7 +155,7 @@ impl CrystalLattice {
 
     /// Get current alignment state
     pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.state() // Fix: Correcting method call
+        self.alignment.state() // Correcting method call
     }
 }
 

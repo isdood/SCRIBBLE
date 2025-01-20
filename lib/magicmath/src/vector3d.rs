@@ -1,3 +1,5 @@
+// lib/magicmath/src/vector3d.rs
+
 //! Three-Dimensional Vector Operations
 //! ==============================
 //!
@@ -15,7 +17,7 @@ use errors::{MathError, MathResult};
 use scribe::{Scribe, native_string::String};
 
 /// Three-dimensional vector with harmony state tracking
-#[derive(Debug, Clone, Copy)]  // Added Copy trait
+#[derive(Debug, Clone, Copy, PartialEq)]  // Added Copy and PartialEq traits
 pub struct Vector3D {
     pub x: f64,
     pub y: f64,

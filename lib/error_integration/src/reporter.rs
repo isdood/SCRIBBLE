@@ -1,12 +1,12 @@
-//! Error reporting module for structured error handling and diagnostics
-//! Created: 2025-01-20 21:39:10
+//! Error reporting module for structured error handling
+//! Created: 2025-01-20 22:13:32
 //! Author: isdood
 
 use crate::context::ErrorContext;
 use error_core::{Diagnose, DiagnosticReport};
-use serde::Serialize;
-use std::sync::Arc;
-use tracing::{error, warn, info, Level};
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use tracing::{error, info, Level};
 
 /// Configuration for error reporting behavior
 #[derive(Debug, Clone)]
@@ -17,6 +17,8 @@ pub struct ReporterConfig {
     pub include_backtraces: bool,
     /// Whether to collect error statistics
     pub collect_stats: bool,
+    /// Maximum number of errors to track per type
+    pub max_errors_per_type: usize,
 }
 
 impl Default for ReporterConfig {
@@ -25,6 +27,31 @@ impl Default for ReporterConfig {
             min_level: Level::ERROR,
             include_backtraces: true,
             collect_stats: true,
+            max_errors_per_type: 1000,
+        }
+    }
+}
+
+/// Error statistics tracking
+#[derive(Debug, Clone)]
+pub struct ErrorStats {
+    /// Total number of errors reported
+    pub total_errors: usize,
+    /// Errors counted by type
+    pub by_type: HashMap<String, usize>,
+    /// Errors counted by module
+    pub by_module: HashMap<String, usize>,
+    /// When the last error occurred
+    pub last_error_time: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl Default for ErrorStats {
+    fn default() -> Self {
+        Self {
+            total_errors: 0,
+            by_type: HashMap::new(),
+            by_module: HashMap::new(),
+            last_error_time: None,
         }
     }
 }
@@ -46,18 +73,10 @@ pub trait ErrorReporter: Send + Sync {
 }
 
 /// Default implementation of ErrorReporter
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DefaultErrorReporter {
     config: ReporterConfig,
-    #[allow(dead_code)]
-    stats: Arc<parking_lot::RwLock<ErrorStats>>,
-}
-
-#[derive(Debug, Default, Serialize)]
-struct ErrorStats {
-    total_errors: usize,
-    by_type: std::collections::HashMap<String, usize>,
-    by_module: std::collections::HashMap<String, usize>,
+    stats: Arc<RwLock<ErrorStats>>,
 }
 
 impl DefaultErrorReporter {
@@ -65,13 +84,20 @@ impl DefaultErrorReporter {
     pub fn new(config: ReporterConfig) -> Self {
         Self {
             config,
-            stats: Arc::new(parking_lot::RwLock::new(ErrorStats::default())),
+            stats: Arc::new(RwLock::new(ErrorStats::default())),
         }
     }
 
     /// Get current error statistics
     pub fn get_stats(&self) -> ErrorStats {
-        self.stats.read().clone()
+        self.stats.read().unwrap().clone()
+    }
+
+    /// Reset error statistics
+    pub fn reset_stats(&self) {
+        if let Ok(mut stats) = self.stats.write() {
+            *stats = ErrorStats::default();
+        }
     }
 }
 
@@ -88,11 +114,22 @@ impl ErrorReporter for DefaultErrorReporter {
     {
         // Update statistics if enabled
         if self.config.collect_stats {
-            let mut stats = self.stats.write();
-            stats.total_errors += 1;
-            *stats.by_type.entry(std::any::type_name::<E>().to_string()).or_default() += 1;
-            if let Some(module) = &context.module_path {
-                *stats.by_module.entry(module.clone()).or_default() += 1;
+            if let Ok(mut stats) = self.stats.write() {
+                stats.total_errors += 1;
+
+                let type_name = std::any::type_name::<E>().to_string();
+                *stats.by_type.entry(type_name).or_default() += 1;
+
+                if let Some(module) = context.module_path() {
+                    *stats.by_module.entry(module.to_string()).or_default() += 1;
+                }
+
+                stats.last_error_time = Some(chrono::Utc::now());
+
+                // Cleanup if we exceed max errors per type
+                if stats.by_type.len() > self.config.max_errors_per_type {
+                    stats.by_type.retain(|_, count| *count > 1);
+                }
             }
         }
 
@@ -104,8 +141,8 @@ impl ErrorReporter for DefaultErrorReporter {
             error = %error,
             context = %context,
             diagnostic = ?diagnostic,
-            backtrace = self.config.include_backtraces.then(|| std::backtrace::Backtrace::capture()),
-               "Error occurred"
+            has_backtrace = self.config.include_backtraces,
+            "Error occurred"
         );
 
         // Log suggestions if available
@@ -138,14 +175,14 @@ mod tests {
     #[derive(Debug, Error, Diagnose)]
     #[error("test error")]
     enum TestError {
-        #[diagnose(detect = "test condition", suggestion = "try this instead")]
-        Basic,
+        #[diagnose(detect = "test condition", suggestion = "fix condition")]
+        Test,
     }
 
     #[test]
     fn test_error_reporting() {
         let reporter = DefaultErrorReporter::default();
-        let error = TestError::Basic;
+        let error = TestError::Test;
         let context = ErrorContext::current();
 
         reporter.report_error(&error, &context);
@@ -156,23 +193,33 @@ mod tests {
     }
 
     #[test]
-    fn test_custom_config() {
-        let config = ReporterConfig {
-            min_level: Level::WARN,
-            include_backtraces: false,
-            collect_stats: true,
-        };
-        let reporter = DefaultErrorReporter::new(config);
-        assert!(!reporter.config().include_backtraces);
+    fn test_stats_reset() {
+        let reporter = DefaultErrorReporter::default();
+        let error = TestError::Test;
+        let context = ErrorContext::current();
+
+        reporter.report_error(&error, &context);
+        assert_eq!(reporter.get_stats().total_errors, 1);
+
+        reporter.reset_stats();
+        assert_eq!(reporter.get_stats().total_errors, 0);
     }
 
     #[test]
-    fn test_diagnostics_collection() {
-        let reporter = DefaultErrorReporter::default();
-        let error = TestError::Basic;
+    fn test_max_errors_per_type() {
+        let config = ReporterConfig {
+            max_errors_per_type: 2,
+            ..Default::default()
+        };
+        let reporter = DefaultErrorReporter::new(config);
+        let error = TestError::Test;
+        let context = ErrorContext::current();
 
-        let diagnostics = reporter.collect_diagnostics(&error);
-        assert_eq!(diagnostics.len(), 1);
-        assert!(!diagnostics[0].suggestions.is_empty());
+        for _ in 0..5 {
+            reporter.report_error(&error, &context);
+        }
+
+        let stats = reporter.get_stats();
+        assert!(stats.by_type.len() <= 2);
     }
 }

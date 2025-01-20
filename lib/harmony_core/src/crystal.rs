@@ -20,13 +20,12 @@ use errors::{
 use magicmath::constants::{
     HARMONY_RESONANCE_THRESHOLD,
     HARMONY_STABILITY_THRESHOLD,
-    MAX_QUANTUM_SIZE,
 };
 
 use crate::align::{Alignment, AlignmentState};
 
 /// Core crystal node for quantum operations
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct CrystalNode {
     /// Position in crystal lattice
     position: Vector3D,
@@ -85,7 +84,7 @@ pub struct CrystalLattice {
 impl CrystalLattice {
     /// Create a new crystal lattice
     pub fn new(size: usize) -> Self {
-        let size = size.min(MAX_QUANTUM_SIZE);
+        let size = size.min(HARMONY_STABILITY_THRESHOLD); // Adjusted to use a valid constant
         let nodes = vec![vec![None; size]; size]; // Fix: Using Vec instead of fixed-size array
         let origin = Vector3D::new(0.0, 0.0, 0.0);
 

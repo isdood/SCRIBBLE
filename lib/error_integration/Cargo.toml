@@ -2,14 +2,20 @@
 name = "error_integration"
 version = "0.1.0"
 edition = "2021"
+authors = ["isdood"]
+description = "Error integration layer with quantum-aware serialization"
+license = "MIT"
+# Created: 2025-01-20 22:11:59
 
 [dependencies]
 error_core = { path = "../error_core" }
 error_derive = { path = "../error_derive" }
-tracing = "0.1"
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.137"
 
 [dev-dependencies]
-tracing-subscriber = "0.3"
+criterion = "0.5"

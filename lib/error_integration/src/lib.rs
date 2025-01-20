@@ -1,34 +1,87 @@
-// lib/error_integration/src/lib.rs
-use error_core::{Diagnose, DiagnosticReport};
-use tracing::{error, warn, info};
-use serde::{Serialize, Deserialize};
+//! Error integration module
+//! Created: 2025-01-20 22:15:53
+//! Author: isdood
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ErrorContext {
-    pub timestamp: chrono::DateTime<chrono::Utc>,
-    pub file: String,
-    pub line: u32,
-    pub column: u32,
+use chrono::{DateTime, Utc};
+use error_core::DiagnosticReport;
+use tracing::error;
+
+mod context;
+mod reporter;
+
+pub use context::ErrorContext;
+pub use reporter::{ErrorReporter, DefaultErrorReporter, ReporterConfig};
+
+/// Error metadata for tracking and reporting
+#[derive(Debug)]
+pub struct ErrorMetadata {
+    /// Context of where/when the error occurred
+    context: ErrorContext,
+    /// Diagnostic information about the error
+    diagnostic: DiagnosticReport,
+    /// When this metadata was created
+    created: DateTime<Utc>,
 }
 
-pub trait ErrorReporter {
-    fn report_error<E: Diagnose + std::error::Error>(&self, error: &E);
-    fn collect_diagnostics<E: Diagnose>(&self, error: &E) -> Vec<DiagnosticReport>;
-}
-
-pub struct DefaultErrorReporter;
-
-impl ErrorReporter for DefaultErrorReporter {
-    fn report_error<E: Diagnose + std::error::Error>(&self, error: &E) {
-        let report = error.diagnose();
-        error!(
-            error = %error,
-            diagnostic = ?report,
-            "Error occurred with diagnostic information"
-        );
+impl ErrorMetadata {
+    /// Creates new error metadata with the given context and diagnostic
+    pub fn new(context: ErrorContext, diagnostic: DiagnosticReport) -> Self {
+        Self {
+            context,
+            diagnostic,
+            created: Utc::now(),
+        }
     }
 
-    fn collect_diagnostics<E: Diagnose>(&self, error: &E) -> Vec<DiagnosticReport> {
-        vec![error.diagnose()]
+    /// Returns a reference to the error context
+    pub fn context(&self) -> &ErrorContext {
+        &self.context
+    }
+
+    /// Returns a reference to the diagnostic report
+    pub fn diagnostic(&self) -> &DiagnosticReport {
+        &self.diagnostic
+    }
+
+    /// Returns when this metadata was created
+    pub fn created(&self) -> DateTime<Utc> {
+        self.created
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use error_core::Diagnose;
+    use error_derive::Diagnose;
+    use thiserror::Error;
+
+    #[derive(Debug, Error, Diagnose)]
+    #[error("test error")]
+    enum TestError {
+        #[diagnose(detect = "test condition", suggestion = "fix condition")]
+        Test,
+    }
+
+    #[test]
+    fn test_error_metadata() {
+        let context = ErrorContext::current();
+        let error = TestError::Test;
+        let diagnostic = error.diagnose();
+
+        let metadata = ErrorMetadata::new(context, diagnostic);
+        assert!(metadata.created() <= Utc::now());
+    }
+
+    #[test]
+    fn test_metadata_getters() {
+        let context = ErrorContext::current();
+        let error = TestError::Test;
+        let diagnostic = error.diagnose();
+
+        let metadata = ErrorMetadata::new(context.clone(), diagnostic.clone());
+
+        assert_eq!(metadata.context().file, context.file);
+        assert_eq!(metadata.diagnostic().suggestions, diagnostic.suggestions);
     }
 }
