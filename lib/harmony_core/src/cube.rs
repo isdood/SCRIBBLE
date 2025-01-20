@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 20:13:24 UTC
+//! Last Updated: 2025-01-20 20:22:11 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -16,11 +16,13 @@ use magicmath::{
 use errors::QuantumError;
 use core::fmt::{self, Display, Write};
 
-use crate::align::{
-    text::String,
-    collections::Vec,
-    mem::Box,
-};
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::{vec, vec::Vec};
+
+#[cfg(feature = "std")]
+use std::{vec, vec::Vec};
 
 /// 3D grid structure for quantum states
 #[derive(Debug)]

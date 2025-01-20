@@ -4,7 +4,7 @@ use error_core::Diagnose as _;
 #[test]
 fn test_basic_derive() {
     #[derive(Debug, Diagnose)]
-    #[error_path = "test/errors"]
+    #[error_path("test/errors")]
     enum TestError {
         #[diagnose(
         detect = "value < 0",

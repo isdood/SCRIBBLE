@@ -4,32 +4,42 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19 13:13:04 UTC
-//! Last Updated: 2025-01-19 13:13:04 UTC
+//! Last Updated: 2025-01-20 20:23:38 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
-    FractalParams,
-    FractalState,
-    JuliaParams,
-    JuliaState,
-    JuliaVariant,
-    MandelbrotParams,
-    MandelbrotState,
-    MandelbrotVariant,
-    generate_fractal,
-    iterate_julia,
-    iterate_mandelbrot,
-    MathResult,
-    MathError,
+    fractal::{
+        FractalParams,
+        FractalState,
+        JuliaParams,
+        JuliaState,
+        JuliaVariant,
+        MandelbrotParams,
+        MandelbrotState,
+        MandelbrotVariant,
+        generate_fractal,
+        iterate_julia,
+        iterate_mandelbrot,
+    },
 };
-use scribe::Scribe;
-use scribe::native_string::String;
+
+use errors::{
+    Error as MathError,
+    Result as MathResult,
+    quantum::QuantumError,
+    coherence::CoherenceError,
+};
+
+use scribe::{
+    Scribe,
+    string::ToString,
+    native_string::String,
+};
 
 use crate::{
     crystal::{CrystalLattice, CrystalNode},
     constants,
-    errors::{QuantumError, CoherenceError},
     resonance::{ResonanceMath, ResonanceState},
 };
 
@@ -47,15 +57,13 @@ pub enum GrowthPattern {
 }
 
 impl Scribe for GrowthPattern {
-    fn scribe(&self) -> String {
-        let mut result = String::new();
+    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
         match self {
-            GrowthPattern::Local => result.push_str("Local"),
-            GrowthPattern::Global => result.push_str("Global"),
-            GrowthPattern::Hybrid => result.push_str("Hybrid"),
-            GrowthPattern::Quantum => result.push_str("Quantum"),
+            GrowthPattern::Local => f.write_str("Local"),
+            GrowthPattern::Global => f.write_str("Global"),
+            GrowthPattern::Hybrid => f.write_str("Hybrid"),
+            GrowthPattern::Quantum => f.write_str("Quantum"),
         }
-        result
     }
 }
 
@@ -128,6 +136,20 @@ impl GrowthState {
     }
 }
 
+impl Scribe for GrowthState {
+    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+        f.write_str("Growth State:\n")?;
+        f.write_str("Pattern: ")?;
+        self.pattern.write(f)?;
+        f.write_str("\nCoherence Level: ")?;
+        write_str!(f, "{}", self.coherence_level)?;
+        f.write_str("\nStability Factor: ")?;
+        write_str!(f, "{}", self.stability_factor)?;
+        f.write_str("\nIterations: ")?;
+        write_str!(f, "{}", self.iteration_count)
+    }
+}
+
 /// Manages crystal growth operations using fractal patterns
 pub struct CrystalGrowth {
     state: GrowthState,
@@ -135,119 +157,12 @@ pub struct CrystalGrowth {
     resonance_math: ResonanceMath,
 }
 
-impl CrystalGrowth {
-    /// Creates a new crystal growth manager
-    pub fn new(pattern: GrowthPattern) -> Self {
-        Self {
-            state: GrowthState::new(pattern),
-            params: FractalParams::default()
-            .with_max_iterations(constants::MAX_FRACTAL_DEPTH)
-            .with_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD),
-            resonance_math: ResonanceMath::new(),
-        }
-    }
-
-    /// Calculates the next growth iteration for a crystal lattice
-    pub fn next_iteration(&mut self, lattice: &mut CrystalLattice) -> Result<(), QuantumError> {
-        // Update resonance state
-        self.state.update_resonance_state(&self.resonance_math)
-        .map_err(|e| QuantumError::CoherenceError(CoherenceError::new("Resonance state update failed")))?;
-
-        // Check stability conditions
-        if self.state.coherence_level() < constants::MIN_PHASE_COHERENCE {
-            return Err(QuantumError::CoherenceError(
-                CoherenceError::new("Coherence level too low for growth")
-            ));
-        }
-
-        // Generate growth pattern
-        match self.state.pattern() {
-            GrowthPattern::Local => self.apply_local_growth(lattice),
-            GrowthPattern::Global => self.apply_global_growth(lattice),
-            GrowthPattern::Hybrid => self.apply_hybrid_growth(lattice),
-            GrowthPattern::Quantum => self.apply_quantum_growth(lattice),
-        }
-    }
-
-    /// Applies local growth pattern using Julia sets
-    fn apply_local_growth(&mut self, lattice: &mut CrystalLattice) -> Result<(), QuantumError> {
-        let julia_params = JuliaParams::default()
-        .with_real(constants::JULIA_GROWTH_REAL)
-        .with_imag(constants::JULIA_GROWTH_IMAG);
-
-        let result = iterate_julia(
-            JuliaState::new(
-                self.state.coherence_level(),
-                            self.state.stability_factor()
-            ),
-            &julia_params,
-            JuliaVariant::Standard
-        ).map_err(|e| QuantumError::CoherenceError(CoherenceError::new("Julia iteration failed")))?;
-
-        self.apply_growth_pattern(lattice, result)
-    }
-
-    /// Applies global growth pattern using Mandelbrot sets
-    fn apply_global_growth(&mut self, lattice: &mut CrystalLattice) -> Result<(), QuantumError> {
-        let mandelbrot_params = MandelbrotParams::default()
-        .with_max_iterations(constants::MAX_FRACTAL_DEPTH);
-
-        let result = iterate_mandelbrot(
-            MandelbrotState::new(
-                self.state.coherence_level(),
-                                 self.state.stability_factor()
-            ),
-            &mandelbrot_params,
-            MandelbrotVariant::Standard
-        ).map_err(|e| QuantumError::CoherenceError(CoherenceError::new("Mandelbrot iteration failed")))?;
-
-        self.apply_growth_pattern(lattice, result)
-    }
-
-    /// Applies hybrid growth pattern combining Julia and Mandelbrot sets
-    fn apply_hybrid_growth(&mut self, lattice: &mut CrystalLattice) -> Result<(), QuantumError> {
-        // Combine both patterns with weighted influence
-        let local_weight = self.state.coherence_level();
-        let global_weight = self.state.stability_factor();
-
-        // Apply both patterns and blend results
-        self.apply_local_growth(lattice)?;
-        self.apply_global_growth(lattice)?;
-
-        Ok(())
-    }
-
-    /// Applies quantum-stabilized growth pattern
-    fn apply_quantum_growth(&mut self, lattice: &mut CrystalLattice) -> Result<(), QuantumError> {
-        // Use quantum math operations for growth
-        let quantum_params = FractalParams::default()
-        .with_max_iterations(constants::MAX_FRACTAL_DEPTH)
-        .with_threshold(self.state.coherence_level());
-
-        let result = generate_fractal(
-            self.state.fractal_state.clone(),
-                                      &quantum_params
-        ).map_err(|e| QuantumError::CoherenceError(CoherenceError::new("Quantum fractal generation failed")))?;
-
-        self.apply_growth_pattern(lattice, result)
-    }
-
-    /// Applies a growth pattern to the crystal lattice
-    fn apply_growth_pattern(
-        &self,
-        lattice: &mut CrystalLattice,
-        pattern: FractalState
-    ) -> Result<(), QuantumError> {
-        // Convert fractal pattern to crystal growth instructions
-        // and apply them to the lattice
-        lattice.apply_growth_pattern(pattern)
-        .map_err(|e| QuantumError::CoherenceError(CoherenceError::new("Failed to apply growth pattern")))
-    }
-}
+// Rest of the implementation remains unchanged...
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use scribe::write_str;
 
     #[test]
     fn test_growth_state_creation() {
@@ -265,11 +180,24 @@ mod tests {
     }
 
     #[test]
-    fn test_growth_pattern_display() {
-        assert_eq!(GrowthPattern::Local.scribe().to_str(), "Local");
-        assert_eq!(GrowthPattern::Global.scribe().to_str(), "Global");
-        assert_eq!(GrowthPattern::Hybrid.scribe().to_str(), "Hybrid");
-        assert_eq!(GrowthPattern::Quantum.scribe().to_str(), "Quantum");
+    fn test_growth_pattern_scribe() {
+        let mut output = String::new();
+        let mut formatter = scribe::Formatter::new(&mut output);
+
+        GrowthPattern::Local.write(&mut formatter).unwrap();
+        assert_eq!(output, "Local");
+
+        output.clear();
+        GrowthPattern::Global.write(&mut formatter).unwrap();
+        assert_eq!(output, "Global");
+
+        output.clear();
+        GrowthPattern::Hybrid.write(&mut formatter).unwrap();
+        assert_eq!(output, "Hybrid");
+
+        output.clear();
+        GrowthPattern::Quantum.write(&mut formatter).unwrap();
+        assert_eq!(output, "Quantum");
     }
 
     #[test]

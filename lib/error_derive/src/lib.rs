@@ -1,8 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
-use darling::FromDeriveInput;
-use darling::FromMeta;
+use darling::{FromDeriveInput, FromMeta, FromVariant};
 
 #[derive(Debug, FromMeta)]
 struct DiagnoseOpts {
@@ -11,21 +10,21 @@ struct DiagnoseOpts {
     quick_fix: String,
 }
 
-#[derive(Debug, FromDeriveInput)]
-#[darling(supports(enum_any), attributes(error_path))]
-struct ErrorDeriveOpts {
-    ident: syn::Ident,
-    data: darling::ast::Data<(), DiagnoseVariant>,
-    #[darling(default)]
-    error_path: Option<String>,
-}
-
 #[derive(Debug, FromVariant)]
 #[darling(attributes(diagnose))]
 struct DiagnoseVariant {
     ident: syn::Ident,
     #[darling(default)]
     diagnose: Option<DiagnoseOpts>,
+}
+
+#[derive(Debug, FromDeriveInput)]
+#[darling(supports(enum_any), attributes(error_path))]
+struct ErrorDeriveOpts {
+    ident: syn::Ident,
+    data: darling::ast::Data<DiagnoseVariant, ()>,
+    #[darling(default)]
+    error_path: Option<String>,
 }
 
 /// Derives the Diagnose trait for error types
@@ -37,7 +36,7 @@ struct DiagnoseVariant {
 /// use error_core::Diagnose as _;
 ///
 /// #[derive(Debug, Diagnose)]
-/// #[error_path = "quantum/errors"]
+/// #[error_path("test/errors")]
 /// pub enum QuantumError {
 ///     #[diagnose(
 ///         detect = "quantum_state < 0.5",
@@ -68,9 +67,9 @@ pub fn derive_diagnose(input: TokenStream) -> TokenStream {
         _ => panic!("Diagnose can only be derived for enums"),
     };
 
-    let match_arms = variants.iter().map(|variant| {
+    let match_arms = variants.into_iter().map(|variant| {
         let variant_name = &variant.ident;
-        if let Some(diagnose) = &variant.diagnose {
+        if let Some(diagnose) = variant.diagnose {
             let detect = &diagnose.detect;
             let suggestion = &diagnose.suggestion;
             let quick_fix = &diagnose.quick_fix;
