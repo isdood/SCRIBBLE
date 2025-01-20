@@ -19,15 +19,14 @@ use errors::{
     QuantumError,
 };
 
-use crate::{
-    constants::{
-        MAX_QUANTUM_SIZE,
-        QUANTUM_STABILITY_THRESHOLD,
-        CRYSTAL_RESONANCE_THRESHOLD,
-    },
-    align::{Alignment, AlignmentState},
-    idk::ShardUninit,
+use magicmath::constants::{
+    MAX_QUANTUM_SIZE,
+    QUANTUM_STABILITY_THRESHOLD,
+    CRYSTAL_RESONANCE_THRESHOLD,
 };
+
+use crate::align::{Alignment, AlignmentState};
+use crate::idk::ShardUninit;
 
 /// Core crystal node for quantum operations
 #[derive(Debug)]

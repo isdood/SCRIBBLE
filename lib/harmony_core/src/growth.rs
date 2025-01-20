@@ -20,7 +20,7 @@ use core::{
     result::Result,
 };
 
-use crate::constants::{
+use magicmath::constants::{
     MAX_FRACTAL_DEPTH,
     QUANTUM_STABILITY_THRESHOLD,
     CRYSTAL_RESONANCE_THRESHOLD,

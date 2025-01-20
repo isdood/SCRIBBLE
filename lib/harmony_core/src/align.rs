@@ -1,10 +1,10 @@
-//! Alignment Operations for Crystal Computing
-//! =====================================
+//! Alignment Module
+//! =================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 20:24:38 UTC
+//! Last Updated: 2025-01-20 21:19:08 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -13,116 +13,85 @@ use magicmath::{
     Vector3D,
 };
 
-use errors::MathError;
+use errors::{MathError, QuantumError};
 
-use crate::{
-    constants::{QUANTUM_STABILITY_THRESHOLD, ALIGNMENT_THRESHOLD},
-    idk::ShardUninit,
+use core::{
+    fmt::{self, Display, Formatter, Result as FmtResult},
+    result::Result,
 };
 
-/// Alignment state for quantum phase coherence
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum AlignmentState {
-    /// Perfect alignment achieved
-    Perfect,
-    /// Partial alignment with given coherence factor
-    Partial(f64),
-    /// Misaligned state
-    Misaligned,
-    /// Unknown alignment state
-    Unknown,
-}
+use magicmath::constants::{
+    HARMONY_STABILITY_THRESHOLD,
+    ALIGNMENT_THRESHOLD,
+};
 
-/// Result type for alignment operations
-pub type AlignmentResult<T> = Result<T, MathError>;
-
-/// Core alignment type for crystal operations
-#[derive(Debug)]
-pub struct AlignmentCore {
-    /// Shard storage for aligned data
-    shard: ShardUninit<[f64; 3]>,
-    /// Current alignment state
-    state: AlignmentState,
-}
-
-/// Alignment calculations for crystal operations
+/// Alignment state for quantum nodes
 #[derive(Debug)]
 pub struct Alignment {
-    /// Core alignment data
-    core: AlignmentCore,
-    /// Reference vector for alignment
-    reference: Vector3D,
-    /// Current alignment state
-    state: AlignmentState,
-}
-
-impl AlignmentCore {
-    /// Create a new alignment core
-    pub const fn new() -> Self {
-        Self {
-            shard: ShardUninit::uninit(), // Fix: Correcting method call
-            state: AlignmentState::Unknown,
-        }
-    }
-
-    /// Get current alignment state
-    pub fn state(&self) -> AlignmentState {
-        self.state
-    }
-
-    /// Set alignment state
-    pub fn set_state(&mut self, state: AlignmentState) {
-        self.state = state;
-    }
+    /// Position in 3D space
+    position: Vector3D,
+    /// Alignment value
+    alignment_value: f64,
 }
 
 impl Alignment {
-    /// Create new alignment calculator
-    pub fn new(reference: Vector3D) -> Self {
+    /// Create a new alignment
+    pub fn new(position: Vector3D) -> Self {
         Self {
-            core: AlignmentCore::new(),
-            reference,
-            state: AlignmentState::Unknown,
+            position,
+            alignment_value: 0.0,
         }
     }
 
-    /// Calculate alignment with target vector
-    pub fn align_with(&mut self, target: &Vector3D) -> AlignmentResult<AlignmentState> {
-        let dot = self.reference.dot(target)?;
-        let mag_ref = self.reference.magnitude()?;
-        let mag_target = target.magnitude()?;
-
-        let coherence = dot / (mag_ref * mag_target);
-
-        self.state = if coherence >= ALIGNMENT_THRESHOLD {
-            AlignmentState::Perfect
-        } else if coherence >= QUANTUM_STABILITY_THRESHOLD {
-            AlignmentState::Partial(coherence)
-        } else {
-            AlignmentState::Misaligned
-        };
-
-        self.core.set_state(self.state);
-        Ok(self.state)
+    /// Get alignment value
+    pub fn value(&self) -> f64 {
+        self.alignment_value
     }
 
-    /// Get current alignment state
-    pub fn state(&self) -> AlignmentState {
-        self.state
+    /// Set alignment value
+    pub fn set_value(&mut self, value: f64) -> Result<(), MathError> {
+        if value < 0.0 || value > 1.0 {
+            return Err(MathError::InvalidRange);
+        }
+        self.alignment_value = value;
+        Ok(())
+    }
+
+    /// Get position
+    pub fn position(&self) -> &Vector3D {
+        &self.position
     }
 
     /// Check if alignment is stable
     pub fn is_stable(&self) -> bool {
-        match self.state {
-            AlignmentState::Perfect => true,
-            AlignmentState::Partial(c) => c >= QUANTUM_STABILITY_THRESHOLD,
-            _ => false
-        }
+        self.alignment_value >= ALIGNMENT_THRESHOLD
     }
 
-    /// Get reference vector
-    pub fn reference(&self) -> &Vector3D {
-        &self.reference
+    /// Get current state
+    pub fn state(&self) -> AlignmentState {
+        if self.is_stable() {
+            AlignmentState::Stable
+        } else {
+            AlignmentState::Unstable
+        }
+    }
+}
+
+/// Alignment state types
+#[derive(Debug, PartialEq)]
+pub enum AlignmentState {
+    /// Stable alignment
+    Stable,
+    /// Unstable alignment
+    Unstable,
+}
+
+impl Display for AlignmentState {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        match self {
+            AlignmentState::Stable => write!(f, "Stable"),
+            AlignmentState::Unstable => write!(f, "Unstable"),
+        }
     }
 }
 
@@ -132,32 +101,27 @@ mod tests {
 
     #[test]
     fn test_alignment_creation() {
-        let reference = Vector3D::new(1.0, 0.0, 0.0);
-        let alignment = Alignment::new(reference);
-        assert_eq!(alignment.state(), AlignmentState::Unknown);
+        let pos = Vector3D::new(1.0, 2.0, 3.0);
+        let alignment = Alignment::new(pos);
+        assert_eq!(alignment.value(), 0.0);
+        assert_eq!(alignment.position(), &pos);
     }
 
     #[test]
-    fn test_perfect_alignment() {
-        let mut alignment = Alignment::new(Vector3D::new(1.0, 0.0, 0.0));
-        let target = Vector3D::new(1.0, 0.0, 0.0);
-        let state = alignment.align_with(&target).unwrap();
-        assert_eq!(state, AlignmentState::Perfect);
-    }
-
-    #[test]
-    fn test_misaligned_state() {
-        let mut alignment = Alignment::new(Vector3D::new(1.0, 0.0, 0.0));
-        let target = Vector3D::new(0.0, 1.0, 0.0);
-        let state = alignment.align_with(&target).unwrap();
-        assert_eq!(state, AlignmentState::Misaligned);
+    fn test_alignment_value() {
+        let mut alignment = Alignment::new(Vector3D::new(0.0, 0.0, 0.0));
+        assert!(alignment.set_value(0.5).is_ok());
+        assert_eq!(alignment.value(), 0.5);
+        assert!(alignment.set_value(-0.1).is_err());
+        assert!(alignment.set_value(1.1).is_err());
     }
 
     #[test]
     fn test_alignment_stability() {
-        let mut alignment = Alignment::new(Vector3D::new(1.0, 0.0, 0.0));
-        let target = Vector3D::new(0.9, 0.1, 0.0);
-        alignment.align_with(&target).unwrap();
+        let mut alignment = Alignment::new(Vector3D::new(0.0, 0.0, 0.0));
+        alignment.set_value(0.9).unwrap();
         assert!(alignment.is_stable());
+        alignment.set_value(0.1).unwrap();
+        assert!(!alignment.is_stable());
     }
 }

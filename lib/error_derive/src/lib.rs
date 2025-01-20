@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Meta, Expr, Lit};
+use syn::{parse_macro_input, DeriveInput, Expr, Lit};
 use darling::FromDeriveInput;
 
 #[derive(Debug, FromDeriveInput)]

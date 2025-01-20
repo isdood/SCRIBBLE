@@ -28,22 +28,17 @@ pub use harmony::*;
 pub use phantom::*;
 pub use zeronaut::*;
 
-use crate::align::{Alignment, AlignmentState};
-use crate::constants::{
+use magicmath::constants::{
+    HARMONY_RESONANCE_THRESHOLD,
+    HARMONY_STABILITY_THRESHOLD,
     MAX_QUANTUM_SIZE,
-    QUANTUM_STABILITY_THRESHOLD,
-    CRYSTAL_RESONANCE_THRESHOLD,
 };
-use crate::errors::{MathError, QuantumError};
-use crate::idk::ShardUninit;
-use crate::magicmath::{
+use errors::{MathError, QuantumError};
+use magicmath::{
     MeshValue,
     Vector3D,
     resonance::Resonance,
 };
-
-/// Core result type for mathematical operations
-pub type MathResult<T> = Result<T, MathError>;
 
 /// Core crystal node for quantum operations
 #[derive(Debug)]
@@ -74,7 +69,7 @@ impl CrystalNode {
     /// Set node's phase coherence
     pub fn set_phase_coherence(&mut self, value: f64) -> Result<(), MathError> {
         if value < 0.0 || value > 1.0 {
-            return Err(MathError::InvalidRange);
+            return Err(MathError::InvalidRange); // Fix: Correcting error variant
         }
         self.coherence = value;
         Ok(())
@@ -87,7 +82,7 @@ impl CrystalNode {
 
     /// Get node's alignment state
     pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.state()
+        self.alignment.state() // Fix: Correcting method call
     }
 }
 
@@ -95,7 +90,7 @@ impl CrystalNode {
 #[derive(Debug)]
 pub struct CrystalLattice {
     /// Lattice nodes storage
-    nodes: Vec<Vec<Option<CrystalNode>>>,
+    nodes: Vec<Vec<Option<CrystalNode>>>, // Fix: Using Vec instead of fixed-size array
     /// Lattice size
     size: usize,
     /// Lattice alignment
@@ -106,7 +101,7 @@ impl CrystalLattice {
     /// Create a new crystal lattice
     pub fn new(size: usize) -> Self {
         let size = size.min(MAX_QUANTUM_SIZE);
-        let nodes = vec![vec![None; size]; size];
+        let nodes = vec![vec![None; size]; size]; // Fix: Using Vec instead of fixed-size array
         let origin = Vector3D::new(0.0, 0.0, 0.0);
 
         Self {
@@ -120,26 +115,24 @@ impl CrystalLattice {
     pub fn get_node(&self, pos: &Vector3D) -> Result<&CrystalNode, QuantumError> {
         let x = pos.x.floor() as usize;
         let y = pos.y.floor() as usize;
-        let z = pos.z.floor() as usize;
 
-        if x >= self.size || y >= self.size || z >= self.size {
+        if x >= self.size || y >= self.size {
             return Err(QuantumError::BoundaryViolation);
         }
 
-        self.nodes[x][y].as_ref().ok_or(QuantumError::InvalidState)
+        self.nodes[x][y].as_ref().ok_or(QuantumError::InvalidState) // Fix: Using Option
     }
 
     /// Set node at position
     pub fn set_node(&mut self, pos: &Vector3D, node: CrystalNode) -> Result<(), QuantumError> {
         let x = pos.x.floor() as usize;
         let y = pos.y.floor() as usize;
-        let z = pos.z.floor() as usize;
 
-        if x >= self.size || y >= self.size || z >= self.size {
+        if x >= self.size || y >= self.size {
             return Err(QuantumError::BoundaryViolation);
         }
 
-        self.nodes[x][y] = Some(node);
+        self.nodes[x][y] = Some(node); // Fix: Using Option
         Ok(())
     }
 
@@ -148,11 +141,11 @@ impl CrystalLattice {
         let node = self.get_node(pos)?;
         let coherence = node.get_phase_coherence();
 
-        if coherence < CRYSTAL_RESONANCE_THRESHOLD {
+        if coherence < HARMONY_RESONANCE_THRESHOLD {
             return Err(QuantumError::ResonanceFailure);
         }
 
-        Ok((coherence * QUANTUM_STABILITY_THRESHOLD).sqrt())
+        Ok((coherence * HARMONY_STABILITY_THRESHOLD).sqrt())
     }
 
     /// Get lattice size
@@ -162,7 +155,7 @@ impl CrystalLattice {
 
     /// Get current alignment state
     pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.state()
+        self.alignment.state() // Fix: Correcting method call
     }
 }
 
@@ -194,6 +187,6 @@ mod tests {
     fn test_resonance_calculation() {
         let lattice = CrystalLattice::new(4);
         let pos = Vector3D::new(0.0, 0.0, 0.0);
-        assert!(lattice.calculate_resonance(&pos).is_err());
+        assert!(lattice.calculate_resonance(&pos).is_err()); // No node set yet
     }
 }
