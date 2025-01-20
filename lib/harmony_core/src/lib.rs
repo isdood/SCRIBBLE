@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:04:32 UTC
+//! Last Updated: 2025-01-20 17:07:42 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -42,34 +42,26 @@ pub use magicmath::{
     vector4d::Vector4D,
     // Resonance
     resonance::Resonance,
-    // Core math types
-    math::{Field, Mesh, PhaseField, AetherField},
+    // Field types
+    field::{Field, Mesh, PhaseField, AetherField},
 };
 
 // Re-exports from errors
 pub use errors::core::{
-    MathError,
+    Error as MathError,
     QuantumError,
 };
 
 // Re-exports from core
 pub use core::{
-    fmt::{self, Write, Formatter},
+    fmt::{self, Write, Formatter, Result as FmtResult},
     result::Result,
 };
 
-// Re-exports from alloc for no_std
-#[cfg(not(feature = "std"))]
-pub use alloc::{
+// Re-exports from scribe
+pub use scribe::{
     string::String,
-    vec::Vec,
-    boxed::Box,
-};
-
-#[cfg(feature = "std")]
-pub use std::{
-    string::String,
-    vec::Vec,
+    collections::Vec,
     boxed::Box,
 };
 
@@ -90,8 +82,8 @@ pub mod constants {
 }
 
 /// Initialize fractal parameters for crystal growth
-pub fn create_growth_params() -> magicmath::resonance::Resonance {
-    let mut params = magicmath::resonance::Resonance::new();
+pub fn create_growth_params() -> Resonance {
+    let mut params = Resonance::new();
     params.set_max_iterations(constants::MAX_FRACTAL_DEPTH);
     params.set_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD);
     params

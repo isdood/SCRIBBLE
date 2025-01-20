@@ -4,15 +4,25 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:04:28 UTC
+//! Last Updated: 2025-01-20 17:07:39 UTC
 //! Version: 0.1.1
 //! License: MIT
 
+// Standard library imports
 use core::fmt::{self, Display, Formatter, Result as FmtResult};
+
+// External crate imports
+use errors::{MathError, MathResult};
 use magicmath::{
-    traits::{MeshValue, Scribe, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
-    errors::MathError,
+    math::{CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
+    traits::MeshValue,
 };
+use scribe::{
+    native_string::String,
+    Scribe,
+};
+
+// Internal imports
 use crate::{
     errors::CoherenceError,
     align::AlignmentState,
@@ -95,11 +105,11 @@ impl<T> CrystalAdd for HarmonyState<T>
 where
 T: CrystalAdd + Clone,
 {
-    fn add(&self, other: &Self) -> Result<Self, MathError> {
+    fn add(&self, other: &Self) -> MathResult<Self> {
         Ok(Self::new(self.value.add(&other.value)?))
     }
 
-    fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+    fn add_assign(&mut self, other: &Self) -> MathResult<()> {
         self.value.add_assign(&other.value)
     }
 }
@@ -108,11 +118,11 @@ impl<T> CrystalSub for HarmonyState<T>
 where
 T: CrystalSub + Clone,
 {
-    fn sub(&self, other: &Self) -> Result<Self, MathError> {
+    fn sub(&self, other: &Self) -> MathResult<Self> {
         Ok(Self::new(self.value.sub(&other.value)?))
     }
 
-    fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+    fn sub_assign(&mut self, other: &Self) -> MathResult<()> {
         self.value.sub_assign(&other.value)
     }
 }
@@ -121,11 +131,11 @@ impl<T> CrystalMul for HarmonyState<T>
 where
 T: CrystalMul + Clone,
 {
-    fn mul(&self, other: &Self) -> Result<Self, MathError> {
+    fn mul(&self, other: &Self) -> MathResult<Self> {
         Ok(Self::new(self.value.mul(&other.value)?))
     }
 
-    fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+    fn mul_assign(&mut self, other: &Self) -> MathResult<()> {
         self.value.mul_assign(&other.value)
     }
 }
@@ -134,11 +144,11 @@ impl<T> CrystalDiv for HarmonyState<T>
 where
 T: CrystalDiv + Clone,
 {
-    fn div(&self, other: &Self) -> Result<Self, MathError> {
+    fn div(&self, other: &Self) -> MathResult<Self> {
         Ok(Self::new(self.value.div(&other.value)?))
     }
 
-    fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+    fn div_assign(&mut self, other: &Self) -> MathResult<()> {
         self.value.div_assign(&other.value)
     }
 }
@@ -147,7 +157,7 @@ impl<T> MeshValue for HarmonyState<T>
 where
 T: MeshValue + CrystalAdd + CrystalSub + CrystalMul + CrystalDiv + Clone,
 {
-    fn to_f64(&self) -> Result<f64, MathError> {
+    fn to_f64(&self) -> MathResult<f64> {
         self.value.to_f64()
     }
 
@@ -155,19 +165,19 @@ T: MeshValue + CrystalAdd + CrystalSub + CrystalMul + CrystalDiv + Clone,
         Self::new(T::from(value))
     }
 
-    fn coherence(&self) -> Result<f64, MathError> {
+    fn coherence(&self) -> MathResult<f64> {
         self.value.coherence()
     }
 
-    fn energy(&self) -> Result<f64, MathError> {
+    fn energy(&self) -> MathResult<f64> {
         self.value.energy()
     }
 
-    fn magnitude(&self) -> Result<f64, MathError> {
+    fn magnitude(&self) -> MathResult<f64> {
         self.value.magnitude()
     }
 
-    fn to_usize(&self) -> Result<usize, MathError> {
+    fn to_usize(&self) -> MathResult<usize> {
         self.value.to_usize()
     }
 
@@ -191,6 +201,7 @@ impl<T: Display> Display for HarmonyState<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use errors::MathError;
 
     #[derive(Debug, Clone)]
     struct TestValue {
@@ -198,47 +209,47 @@ mod tests {
     }
 
     impl CrystalAdd for TestValue {
-        fn add(&self, other: &Self) -> Result<Self, MathError> {
+        fn add(&self, other: &Self) -> MathResult<Self> {
             Ok(Self { value: self.value + other.value })
         }
 
-        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+        fn add_assign(&mut self, other: &Self) -> MathResult<()> {
             self.value += other.value;
             Ok(())
         }
     }
 
     impl CrystalSub for TestValue {
-        fn sub(&self, other: &Self) -> Result<Self, MathError> {
+        fn sub(&self, other: &Self) -> MathResult<Self> {
             Ok(Self { value: self.value - other.value })
         }
 
-        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+        fn sub_assign(&mut self, other: &Self) -> MathResult<()> {
             self.value -= other.value;
             Ok(())
         }
     }
 
     impl CrystalMul for TestValue {
-        fn mul(&self, other: &Self) -> Result<Self, MathError> {
+        fn mul(&self, other: &Self) -> MathResult<Self> {
             Ok(Self { value: self.value * other.value })
         }
 
-        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+        fn mul_assign(&mut self, other: &Self) -> MathResult<()> {
             self.value *= other.value;
             Ok(())
         }
     }
 
     impl CrystalDiv for TestValue {
-        fn div(&self, other: &Self) -> Result<Self, MathError> {
+        fn div(&self, other: &Self) -> MathResult<Self> {
             if other.value == 0.0 {
                 return Err(MathError::DivisionByZero);
             }
             Ok(Self { value: self.value / other.value })
         }
 
-        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+        fn div_assign(&mut self, other: &Self) -> MathResult<()> {
             if other.value == 0.0 {
                 return Err(MathError::DivisionByZero);
             }
@@ -248,7 +259,7 @@ mod tests {
     }
 
     impl MeshValue for TestValue {
-        fn to_f64(&self) -> Result<f64, MathError> {
+        fn to_f64(&self) -> MathResult<f64> {
             Ok(self.value)
         }
 
@@ -256,19 +267,19 @@ mod tests {
             Self { value }
         }
 
-        fn coherence(&self) -> Result<f64, MathError> {
+        fn coherence(&self) -> MathResult<f64> {
             Ok(1.0)
         }
 
-        fn energy(&self) -> Result<f64, MathError> {
+        fn energy(&self) -> MathResult<f64> {
             Ok(self.value.abs())
         }
 
-        fn magnitude(&self) -> Result<f64, MathError> {
+        fn magnitude(&self) -> MathResult<f64> {
             Ok(self.value.abs())
         }
 
-        fn to_usize(&self) -> Result<usize, MathError> {
+        fn to_usize(&self) -> MathResult<usize> {
             Ok(self.value as usize)
         }
 
