@@ -13,52 +13,41 @@
 
 // External crates
 extern crate magicmath;
+extern crate errors;
 extern crate scribe;
 
 // Module declarations
-pub mod vector;
 pub mod harmony;
 pub mod idk;
 pub mod crystal;
-pub mod errors;
 pub mod zeronaut;
 pub mod phantom;
 pub mod align;
 pub mod aether;
 pub mod cube;
 pub mod growth;
-pub mod native;
 
-// Re-exports from local modules
-pub use {
-    crystal::{CrystalLattice, CrystalNode},
-    errors::{QuantumError, CoherenceError, QuantumResult, CoherenceResult},
-    vector::{Vector3D, Vector4D},
-    zeronaut::Zeronaut,
-    phantom::Phantom,
-    align::{Alignment, AlignmentState, AlignmentResult},
-    aether::AetherField,
-    growth::{GrowthPattern, GrowthState, CrystalGrowth},
-    native::{String, Box, Vec},
+// Re-exports from magicmath
+pub use magicmath::{
+    Vector3D,
+    Vector4D,
+    resonance::{Quantum, Phase, Resonance},
 };
 
-// Re-exports from external crates
-pub use {
-    scribe::Scribe,
-    magicmath::{
-        traits::{MeshValue, Resonance},
-        FractalParams,
-        FractalState,
-        JuliaParams,
-        JuliaState,
-        JuliaVariant,
-        MandelbrotParams,
-        MandelbrotState,
-        MandelbrotVariant,
-        generate_fractal,
-        iterate_julia,
-        iterate_mandelbrot,
-    },
+// Re-exports from errors
+pub use errors::{
+    core::{
+        MathError,
+        QuantumError,
+        MathResult,
+        QuantumResult
+    }
+};
+
+// Re-exports from scribe
+pub use scribe::{
+    Scribe,
+    native_string::String
 };
 
 // Constants module

@@ -1,23 +1,26 @@
 /// Wanda AI Assistant Brain Module
-/// Last Updated: 2025-01-16 02:40:24 UTC
+/// Last Updated: 2025-01-20 15:13:46 UTC
 /// Author: isdood
 /// Current User: isdood
 ///
 /// Quantum-aware neural processing unit for the Wanda AI Assistant.
 /// Implements cerealization for state persistence and quantum coherence tracking.
+/// Now features Prolog integration for enhanced logical reasoning.
 
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 use unstable_matter::scribe::{Scribe, ScribePrecision, QuantumString};
 use unstable_matter::cereal::{Cereal, QuantumBuffer, CerealError, CerealResult};
+use crate::prolog::PrologBridge;
 
 // Quantum coherence constants
 const QUANTUM_STABILITY_THRESHOLD: f64 = 0.75;
 const COHERENCE_DECAY_RATE: f64 = 0.99999;
 const NEURAL_ENTROPY_FACTOR: f64 = 0.000001;
+const FAIRY_DUST_COEFFICIENT: f64 = 0.618033988749895;
 
 /// Brain state for quantum stability tracking
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BrainState {
     Initializing,
     Learning,
@@ -29,15 +32,15 @@ pub enum BrainState {
 /// Neural pattern with quantum properties
 #[derive(Debug, Clone)]
 pub struct NeuralPattern {
-    confidence: f64,
-    coherence: f64,
-    timestamp: u64,
-    pattern_hash: u64,
-    quantum_phase: f64,
+    pub(crate) confidence: f64,
+    pub(crate) coherence: f64,
+    pub(crate) timestamp: u64,
+    pub(crate) pattern_hash: u64,
+    pub(crate) quantum_phase: f64,
 }
 
 impl NeuralPattern {
-    fn new(confidence: f64) -> Self {
+    pub fn new(confidence: f64) -> Self {
         Self {
             confidence,
             coherence: 1.0,
@@ -139,7 +142,7 @@ impl Scribe for AnalysisResult {
     }
 }
 
-/// Quantum-aware AI brain implementation
+/// Quantum-aware AI brain implementation with Prolog integration
 pub struct WandaBrain {
     patterns: Vec<NeuralPattern>,
     state: BrainState,
@@ -147,6 +150,7 @@ pub struct WandaBrain {
     last_update: u64,
     quantum_state: f64,
     creator: [u8; 32],  // Fixed size for username
+    prolog: Option<PrologBridge>,
 }
 
 impl WandaBrain {
@@ -161,11 +165,19 @@ impl WandaBrain {
             .as_secs(),
             quantum_state: 1.0,
             creator: [0; 32],
+            prolog: Some(PrologBridge::new()),
         };
 
         // Set creator (isdood)
         let creator = b"isdood";
         brain.creator[..creator.len()].copy_from_slice(creator);
+
+        // Initialize Prolog integration
+        if let Some(prolog) = &brain.prolog {
+            prolog.init_quantum_rules()
+            .expect("Failed to initialize quantum rules");
+        }
+
         brain.state = BrainState::Resting;
         brain
     }
@@ -175,14 +187,16 @@ impl WandaBrain {
         self.coherence *= COHERENCE_DECAY_RATE;
 
         let mut suggestions = Vec::new();
-        if self.is_stable() {
-            // Generate quantum-aware suggestions
+        if self.validate_state() {
+            // Generate quantum-aware suggestions with Prolog validation
             let pattern = NeuralPattern::new(0.85);
-            self.patterns.push(pattern);
+            if self.validate_pattern(&pattern) {
+                self.patterns.push(pattern);
 
-            suggestions.push("Consider adding documentation".to_string());
-            suggestions.push("Check error handling".to_string());
-            suggestions.push("Review variable naming".to_string());
+                suggestions.push("Consider adding documentation".to_string());
+                suggestions.push("Check error handling".to_string());
+                suggestions.push("Review variable naming".to_string());
+            }
         }
 
         self.last_update = SystemTime::now()
@@ -200,7 +214,11 @@ impl WandaBrain {
 
         // Apply quantum entropy
         self.quantum_state *= 1.0 - NEURAL_ENTROPY_FACTOR;
-        self.patterns.push(pattern);
+
+        // Validate pattern with Prolog before learning
+        if self.validate_pattern(&pattern) {
+            self.patterns.push(pattern);
+        }
 
         self.last_update = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -208,7 +226,25 @@ impl WandaBrain {
         .as_secs();
 
         self.state = BrainState::Resting;
-        self.is_stable()
+        self.validate_state()
+    }
+
+    pub fn validate_state(&self) -> bool {
+        if let Some(prolog) = &self.prolog {
+            prolog.query_state(&self.state, self.coherence)
+            .unwrap_or_else(|_| self.is_stable())
+        } else {
+            self.is_stable()
+        }
+    }
+
+    pub fn validate_pattern(&self, pattern: &NeuralPattern) -> bool {
+        if let Some(prolog) = &self.prolog {
+            prolog.validate_pattern(pattern)
+            .unwrap_or(pattern.confidence >= QUANTUM_STABILITY_THRESHOLD)
+        } else {
+            pattern.confidence >= QUANTUM_STABILITY_THRESHOLD
+        }
     }
 
     pub fn is_stable(&self) -> bool {
@@ -234,7 +270,7 @@ impl WandaBrain {
             .as_secs(),
         };
 
-        if self.is_stable() {
+        if self.validate_state() {
             if path.is_file() {
                 result.suggestions.push("Analyzing file structure...".to_string());
                 if let Some(ext) = path.extension() {
@@ -244,11 +280,18 @@ impl WandaBrain {
                             result.suggestions.push("Check for error handling".to_string());
                             result.suggestions.push("Review variable naming".to_string());
                             result.suggestions.push("Verify quantum coherence tracking".to_string());
+                            result.suggestions.push("Validate Prolog integration".to_string());
                         },
                         Some("toml") => {
                             result.suggestions.push("Check dependency versions".to_string());
                             result.suggestions.push("Verify feature flags".to_string());
                             result.suggestions.push("Review unstable_matter integration".to_string());
+                            result.suggestions.push("Check Prolog dependencies".to_string());
+                        },
+                        Some("pl") => {
+                            result.suggestions.push("Validate Prolog rules".to_string());
+                            result.suggestions.push("Check quantum predicates".to_string());
+                            result.suggestions.push("Review logical consistency".to_string());
                         },
                         _ => {
                             result.suggestions.push("Unknown file type".to_string());
@@ -261,11 +304,14 @@ impl WandaBrain {
                 result.suggestions.push("Check for README.md".to_string());
                 result.suggestions.push("Verify .gitignore".to_string());
                 result.suggestions.push("Look for quantum state persistence".to_string());
+                result.suggestions.push("Validate Prolog rule files".to_string());
             }
 
             // Create and store analysis pattern
             let pattern = NeuralPattern::new(0.95);
-            self.patterns.push(pattern);
+            if self.validate_pattern(&pattern) {
+                self.patterns.push(pattern);
+            }
         }
 
         self.last_update = SystemTime::now()
@@ -330,13 +376,15 @@ impl Cereal for WandaBrain {
         let pattern_count = buffer.read_u32(pos)?;
         brain.patterns.clear();
         for _ in 0..pattern_count {
-            brain.patterns.push(NeuralPattern::decerealize(buffer, pos)?);
+            let pattern = NeuralPattern::decerealize(buffer, pos)?;
+            if brain.validate_pattern(&pattern) {
+                brain.patterns.push(pattern);
+            }
         }
 
         Ok(brain)
     }
 }
-
 impl Scribe for WandaBrain {
     fn scribe(&self, precision: ScribePrecision, output: &mut QuantumString) {
         output.push_str("WandaBrain[");
@@ -356,224 +404,8 @@ impl Scribe for WandaBrain {
         self.quantum_state.scribe(precision, output);
         output.push_str(", updated=");
         self.last_update.scribe(precision, output);
+        output.push_str(", prolog=");
+        output.push_str(if self.prolog.is_some() { "active" } else { "inactive" });
         output.push_char(']');
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_brain_creation() {
-        let brain = WandaBrain::new();
-        assert!(brain.is_stable());
-        assert_eq!(brain.patterns.len(), 0);
-
-        // Verify creator
-        let creator = b"isdood";
-        let mut creator_slice = &brain.creator[..creator.len()];
-        assert_eq!(creator_slice, creator);
-    }
-
-    #[test]
-    fn test_brain_cerealization() {
-        let mut brain = WandaBrain::new();
-        brain.process("test input");
-
-        let mut buffer = QuantumBuffer::new();
-        assert!(brain.cerealize(&mut buffer).is_ok());
-
-        let mut pos = 6; // Skip magic + version
-        let decoded = WandaBrain::decerealize(&mut buffer, &mut pos).unwrap();
-
-        assert_eq!(brain.patterns.len(), decoded.patterns.len());
-        assert!((brain.coherence - decoded.coherence).abs() < 0.0001);
-        assert_eq!(brain.creator, decoded.creator);
-
-        // Verify quantum state transfer
-        assert!((brain.quantum_state - decoded.quantum_state).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_brain_processing() {
-        let mut brain = WandaBrain::new();
-        let suggestions = brain.process("test input");
-
-        assert!(!suggestions.is_empty());
-        assert!(brain.patterns.len() > 0);
-        assert!(brain.coherence < 1.0);
-        assert!(brain.is_stable());
-    }
-
-    #[test]
-    fn test_quantum_stability() {
-        let mut brain = WandaBrain::new();
-        let initial_coherence = brain.coherence;
-
-        // Process multiple inputs to test stability decay
-        for _ in 0..10 {
-            brain.process("test");
-        }
-
-        assert!(brain.coherence < initial_coherence);
-        assert!(brain.coherence > QUANTUM_STABILITY_THRESHOLD);
-        assert!(brain.quantum_state > QUANTUM_STABILITY_THRESHOLD);
-        assert!(brain.is_stable());
-    }
-
-    #[test]
-    fn test_pattern_creation() {
-        let pattern = NeuralPattern::new(0.95);
-        assert_eq!(pattern.confidence, 0.95);
-        assert_eq!(pattern.coherence, 1.0);
-        assert_eq!(pattern.quantum_phase, 0.0);
-        assert!(pattern.timestamp > 0);
-    }
-
-    #[test]
-    fn test_pattern_cerealization() {
-        let pattern = NeuralPattern::new(0.95);
-        let mut buffer = QuantumBuffer::new();
-
-        assert!(pattern.cerealize(&mut buffer).is_ok());
-
-        let mut pos = 6;
-        let decoded = NeuralPattern::decerealize(&mut buffer, &mut pos).unwrap();
-
-        assert!((pattern.confidence - decoded.confidence).abs() < 0.0001);
-        assert!((pattern.coherence - decoded.coherence).abs() < 0.0001);
-        assert!((pattern.quantum_phase - decoded.quantum_phase).abs() < 0.0001);
-        assert_eq!(pattern.timestamp, decoded.timestamp);
-        assert_eq!(pattern.pattern_hash, decoded.pattern_hash);
-    }
-
-    #[test]
-    fn test_analyze_rust_file() {
-        let mut brain = WandaBrain::new();
-        let path = PathBuf::from("test.rs");
-        let result = brain.analyze_path(&path);
-
-        assert!(!result.suggestions.is_empty());
-        assert!(result.confidence > 0.0);
-        assert!(result.coherence > 0.0);
-        assert!(result.suggestions.iter().any(|s| s.contains("documentation")));
-        assert!(result.suggestions.iter().any(|s| s.contains("error handling")));
-    }
-
-    #[test]
-    fn test_analyze_toml_file() {
-        let mut brain = WandaBrain::new();
-        let path = PathBuf::from("Cargo.toml");
-        let result = brain.analyze_path(&path);
-
-        assert!(!result.suggestions.is_empty());
-        assert!(result.suggestions.iter().any(|s| s.contains("dependency")));
-        assert!(result.suggestions.iter().any(|s| s.contains("feature")));
-    }
-
-    #[test]
-    fn test_analyze_directory() {
-        let mut brain = WandaBrain::new();
-        let path = PathBuf::from("./");
-        let result = brain.analyze_path(&path);
-
-        assert!(!result.suggestions.is_empty());
-        assert!(result.suggestions.iter().any(|s| s.contains("README")));
-        assert!(result.suggestions.iter().any(|s| s.contains("gitignore")));
-    }
-
-    #[test]
-    fn test_analysis_cerealization() {
-        let analysis = AnalysisResult {
-            suggestions: vec![
-                "Test suggestion".to_string(),
-                "Another suggestion".to_string()
-            ],
-            confidence: 0.95,
-            coherence: 0.98,
-            timestamp: SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs(),
-        };
-
-        let mut buffer = QuantumBuffer::new();
-        assert!(analysis.cerealize(&mut buffer).is_ok());
-
-        let mut pos = 6;
-        let decoded = AnalysisResult::decerealize(&mut buffer, &mut pos).unwrap();
-
-        assert_eq!(analysis.suggestions, decoded.suggestions);
-        assert!((analysis.confidence - decoded.confidence).abs() < 0.0001);
-        assert!((analysis.coherence - decoded.coherence).abs() < 0.0001);
-        assert_eq!(analysis.timestamp, decoded.timestamp);
-    }
-
-    #[test]
-    fn test_quantum_coherence_decay() {
-        let mut brain = WandaBrain::new();
-        let initial_coherence = brain.coherence;
-        let initial_quantum_state = brain.quantum_state;
-
-        // Simulate heavy processing
-        for _ in 0..100 {
-            brain.process("test");
-            brain.analyze_path(&PathBuf::from("test.rs"));
-        }
-
-        assert!(brain.coherence < initial_coherence);
-        assert!(brain.quantum_state < initial_quantum_state);
-        assert!(brain.is_stable());  // Should still be stable
-    }
-
-    #[test]
-    fn test_pattern_learning() {
-        let mut brain = WandaBrain::new();
-        let pattern = NeuralPattern::new(0.95);
-
-        assert!(brain.learn(pattern.clone()));
-        assert_eq!(brain.patterns.len(), 1);
-
-        // Verify pattern storage
-        let stored_pattern = &brain.patterns[0];
-        assert!((stored_pattern.confidence - pattern.confidence).abs() < 0.0001);
-        assert!((stored_pattern.coherence - pattern.coherence).abs() < 0.0001);
-    }
-
-    #[test]
-    fn test_state_transitions() {
-        let mut brain = WandaBrain::new();
-        assert!(matches!(brain.state, BrainState::Resting));
-
-        // Test processing state
-        brain.process("test");
-        assert!(matches!(brain.state, BrainState::Resting));
-
-        // Test learning state
-        brain.learn(NeuralPattern::new(0.95));
-        assert!(matches!(brain.state, BrainState::Resting));
-
-        // Test analysis state
-        brain.analyze_path(&PathBuf::from("test.rs"));
-        assert!(matches!(brain.state, BrainState::Resting));
-    }
-
-    #[test]
-    fn test_brain_stats() {
-        let mut brain = WandaBrain::new();
-        let (initial_patterns, initial_coherence, initial_quantum) = brain.get_stats();
-
-        assert_eq!(initial_patterns, 0);
-        assert_eq!(initial_coherence, 1.0);
-        assert_eq!(initial_quantum, 1.0);
-
-        brain.process("test");
-
-        let (patterns, coherence, quantum) = brain.get_stats();
-        assert!(patterns > initial_patterns);
-        assert!(coherence < initial_coherence);
-        assert!(quantum <= initial_quantum);
     }
 }

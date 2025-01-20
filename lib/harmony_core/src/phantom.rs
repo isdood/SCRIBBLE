@@ -18,9 +18,10 @@ use crate::{
     errors::QuantumError,
     vector::{Vector3D, Vector4D},
     resonance::{Quantum, Phase, Resonance},
-    scribe::Scribe,
     native::{Box, Vec},
 };
+
+use scribe::{Scribe, native_string::String};
 
 /// Phantom state handler for higher-dimensional operations
 #[derive(Debug)]

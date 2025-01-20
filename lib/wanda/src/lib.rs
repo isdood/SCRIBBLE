@@ -10,13 +10,15 @@
 pub mod paths;
 pub mod service;
 pub mod types;
+pub mod prolog;
+pub mod brain;
 
 // Re-exports
 pub use paths::*;
 pub use service::WandaService;
 pub use types::*;
-pub mod brain;
 pub use brain::WandaBrain;
+pub use prolog::PrologBridge;
 
 // Library-wide constants
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

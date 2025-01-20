@@ -9,18 +9,18 @@
 //! License: MIT
 
 use magicmath::{
+    core::Field,
     traits::MeshValue,
-    math::Field,
-    errors::MathError,
+    Vector3D,
+    resonance::{Quantum, Phase, Resonance}
 };
 
+use errors::core::MathError;
+use scribe::{Scribe, native_string::String};
+
 use crate::{
-    errors::QuantumError,
-    vector::Vector3D,
     cube::Cube,
-    align::{Alignment, AlignmentState},
-    resonance::{Quantum, Phase, Resonance},
-    scribe::Scribe,
+    align::{Alignment, AlignmentState}
 };
 
 /// A quantum state handler
@@ -90,14 +90,15 @@ impl<T: MeshValue> Phase for HarmonicHandler<T> {
     }
 }
 
+// Replace write_str! macro usage with native_string methods:
 impl<T: MeshValue + Scribe> Scribe for HarmonicHandler<T> {
     fn scribe(&self) -> String {
         let mut result = String::new();
-        write_str!(result, "Harmonic State:\n");
-        write_str!(result, "Resonance: ");
-        write_str!(result, &self.resonance.scribe());
-        write_str!(result, "\nField: ");
-        write_str!(result, &self.field.scribe());
+        result.push_str("Harmonic State:\n");
+        result.push_str("Resonance: ");
+        result.push_str(&self.resonance.scribe().to_str());
+        result.push_str("\nField: ");
+        result.push_str(&self.field.scribe().to_str());
         result
     }
 }
