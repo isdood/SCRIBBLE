@@ -3,48 +3,43 @@
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-19
-//! Last Updated: 2025-01-19 23:56:38 UTC
+//! Created: 2025-01-20
+//! Last Updated: 2025-01-20 02:12:57 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::traits::CrystalSub;
-use crate::constants::HARMONY_STABILITY_THRESHOLD;
-use errors::{MathError, MathResult};
+use errors::MathResult;
 
-impl<T: MeshValue> CrystalSub for T {
-    fn sub(&self, other: &Self) -> MathResult<Self> {
-        if !self.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable);
-        }
-
-        if !other.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable);
-        }
-
-        let result = self.raw_sub(other)?;
-
-        if !result.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable);
-        }
-
-        Ok(result)
-    }
-
-    fn sub_assign(&mut self, other: &Self) -> MathResult<()> {
-        *self = self.sub(other)?;
-        Ok(())
-    }
-}
-
-trait RawSub {
+pub trait RawSub {
     fn raw_sub(&self, other: &Self) -> MathResult<Self> where Self: Sized;
 }
 
-impl<T: MeshValue> RawSub for T {
-    fn raw_sub(&self, other: &Self) -> MathResult<Self> {
-        let self_val = self.to_f64()?;
-        let other_val = other.to_f64()?;
-        Ok(T::from(self_val - other_val))
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::vector3d::Vector3D;
+    use crate::vector4d::Vector4D;
+
+    #[test]
+    fn test_vector3d_subtraction() -> MathResult<()> {
+        let v1 = Vector3D::new(4.0, 5.0, 6.0);
+        let v2 = Vector3D::new(1.0, 2.0, 3.0);
+        let result = v1.sub(&v2)?;
+        assert_eq!(result.x, 3.0);
+        assert_eq!(result.y, 3.0);
+        assert_eq!(result.z, 3.0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_vector4d_subtraction() -> MathResult<()> {
+        let v1 = Vector4D::new(5.0, 6.0, 7.0, 8.0);
+        let v2 = Vector4D::new(1.0, 2.0, 3.0, 4.0);
+        let result = v1.sub(&v2)?;
+        assert_eq!(result.x, 4.0);
+        assert_eq!(result.y, 4.0);
+        assert_eq!(result.z, 4.0);
+        assert_eq!(result.w, 4.0);
+        Ok(())
     }
 }

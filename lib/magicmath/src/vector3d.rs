@@ -1,21 +1,20 @@
-//! Three-Dimensional Vector Mathematics and Operations
-//! ==========================================
+//! Three-Dimensional Vector Operations
+//! ==============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-20
-//! Last Updated: 2025-01-20 01:22:10 UTC
+//! Last Updated: 2025-01-20 02:06:32 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use crate::traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv, Quantum, Phase};
-use errors::{MathError, MathResult};
-use scribe::Scribe;
-use scribe::native_string::String;
 use crate::core::HarmonyState;
 use crate::constants::HARMONY_STABILITY_THRESHOLD;
+use errors::{MathError, MathResult};
+use scribe::{Scribe, native_string::String};
 
-/// Three-dimensional vector with harmony state
+/// Three-dimensional vector with harmony state tracking
 #[derive(Debug, Clone)]
 pub struct Vector3D {
     pub x: f64,
@@ -36,7 +35,7 @@ impl Vector3D {
     }
 
     /// Check harmony stability
-    pub fn check_stability(&self) -> MathResult<()> {
+    fn check_stability(&self) -> MathResult<()> {
         if !self.check_harmony_state() {
             return Err(MathError::HarmonyStateUnstable);
         }
@@ -46,6 +45,20 @@ impl Vector3D {
     /// Calculate vector magnitude
     pub fn magnitude(&self) -> MathResult<f64> {
         Ok((self.x * self.x + self.y * self.y + self.z * self.z).sqrt())
+    }
+
+    /// Calculate dot product
+    pub fn dot(&self, other: &Self) -> MathResult<f64> {
+        Ok(self.x * other.x + self.y * other.y + self.z * other.z)
+    }
+
+    /// Calculate cross product
+    pub fn cross(&self, other: &Self) -> MathResult<Self> {
+        Ok(Self::new(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x,
+        ))
     }
 }
 
@@ -91,7 +104,7 @@ impl CrystalAdd for Vector3D {
         Ok(Self::new(
             self.x + other.x,
             self.y + other.y,
-            self.z + other.z
+            self.z + other.z,
         ))
     }
 
@@ -109,7 +122,7 @@ impl CrystalSub for Vector3D {
         Ok(Self::new(
             self.x - other.x,
             self.y - other.y,
-            self.z - other.z
+            self.z - other.z,
         ))
     }
 
@@ -127,7 +140,7 @@ impl CrystalMul for Vector3D {
         Ok(Self::new(
             self.x * other.x,
             self.y * other.y,
-            self.z * other.z
+            self.z * other.z,
         ))
     }
 
@@ -149,7 +162,7 @@ impl CrystalDiv for Vector3D {
         Ok(Self::new(
             self.x / other.x,
             self.y / other.y,
-            self.z / other.z
+            self.z / other.z,
         ))
     }
 
@@ -180,6 +193,7 @@ impl Phase for Vector3D {
         let new_phase = current_phase + shift;
         self.x = mag * new_phase.cos();
         self.y = mag * new_phase.sin();
+        // z component remains unchanged during phase shift
         Ok(())
     }
 }
@@ -187,5 +201,50 @@ impl Phase for Vector3D {
 impl Scribe for Vector3D {
     fn scribe(&self) -> String {
         String::from(format!("({}, {}, {})", self.x, self.y, self.z).as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vector3d_creation() {
+        let v = Vector3D::new(1.0, 2.0, 3.0);
+        assert_eq!(v.x, 1.0);
+        assert_eq!(v.y, 2.0);
+        assert_eq!(v.z, 3.0);
+    }
+
+    #[test]
+    fn test_vector3d_magnitude() -> MathResult<()> {
+        let v = Vector3D::new(3.0, 4.0, 0.0);
+        assert_eq!(v.magnitude()?, 5.0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_vector3d_dot_product() -> MathResult<()> {
+        let v1 = Vector3D::new(1.0, 2.0, 3.0);
+        let v2 = Vector3D::new(4.0, 5.0, 6.0);
+        assert_eq!(v1.dot(&v2)?, 32.0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_vector3d_cross_product() -> MathResult<()> {
+        let v1 = Vector3D::new(1.0, 0.0, 0.0);
+        let v2 = Vector3D::new(0.0, 1.0, 0.0);
+        let result = v1.cross(&v2)?;
+        assert_eq!(result.x, 0.0);
+        assert_eq!(result.y, 0.0);
+        assert_eq!(result.z, 1.0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_harmony_state() {
+        let v = Vector3D::new(1.0, 2.0, 3.0);
+        assert!(v.check_harmony_state());
     }
 }

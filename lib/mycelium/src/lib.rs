@@ -8,7 +8,7 @@ pub mod network;
 pub mod transport;
 pub mod topology;
 pub mod error;
-pub mod coherence;
+pub mod harmony;  // Changed from coherence
 
 pub mod prelude {
     //! Convenient imports for common Mycelium types and traits
@@ -17,7 +17,7 @@ pub mod prelude {
     pub use crate::transport::{TransportChannel, QuantumState};
     pub use crate::topology::TopologyType;
     pub use crate::error::{NetworkError, NetworkResult};
-    pub use crate::coherence::{CoherenceMonitor, StabilityMetrics};
+    pub use crate::harmony::{HarmonyMonitor, StabilityMetrics};  // Changed from coherence
 }
 
 // Re-exports

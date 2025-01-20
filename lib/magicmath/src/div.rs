@@ -1,58 +1,53 @@
 //! Crystal-Aware Division Operations
-//! ===========================
+//! ==============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-19
-//! Last Updated: 2025-01-19 23:56:38 UTC
+//! Created: 2025-01-20
+//! Last Updated: 2025-01-20 02:14:30 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::traits::CrystalDiv;
-use crate::constants::HARMONY_STABILITY_THRESHOLD;
-use errors::{MathError, MathResult};
+use errors::MathResult;
 
-impl<T: MeshValue> CrystalDiv for T {
-    fn div(&self, other: &Self) -> MathResult<Self> {
-        if !self.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable);
-        }
-
-        if !other.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable);
-        }
-
-        let other_val = other.to_f64()?;
-        if other_val == 0.0 {
-            return Err(MathError::DivisionByZero);
-        }
-
-        let result = self.raw_div(other)?;
-
-        if !result.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable);
-        }
-
-        Ok(result)
-    }
-
-    fn div_assign(&mut self, other: &Self) -> MathResult<()> {
-        *self = self.div(other)?;
-        Ok(())
-    }
-}
-
-trait RawDiv {
+pub trait RawDiv {
     fn raw_div(&self, other: &Self) -> MathResult<Self> where Self: Sized;
 }
 
-impl<T: MeshValue> RawDiv for T {
-    fn raw_div(&self, other: &Self) -> MathResult<Self> {
-        let self_val = self.to_f64()?;
-        let other_val = other.to_f64()?;
-        if other_val == 0.0 {
-            return Err(MathError::DivisionByZero);
-        }
-        Ok(T::from(self_val / other_val))
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use errors::MathError;
+    use crate::vector3d::Vector3D;
+    use crate::vector4d::Vector4D;
+
+    #[test]
+    fn test_vector3d_division() -> MathResult<()> {
+        let v1 = Vector3D::new(6.0, 12.0, 15.0);
+        let v2 = Vector3D::new(2.0, 3.0, 5.0);
+        let result = v1.div(&v2)?;
+        assert_eq!(result.x, 3.0);
+        assert_eq!(result.y, 4.0);
+        assert_eq!(result.z, 3.0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_vector4d_division() -> MathResult<()> {
+        let v1 = Vector4D::new(6.0, 12.0, 15.0, 20.0);
+        let v2 = Vector4D::new(2.0, 3.0, 5.0, 4.0);
+        let result = v1.div(&v2)?;
+        assert_eq!(result.x, 3.0);
+        assert_eq!(result.y, 4.0);
+        assert_eq!(result.z, 3.0);
+        assert_eq!(result.w, 5.0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_division_by_zero() {
+        let v1 = Vector3D::new(1.0, 2.0, 3.0);
+        let v2 = Vector3D::new(0.0, 1.0, 1.0);
+        assert!(matches!(v1.div(&v2), Err(MathError::DivisionByZero)));
     }
 }
