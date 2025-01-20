@@ -38,9 +38,15 @@ scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
 ziggy = { path = "lib/ziggy" }
 criterion = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [lib]
 path = "src/lib.rs"
+
+[[bin]]
+name = "bench_compare"
+path = "tools/bench_compare.rs"
 
 [dependencies]
 libm = "0.2.11"
@@ -48,6 +54,8 @@ scribble = { path = "lib/scribble" }
 scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
 ziggy = { path = "lib/ziggy" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 [dev-dependencies]
 criterion = "0.5"
@@ -55,5 +63,5 @@ criterion = "0.5"
 # Metadata
 [package.metadata]
 created = "2025-01-19"
-updated = "2025-01-20 16:31:10"
+updated = "2025-01-20 17:32:54"
 current_user = "isdood"

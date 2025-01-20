@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:14:08 UTC
+//! Last Updated: 2025-01-20 17:33:32 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -15,6 +15,7 @@
 extern crate magicmath;
 extern crate errors;
 extern crate scribe;
+extern crate align;
 
 // Module declarations
 pub mod align;
@@ -37,21 +38,36 @@ pub use magicmath::{
         CrystalMul,
         CrystalDiv,
     },
+    // Core types
+    types::{Field, Mesh, PhaseField, AetherField},
     // Vectors
     vector3d::Vector3D,
     vector4d::Vector4D,
-    // Math operations
-    ops::{Field, Mesh, PhaseField, AetherField},
     // Resonance
     resonance::Resonance,
-    // Math utilities
-    utils::{floor, sqrt},
+    // Math functions
+    math::{floor, sqrt},
+    // Fractal types
+    fractal::{
+        FractalParams,
+        FractalState,
+        JuliaParams,
+        JuliaState,
+        JuliaVariant,
+        MandelbrotParams,
+        MandelbrotState,
+        MandelbrotVariant,
+        generate_fractal,
+        iterate_julia,
+        iterate_mandelbrot,
+    },
 };
 
 // Re-exports from errors
 pub use errors::{
     MathError,
     QuantumError,
+    MathResult,
 };
 
 // Re-exports from core
@@ -60,10 +76,10 @@ pub use core::{
     result::Result,
 };
 
-// Re-exports from alloc
-pub use alloc::{
+// Re-exports from align
+pub use align::{
     string::String,
-    vec::Vec,
+    collections::Vec,
     boxed::Box,
 };
 
