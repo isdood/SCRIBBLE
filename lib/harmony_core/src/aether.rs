@@ -4,22 +4,22 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 17:11:51 UTC
+//! Last Updated: 2025-01-20 17:19:22 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
-    field::{Field, Mesh, PhaseField, AetherField},
+    ops::{Field, Mesh, PhaseField, AetherField},
     traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
     vector3d::Vector3D,
     vector4d::Vector4D,
     resonance::{Quantum, Phase, Resonance}
 };
 
-use errors::core::{MathError, QuantumError};
+use errors::MathError;
+use crate::{QuantumError, String};
 use core::fmt::{self, Write, Formatter, Result as FmtResult};
-
-use crate::String;
+use alloc::string::ToString;
 
 /// Aether field state handler
 #[derive(Debug)]
@@ -112,14 +112,13 @@ impl<T: MeshValue> Phase for Aether<T> {
     }
 }
 
-impl<T: MeshValue + Write> Write for Aether<T> {
-    fn write_str(&mut self, s: &str) -> FmtResult {
-        write!(self, "Aether Field State:\n")?;
-        write!(self, "Position: {}\n", self.position)?;
-        write!(self, "Density: {}\n", self.density)?;
-        write!(self, "Potential: {}\n", self.potential().unwrap_or(0.0))?;
-        write!(self, "Resonance: {}", self.resonance)?;
-        Ok(())
+impl<T: MeshValue> fmt::Display for Aether<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        writeln!(f, "Aether Field State:")?;
+        writeln!(f, "Position: {}", self.position)?;
+        writeln!(f, "Density: {}", self.density)?;
+        writeln!(f, "Potential: {}", self.potential().unwrap_or(0.0))?;
+        write!(f, "Resonance: {}", self.resonance)
     }
 }
 
@@ -212,9 +211,9 @@ mod tests {
         }
     }
 
-    impl Write for TestAether {
-        fn write_str(&mut self, s: &str) -> FmtResult {
-            write!(self, "{}", self.value)
+    impl fmt::Display for TestAether {
+        fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+            write!(f, "{}", self.value)
         }
     }
 

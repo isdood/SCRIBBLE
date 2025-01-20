@@ -12,7 +12,14 @@ rustversion = "1.0"
 errors = { path = "../errors" }
 scribe = { path = "../scribe" }
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
 [package.metadata]
 created = "2025-01-19"
 updated = "2025-01-19 14:31:18"
 current_user = "isdood"
+
+[[bench]]
+name = "vector_ops"
+harness = false
