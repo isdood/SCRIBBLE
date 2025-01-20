@@ -4,23 +4,21 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 21:34:35 UTC
+//! Last Updated: 2025-01-20 16:00:18 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
+    core::{Field, Mesh, PhaseField, AetherField},
     traits::MeshValue,
-    math::{Field, Mesh, PhaseField, AetherField},
-    errors::MathError,
+    Vector3D,
+    Vector4D,
+    resonance::{Quantum, Phase, Resonance}
 };
 
-use crate::{
-    errors::QuantumError,
-    vector::{Vector3D, Vector4D},
-    resonance::{Quantum, Phase, Resonance},
-    scribe::Scribe,
-    native::{Box, Vec},
-};
+use errors::core::{MathError, QuantumError};
+use scribe::{Scribe, native_string::String};
+use native::{Box, Vec};
 
 /// Aether field state handler
 #[derive(Debug)]
@@ -116,15 +114,15 @@ impl<T: MeshValue> Phase for Aether<T> {
 impl<T: MeshValue + Scribe> Scribe for Aether<T> {
     fn scribe(&self) -> String {
         let mut result = String::new();
-        write_str!(result, "Aether Field State:\n");
-        write_str!(result, "Position: ");
-        write_str!(result, &self.position.scribe());
-        write_str!(result, "\nDensity: ");
-        write_str!(result, &self.density.scribe());
-        write_str!(result, "\nPotential: ");
-        write_str!(result, &self.potential().unwrap_or(0.0).scribe());
-        write_str!(result, "\nResonance: ");
-        write_str!(result, &self.resonance.scribe());
+        result.push_str("Aether Field State:\n");
+        result.push_str("Position: ");
+        result.push_str(&self.position.scribe().to_str());
+        result.push_str("\nDensity: ");
+        result.push_str(&self.density.to_string());
+        result.push_str("\nPotential: ");
+        result.push_str(&self.potential().unwrap_or(0.0).to_string());
+        result.push_str("\nResonance: ");
+        result.push_str(&self.resonance.scribe().to_str());
         result
     }
 }
@@ -151,7 +149,7 @@ mod tests {
     impl Scribe for TestAether {
         fn scribe(&self) -> String {
             let mut result = String::new();
-            write_str!(result, &self.value.scribe());
+            result.push_str(&self.value.to_string());
             result
         }
     }

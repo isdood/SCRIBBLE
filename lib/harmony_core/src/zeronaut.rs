@@ -4,24 +4,20 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 21:30:14 UTC
+//! Last Updated: 2025-01-20 16:05:53 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
+    core::{Field, Mesh},
     traits::MeshValue,
-    math::{Field, Mesh},
-    errors::MathError,
+    Vector3D,
+    resonance::{Quantum, Phase, Resonance}
 };
 
-use crate::{
-    errors::QuantumError,
-    vector::Vector3D,
-    resonance::{Quantum, Phase, Resonance},
-    native::{Box, Vec},
-};
-
+use errors::core::{MathError, QuantumError};
 use scribe::{Scribe, native_string::String};
+use native::{Box, Vec};
 
 /// Zero-point energy state handler
 #[derive(Debug)]
@@ -105,13 +101,13 @@ impl<T: MeshValue> Phase for Zeronaut<T> {
 impl<T: MeshValue + Scribe> Scribe for Zeronaut<T> {
     fn scribe(&self) -> String {
         let mut result = String::new();
-        write_str!(result, "Zeronaut State:\n");
-        write_str!(result, "Position: ");
-        write_str!(result, &self.position.scribe());
-        write_str!(result, "\nResonance: ");
-        write_str!(result, &self.resonance.scribe());
-        write_str!(result, "\nField Energy: ");
-        write_str!(result, &self.field.energy().unwrap_or(0.0).scribe());
+        result.push_str("Zeronaut State:\n");
+        result.push_str("Position: ");
+        result.push_str(&self.position.scribe().to_str());
+        result.push_str("\nResonance: ");
+        result.push_str(&self.resonance.scribe().to_str());
+        result.push_str("\nField Energy: ");
+        result.push_str(&self.field.energy().unwrap_or(0.0).to_string());
         result
     }
 }
@@ -138,7 +134,7 @@ mod tests {
     impl Scribe for TestZero {
         fn scribe(&self) -> String {
             let mut result = String::new();
-            write_str!(result, &self.value.scribe());
+            result.push_str(&self.value.to_string());
             result
         }
     }
