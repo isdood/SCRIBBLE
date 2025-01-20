@@ -19,7 +19,8 @@ members = [
     "lib/garnet",
     "lib/quartz",
     "lib/scribe",
-    "lib/errors"
+    "lib/errors",
+    "lib/ziggy"  # Added new Zig integration module
 ]
 resolver = "2"
 
@@ -35,6 +36,8 @@ shard = { path = "lib/shard" }
 quartz = { path = "lib/quartz" }
 scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
+ziggy = { path = "lib/ziggy" }  # Added Zig integration library
+criterion = "0.5"  # Added for benchmarking
 
 [lib]
 path = "src/lib.rs"
@@ -44,9 +47,19 @@ libm = "0.2.11"
 scribble = { path = "lib/scribble" }
 scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
+ziggy = { path = "lib/ziggy" }  # Added Zig integration dependency
+
+# Dev dependencies for benchmarking
+[dev-dependencies]
+criterion = "0.5"
 
 # Metadata
 [package.metadata]
 created = "2025-01-19"
-updated = "2025-01-19 16:03:45"
+updated = "2025-01-20 16:13:24"  # Updated to current timestamp
 current_user = "isdood"
+
+# Benchmark configuration
+[[bench]]
+name = "vector_ops"
+harness = false

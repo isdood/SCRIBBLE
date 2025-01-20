@@ -1,0 +1,17 @@
+[package]
+name = "ziggy"
+version = "0.1.0"
+edition = "2021"
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "Zig integration module for Scribble"
+license = "MIT"
+
+[lib]
+name = "ziggy"
+path = "src/lib.rs"
+
+[dependencies]
+approx = "0.5"  # For float comparisons in tests
+
+[build-dependencies]
+cc = "1.0"  # For building Zig code
