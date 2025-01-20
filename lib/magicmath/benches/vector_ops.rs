@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-20
-//! Last Updated: 2025-01-20 17:22:16 UTC
+//! Last Updated: 2025-01-20 17:40:13 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -52,10 +52,8 @@ fn dot_product(c: &mut Criterion) {
                 let id = format!("v{}·v{}", i + 1, j + 1);
                 group.bench_function(id, |b| {
                     b.iter_with_setup(
-                        || (v1, v2),
-                                      |(v1, v2)| {
-                                          criterion::black_box(v1.dot(&v2))
-                                      }
+                        || (v1, v2),  // Now works because Vector3D implements Copy
+                                      |(v1, v2)| criterion::black_box(v1.dot(&v2))
                     )
                 });
             }
@@ -72,10 +70,8 @@ fn magnitude(c: &mut Criterion) {
         let id = format!("v{}", i + 1);
         group.bench_function(id, |b| {
             b.iter_with_setup(
-                || v,
-                |v| {
-                    criterion::black_box(v.magnitude())
-                }
+                || v,  // Now works because Vector3D implements Copy
+                |v| criterion::black_box(v.magnitude())
             )
         });
     }

@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 23:49:52 UTC // Updated timestamp
+//! Last Updated: 2025-01-20 17:44:14 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -27,6 +27,24 @@ impl From<f64> for WrappedF64 {
 impl Scribe for WrappedF64 {
     fn scribe(&self) -> String {
         String::from(self.0.to_string().as_str())
+    }
+}
+
+// Add String extension traits
+trait StringExt {
+    fn contains(&self, needle: &str) -> bool;
+    fn push_str(&mut self, s: &str);
+}
+
+impl StringExt for String {
+    fn contains(&self, needle: &str) -> bool {
+        self.as_str().contains(needle)
+    }
+
+    fn push_str(&mut self, s: &str) {
+        let mut new_str = self.as_str().to_owned();
+        new_str.push_str(s);
+        *self = String::from(new_str.as_str());
     }
 }
 
@@ -89,7 +107,7 @@ impl Resonance {
 
     /// Get current position
     pub fn position(&self) -> Vector3D {
-        self.position.clone() // Added .clone() here
+        self.position.clone()
     }
 
     /// Set new position
@@ -104,7 +122,6 @@ impl Default for Resonance {
     }
 }
 
-// Implement Quantum trait
 impl Quantum for Resonance {
     fn energy(&self) -> Result<f64, MathError> {
         self.energy()
@@ -115,7 +132,6 @@ impl Quantum for Resonance {
     }
 }
 
-// Implement Phase trait
 impl Phase for Resonance {
     fn phase_shift(&mut self, shift: f64) -> Result<(), MathError> {
         self.phase_shift(shift)
@@ -174,7 +190,7 @@ mod tests {
     fn test_position() {
         let mut res = Resonance::new();
         let pos = Vector3D::new(1.0, 2.0, 3.0);
-        res.set_position(pos.clone()); // Added .clone()
+        res.set_position(pos.clone());
         let retrieved_pos = res.position();
         assert_eq!(retrieved_pos.x, 1.0);
         assert_eq!(retrieved_pos.y, 2.0);

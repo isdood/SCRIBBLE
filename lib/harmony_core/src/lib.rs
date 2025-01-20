@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:33:32 UTC
+//! Last Updated: 2025-01-20 17:41:57 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -31,22 +31,25 @@ pub mod aether;
 // Re-export common types from magicmath
 pub use magicmath::{
     // Core traits
-    traits::{
-        MeshValue,
-        CrystalAdd,
-        CrystalSub,
-        CrystalMul,
-        CrystalDiv,
-    },
+    traits::MeshValue,
     // Core types
-    types::{Field, Mesh, PhaseField, AetherField},
+    Field,
+    Mesh,
+    PhaseField,
+    AetherField,
+    // Math operations
+    CrystalAdd,
+    CrystalSub,
+    CrystalMul,
+    CrystalDiv,
     // Vectors
-    vector3d::Vector3D,
-    vector4d::Vector4D,
+    Vector3D,
+    Vector4D,
     // Resonance
-    resonance::Resonance,
+    Resonance,
     // Math functions
-    math::{floor, sqrt},
+    floor,
+    sqrt,
     // Fractal types
     fractal::{
         FractalParams,
@@ -65,9 +68,8 @@ pub use magicmath::{
 
 // Re-exports from errors
 pub use errors::{
-    MathError,
+    Error as MathError,
     QuantumError,
-    MathResult,
 };
 
 // Re-exports from core

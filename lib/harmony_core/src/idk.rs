@@ -4,15 +4,19 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:33:51 UTC
+//! Last Updated: 2025-01-20 17:42:00 UTC
 //! Version: 0.1.1
 //! License: MIT
 
 use core::fmt::{Display, Formatter, Result as FmtResult};
-use magicmath::{
-    traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
-    errors::{Error as MathError, Result as MathResult},
+use magicmath::traits::{
+    MeshValue,
+    CrystalAdd,
+    CrystalSub,
+    CrystalMul,
+    CrystalDiv,
 };
+use magicmath::errors::{Error as MathError, Result as MathResult};
 use scribe::{
     native_string::String,
     Scribe,
