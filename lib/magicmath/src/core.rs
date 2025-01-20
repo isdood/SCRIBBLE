@@ -4,22 +4,17 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 18:49:41 UTC
+//! Last Updated: 2025-01-20 01:43:40 UTC
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::{
-    constants::{
-        HARMONY_STABILITY_THRESHOLD,
-        RESONANCE_FACTOR
-    },
-    traits::MeshValue,
-    fractal,
-    julia,
-    brot,
+use crate::constants::{
+    HARMONY_STABILITY_THRESHOLD,
+    RESONANCE_FACTOR
 };
-use errors::core::MathError;
-use scribe::native_string::String; // Import the correct String type
+use crate::traits::MeshValue;
+use errors::{MathError, MathResult};
+use scribe::native_string::String;
 
 /// Core harmony state tracking for all mathematical operations
 #[derive(Debug, Clone, Copy)]
@@ -53,7 +48,7 @@ impl HarmonyState {
 
     /// Update harmony state with new operation
     #[inline]
-    pub fn update(&mut self, operation: Operation) -> Result<(), MathError> {
+    pub fn update(&mut self, operation: Operation) -> MathResult<()> {
         self.coherence *= operation.coherence_factor();
         self.phase += operation.phase_shift();
         self.energy *= operation.energy_factor();
@@ -80,9 +75,6 @@ pub enum Operation {
     Golden,
     Pythagorean,
     Fibonacci,
-    Julia,
-    Mandelbrot,
-    Fractal,
 }
 
 impl Operation {
@@ -100,9 +92,6 @@ impl Operation {
             Operation::Golden => 1.15,
             Operation::Pythagorean => 0.95,
             Operation::Fibonacci => 1.20,
-            Operation::Julia => 1.25,
-            Operation::Mandelbrot => 1.30,
-            Operation::Fractal => 1.35,
         }
     }
 
@@ -120,9 +109,6 @@ impl Operation {
             Operation::Golden => (3.0 - 5.0f64.sqrt()) * core::f64::consts::PI,
             Operation::Pythagorean => core::f64::consts::PI / 3.0,
             Operation::Fibonacci => (1.0 - 5.0f64.sqrt()) * core::f64::consts::PI / 2.0,
-            Operation::Julia => core::f64::consts::PI / 6.0,
-            Operation::Mandelbrot => core::f64::consts::PI / 8.0,
-            Operation::Fractal => core::f64::consts::PI / 12.0,
         }
     }
 
@@ -140,9 +126,6 @@ impl Operation {
             Operation::Golden => 1.4,
             Operation::Pythagorean => 1.0,
             Operation::Fibonacci => 1.5,
-            Operation::Julia => 1.6,
-            Operation::Mandelbrot => 1.7,
-            Operation::Fractal => 1.8,
         }
     }
 }
@@ -163,7 +146,7 @@ impl HarmonyMath {
 
     /// Perform operation with harmony stability check
     #[inline]
-    pub fn operate<T: MeshValue + Copy>(&mut self, operation: Operation, value: T) -> Result<T, MathError> {
+    pub fn operate<T: MeshValue + Copy>(&mut self, operation: Operation, value: T) -> MathResult<T> {
         self.state.update(operation)?;
 
         match operation {
@@ -177,31 +160,6 @@ impl HarmonyMath {
             Operation::Golden => harmony_phi(&value),
             Operation::Pythagorean => harmony_pythagoras(&value, &value),
             Operation::Fibonacci => harmony_fibonacci(value.to_usize()?),
-            Operation::Julia => {
-                let state = julia::JuliaState::new(value.to_f64()?, 0.0);
-                let params = julia::JuliaParams::default();
-                let result = julia::iterate_julia(state, &params, julia::JuliaVariant::Standard)?;
-                Ok(T::from(result.escape_time().unwrap_or(0) as f64))
-            },
-            Operation::Mandelbrot => {
-                let state = brot::MandelbrotState::new(value.to_f64()?, 0.0);
-                let params = brot::MandelbrotParams::default();
-                let result = brot::iterate_mandelbrot(state, &params, brot::MandelbrotVariant::Standard)?;
-                Ok(T::from(result.escape_time().unwrap_or(0) as f64))
-            },
-            Operation::Fractal => {
-                let state = fractal::FractalState::Custom(fractal::CustomState {
-                    z_real: value.to_f64()?,
-                                                          z_imag: 0.0,
-                                                          iterations: 0,
-                                                          stability: 1.0,
-                                                          phase: 0.0,
-                                                          escape_time: None,
-                });
-                let params = fractal::FractalParams::default();
-                let result = fractal::generate_fractal(state, &params)?;
-                Ok(T::from(result.escape_time().unwrap_or(0) as f64))
-            },
         }
     }
 
@@ -220,22 +178,22 @@ impl HarmonyMath {
 
 // Core harmony operations
 #[inline]
-pub fn harmony_add<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_add<T: MeshValue>(a: &T, b: &T) -> MathResult<T> {
     Ok(T::from(a.to_f64()? + b.to_f64()?))
 }
 
 #[inline]
-pub fn harmony_sub<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_sub<T: MeshValue>(a: &T, b: &T) -> MathResult<T> {
     Ok(T::from(a.to_f64()? - b.to_f64()?))
 }
 
 #[inline]
-pub fn harmony_mul<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_mul<T: MeshValue>(a: &T, b: &T) -> MathResult<T> {
     Ok(T::from(a.to_f64()? * b.to_f64()?))
 }
 
 #[inline]
-pub fn harmony_div<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_div<T: MeshValue>(a: &T, b: &T) -> MathResult<T> {
     let b_val = b.to_f64()?;
     if b_val == 0.0 {
         return Err(MathError::DivisionByZero);
@@ -244,7 +202,7 @@ pub fn harmony_div<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
 }
 
 #[inline]
-pub fn harmony_sqrt<T: MeshValue>(a: &T) -> Result<T, MathError> {
+pub fn harmony_sqrt<T: MeshValue>(a: &T) -> MathResult<T> {
     let val = a.to_f64()?;
     if val < 0.0 {
         return Err(MathError::InvalidDomain(String::from("Square root of negative number")));
@@ -253,7 +211,7 @@ pub fn harmony_sqrt<T: MeshValue>(a: &T) -> Result<T, MathError> {
 }
 
 #[inline]
-pub fn harmony_ln<T: MeshValue>(a: &T) -> Result<T, MathError> {
+pub fn harmony_ln<T: MeshValue>(a: &T) -> MathResult<T> {
     let val = a.to_f64()?;
     if val <= 0.0 {
         return Err(MathError::LogarithmDomainError(val));
@@ -262,24 +220,24 @@ pub fn harmony_ln<T: MeshValue>(a: &T) -> Result<T, MathError> {
 }
 
 #[inline]
-pub fn harmony_pi<T: MeshValue>(scale: &T) -> Result<T, MathError> {
+pub fn harmony_pi<T: MeshValue>(scale: &T) -> MathResult<T> {
     Ok(T::from(core::f64::consts::PI * scale.to_f64()?))
 }
 
 #[inline]
-pub fn harmony_phi<T: MeshValue>(scale: &T) -> Result<T, MathError> {
+pub fn harmony_phi<T: MeshValue>(scale: &T) -> MathResult<T> {
     Ok(T::from(((1.0 + 5.0f64.sqrt()) / 2.0) * scale.to_f64()?))
 }
 
 #[inline]
-pub fn harmony_pythagoras<T: MeshValue>(a: &T, b: &T) -> Result<T, MathError> {
+pub fn harmony_pythagoras<T: MeshValue>(a: &T, b: &T) -> MathResult<T> {
     let a_val = a.to_f64()?;
     let b_val = b.to_f64()?;
     Ok(T::from((a_val * a_val + b_val * b_val).sqrt()))
 }
 
 #[inline]
-pub fn harmony_fibonacci<T: MeshValue>(n: usize) -> Result<T, MathError> {
+pub fn harmony_fibonacci<T: MeshValue>(n: usize) -> MathResult<T> {
     if n <= 1 {
         return Ok(T::from(n as f64));
     }

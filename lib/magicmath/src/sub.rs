@@ -8,9 +8,9 @@
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::traits::{MeshValue, CrystalSub};
+use crate::traits::CrystalSub;
 use crate::constants::HARMONY_STABILITY_THRESHOLD;
-use errors::MathError;
+use errors::{MathError, MathResult};
 
 impl<T: MeshValue> CrystalSub for T {
     fn sub(&self, other: &Self) -> MathResult<Self> {

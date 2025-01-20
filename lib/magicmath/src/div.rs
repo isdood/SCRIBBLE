@@ -8,9 +8,9 @@
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::traits::{MeshValue, CrystalDiv};
+use crate::traits::CrystalDiv;
 use crate::constants::HARMONY_STABILITY_THRESHOLD;
-use errors::MathError;
+use errors::{MathError, MathResult};
 
 impl<T: MeshValue> CrystalDiv for T {
     fn div(&self, other: &Self) -> MathResult<Self> {

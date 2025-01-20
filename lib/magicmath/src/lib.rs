@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 01:24:15 UTC
+//! Last Updated: 2025-01-20 01:32:46 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -40,6 +40,7 @@ pub use crate::traits::{
     Resonance,
 };
 
+// Vector re-exports
 pub use crate::vector3d::Vector3D;
 pub use crate::vector4d::Vector4D;
 
@@ -49,9 +50,7 @@ pub const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 pub const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 
 /// Initialize the library with default configuration
-pub fn init() {
-    // Initialize any necessary resources or configurations
-}
+pub fn init() {}
 
 /// Get the library version
 pub fn version() -> &'static str {
@@ -71,6 +70,7 @@ pub fn description() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use errors::MathResult;
 
     #[test]
     fn test_version() {
@@ -88,14 +88,14 @@ mod tests {
     }
 
     #[test]
-    fn test_crystal_operations() {
+    fn test_crystal_operations() -> MathResult<()> {
         let v1 = Vector3D::new(1.0, 2.0, 3.0);
         let v2 = Vector3D::new(4.0, 5.0, 6.0);
 
-        // Test basic operations work
-        let _add_result = v1.add(&v2).unwrap();
-        let _sub_result = v1.sub(&v2).unwrap();
-        let _mul_result = v1.mul(&v2).unwrap();
-        let _div_result = v1.div(&v2).unwrap();
+        let _add_result = v1.add(&v2)?;
+        let _sub_result = v1.sub(&v2)?;
+        let _mul_result = v1.mul(&v2)?;
+        let _div_result = v1.div(&v2)?;
+        Ok(())
     }
 }

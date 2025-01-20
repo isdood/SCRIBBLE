@@ -8,9 +8,9 @@
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::traits::MeshValue;
+use crate::traits::CrystalMul;
 use crate::core::HarmonyState;
-use errors::MathError;
+use errors::{MathError, MathResult};
 use crate::constants::{
     HARMONY_STABILITY_THRESHOLD,
     RESONANCE_FACTOR,

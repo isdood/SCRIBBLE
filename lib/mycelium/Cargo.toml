@@ -1,0 +1,20 @@
+[package]
+name = "mycelium"
+version = "0.1.0"
+edition = "2021"
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "Crystal-based high-performance computing network framework"
+
+[dependencies]
+harmony_core = { path = "../harmony_core" }
+shard = { path = "../shard" }
+unstable_matter = { path = "../unstable_matter" }
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+tracing = "0.1"
+uuid = { version = "1.0", features = ["v4"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = "0.5"

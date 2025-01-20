@@ -8,9 +8,9 @@
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::traits::{MeshValue, CrystalAdd};
+use crate::traits::CrystalAdd;
 use crate::constants::HARMONY_STABILITY_THRESHOLD;
-use errors::MathError;
+use errors::{MathError, MathResult};
 
 impl<T: MeshValue> CrystalAdd for T {
     fn add(&self, other: &Self) -> MathResult<Self> {

@@ -8,7 +8,7 @@
 //! Version: 0.1.0
 //! License: MIT
 
-use crate::vector::Vector3D;
+use crate::vector3d::Vector3D;
 use scribe::Scribe;
 use scribe::native_string::String;
 use errors::MathError;
