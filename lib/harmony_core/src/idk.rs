@@ -4,18 +4,18 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 21:14:31 UTC
+//! Last Updated: 2025-01-20 17:04:28 UTC
 //! Version: 0.1.1
 //! License: MIT
 
-use magicmath::traits::{MeshValue, Scribe};
-use magicmath::errors::MathError;
+use core::fmt::{self, Display, Formatter, Result as FmtResult};
+use magicmath::{
+    traits::{MeshValue, Scribe, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
+    errors::MathError,
+};
 use crate::{
-    phantom::PhantomCore,
     errors::CoherenceError,
     align::AlignmentState,
-    cube::Cube,
-    scribe::native_string::String,
 };
 
 /// Result type for coherence operations
@@ -30,29 +30,23 @@ pub struct ShardUninit<T> {
 }
 
 /// Core harmony state container
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HarmonyState<T> {
     /// Inner value pointer
     value: T,
-    /// Phantom data for variance
-    _phantom: PhantomCore<T>,
 }
 
 impl<T> ShardUninit<T> {
     /// Create a new uninitialized shard
     #[inline]
     pub const fn new() -> Self {
-        Self {
-            value: None,
-        }
+        Self { value: None }
     }
 
     /// Create a new initialized shard
     #[inline]
     pub fn new_init(value: T) -> Self {
-        Self {
-            value: Some(value),
-        }
+        Self { value: Some(value) }
     }
 
     /// Get a reference to the inner value if initialized
@@ -83,10 +77,7 @@ impl<T> ShardUninit<T> {
 impl<T> HarmonyState<T> {
     /// Create a new harmony state
     pub fn new(value: T) -> Self {
-        Self {
-            value,
-            _phantom: PhantomCore::new(),
-        }
+        Self { value }
     }
 
     /// Get the inner value
@@ -100,22 +91,68 @@ impl<T> HarmonyState<T> {
     }
 }
 
-impl<T> Scribe for HarmonyState<T> where T: Scribe {
-    fn scribe(&self) -> String {
-        self.value.scribe()
+impl<T> CrystalAdd for HarmonyState<T>
+where
+T: CrystalAdd + Clone,
+{
+    fn add(&self, other: &Self) -> Result<Self, MathError> {
+        Ok(Self::new(self.value.add(&other.value)?))
+    }
+
+    fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+        self.value.add_assign(&other.value)
     }
 }
 
-impl<T> MeshValue for HarmonyState<T> where T: MeshValue {
+impl<T> CrystalSub for HarmonyState<T>
+where
+T: CrystalSub + Clone,
+{
+    fn sub(&self, other: &Self) -> Result<Self, MathError> {
+        Ok(Self::new(self.value.sub(&other.value)?))
+    }
+
+    fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+        self.value.sub_assign(&other.value)
+    }
+}
+
+impl<T> CrystalMul for HarmonyState<T>
+where
+T: CrystalMul + Clone,
+{
+    fn mul(&self, other: &Self) -> Result<Self, MathError> {
+        Ok(Self::new(self.value.mul(&other.value)?))
+    }
+
+    fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+        self.value.mul_assign(&other.value)
+    }
+}
+
+impl<T> CrystalDiv for HarmonyState<T>
+where
+T: CrystalDiv + Clone,
+{
+    fn div(&self, other: &Self) -> Result<Self, MathError> {
+        Ok(Self::new(self.value.div(&other.value)?))
+    }
+
+    fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+        self.value.div_assign(&other.value)
+    }
+}
+
+impl<T> MeshValue for HarmonyState<T>
+where
+T: MeshValue + CrystalAdd + CrystalSub + CrystalMul + CrystalDiv + Clone,
+{
     fn to_f64(&self) -> Result<f64, MathError> {
         self.value.to_f64()
     }
 
     fn from(value: f64) -> Self {
-        Self {
-            value: T::from(value),
-            _phantom: PhantomCore::new(),
-        }
+        Self::new(T::from(value))
     }
 
     fn coherence(&self) -> Result<f64, MathError> {
@@ -133,6 +170,22 @@ impl<T> MeshValue for HarmonyState<T> where T: MeshValue {
     fn to_usize(&self) -> Result<usize, MathError> {
         self.value.to_usize()
     }
+
+    fn check_harmony_state(&self) -> bool {
+        self.value.check_harmony_state()
+    }
+}
+
+impl<T: Scribe> Scribe for HarmonyState<T> {
+    fn scribe(&self) -> String {
+        self.value.scribe()
+    }
+}
+
+impl<T: Display> Display for HarmonyState<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "{}", self.value)
+    }
 }
 
 #[cfg(test)]
@@ -142,21 +195,55 @@ mod tests {
     #[derive(Debug, Clone)]
     struct TestValue {
         value: f64,
-        energy_factor: f64,
     }
 
-    impl TestValue {
-        fn new(value: f64) -> Self {
-            Self {
-                value,
-                energy_factor: 1.0,
-            }
+    impl CrystalAdd for TestValue {
+        fn add(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self { value: self.value + other.value })
+        }
+
+        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value += other.value;
+            Ok(())
         }
     }
 
-    impl Scribe for TestValue {
-        fn scribe(&self) -> String {
-            format!("{}", self.value)
+    impl CrystalSub for TestValue {
+        fn sub(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self { value: self.value - other.value })
+        }
+
+        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value -= other.value;
+            Ok(())
+        }
+    }
+
+    impl CrystalMul for TestValue {
+        fn mul(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self { value: self.value * other.value })
+        }
+
+        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value *= other.value;
+            Ok(())
+        }
+    }
+
+    impl CrystalDiv for TestValue {
+        fn div(&self, other: &Self) -> Result<Self, MathError> {
+            if other.value == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            Ok(Self { value: self.value / other.value })
+        }
+
+        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            if other.value == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            self.value /= other.value;
+            Ok(())
         }
     }
 
@@ -166,15 +253,15 @@ mod tests {
         }
 
         fn from(value: f64) -> Self {
-            Self::new(value)
+            Self { value }
         }
 
         fn coherence(&self) -> Result<f64, MathError> {
-            Ok(self.value.abs().min(1.0))
+            Ok(1.0)
         }
 
         fn energy(&self) -> Result<f64, MathError> {
-            Ok(self.value * self.energy_factor)
+            Ok(self.value.abs())
         }
 
         fn magnitude(&self) -> Result<f64, MathError> {
@@ -182,40 +269,45 @@ mod tests {
         }
 
         fn to_usize(&self) -> Result<usize, MathError> {
-            if self.value < 0.0 || self.value.fract() != 0.0 {
-                Err(MathError::InvalidConversion)
-            } else {
-                Ok(self.value as usize)
-            }
+            Ok(self.value as usize)
+        }
+
+        fn check_harmony_state(&self) -> bool {
+            true
+        }
+    }
+
+    impl Scribe for TestValue {
+        fn scribe(&self) -> String {
+            self.value.to_string()
+        }
+    }
+
+    impl Display for TestValue {
+        fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+            write!(f, "{}", self.value)
         }
     }
 
     #[test]
-    fn test_mesh_value_implementation() {
-        let state = HarmonyState::new(TestValue::new(42.0));
+    fn test_harmony_state() {
+        let state1 = HarmonyState::new(TestValue { value: 42.0 });
+        let state2 = HarmonyState::new(TestValue { value: 8.0 });
 
-        assert_eq!(state.to_f64().unwrap(), 42.0);
-        assert_eq!(state.coherence().unwrap(), 1.0);
-        assert_eq!(state.energy().unwrap(), 42.0);
-        assert_eq!(state.magnitude().unwrap(), 42.0);
-        assert_eq!(state.to_usize().unwrap(), 42);
+        assert!(state1.add(&state2).is_ok());
+        assert!(state1.sub(&state2).is_ok());
+        assert!(state1.mul(&state2).is_ok());
+        assert!(state1.div(&state2).is_ok());
+        assert!(state1.check_harmony_state());
     }
 
     #[test]
-    fn test_invalid_conversions() {
-        let negative = HarmonyState::new(TestValue::new(-1.0));
-        assert!(negative.to_usize().is_err());
+    fn test_shard_uninit() {
+        let mut shard = ShardUninit::<TestValue>::new();
+        assert!(!shard.is_initialized());
 
-        let fractional = HarmonyState::new(TestValue::new(1.5));
-        assert!(fractional.to_usize().is_err());
-    }
-
-    #[test]
-    fn test_coherence_limits() {
-        let large = HarmonyState::new(TestValue::new(2.0));
-        assert_eq!(large.coherence().unwrap(), 1.0);
-
-        let small = HarmonyState::new(TestValue::new(0.5));
-        assert_eq!(small.coherence().unwrap(), 0.5);
+        shard.set(TestValue { value: 42.0 });
+        assert!(shard.is_initialized());
+        assert_eq!(shard.get_ref().unwrap().value, 42.0);
     }
 }

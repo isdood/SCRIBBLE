@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 16:42:34 UTC
+//! Last Updated: 2025-01-20 17:04:32 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -29,35 +29,48 @@ pub mod aether;
 
 // Re-export common types from magicmath
 pub use magicmath::{
-    // Core types
-    core::Field,
-    traits::{CrystalAdd, CrystalSub, CrystalMul, CrystalDiv, MeshValue},
+    // Core types from traits
+    traits::{
+        MeshValue,
+        CrystalAdd,
+        CrystalSub,
+        CrystalMul,
+        CrystalDiv,
+    },
+    // Vectors
     vector3d::Vector3D,
     vector4d::Vector4D,
-    resonance::{Resonance as ResonanceMath, ResonanceState},
-    HarmonyState,
-    // Math operations
-    add, sub, mul, div,
-    // Constants
-    constants::HARMONY_STABILITY_THRESHOLD,
+    // Resonance
+    resonance::Resonance,
+    // Core math types
+    math::{Field, Mesh, PhaseField, AetherField},
 };
 
 // Re-exports from errors
 pub use errors::core::{
     MathError,
     QuantumError,
-    MathResult,
-    QuantumResult
 };
 
-// Re-exports from scribe
-pub use scribe::{
-    Write as Scribe,
-    native::{
-        String,
-        Vec,
-        Box,
-    }
+// Re-exports from core
+pub use core::{
+    fmt::{self, Write, Formatter},
+    result::Result,
+};
+
+// Re-exports from alloc for no_std
+#[cfg(not(feature = "std"))]
+pub use alloc::{
+    string::String,
+    vec::Vec,
+    boxed::Box,
+};
+
+#[cfg(feature = "std")]
+pub use std::{
+    string::String,
+    vec::Vec,
+    boxed::Box,
 };
 
 // Constants module
@@ -78,9 +91,10 @@ pub mod constants {
 
 /// Initialize fractal parameters for crystal growth
 pub fn create_growth_params() -> magicmath::resonance::Resonance {
-    magicmath::resonance::Resonance::new()
-    .with_max_iterations(constants::MAX_FRACTAL_DEPTH)
-    .with_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD)
+    let mut params = magicmath::resonance::Resonance::new();
+    params.set_max_iterations(constants::MAX_FRACTAL_DEPTH);
+    params.set_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD);
+    params
 }
 
 #[cfg(test)]

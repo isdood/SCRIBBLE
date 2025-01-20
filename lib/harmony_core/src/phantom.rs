@@ -4,20 +4,20 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 16:19:04 UTC
+//! Last Updated: 2025-01-20 16:57:53 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
-    math::{Field, Mesh, PhaseField},
+    core::{Field, Mesh, PhaseField},
     traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
-    Vector3D,
-    Vector4D,
+    vector3d::Vector3D,
+    vector4d::Vector4D,
     resonance::{Quantum, Phase, Resonance}
 };
 
 use errors::core::{MathError, QuantumError};
-use scribe::{Scribe, native_string::String, collections::Vec};
+use scribe::{Write as Scribe, native::String, native::Vec};
 
 /// Phantom state handler for higher-dimensional operations
 #[derive(Debug)]
@@ -114,18 +114,17 @@ impl<T: MeshValue> Phase for Phantom<T> {
 }
 
 impl<T: MeshValue + Scribe> Scribe for Phantom<T> {
-    fn scribe(&self) -> String {
-        let mut result = String::new();
-        result.push_str("Phantom State:\n");
-        result.push_str("4D Position: ");
-        result.push_str(&self.position.scribe().to_str());
-        result.push_str("\n3D Projection: ");
-        result.push_str(&self.project().scribe().to_str());
-        result.push_str("\nResonance: ");
-        result.push_str(&self.resonance.scribe().to_str());
-        result.push_str("\nPhase Field: ");
-        result.push_str(&self.phase_field.scribe().to_str());
-        result
+    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+        f.write_str("Phantom State:\n")?;
+        f.write_str("4D Position: ")?;
+        self.position.write(f)?;
+        f.write_str("\n3D Projection: ")?;
+        self.project().write(f)?;
+        f.write_str("\nResonance: ")?;
+        self.resonance.write(f)?;
+        f.write_str("\nPhase Field: ")?;
+        self.phase_field.write(f)?;
+        Ok(())
     }
 }
 
@@ -172,17 +171,32 @@ mod tests {
         fn add(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value + other.value })
         }
+
+        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value += other.value;
+            Ok(())
+        }
     }
 
     impl CrystalSub for TestPhantom {
         fn sub(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value - other.value })
         }
+
+        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value -= other.value;
+            Ok(())
+        }
     }
 
     impl CrystalMul for TestPhantom {
         fn mul(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value * other.value })
+        }
+
+        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value *= other.value;
+            Ok(())
         }
     }
 
@@ -193,13 +207,19 @@ mod tests {
             }
             Ok(Self { value: self.value / other.value })
         }
+
+        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            if other.value == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            self.value /= other.value;
+            Ok(())
+        }
     }
 
     impl Scribe for TestPhantom {
-        fn scribe(&self) -> String {
-            let mut result = String::new();
-            result.push_str(&self.value.to_string());
-            result
+        fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+            write!(f, "{}", self.value)
         }
     }
 
