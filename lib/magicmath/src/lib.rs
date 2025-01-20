@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 23:54:38 UTC
+//! Last Updated: 2025-01-20 01:24:15 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -19,8 +19,11 @@ pub mod sub;
 pub mod mul;
 pub mod div;
 
-// Vector and Resonance Operations
-pub mod vector;
+// Vector Operations
+pub mod vector3d;
+pub mod vector4d;
+
+// Resonance Operations
 pub mod resonance;
 
 // Re-exports for convenient access
@@ -28,15 +31,17 @@ pub use crate::core::HarmonyState;
 
 pub use crate::traits::{
     MeshValue,
+    CrystalAdd,
+    CrystalSub,
+    CrystalMul,
+    CrystalDiv,
     Quantum,
     Phase,
     Resonance,
 };
 
-pub use crate::vector::{
-    Vector3D,
-    Vector4D,
-};
+pub use crate::vector3d::Vector3D;
+pub use crate::vector4d::Vector4D;
 
 // Version Information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -44,7 +49,9 @@ pub const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 pub const DESCRIPTION: &str = env!("CARGO_PKG_DESCRIPTION");
 
 /// Initialize the library with default configuration
-pub fn init() {}
+pub fn init() {
+    // Initialize any necessary resources or configurations
+}
 
 /// Get the library version
 pub fn version() -> &'static str {
@@ -78,5 +85,17 @@ mod tests {
     #[test]
     fn test_description() {
         assert!(!description().is_empty());
+    }
+
+    #[test]
+    fn test_crystal_operations() {
+        let v1 = Vector3D::new(1.0, 2.0, 3.0);
+        let v2 = Vector3D::new(4.0, 5.0, 6.0);
+
+        // Test basic operations work
+        let _add_result = v1.add(&v2).unwrap();
+        let _sub_result = v1.sub(&v2).unwrap();
+        let _mul_result = v1.mul(&v2).unwrap();
+        let _div_result = v1.div(&v2).unwrap();
     }
 }
