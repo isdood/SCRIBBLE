@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:07:42 UTC
+//! Last Updated: 2025-01-20 17:14:08 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -29,7 +29,7 @@ pub mod aether;
 
 // Re-export common types from magicmath
 pub use magicmath::{
-    // Core types from traits
+    // Core traits
     traits::{
         MeshValue,
         CrystalAdd,
@@ -40,15 +40,17 @@ pub use magicmath::{
     // Vectors
     vector3d::Vector3D,
     vector4d::Vector4D,
+    // Math operations
+    ops::{Field, Mesh, PhaseField, AetherField},
     // Resonance
     resonance::Resonance,
-    // Field types
-    field::{Field, Mesh, PhaseField, AetherField},
+    // Math utilities
+    utils::{floor, sqrt},
 };
 
 // Re-exports from errors
-pub use errors::core::{
-    Error as MathError,
+pub use errors::{
+    MathError,
     QuantumError,
 };
 
@@ -58,10 +60,10 @@ pub use core::{
     result::Result,
 };
 
-// Re-exports from scribe
-pub use scribe::{
+// Re-exports from alloc
+pub use alloc::{
     string::String,
-    collections::Vec,
+    vec::Vec,
     boxed::Box,
 };
 

@@ -4,12 +4,12 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 16:48:09 UTC
+//! Last Updated: 2025-01-20 17:11:51 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
-    core::{Field, Mesh, PhaseField, AetherField},
+    field::{Field, Mesh, PhaseField, AetherField},
     traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
     vector3d::Vector3D,
     vector4d::Vector4D,
@@ -17,7 +17,9 @@ use magicmath::{
 };
 
 use errors::core::{MathError, QuantumError};
-use scribe::{Write as Scribe, native::String, native::Vec};
+use core::fmt::{self, Write, Formatter, Result as FmtResult};
+
+use crate::String;
 
 /// Aether field state handler
 #[derive(Debug)]
@@ -110,17 +112,13 @@ impl<T: MeshValue> Phase for Aether<T> {
     }
 }
 
-impl<T: MeshValue + Scribe> Scribe for Aether<T> {
-    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
-        f.write_str("Aether Field State:\n")?;
-        f.write_str("Position: ")?;
-        self.position.write(f)?;
-        f.write_str("\nDensity: ")?;
-        write!(f, "{}", self.density)?;
-        f.write_str("\nPotential: ")?;
-        write!(f, "{}", self.potential().unwrap_or(0.0))?;
-        f.write_str("\nResonance: ")?;
-        self.resonance.write(f)?;
+impl<T: MeshValue + Write> Write for Aether<T> {
+    fn write_str(&mut self, s: &str) -> FmtResult {
+        write!(self, "Aether Field State:\n")?;
+        write!(self, "Position: {}\n", self.position)?;
+        write!(self, "Density: {}\n", self.density)?;
+        write!(self, "Potential: {}\n", self.potential().unwrap_or(0.0))?;
+        write!(self, "Resonance: {}", self.resonance)?;
         Ok(())
     }
 }
@@ -214,9 +212,9 @@ mod tests {
         }
     }
 
-    impl Scribe for TestAether {
-        fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
-            write!(f, "{}", self.value)
+    impl Write for TestAether {
+        fn write_str(&mut self, s: &str) -> FmtResult {
+            write!(self, "{}", self.value)
         }
     }
 
