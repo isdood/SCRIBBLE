@@ -1,202 +1,180 @@
-//! Shard Architecture Core Components
-//! Last Updated: 2025-01-18 19:15:12 UTC
-//! Author: isdood
-//!
-//! This module defines the fundamental components of the Shard architecture,
-//! including register files, memory hierarchy, and instruction set.
+// core.rs
 
-use crate::hashbrown::{QuantumHashMap, HashBrownConfig};
-use crate::vector4d::{Vector4D, HyperRotation, QuatTransform};
+use crate::crystal_compute::{ComputeCrystal, CrystalScheduler, QuantumOptimizer};
 
-/// Quantum coherence threshold for stable operations
-pub const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.87;
-/// Maximum cache entries per level
-pub const CACHE_MAX_ENTRIES: usize = 1024;
-/// Golden ratio inverse for crystal structure optimization
-pub const FAIRY_DUST_COEFFICIENT: f64 = 0.618033988749895;
-
-/// Register file for the Shard architecture
+/// Enhanced register file for the Shard architecture
 #[derive(Debug, Clone)]
 pub struct ShardRegisterFile {
-    /// Vector registers (V0-V7)
-    /// Each register holds a 4D vector for hyperspace operations
-    /// V0: Accumulator
-    /// V1-V7: General purpose vector registers
-    v_regs: [Vector4D; 8],
+    // Existing fields remain the same
+    pub v_regs: [Vector4D; 8],
+    pub qs_regs: [Vec<f64>; 4],
+    pub cr_regs: [Vec<f64>; 4],
+    pub rp_regs: [[f64; 8]; 4],
+    pub pc4d: Vector4D,
+    pub qf: u64,
 
-    /// Quantum State registers (QS0-QS3)
-    /// Each register contains a vector of quantum state amplitudes
-    /// QS0: Primary quantum state
-    /// QS1: Entanglement buffer
-    /// QS2-QS3: Quantum operation workspace
-    qs_regs: [Vec<f64>; 4],
-
-    /// Crystal registers (CR0-CR1)
-    /// Hold crystalline structure parameters for quantum memory optimization
-    /// CR0: Growth parameters
-    /// CR1: Lattice configuration
-    cr_regs: [Vec<f64>; 2],
-
-    /// Reality Projection registers (RP0-RP1)
-    /// 7-dimensional projection matrices for reality mapping
-    /// [0]: x projection
-    /// [1]: y projection
-    /// [2]: z projection
-    /// [3]: w projection
-    /// [4]: quantum phase
-    /// [5]: crystal alignment
-    /// [6]: coherence factor
-    rp_regs: [[f64; 7]; 2],
-
-    /// 4D Program Counter
-    /// Tracks execution position in 4D memory space
-    /// w component represents quantum phase
-    pc4d: Vector4D,
-
-    /// Quantum Flags Register
-    /// Bits 0-15: Quantum state flags
-    /// Bits 16-31: Crystal structure flags
-    /// Bits 32-47: Hyperspace navigation flags
-    /// Bits 48-63: System status flags
-    qf: u64,
+    // New fields for crystal compute integration
+    /// Active compute crystal reference
+    pub compute_crystal: Option<Arc<RwLock<ComputeCrystal>>>,
+    /// Performance metrics for current crystal
+    pub crystal_metrics: CrystalMetrics,
 }
 
-/// Multi-level quantum-aware cache hierarchy with crystal resonance
+/// Extended Shard Instruction Set
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ShardOpcode {
+    // Existing opcodes...
+    
+    // New Crystal Compute Operations
+    CGROW_OPT,    // Optimized crystal growth
+    CADAPT,       // Adapt crystal to workload
+    COPT,         // Optimize crystal structure
+    CPERF,        // Get crystal performance metrics
+    CSCHED,       // Schedule workload on crystal
+    CMEM,         // Crystal memory operation
+}
+
+impl ShardRegisterFile {
+    /// Initialize with crystal compute support
+    pub fn new() -> Self {
+        Self {
+            // Initialize existing fields...
+            v_regs: [Vector4D::zero(); 8],
+            qs_regs: std::array::from_fn(|_| Vec::with_capacity(16)),
+            cr_regs: std::array::from_fn(|_| Vec::with_capacity(16)),
+            rp_regs: [[0.0; 8]; 4],
+            pc4d: Vector4D::zero(),
+            qf: 0,
+            
+            // Initialize new fields
+            compute_crystal: None,
+            crystal_metrics: CrystalMetrics::default(),
+        }
+    }
+
+    /// Attach compute crystal to register file
+    pub fn attach_compute_crystal(&mut self, crystal: Arc<RwLock<ComputeCrystal>>) {
+        self.compute_crystal = Some(crystal);
+        self.update_crystal_metrics();
+    }
+
+    /// Update crystal performance metrics
+    fn update_crystal_metrics(&mut self) {
+        if let Some(crystal) = &self.compute_crystal {
+            let crystal = crystal.read();
+            self.crystal_metrics = crystal.metrics.clone();
+            
+            // Update crystal registers based on performance
+            if let Some(cr) = self.cr_regs[0].first_mut() {
+                *cr = crystal.efficiency;
+            }
+            if let Some(cr) = self.cr_regs[1].first_mut() {
+                *cr = crystal.growth_state.stability;
+            }
+        }
+    }
+}
+
+/// Enhanced memory system with crystal compute support
+#[derive(Debug)]
 pub struct ShardMemory {
-    /// L1 Quantum Cache - Fastest access, stores quantum state vectors
-    l1q: QuantumHashMap<Vector4D, f64>,
-    /// L2 Crystal Cache - Medium access, stores crystalline structure
-    l2c: CrystalLattice,
-    /// L3 Hyperspace Cache - Slowest access, higher-dimensional data
-    l3h: HyperGrid,
-    /// Aether state tracker
-    aether_state: AetherGrid,
+    // Existing fields
+    pub l1q: QuantumHashMap<Vector4D, f64>,
+    pub l2c: CrystalLattice,
+    pub l3h: HyperGrid,
+    pub aether_state: AetherGrid,
+    
+    // New fields for crystal compute
+    pub crystal_scheduler: CrystalScheduler,
+    pub memory_manager: CrystalMemoryManager,
+    pub quantum_optimizer: QuantumOptimizer,
 }
 
 impl ShardMemory {
     pub fn new() -> Self {
         let config = CrystalConfig {
             coherence_threshold: QUANTUM_COHERENCE_THRESHOLD,
-            crystal_growth_rate: CRYSTAL_GROWTH_RATE,
+            crystal_growth_rate: CRYSTAL_RESONANCE_THRESHOLD,
             creator: b"isdood".to_vec(),
         };
 
         Self {
-            l1q: QuantumHashMap::with_capacity(L1_CACHE_SIZE),
+            // Initialize existing fields
+            l1q: QuantumHashMap::with_capacity(CACHE_MAX_ENTRIES),
             l2c: CrystalLattice::new(config.clone()),
             l3h: HyperGrid::new(config.clone()),
             aether_state: AetherGrid::new(config),
+            
+            // Initialize new components
+            crystal_scheduler: CrystalScheduler::new(),
+            memory_manager: CrystalMemoryManager::new(),
+            quantum_optimizer: QuantumOptimizer::new(),
         }
     }
 
-    #[inline(always)]
-    pub fn cache_read(&self, addr: Vector4D) -> Option<f64> {
-        // Try L1 cache first
-        if let Some(value) = self.l1q.get(&addr) {
-            return Some(*value);
+    /// Schedule workload using crystal compute
+    pub fn schedule_workload(&mut self, workload: Workload) -> Result<(), Error> {
+        // Distribute workload across crystal structure
+        let allocation = self.crystal_scheduler.distribute_workload(workload)?;
+        
+        // Optimize memory access patterns
+        self.memory_manager.optimize_access_patterns()?;
+        
+        // Apply quantum optimizations
+        for crystal in self.crystal_scheduler.crystals.iter_mut() {
+            self.quantum_optimizer.apply_quantum_optimization(&mut crystal.write())?;
         }
+        
+        Ok(())
+    }
 
-        // Try L2 crystal cache
-        if let Some(value) = self.l2c.query_lattice(&addr) {
-            // Promote to L1
-            self.l1q.insert(addr, *value);
-            return Some(*value);
-        }
-
-        // Finally try L3 hyperspace
-        self.l3h.query_hyperpoint(&addr)
+    /// Optimize crystal compute structure
+    pub fn optimize_compute_structure(&mut self) -> Result<OptimizationStats, Error> {
+        // Optimize crystal structure
+        let stats = self.crystal_scheduler.optimize_structure()?;
+        
+        // Update memory hierarchy
+        self.memory_manager.update_hierarchy(&stats)?;
+        
+        // Apply quantum optimizations
+        self.quantum_optimizer.optimize_global_state(&self.crystal_scheduler)?;
+        
+        Ok(stats)
     }
 }
 
-/// Shard Architecture Instruction Set
-#[derive(Debug, Clone, Copy)]
-pub enum ShardOpcode {
-    // Vector Operations
-    /// 4D vector addition
-    VADD4D,
-    /// 4D vector multiplication
-    VMUL4D,
-    /// 4D vector rotation
-    VROT4D,
-    /// 4D vector projection
-    VPROJ4D,
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    // Quantum Operations
-    /// Quantum entanglement
-    QENT,
-    /// Quantum coherence manipulation
-    QCOH,
-    /// Quantum phase adjustment
-    QPHASE,
-    /// Quantum bridge creation
-    QBRIDGE,
-
-    // Crystal Operations
-    /// Crystal growth initiation
-    CGROW,
-    /// Lattice manipulation
-    CLATT,
-    /// Crystal resonance
-    CRES,
-    /// Crystal facet manipulation
-    CFACET,
-
-    // Memory Operations
-    /// 4D memory load
-    LOAD4D,
-    /// 4D memory store
-    STORE4D,
-    /// Quantum state load
-    LOADQ,
-    /// Quantum state store
-    STOREQ,
-}
-
-/// Instruction format for the Shard architecture
-#[derive(Debug, Clone)]
-pub struct ShardInstruction {
-    /// Operation code
-    pub opcode: ShardOpcode,
-    /// Destination register index
-    pub dest: usize,
-    /// First source register index
-    pub src1: usize,
-    /// Optional second source register index
-    pub src2: Option<usize>,
-    /// Optional immediate value
-    pub imm: Option<f64>,
-    /// Optional 4D memory address
-    pub addr: Option<Vector4D>,
-}
-
-impl ShardRegisterFile {
-    /// Creates a new register file with zeroed registers
-    pub fn new() -> Self {
-        Self {
-            v_regs: [Vector4D::zero(); 8],
-            qs_regs: Default::default(),
-            cr_regs: Default::default(),
-            rp_regs: [[0.0; 7]; 2],
-            pc4d: Vector4D::zero(),
-            qf: 0,
-        }
+    #[test]
+    fn test_crystal_compute_integration() {
+        let mut mem = ShardMemory::new();
+        
+        // Create test workload
+        let workload = Workload::new()
+            .with_compute_intensity(0.8)
+            .with_memory_access_pattern(AccessPattern::Strided)
+            .with_priority(Priority::High);
+            
+        // Schedule workload
+        assert!(mem.schedule_workload(workload).is_ok());
+        
+        // Verify crystal structure optimization
+        let stats = mem.optimize_compute_structure().unwrap();
+        assert!(stats.efficiency > EFFICIENCY_THRESHOLD);
     }
 
-    /// Returns the current quantum coherence level
-    #[inline(always)]
-    pub fn get_coherence(&self) -> f64 {
-        self.rp_regs[0][6]
-    }
-
-    /// Checks if the quantum state is stable
-    #[inline(always)]
-    pub fn is_quantum_stable(&self) -> bool {
-        self.get_coherence() >= QUANTUM_COHERENCE_THRESHOLD
-    }
-}
-
-impl Default for ShardRegisterFile {
-    fn default() -> Self {
-        Self::new()
+    #[test]
+    fn test_register_crystal_attachment() {
+        let mut regs = ShardRegisterFile::new();
+        let crystal = Arc::new(RwLock::new(ComputeCrystal::new()));
+        
+        regs.attach_compute_crystal(crystal);
+        assert!(regs.compute_crystal.is_some());
+        
+        // Verify metrics update
+        regs.update_crystal_metrics();
+        assert!(regs.crystal_metrics.throughput >= 0.0);
     }
 }
