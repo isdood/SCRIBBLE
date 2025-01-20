@@ -4,23 +4,27 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-19 21:29:20 UTC
+//! Last Updated: 2025-01-20 18:46:16 UTC
 //! Version: 0.1.1
 //! License: MIT
 
 use magicmath::{
-    core::Field,
-    traits::MeshValue,
+    MeshValue,
     Vector3D,
-    resonance::{Quantum, Phase, Resonance}
+    resonance::{Quantum, Phase, Resonance},
+    CrystalAdd,
+    CrystalSub,
+    CrystalMul,
+    CrystalDiv,
 };
 
-use errors::core::MathError;
-use scribe::{Scribe, native_string::String};
+use errors::MathError;
+use core::fmt::Write;
 
 use crate::{
     cube::Cube,
-    align::{Alignment, AlignmentState}
+    align::{Alignment, AlignmentState},
+    QuantumError,
 };
 
 /// A quantum state handler
@@ -28,7 +32,7 @@ use crate::{
 pub struct HarmonicHandler<T> {
     state: Cube<T>,
     resonance: Resonance,
-    field: Field,
+    field: f64,
 }
 
 impl<T: Default + Clone + MeshValue> HarmonicHandler<T> {
@@ -37,7 +41,7 @@ impl<T: Default + Clone + MeshValue> HarmonicHandler<T> {
         Self {
             state: Cube::new(size),
             resonance: Resonance::new(),
-            field: Field::default(),
+            field: 0.0,
         }
     }
 
@@ -57,13 +61,13 @@ impl<T: Default + Clone + MeshValue> HarmonicHandler<T> {
     }
 
     /// Get the current field
-    pub fn field(&self) -> &Field {
-        &self.field
+    pub fn field(&self) -> f64 {
+        self.field
     }
 
     /// Apply field transformation
     pub fn apply_field(&mut self, pos: &Vector3D) -> Result<(), MathError> {
-        self.field.transform(pos)?;
+        self.field = pos.magnitude()?;
         self.resonance.set_position(*pos);
         Ok(())
     }
@@ -90,16 +94,10 @@ impl<T: MeshValue> Phase for HarmonicHandler<T> {
     }
 }
 
-// Replace write_str! macro usage with native_string methods:
-impl<T: MeshValue + Scribe> Scribe for HarmonicHandler<T> {
-    fn scribe(&self) -> String {
-        let mut result = String::new();
-        result.push_str("Harmonic State:\n");
-        result.push_str("Resonance: ");
-        result.push_str(&self.resonance.scribe().to_str());
-        result.push_str("\nField: ");
-        result.push_str(&self.field.scribe().to_str());
-        result
+impl<T: MeshValue + fmt::Display> fmt::Display for HarmonicHandler<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Harmonic State:")?;
+        write!(f, "Resonance: {}\nField: {}", self.resonance, self.field)
     }
 }
 
@@ -112,6 +110,33 @@ mod tests {
         value: f64,
     }
 
+    impl CrystalAdd for TestHarmonic {
+        fn add(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self { value: self.value + other.value })
+        }
+    }
+
+    impl CrystalSub for TestHarmonic {
+        fn sub(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self { value: self.value - other.value })
+        }
+    }
+
+    impl CrystalMul for TestHarmonic {
+        fn mul(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(Self { value: self.value * other.value })
+        }
+    }
+
+    impl CrystalDiv for TestHarmonic {
+        fn div(&self, other: &Self) -> Result<Self, MathError> {
+            if other.value == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            Ok(Self { value: self.value / other.value })
+        }
+    }
+
     impl MeshValue for TestHarmonic {
         fn to_f64(&self) -> Result<f64, MathError> {
             Ok(self.value)
@@ -120,13 +145,31 @@ mod tests {
         fn from(value: f64) -> Self {
             Self { value }
         }
+
+        fn coherence(&self) -> Result<f64, MathError> {
+            Ok(self.value.abs())
+        }
+
+        fn energy(&self) -> Result<f64, MathError> {
+            Ok(self.value * self.value)
+        }
+
+        fn magnitude(&self) -> Result<f64, MathError> {
+            Ok(self.value.abs())
+        }
+
+        fn to_usize(&self) -> Result<usize, MathError> {
+            Ok(self.value as usize)
+        }
+
+        fn check_harmony_state(&self) -> bool {
+            self.value >= 0.0
+        }
     }
 
-    impl Scribe for TestHarmonic {
-        fn scribe(&self) -> String {
-            let mut result = String::new();
-            write_str!(result, &self.value.scribe());
-            result
+    impl fmt::Display for TestHarmonic {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.value)
         }
     }
 

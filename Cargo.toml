@@ -20,6 +20,8 @@ members = [
     "lib/quartz",
     "lib/scribe",
     "lib/errors",
+    "lib/error_derive",
+    "lib/error_core",
     "lib/ziggy"
 ]
 resolver = "2"
@@ -36,6 +38,8 @@ shard = { path = "lib/shard" }
 quartz = { path = "lib/quartz" }
 scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
+error_derive = { path = "lib/error_derive" }
+error_core = { path = "lib/error_core" }
 ziggy = { path = "lib/ziggy" }
 criterion = "0.5"
 serde = { version = "1.0", features = ["derive"] }
@@ -53,6 +57,8 @@ libm = "0.2.11"
 scribble = { path = "lib/scribble" }
 scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
+error_derive = { path = "lib/error_derive" }
+error_core = { path = "lib/error_core" }
 ziggy = { path = "lib/ziggy" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -63,5 +69,5 @@ criterion = "0.5"
 # Metadata
 [package.metadata]
 created = "2025-01-19"
-updated = "2025-01-20 17:32:54"
+updated = "2025-01-20 20:09:12"
 current_user = "isdood"
