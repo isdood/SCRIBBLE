@@ -4,19 +4,19 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 16:20:41 UTC
+//! Last Updated: 2025-01-20 16:50:49 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
-    math::{Field, Mesh},
+    core::{Field, Mesh},
     traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
-    Vector3D,
+    vector3d::Vector3D,
     resonance::{Quantum, Phase, Resonance}
 };
 
 use errors::core::{MathError, QuantumError};
-use scribe::{Scribe, native_string::String, collections::Vec};
+use scribe::{Write as Scribe, native::String, native::Vec};
 
 /// Zero-point energy state handler
 #[derive(Debug)]
@@ -98,16 +98,15 @@ impl<T: MeshValue> Phase for Zeronaut<T> {
 }
 
 impl<T: MeshValue + Scribe> Scribe for Zeronaut<T> {
-    fn scribe(&self) -> String {
-        let mut result = String::new();
-        result.push_str("Zeronaut State:\n");
-        result.push_str("Position: ");
-        result.push_str(&self.position.scribe().to_str());
-        result.push_str("\nResonance: ");
-        result.push_str(&self.resonance.scribe().to_str());
-        result.push_str("\nField Energy: ");
-        result.push_str(&self.field.energy().unwrap_or(0.0).to_string());
-        result
+    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+        f.write_str("Zeronaut State:\n")?;
+        f.write_str("Position: ")?;
+        self.position.write(f)?;
+        f.write_str("\nResonance: ")?;
+        self.resonance.write(f)?;
+        f.write_str("\nField Energy: ")?;
+        write!(f, "{}", self.field.energy().unwrap_or(0.0))?;
+        Ok(())
     }
 }
 
@@ -154,17 +153,32 @@ mod tests {
         fn add(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value + other.value })
         }
+
+        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value += other.value;
+            Ok(())
+        }
     }
 
     impl CrystalSub for TestZero {
         fn sub(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value - other.value })
         }
+
+        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value -= other.value;
+            Ok(())
+        }
     }
 
     impl CrystalMul for TestZero {
         fn mul(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value * other.value })
+        }
+
+        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value *= other.value;
+            Ok(())
         }
     }
 
@@ -175,13 +189,19 @@ mod tests {
             }
             Ok(Self { value: self.value / other.value })
         }
+
+        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            if other.value == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            self.value /= other.value;
+            Ok(())
+        }
     }
 
     impl Scribe for TestZero {
-        fn scribe(&self) -> String {
-            let mut result = String::new();
-            result.push_str(&self.value.to_string());
-            result
+        fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+            write!(f, "{}", self.value)
         }
     }
 

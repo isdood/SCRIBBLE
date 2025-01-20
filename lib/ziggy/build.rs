@@ -3,8 +3,8 @@
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-20
-//! Last Updated: 2025-01-20 16:47:24 UTC
+//! Created: 2025-01-19
+//! Last Updated: 2025-01-20 16:49:21 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -47,18 +47,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Check required files exist
     check_build_files(project_root)?;
 
-    // Create build directory if it doesn't exist
-    let build_dir = Path::new(&out_dir);
-    std::fs::create_dir_all(build_dir)?;
-
-    // Build Zig code with error handling
+    // Build Zig code
     let build_status = Command::new("zig")
     .current_dir(project_root)
-    .args(&[
-        "build",
-        "-Doptimize=ReleaseSafe",
-        "--prefix", build_dir.to_str().unwrap(),
-    ])
+    .args(&["build"])
     .status()
     .map_err(|e| format!("Failed to execute zig build: {}", e))?;
 
@@ -66,8 +58,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Zig build failed".into());
     }
 
+    // Copy the built library to the output directory
+    let lib_name = if cfg!(windows) {
+        "ziggy.lib"
+    } else {
+        "libziggy.a"
+    };
+
+    let src_lib = project_root.join("zig-out").join("lib").join(lib_name);
+    let dst_lib = Path::new(&out_dir).join(lib_name);
+
+    std::fs::copy(&src_lib, &dst_lib)
+    .map_err(|e| format!("Failed to copy library from {:?} to {:?}: {}", src_lib, dst_lib, e))?;
+
     // Output cargo configuration
-    println!("cargo:rustc-link-search=native={}", out_dir);
+    println!("cargo:rustc-link-search={}", out_dir);
     println!("cargo:rustc-link-lib=static=ziggy");
     println!("cargo:rerun-if-changed=src/vector3d.zig");
     println!("cargo:rerun-if-changed=build.zig");

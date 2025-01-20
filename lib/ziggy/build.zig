@@ -3,8 +3,8 @@
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-20
-//! Last Updated: 2025-01-20 16:47:24 UTC
+//! Created: 2025-01-19
+//! Last Updated: 2025-01-20 16:49:21 UTC
 //! Version: 0.1.0
 //! License: MIT
 
@@ -24,9 +24,9 @@ pub fn build(b: *std.Build) !void {
     // Make sure the library is built as a static library
     lib.linkage = .static;
 
-    // This declares intent for the library to be installed into the standard
-    // location when the user invokes the "install" step
-    b.installArtifact(lib);
+    // Install the library artifact
+    const install_lib = b.addInstallArtifact(lib, .{});
+    b.getInstallStep().dependOn(&install_lib.step);
 
     // Create test step
     const main_tests = b.addTest(.{
@@ -45,7 +45,7 @@ pub fn build(b: *std.Build) !void {
     const print_cmd = b.addSystemCommand(&[_][]const u8{
         "sh", "-c",
         \\echo -e "\033[32mBuild completed successfully!\033[0m"
-        \\echo "Time: 2025-01-20 16:47:24 UTC"
+        \\echo "Time: 2025-01-20 16:49:21 UTC"
         \\echo "User: isdood"
         \\echo -e "Ziggy is ready to rock! 🚀\n"
     });
