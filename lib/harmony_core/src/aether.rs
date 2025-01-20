@@ -17,7 +17,7 @@ use magicmath::{
     CrystalDiv,
 };
 
-use errors::{MathError, QuantumError};
+use errors::{MathError};
 
 use core::{
     fmt::{self, Display, Formatter, Result as FmtResult},
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn test_field_creation() {
         let pos = Vector3D::new(1.0, 2.0, 3.0);
-        let field = TestField::new(pos, 1.0);
+        let field = TestField::new(pos.clone(), 1.0);
         assert_eq!(field.position(), &pos);
         assert_eq!(field.value(), 1.0);
     }

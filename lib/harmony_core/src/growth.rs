@@ -9,7 +9,6 @@
 //! License: MIT
 
 use magicmath::{
-    MeshValue,
     Vector3D,
     resonance::{Resonance, Phase},
 };
@@ -21,9 +20,9 @@ use core::{
 };
 
 use magicmath::constants::{
+    HARMONY_STABILITY_THRESHOLD,
+    HARMONY_RESONANCE_THRESHOLD,
     MAX_FRACTAL_DEPTH,
-    QUANTUM_STABILITY_THRESHOLD,
-    CRYSTAL_RESONANCE_THRESHOLD,
 };
 
 /// Crystal growth pattern types
@@ -128,8 +127,8 @@ impl GrowthState {
 
     /// Check if growth is stable
     pub fn is_stable(&self) -> bool {
-        self.coherence_level >= QUANTUM_STABILITY_THRESHOLD &&
-        self.stability_factor >= CRYSTAL_RESONANCE_THRESHOLD
+        self.coherence_level >= HARMONY_STABILITY_THRESHOLD &&
+        self.stability_factor >= HARMONY_RESONANCE_THRESHOLD
     }
 }
 

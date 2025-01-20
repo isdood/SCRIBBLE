@@ -9,9 +9,7 @@
 //! License: MIT
 
 use magicmath::{
-    MeshValue,
     Vector3D,
-    resonance::Resonance,
 };
 
 use errors::{
@@ -20,13 +18,12 @@ use errors::{
 };
 
 use magicmath::constants::{
+    HARMONY_RESONANCE_THRESHOLD,
+    HARMONY_STABILITY_THRESHOLD,
     MAX_QUANTUM_SIZE,
-    QUANTUM_STABILITY_THRESHOLD,
-    CRYSTAL_RESONANCE_THRESHOLD,
 };
 
 use crate::align::{Alignment, AlignmentState};
-use crate::idk::ShardUninit;
 
 /// Core crystal node for quantum operations
 #[derive(Debug)]
@@ -129,11 +126,11 @@ impl CrystalLattice {
         let node = self.get_node(pos)?;
         let coherence = node.get_phase_coherence();
 
-        if coherence < CRYSTAL_RESONANCE_THRESHOLD {
+        if coherence < HARMONY_RESONANCE_THRESHOLD {
             return Err(QuantumError::ResonanceFailure);
         }
 
-        Ok((coherence * QUANTUM_STABILITY_THRESHOLD).sqrt())
+        Ok((coherence * HARMONY_STABILITY_THRESHOLD).sqrt())
     }
 
     /// Get lattice size

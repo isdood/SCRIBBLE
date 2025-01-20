@@ -22,6 +22,7 @@ members = [
     "lib/errors",
     "lib/error_derive",
     "lib/error_core",
+    "lib/error_integration",
     "lib/ziggy"
 ]
 resolver = "2"
@@ -32,7 +33,19 @@ authors = ["Caleb J.D. Terkovics <isdood>"]
 edition = "2021"
 
 [workspace.dependencies]
+# Core dependencies
 libm = "0.2.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+
+# Testing & benchmarking
+criterion = "0.5"
+tracing-subscriber = "0.3"
+
+# Internal crates
 harmony_core = { path = "lib/harmony_core" }
 shard = { path = "lib/shard" }
 quartz = { path = "lib/quartz" }
@@ -40,10 +53,8 @@ scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
 error_derive = { path = "lib/error_derive" }
 error_core = { path = "lib/error_core" }
+error_integration = { path = "lib/error_integration" }
 ziggy = { path = "lib/ziggy" }
-criterion = "0.5"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 
 [lib]
 path = "src/lib.rs"
@@ -53,21 +64,24 @@ name = "bench_compare"
 path = "tools/bench_compare.rs"
 
 [dependencies]
-libm = "0.2.11"
+libm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+# Internal dependencies
 scribble = { path = "lib/scribble" }
 scribe = { path = "lib/scribe" }
 errors = { path = "lib/errors" }
 error_derive = { path = "lib/error_derive" }
 error_core = { path = "lib/error_core" }
+error_integration = { path = "lib/error_integration" }
 ziggy = { path = "lib/ziggy" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 
 [dev-dependencies]
-criterion = "0.5"
+criterion.workspace = true
 
 # Metadata
 [package.metadata]
 created = "2025-01-19"
-updated = "2025-01-20 20:09:12"
+updated = "2025-01-20 21:35:48"
 current_user = "isdood"

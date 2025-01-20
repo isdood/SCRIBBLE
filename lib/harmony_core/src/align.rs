@@ -13,7 +13,7 @@ use magicmath::{
     Vector3D,
 };
 
-use errors::{MathError, QuantumError};
+use errors::{MathError};
 
 use core::{
     fmt::{self, Display, Formatter, Result as FmtResult},
@@ -21,8 +21,7 @@ use core::{
 };
 
 use magicmath::constants::{
-    HARMONY_STABILITY_THRESHOLD,
-    ALIGNMENT_THRESHOLD,
+    HARMONY_RESONANCE_THRESHOLD,
 };
 
 /// Alignment state for quantum nodes
@@ -64,7 +63,7 @@ impl Alignment {
 
     /// Check if alignment is stable
     pub fn is_stable(&self) -> bool {
-        self.alignment_value >= ALIGNMENT_THRESHOLD
+        self.alignment_value >= HARMONY_RESONANCE_THRESHOLD
     }
 
     /// Get current state
@@ -102,7 +101,7 @@ mod tests {
     #[test]
     fn test_alignment_creation() {
         let pos = Vector3D::new(1.0, 2.0, 3.0);
-        let alignment = Alignment::new(pos);
+        let alignment = Alignment::new(pos.clone());
         assert_eq!(alignment.value(), 0.0);
         assert_eq!(alignment.position(), &pos);
     }

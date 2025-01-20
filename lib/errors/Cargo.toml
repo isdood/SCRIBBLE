@@ -1,16 +1,22 @@
 [package]
 name = "errors"
-version = "0.1.0"
-edition = "2021"
-authors = ["Caleb J.D. Terkovics <isdood>"]
-description = "Error types for crystal computing systems"
-license = "MIT"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description = "Error integration layer for Scribble"
 repository = "https://github.com/isdood/scribble"
+license = "MIT"
 
 [dependencies]
 scribe = { path = "../scribe" }
+error_core = { workspace = true }
+error_derive = { workspace = true }
+tracing = "0.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
 
-[package.metadata]
-created = "2025-01-19 14:31:53"
-updated = "2025-01-19 14:31:53"
-current_user = "isdood"
+[dev-dependencies]
+tracing-subscriber = "0.3"
+criterion = { workspace = true }
