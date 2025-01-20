@@ -4,20 +4,27 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 16:57:53 UTC
+//! Last Updated: 2025-01-20 20:13:06 UTC
 //! Version: 0.1.0
 //! License: MIT
 
+use core::fmt::{Display, Formatter, Result as FmtResult};
+
 use magicmath::{
-    core::{Field, Mesh, PhaseField},
-    traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
-    vector3d::Vector3D,
-    vector4d::Vector4D,
-    resonance::{Quantum, Phase, Resonance}
+    traits::MeshValue,
+    operations::{
+        Field,
+        Mesh,
+        PhaseField,
+    },
+    geometry::{Vector3D, Vector4D},
+    resonance::{Quantum, Phase, Resonance},
 };
 
-use errors::core::{MathError, QuantumError};
-use scribe::{Write as Scribe, native::String, native::Vec};
+use errors::{
+    quantum::QuantumError,
+    core::Error as MathError,
+};
 
 /// Phantom state handler for higher-dimensional operations
 #[derive(Debug)]
@@ -113,24 +120,20 @@ impl<T: MeshValue> Phase for Phantom<T> {
     }
 }
 
-impl<T: MeshValue + Scribe> Scribe for Phantom<T> {
-    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
-        f.write_str("Phantom State:\n")?;
-        f.write_str("4D Position: ")?;
-        self.position.write(f)?;
-        f.write_str("\n3D Projection: ")?;
-        self.project().write(f)?;
-        f.write_str("\nResonance: ")?;
-        self.resonance.write(f)?;
-        f.write_str("\nPhase Field: ")?;
-        self.phase_field.write(f)?;
-        Ok(())
+impl<T: MeshValue + Display> Display for Phantom<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        writeln!(f, "Phantom State:")?;
+        writeln!(f, "4D Position: {}", self.position)?;
+        writeln!(f, "3D Projection: {}", self.project())?;
+        writeln!(f, "Resonance: {}", self.resonance)?;
+        write!(f, "Phase Field: {}", self.phase_field)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use magicmath::traits::{CrystalAdd, CrystalSub, CrystalMul, CrystalDiv};
 
     #[derive(Debug, Clone, Default)]
     struct TestPhantom {
@@ -217,8 +220,8 @@ mod tests {
         }
     }
 
-    impl Scribe for TestPhantom {
-        fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+    impl Display for TestPhantom {
+        fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
             write!(f, "{}", self.value)
         }
     }

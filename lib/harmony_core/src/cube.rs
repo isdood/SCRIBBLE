@@ -1,146 +1,115 @@
-//! Crystal Cube Operations
-//! ==================
+//! Cube - 3D Grid Data Structure
+//! ===========================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-19 09:48:03 UTC
-//! Last Updated: 2025-01-19 21:22:00 UTC
-//! Version: 0.1.0
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-20 20:13:24 UTC
+//! Version: 0.1.1
 //! License: MIT
 
-use magicmath::floor::floor;
-use crate::{
-    errors::QuantumError,
-    vector::Vector3D,
-    constants::MAX_QUANTUM_SIZE,
-    align::{Alignment, AlignmentState},
-    scribe::Scribe,
-    native::{Box, Vec},
+use magicmath::{
+    MeshValue,
+    Vector3D,
 };
-use scribe::native_string::String;
-use scribe::string::WriteStr;
 
-/// A three-dimensional crystal cube structure
+use errors::QuantumError;
+use core::fmt::{self, Display, Write};
+
+use crate::align::{
+    text::String,
+    collections::Vec,
+    mem::Box,
+};
+
+/// 3D grid structure for quantum states
 #[derive(Debug)]
 pub struct Cube<T> {
-    alignment: Alignment,
-    data: Box<[Box<[Box<[T]>]>]>,  // Use nested arrays managed by Box
+    /// Grid data storage
+    data: Vec<Vec<Vec<Option<T>>>>,
+    /// Grid size
     size: usize,
 }
 
-/// Storage for boxed cube values
-#[derive(Debug)]
-pub struct CubeBox<T> {
-    value: T,
-}
-
-impl<T> CubeBox<T> {
-    /// Create a new cube box with given value
-    pub fn new(value: T) -> Self {
-        Self { value }
-    }
-
-    /// Get the inner value
-    pub fn into_inner(self) -> T {
-        self.value
-    }
-
-    /// Convert into raw pointer
-    pub fn into_raw(self) -> *mut T {
-        Box::into_raw(Box::new(self.value))
-    }
-
-    /// Create from raw pointer
-    pub unsafe fn from_raw(ptr: *mut T) -> Self {
-        Self {
-            value: *Box::from_raw(ptr)
-        }
-    }
-}
-
-impl<T: Default + Clone + Scribe> Cube<T> {
-    /// Create a new crystal cube with given size
+impl<T: Default + Clone> Cube<T> {
+    /// Create a new cube with given size
     pub fn new(size: usize) -> Self {
-        let size = size.min(MAX_QUANTUM_SIZE);
-        let data = (0..size)
-        .map(|_| (0..size)
-        .map(|_| (0..size)
-        .map(|_| T::default())
-        .collect::<Vec<_>>()
-        .into_boxed_slice())
-        .collect::<Vec<_>>()
-        .into_boxed_slice())
-        .collect::<Vec<_>>()
-        .into_boxed_slice();
+        let mut data = Vec::with_capacity(size);
+        for _ in 0..size {
+            let mut plane = Vec::with_capacity(size);
+            for _ in 0..size {
+                let line = vec![None; size];
+                plane.push(line);
+            }
+            data.push(plane);
+        }
 
-        let alignment = Alignment::new(Vector3D::new(0.0, 0.0, 0.0));
-
-        Self { data, size, alignment }
+        Self { data, size }
     }
 
-    /// Get state at given coordinates
-    pub fn get_state(&self, x: usize, y: usize, z: usize) -> Result<T, QuantumError> {
+    /// Get state at position
+    pub fn get_state_at(&self, pos: &Vector3D) -> Result<T, QuantumError> {
+        let x = pos.x.floor() as usize;
+        let y = pos.y.floor() as usize;
+        let z = pos.z.floor() as usize;
+
         if x >= self.size || y >= self.size || z >= self.size {
             return Err(QuantumError::BoundaryViolation);
         }
-        Ok(self.data[x][y][z].clone())
+
+        self.data[x][y][z]
+        .as_ref()
+        .cloned()
+        .ok_or(QuantumError::InvalidState)
     }
 
-    /// Set state at given coordinates
-    pub fn set_state(&mut self, x: usize, y: usize, z: usize, value: T) -> Result<(), QuantumError> {
+    /// Set state at position
+    pub fn set_state_at(&mut self, pos: &Vector3D, value: T) -> Result<(), QuantumError> {
+        let x = pos.x.floor() as usize;
+        let y = pos.y.floor() as usize;
+        let z = pos.z.floor() as usize;
+
         if x >= self.size || y >= self.size || z >= self.size {
             return Err(QuantumError::BoundaryViolation);
         }
-        self.data[x][y][z] = value;
+
+        self.data[x][y][z] = Some(value);
         Ok(())
     }
 
-    /// Get state at vector position
-    pub fn get_state_at(&self, pos: &Vector3D) -> Result<T, QuantumError> {
-        let x = floor(pos.x) as usize;
-        let y = floor(pos.y) as usize;
-        let z = floor(pos.z) as usize;
-        self.get_state(x, y, z)
-    }
-
-    /// Set state at vector position
-    pub fn set_state_at(&mut self, pos: &Vector3D, value: T) -> Result<(), QuantumError> {
-        let x = floor(pos.x) as usize;
-        let y = floor(pos.y) as usize;
-        let z = floor(pos.z) as usize;
-        self.set_state(x, y, z, value)
-    }
-
-    /// Get the size of the cube
+    /// Get cube size
     pub fn size(&self) -> usize {
         self.size
     }
 
-    /// Get current alignment state
-    pub fn alignment_state(&self) -> AlignmentState {
-        self.alignment.state()
-    }
-}
-
-impl<T: Default + Clone + Scribe> Scribe for Cube<T> {
-    fn scribe(&self) -> String {
-        let mut result = String::new();
-        for x in 0..self.size {
-            for y in 0..self.size {
-                for z in 0..self.size {
-                    result.write_str("(").unwrap();
-                    result.write_str(&x.scribe()).unwrap();
-                    result.write_str(",").unwrap();
-                    result.write_str(&y.scribe()).unwrap();
-                    result.write_str(",").unwrap();
-                    result.write_str(&z.scribe()).unwrap();
-                    result.write_str("): ").unwrap();
-                    result.write_str(&self.data[x][y][z].scribe()).unwrap();
-                    result.write_str("\n").unwrap();
+    /// Clear all states
+    pub fn clear(&mut self) {
+        for plane in &mut self.data {
+            for line in plane {
+                for state in line {
+                    *state = None;
                 }
             }
         }
-        result
+    }
+}
+
+impl<T: MeshValue + Display> Display for Cube<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Cube [{}x{}x{}]:", self.size, self.size, self.size)?;
+        for (x, plane) in self.data.iter().enumerate() {
+            writeln!(f, "Plane {}:", x)?;
+            for line in plane {
+                for state in line {
+                    match state {
+                        Some(val) => write!(f, "{} ", val)?,
+                        None => write!(f, "- ")?,
+                    }
+                }
+                writeln!(f)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -148,51 +117,43 @@ impl<T: Default + Clone + Scribe> Scribe for Cube<T> {
 mod tests {
     use super::*;
 
-    #[derive(Debug, Clone, Default)]
-    struct TestValue {
-        value: i32,
-    }
-
-    impl Scribe for TestValue {
-        fn scribe(&self) -> String {
-            let mut result = String::new();
-            result.write_str(&self.value.scribe()).unwrap();
-            result
-        }
-    }
-
     #[test]
     fn test_cube_creation() {
-        let cube: Cube<TestValue> = Cube::new(4);
-        assert_eq!(cube.size(), 4);
+        let cube: Cube<f64> = Cube::new(3);
+        assert_eq!(cube.size(), 3);
     }
 
     #[test]
     fn test_state_access() {
-        let mut cube = Cube::new(4);
-        let test_value = TestValue { value: 42 };
-        assert!(cube.set_state(0, 0, 0, test_value.clone()).is_ok());
-        assert_eq!(cube.get_state(0, 0, 0).unwrap().value, 42);
-    }
-
-    #[test]
-    fn test_boundary_violation() {
-        let cube = Cube::<TestValue>::new(4);
-        assert!(cube.get_state(4, 0, 0).is_err());
-    }
-
-    #[test]
-    fn test_cube_scribe() {
         let mut cube = Cube::new(2);
-        let test_value = TestValue { value: 42 };
-        cube.set_state(0, 0, 0, test_value.clone()).unwrap();
-        assert!(cube.scribe().contains("(0,0,0): 42"));
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+
+        // Initial state should be None
+        assert!(cube.get_state_at(&pos).is_err());
+
+        // Set and get state
+        assert!(cube.set_state_at(&pos, 42.0).is_ok());
+        assert_eq!(cube.get_state_at(&pos).unwrap(), 42.0);
     }
 
     #[test]
-    fn test_cube_box() {
-        let value = TestValue { value: 42 };
-        let cube_box = CubeBox::new(value);
-        assert_eq!(cube_box.into_inner().value, 42);
+    fn test_boundary_check() {
+        let mut cube = Cube::new(2);
+        let pos = Vector3D::new(2.0, 0.0, 0.0);
+
+        assert!(matches!(
+            cube.set_state_at(&pos, 1.0),
+                         Err(QuantumError::BoundaryViolation)
+        ));
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut cube = Cube::new(2);
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+
+        assert!(cube.set_state_at(&pos, 1.0).is_ok());
+        cube.clear();
+        assert!(cube.get_state_at(&pos).is_err());
     }
 }
