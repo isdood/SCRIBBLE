@@ -1,153 +1,124 @@
 //! Phantom State Management
-//! ====================
+//! ======================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-18
-//! Last Updated: 2025-01-20 20:32:08 UTC
-//! Version: 0.1.1
+//! Created: 2025-01-19
+//! Last Updated: 2025-01-20 20:37:40 UTC
+//! Version: 0.1.0
 //! License: MIT
 
-use core::{
-    fmt::{self, Display, Write},
-    result::Result,
-};
-
 use magicmath::{
-    MeshValue,
-    Vector3D,
-    Vector4D,
+    traits::MeshValue,
+    base::{Field, Mesh, PhaseField},
+    vectors::{Vector3D, Vector4D},
     resonance::{Resonance, Phase},
 };
 
-use errors::MathError;
+use errors::{
+    core::{Error as MathError, Result as MathResult},
+    quantum::QuantumError,
+};
 
-/// A phantom state error
+use scribe::{
+    Scribe,
+    native_string::String,
+};
+
+use crate::constants;
+
+/// Phantom state container for quantum field manipulation
 #[derive(Debug)]
-pub enum PhantomError {
-    /// Invalid quantum state
-    InvalidState,
-    /// Phase coherence lost
-    CoherenceLost,
-    /// State boundary violation
-    BoundaryViolation,
-}
-
-/// Result type for phantom operations
-pub type PhantomResult<T> = Result<T, PhantomError>;
-
-/// A phantom quantum state
-#[derive(Debug)]
-pub struct PhantomState {
-    /// Position in 3D space
-    position: Vector3D,
-    /// Momentum in 4D space-time
-    momentum: Vector4D,
-    /// Quantum resonance
+pub struct PhantomState<T> {
+    field: PhaseField,
+    mesh: Mesh<T>,
     resonance: Resonance,
-    /// Phase coherence
-    coherence: f64,
+    position: Vector3D,
+    momentum: Vector4D,
 }
 
-impl PhantomState {
-    /// Create a new phantom state
-    pub fn new(position: Vector3D, momentum: Vector4D) -> Self {
+impl<T: Default + Clone + MeshValue> PhantomState<T> {
+    /// Create new phantom state
+    pub fn new(size: usize) -> Self {
         Self {
-            position,
-            momentum,
+            field: PhaseField::new(constants::PHANTOM_PHASE_SHIFT),
+            mesh: Mesh::new(size),
             resonance: Resonance::new(),
-            coherence: 1.0,
+            position: Vector3D::new(0.0, 0.0, 0.0),
+            momentum: Vector4D::new(0.0, 0.0, 0.0, 1.0),
         }
     }
 
-    /// Get position
+    /// Get current position
     pub fn position(&self) -> &Vector3D {
         &self.position
     }
 
-    /// Get momentum
+    /// Get current momentum
     pub fn momentum(&self) -> &Vector4D {
         &self.momentum
     }
 
-    /// Get coherence
-    pub fn coherence(&self) -> f64 {
-        self.coherence
+    /// Get phase field state
+    pub fn field(&self) -> &PhaseField {
+        &self.field
     }
 
-    /// Set coherence level
-    pub fn set_coherence(&mut self, value: f64) -> PhantomResult<()> {
-        if value < 0.0 || value > 1.0 {
-            return Err(PhantomError::InvalidState);
-        }
-        self.coherence = value;
+    /// Get resonance state
+    pub fn resonance(&self) -> &Resonance {
+        &self.resonance
+    }
+
+    /// Set new position
+    pub fn set_position(&mut self, pos: Vector3D) -> MathResult<()> {
+        self.position = pos;
+        self.update_field()
+    }
+
+    /// Set new momentum
+    pub fn set_momentum(&mut self, mom: Vector4D) -> MathResult<()> {
+        self.momentum = mom;
+        self.update_field()
+    }
+
+    /// Update field state
+    fn update_field(&mut self) -> MathResult<()> {
+        self.field.transform(&self.position)?;
+        self.field.adjust_phase(self.momentum.w())?;
+        self.resonance.phase_shift(self.field.phase()?)?;
         Ok(())
     }
 
-    /// Apply phase shift
-    pub fn apply_phase_shift(&mut self, shift: f64) -> Result<(), MathError> {
-        self.resonance.phase_shift(shift)
-    }
-
-    /// Check if state is coherent
-    pub fn is_coherent(&self) -> bool {
-        self.coherence > 0.5
+    /// Calculate total energy
+    pub fn energy(&self) -> MathResult<f64> {
+        let field_energy = self.field.energy()?;
+        let resonance_energy = self.resonance.energy()?;
+        Ok(field_energy + resonance_energy)
     }
 }
 
-impl Display for PhantomState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Phantom State:")?;
-        writeln!(f, "Position: {:?}", self.position)?;
-        writeln!(f, "Momentum: {:?}", self.momentum)?;
-        writeln!(f, "Resonance: {:?}", self.resonance)?;
-        write!(f, "Coherence: {}", self.coherence)
+impl<T: MeshValue> Phase for PhantomState<T> {
+    fn phase_shift(&mut self, shift: f64) -> MathResult<()> {
+        self.field.adjust_phase(shift)?;
+        self.resonance.phase_shift(shift)?;
+        Ok(())
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_phantom_state_creation() {
-        let pos = Vector3D::new(1.0, 0.0, 0.0);
-        let mom = Vector4D::new(1.0, 0.0, 0.0, 0.0);
-        let state = PhantomState::new(pos.clone(), mom.clone());
-
-        assert_eq!(state.position(), &pos);
-        assert_eq!(state.momentum(), &mom);
-        assert_eq!(state.coherence(), 1.0);
-    }
-
-    #[test]
-    fn test_coherence_limits() {
-        let pos = Vector3D::new(0.0, 0.0, 0.0);
-        let mom = Vector4D::new(0.0, 0.0, 0.0, 0.0);
-        let mut state = PhantomState::new(pos, mom);
-
-        assert!(state.set_coherence(0.5).is_ok());
-        assert!(state.set_coherence(-0.1).is_err());
-        assert!(state.set_coherence(1.1).is_err());
-    }
-
-    #[test]
-    fn test_phase_shift() {
-        let pos = Vector3D::new(0.0, 0.0, 0.0);
-        let mom = Vector4D::new(0.0, 0.0, 0.0, 0.0);
-        let mut state = PhantomState::new(pos, mom);
-
-        assert!(state.apply_phase_shift(0.5).is_ok());
-    }
-
-    #[test]
-    fn test_coherence_state() {
-        let pos = Vector3D::new(0.0, 0.0, 0.0);
-        let mom = Vector4D::new(0.0, 0.0, 0.0, 0.0);
-        let mut state = PhantomState::new(pos, mom);
-
-        assert!(state.is_coherent());
-        assert!(state.set_coherence(0.4).is_ok());
-        assert!(!state.is_coherent());
+impl<T: MeshValue> Scribe for PhantomState<T> {
+    fn scribe(&self) -> String {
+        let mut result = String::new();
+        result.push_str("Phantom State:\n");
+        result.push_str("Position: ");
+        result.push_str(&format!("{:?}", self.position));
+        result.push_str("\nMomentum: ");
+        result.push_str(&format!("{:?}", self.momentum));
+        result.push_str("\nPhase: ");
+        result.push_str(&format!("{:?}", self.field.phase()));
+        result.push_str("\nResonance: ");
+        result.push_str(&format!("{:?}", self.resonance));
+        result.push_str("\nEnergy: ");
+        result.push_str(&self.energy().unwrap_or(0.0).to_string());
+        result
     }
 }

@@ -1,73 +1,45 @@
-//! Zeronaut Quantum State Management
-//! ==============================
+//! Zeronaut - Zero Point Energy Handler
+//! ===============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-19
-//! Last Updated: 2025-01-20 20:32:11 UTC
-//! Version: 0.1.0
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-20 20:36:33 UTC
+//! Version: 0.1.1
 //! License: MIT
 
+use core::{
+    fmt::{self, Display, Write},
+    result::Result,
+};
+
 use magicmath::{
-    traits::MeshValue,
-    geometry::{Field, Mesh},
-    types::Vector3D,
-    resonance::{Quantum, Phase, Resonance},
+    MeshValue,
+    Vector3D,
+    resonance::Resonance,
 };
 
-use errors::{
-    Error as MathError,
-    types::QuantumError,
-};
+use errors::MathError;
 
-use scribe::{
-    Scribe,
-    native_string::String,
-};
-
-/// Zero-point energy state handler
+/// Zero point energy state
 #[derive(Debug)]
-pub struct Zeronaut<T> {
-    field: Field,
-    mesh: Mesh<T>,
-    resonance: Resonance,
+pub struct ZeroState {
+    /// Position in 3D space
     position: Vector3D,
+    /// Energy level
+    energy: f64,
+    /// Quantum resonance
+    resonance: Resonance,
 }
 
-impl<T: Default + Clone + MeshValue> Zeronaut<T> {
-    /// Create a new zeronaut handler
-    pub fn new(size: usize) -> Self {
+impl ZeroState {
+    /// Create new zero point state
+    pub fn new(position: Vector3D) -> Self {
         Self {
-            field: Field::default(),
-            mesh: Mesh::new(size),
+            position,
+            energy: 0.0,
             resonance: Resonance::new(),
-            position: Vector3D::new(0.0, 0.0, 0.0),
         }
-    }
-
-    /// Get the zero-point state at position
-    pub fn get_state(&self, pos: &Vector3D) -> Result<T, QuantumError> {
-        self.mesh.get_value_at(pos)
-        .map_err(|_| QuantumError::BoundaryViolation)
-    }
-
-    /// Set the zero-point state at position
-    pub fn set_state(&mut self, pos: &Vector3D, value: T) -> Result<(), QuantumError> {
-        self.mesh.set_value_at(pos, value)
-        .map_err(|_| QuantumError::BoundaryViolation)
-    }
-
-    /// Apply field transformation at current position
-    pub fn apply_field(&mut self) -> Result<(), MathError> {
-        self.field.transform(&self.position)?;
-        self.resonance.set_position(self.position);
-        Ok(())
-    }
-
-    /// Move to new position
-    pub fn move_to(&mut self, pos: Vector3D) -> Result<(), MathError> {
-        self.position = pos;
-        self.apply_field()
     }
 
     /// Get current position
@@ -75,45 +47,84 @@ impl<T: Default + Clone + MeshValue> Zeronaut<T> {
         &self.position
     }
 
-    /// Get current resonance state
+    /// Get current energy level
+    pub fn energy(&self) -> f64 {
+        self.energy
+    }
+
+    /// Get current resonance
     pub fn resonance(&self) -> &Resonance {
         &self.resonance
     }
 
-    /// Calculate zero-point energy
-    pub fn zero_point_energy(&self) -> Result<f64, MathError> {
-        let field_energy = self.field.energy()?;
-        let resonance_energy = self.resonance.energy()?;
-        Ok(0.5 * (field_energy + resonance_energy))
-    }
-}
-
-impl<T: MeshValue> Quantum for Zeronaut<T> {
-    fn energy(&self) -> Result<f64, MathError> {
-        self.zero_point_energy()
+    /// Set energy level
+    pub fn set_energy(&mut self, energy: f64) -> Result<(), MathError> {
+        if energy < 0.0 {
+            return Err(MathError::NegativeEnergy);
+        }
+        self.energy = energy;
+        Ok(())
     }
 
-    fn phase(&self) -> Result<f64, MathError> {
-        self.resonance.phase()
-    }
-}
-
-impl<T: MeshValue> Phase for Zeronaut<T> {
-    fn phase_shift(&mut self, shift: f64) -> Result<(), MathError> {
+    /// Apply resonance shift
+    pub fn apply_resonance(&mut self, shift: f64) -> Result<(), MathError> {
         self.resonance.phase_shift(shift)
     }
+
+    /// Check if state is stable
+    pub fn is_stable(&self) -> bool {
+        self.energy >= 0.0
+    }
 }
 
-impl<T: MeshValue> Scribe for Zeronaut<T> {
-    fn scribe(&self) -> String {
-        let mut result = String::new();
-        result.push_str("Zeronaut State:\n");
-        result.push_str("Position: ");
-        result.push_str(&self.position.to_string());
-        result.push_str("\nResonance: ");
-        result.push_str(&self.resonance.to_string());
-        result.push_str("\nField Energy: ");
-        result.push_str(&self.field.energy().unwrap_or(0.0).to_string());
-        result
+impl Display for ZeroState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Zero Point State:")?;
+        writeln!(f, "Position: {:?}", self.position)?;
+        writeln!(f, "Energy: {}", self.energy)?;
+        write!(f, "Resonance: {:?}", self.resonance)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_zero_state() {
+        let pos = Vector3D::new(1.0, 0.0, 0.0);
+        let state = ZeroState::new(pos.clone());
+
+        // Use debug format for comparison since Vector3D doesn't implement PartialEq
+        assert_eq!(format!("{:?}", state.position()), format!("{:?}", &pos));
+        assert_eq!(state.energy(), 0.0);
+        assert!(state.is_stable());
+    }
+
+    #[test]
+    fn test_energy_limits() {
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        let mut state = ZeroState::new(pos);
+
+        assert!(state.set_energy(1.0).is_ok());
+        assert!(state.set_energy(-1.0).is_err());
+    }
+
+    #[test]
+    fn test_resonance() {
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        let mut state = ZeroState::new(pos);
+
+        assert!(state.apply_resonance(0.5).is_ok());
+    }
+
+    #[test]
+    fn test_state_stability() {
+        let pos = Vector3D::new(0.0, 0.0, 0.0);
+        let mut state = ZeroState::new(pos);
+
+        assert!(state.is_stable());
+        assert!(state.set_energy(0.0).is_ok());
+        assert!(state.is_stable());
     }
 }

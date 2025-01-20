@@ -1,4 +1,9 @@
-/// Represents a compile-time diagnostic report
+#[derive(Debug, Default)]
+pub struct QuickFix {
+    pub description: String,
+    pub code: String,
+}
+
 #[derive(Debug, Default)]
 pub struct DiagnosticReport {
     pub message: String,
@@ -12,21 +17,12 @@ impl DiagnosticReport {
     }
 }
 
-/// Represents a quick fix for an error
-#[derive(Debug)]
-pub struct QuickFix {
-    pub description: String,
-    pub code: String,
-}
-
-/// Represents a compile-time error
 #[derive(Debug)]
 pub struct CompileTimeError {
     pub message: String,
     pub location: String,
 }
 
-/// Trait for diagnostic capabilities
 pub trait Diagnose {
     fn diagnose(&self) -> DiagnosticReport;
     fn get_quick_fixes(&self) -> Vec<QuickFix>;
