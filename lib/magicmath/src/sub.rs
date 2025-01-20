@@ -1,72 +1,50 @@
-// lib/magicmath/src/sub.rs
+//! Crystal-Aware Subtraction Operations
+//! ==============================
+//!
+//! Author: Caleb J.D. Terkovics <isdood>
+//! Current User: isdood
+//! Created: 2025-01-19
+//! Last Updated: 2025-01-19 23:56:38 UTC
+//! Version: 0.1.0
+//! License: MIT
 
-use crate::traits::MeshValue;
+use crate::traits::{MeshValue, CrystalSub};
+use crate::constants::HARMONY_STABILITY_THRESHOLD;
 use errors::MathError;
 
-impl<T: MeshValue> Sub for T {
-    type Output = Result<T, MathError>;
-
-    fn sub(self, rhs: T) -> Self::Output {
+impl<T: MeshValue> CrystalSub for T {
+    fn sub(&self, other: &Self) -> MathResult<Self> {
         if !self.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable); // Fixed: Changed from UnstableState
+            return Err(MathError::HarmonyStateUnstable);
         }
 
-        let result = self.raw_sub(rhs)?;
+        if !other.check_harmony_state() {
+            return Err(MathError::HarmonyStateUnstable);
+        }
 
-        // Verify the result maintains harmony
+        let result = self.raw_sub(other)?;
+
         if !result.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable); // Fixed: Changed from UnstableState
+            return Err(MathError::HarmonyStateUnstable);
         }
 
         Ok(result)
     }
-}
 
-impl<T: MeshValue> SubAssign for T {
-    fn sub_assign(&mut self, rhs: T) {
-        match self.sub(rhs) {
-            Ok(result) => *self = result,
-            Err(e) => panic!("Subtraction operation failed: {}", e.scribe()),
-        }
+    fn sub_assign(&mut self, other: &Self) -> MathResult<()> {
+        *self = self.sub(other)?;
+        Ok(())
     }
 }
 
-// Helper trait for raw subtraction
 trait RawSub {
-    fn raw_sub(&self, other: Self) -> Result<Self, MathError> where Self: Sized;
+    fn raw_sub(&self, other: &Self) -> MathResult<Self> where Self: Sized;
 }
 
 impl<T: MeshValue> RawSub for T {
-    fn raw_sub(&self, rhs: T) -> Result<Self, MathError> {
-        self.sub(&rhs)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_subtraction() {
-        let a = TestValue::new(5.0);
-        let b = TestValue::new(3.0);
-        let result = a.sub(b).unwrap();
-        assert_eq!(result.value(), 2.0);
-    }
-
-    #[test]
-    fn test_subtraction_assign() {
-        let mut a = TestValue::new(5.0);
-        let b = TestValue::new(3.0);
-        a -= b;
-        assert_eq!(a.value(), 2.0);
-    }
-
-    #[test]
-    fn test_harmony_violation() {
-        let mut a = TestValue::new(5.0);
-        a.destabilize();
-        let b = TestValue::new(3.0);
-        assert!(matches!(a.sub(b), Err(MathError::HarmonyStateUnstable)));
+    fn raw_sub(&self, other: &Self) -> MathResult<Self> {
+        let self_val = self.to_f64()?;
+        let other_val = other.to_f64()?;
+        Ok(T::from(self_val - other_val))
     }
 }

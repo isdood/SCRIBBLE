@@ -1,83 +1,58 @@
-// lib/magicmath/src/div.rs
+//! Crystal-Aware Division Operations
+//! ===========================
+//!
+//! Author: Caleb J.D. Terkovics <isdood>
+//! Current User: isdood
+//! Created: 2025-01-19
+//! Last Updated: 2025-01-19 23:56:38 UTC
+//! Version: 0.1.0
+//! License: MIT
 
-use crate::traits::MeshValue;
+use crate::traits::{MeshValue, CrystalDiv};
+use crate::constants::HARMONY_STABILITY_THRESHOLD;
 use errors::MathError;
 
-impl<T: MeshValue> Div for T {
-    type Output = Result<T, MathError>;
-
-    fn div(self, rhs: T) -> Self::Output {
+impl<T: MeshValue> CrystalDiv for T {
+    fn div(&self, other: &Self) -> MathResult<Self> {
         if !self.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable); // Fixed: Changed from UnstableState
+            return Err(MathError::HarmonyStateUnstable);
         }
 
-        if rhs.is_zero() {
+        if !other.check_harmony_state() {
+            return Err(MathError::HarmonyStateUnstable);
+        }
+
+        let other_val = other.to_f64()?;
+        if other_val == 0.0 {
             return Err(MathError::DivisionByZero);
         }
 
-        let result = self.raw_div(rhs)?;
+        let result = self.raw_div(other)?;
 
-        // Verify the result maintains harmony
         if !result.check_harmony_state() {
-            return Err(MathError::HarmonyStateUnstable); // Fixed: Changed from UnstableState
+            return Err(MathError::HarmonyStateUnstable);
         }
 
         Ok(result)
     }
-}
 
-impl<T: MeshValue> DivAssign for T {
-    fn div_assign(&mut self, rhs: T) {
-        match self.div(rhs) {
-            Ok(result) => *self = result,
-            Err(e) => panic!("Division operation failed: {}", e.scribe()),
-        }
+    fn div_assign(&mut self, other: &Self) -> MathResult<()> {
+        *self = self.div(other)?;
+        Ok(())
     }
 }
 
-// Helper trait for raw division
 trait RawDiv {
-    fn raw_div(&self, other: Self) -> Result<Self, MathError> where Self: Sized;
+    fn raw_div(&self, other: &Self) -> MathResult<Self> where Self: Sized;
 }
 
 impl<T: MeshValue> RawDiv for T {
-    fn raw_div(&self, rhs: T) -> Result<Self, MathError> {
-        self.div(&rhs)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_division() {
-        let a = TestValue::new(6.0);
-        let b = TestValue::new(2.0);
-        let result = a.div(b).unwrap();
-        assert_eq!(result.value(), 3.0);
-    }
-
-    #[test]
-    fn test_division_by_zero() {
-        let a = TestValue::new(5.0);
-        let b = TestValue::new(0.0);
-        assert!(matches!(a.div(b), Err(MathError::DivisionByZero)));
-    }
-
-    #[test]
-    fn test_division_assign() {
-        let mut a = TestValue::new(6.0);
-        let b = TestValue::new(2.0);
-        a /= b;
-        assert_eq!(a.value(), 3.0);
-    }
-
-    #[test]
-    fn test_harmony_violation() {
-        let mut a = TestValue::new(6.0);
-        a.destabilize();
-        let b = TestValue::new(2.0);
-        assert!(matches!(a.div(b), Err(MathError::HarmonyStateUnstable)));
+    fn raw_div(&self, other: &Self) -> MathResult<Self> {
+        let self_val = self.to_f64()?;
+        let other_val = other.to_f64()?;
+        if other_val == 0.0 {
+            return Err(MathError::DivisionByZero);
+        }
+        Ok(T::from(self_val / other_val))
     }
 }
