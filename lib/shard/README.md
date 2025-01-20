@@ -1,4 +1,4 @@
-# 💎 Shard
+# � Shard
 ## Quantum Memory and Crystal Structure Management
 
 ```ascii
@@ -14,7 +14,7 @@ L3 Cache (Hyperspace)
   Aether Grid
 ```
 
-Shard is a revolutionary no-std memory management system that implements quantum-coherent memory operations through crystalline structures. It serves as the foundation layer of the Scribble framework, providing stable quantum state management and 4D memory operations.
+Shard is a revolutionary no-std memory management system that implements quantum-coherent memory operations through crystalline structures. It serves as the foundation layer of the Scribble framework.
 
 ## ✨ Core Features
 
@@ -36,18 +36,36 @@ pub struct ShardMemory {
 - 4D Program Counter
 - 64-bit Quantum Flags Register
 
-## 🚀 Quick Start
+### Crystal Threading (New!)
+```rust
+pub struct CrystalSystem {
+    executor: CrystalArc<QuantumExecutor>,    // Quantum task execution
+    memory: CrystalArc<CrystalMemoryManager>, // Crystal memory management
+    optimizer: CrystalArc<CrystalOptimizer>,  // Structure optimization
+    scheduler: CrystalArc<CrystalScheduler>,  // Workload scheduling
+    lattice: CrystalArc<CrystalLattice>,     // Crystal organization
+    resonator: CrystalArc<Resonator>,         // System resonance
+}
+```
+
+## � Quick Start
 
 ```rust
-use shard::{ShardRegisterFile, ShardMemory, Vector4D};
+use shard::{ShardRegisterFile, ShardMemory, Vector4D, CrystalSystem, CrystalConfig};
 
-fn main() -> Result<(), &'static str> {
+#[tokio::main]
+async fn main() -> Result<(), &'static str> {
     // Initialize shard subsystems
     shard::init()?;
 
     // Create register file and memory
     let mut regs = ShardRegisterFile::new();
     let mut memory = ShardMemory::new();
+    
+    // Initialize crystal system
+    let config = CrystalConfig::default();
+    let system = CrystalSystem::new(config);
+    system.initialize().await?;
     
     // Verify quantum coherence
     if !shard::check_coherence() {
@@ -66,16 +84,19 @@ fn main() -> Result<(), &'static str> {
 }
 ```
 
-## 📊 System Constants
+## � System Constants
 
 ```rust
 // Quantum thresholds
 pub const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.87;
 pub const FAIRY_DUST_COEFFICIENT: f64 = 0.618033988749895;
+pub const CRYSTAL_RESONANCE_HZ: f64 = 432.0;
+pub const BLEND_COHERENCE_THRESHOLD: f64 = 0.95;
+pub const MAX_BLEND_DEPTH: usize = 64;
 pub const CACHE_MAX_ENTRIES: usize = 1024;
 ```
 
-## 🎯 Core Modules
+## � Core Modules
 
 ### 1. Core Module (`core.rs`)
 - Register file implementation
@@ -87,6 +108,7 @@ pub const CACHE_MAX_ENTRIES: usize = 1024;
 - Quantum-aware caching
 - Crystal lattice storage
 - Hyperspace grid management
+- Crystal threading integration
 
 ### 3. Vector4D Module (`vector4d.rs`)
 - 4D vector operations
@@ -98,7 +120,14 @@ pub const CACHE_MAX_ENTRIES: usize = 1024;
 - Quantum field mathematics
 - Reality projection computations
 
-## 💫 Instruction Set
+### 5. Crystal Threading (New!)
+- Quantum task execution
+- Crystal memory management
+- Structure optimization
+- Workload scheduling
+- Resonance patterns
+
+## � Instruction Set
 
 ### Vector Operations
 - `VADD4D`: 4D vector addition
@@ -124,6 +153,12 @@ pub const CACHE_MAX_ENTRIES: usize = 1024;
 - `LOADQ`: Quantum state load
 - `STOREQ`: Quantum state store
 
+### Threading Operations (New!)
+- `TEXEC`: Thread execution
+- `TSYNC`: Thread synchronization
+- `TBLEND`: Thread blending
+- `TRES`: Thread resonance
+
 ## ⚡ Performance Characteristics
 
 ### Cache Performance
@@ -137,23 +172,26 @@ pub const CACHE_MAX_ENTRIES: usize = 1024;
 - Quantum Operations: O(log n)
 - Crystal Operations: O(φ⁻¹) where φ is FAIRY_DUST_COEFFICIENT
 - Reality Projections: O(1)
+- Thread Operations: O(1) with harmony > 0.95
 
-## 🛠️ Requirements
+## �️ Requirements
 
 ### System Requirements
 - Rust nightly (for core_intrinsics)
 - no_std environment
 - Quantum coherence level ≥ 0.87
 - Crystal stability ≥ 0.75
+- Thread harmony ≥ 0.95
 
 ### Dependencies
 ```toml
 [dependencies]
 scribble_cereal = "0.1.0"
 hashbrown = { version = "0.1.0", features = ["quantum"] }
+quartz = { version = "0.1.0", features = ["threading"] }
 ```
 
-## 🔬 Testing
+## � Testing
 
 ```bash
 # Run all tests
@@ -167,9 +205,12 @@ cargo test quantum
 
 # Test crystal operations
 cargo test crystal
+
+# Test threading (New!)
+cargo test threading
 ```
 
-## 📈 Register Layout
+## � Register Layout
 
 ### Vector Registers (V0-V7)
 ```rust
@@ -201,23 +242,33 @@ CR1: Lattice configuration
 [6]: coherence factor
 ```
 
-## 🤝 Contributing
+### Thread Registers (New!)
+```rust
+TR0: Thread state
+TR1: Harmony buffer
+TR2: Resonance control
+TR3: Blend parameters
+```
+
+## � Contributing
 
 1. Maintain quantum coherence (≥ 0.87)
 2. Preserve crystal stability
-3. Add tests for new features
-4. Update documentation
-5. Follow no_std guidelines
+3. Ensure thread harmony (≥ 0.95)
+4. Add tests for new features
+5. Update documentation
+6. Follow no_std guidelines
 
-## 📊 Current Status
+## � Current Status
 - Version: 0.1.0
-- Last Updated: 2025-01-18 19:41:07 UTC
+- Last Updated: 2025-01-20 13:52:15 UTC
 - Implementation: Rust (no_std)
 - Author: Caleb J.D. Terkovics (isdood)
 
-## 📜 License
+## � License
 MIT - See LICENSE for details
 
 ---
 
 *"Memory is not a place, but a crystal lattice of quantum possibilities."* - isdood
+
