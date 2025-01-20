@@ -10,6 +10,7 @@ license = "MIT"
 [dependencies]
 magicmath = { path = "../magicmath" }
 scribe = { path = "../scribe" }
+errors = { path = "../errors" }
 
 [[test]]
 name = "simd_tests"

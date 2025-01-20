@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 21:16:07 UTC
+//! Last Updated: 2025-01-20 16:38:04 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -17,37 +17,38 @@ extern crate errors;
 extern crate scribe;
 
 // Module declarations
-pub mod harmony;
-pub mod idk;
-pub mod crystal;
-pub mod zeronaut;
-pub mod phantom;
 pub mod align;
-pub mod aether;
+pub mod crystal;
 pub mod cube;
 pub mod growth;
+pub mod harmony;
+pub mod idk;
+pub mod phantom;
+pub mod zeronaut;
+pub mod aether;
 
-// Re-exports from magicmath
+// Re-export common types from magicmath
 pub use magicmath::{
-    Vector3D,
-    Vector4D,
-    resonance::{Quantum, Phase, Resonance},
+    core::Field,
+    traits::{CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
+    vector3d::Vector3D,
+    vector4d::Vector4D,
+    resonance::{ResonanceMath, ResonanceState},
+    HarmonyState,
 };
 
 // Re-exports from errors
-pub use errors::{
-    core::{
-        MathError,
-        QuantumError,
-        MathResult,
-        QuantumResult
-    }
+pub use errors::core::{
+    MathError,
+    QuantumError,
+    MathResult,
+    QuantumResult
 };
 
 // Re-exports from scribe
 pub use scribe::{
-    Scribe,
-    native_string::String
+    Write as Scribe,
+    string::String
 };
 
 // Constants module
@@ -67,8 +68,8 @@ pub mod constants {
 }
 
 /// Initialize fractal parameters for crystal growth
-pub fn create_growth_params() -> FractalParams {
-    FractalParams::default()
+pub fn create_growth_params() -> magicmath::resonance::FractalParams {
+    magicmath::resonance::FractalParams::default()
     .with_max_iterations(constants::MAX_FRACTAL_DEPTH)
     .with_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD)
 }
