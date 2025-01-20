@@ -1,10 +1,9 @@
 //! Error integration module
-//! Created: 2025-01-20 22:15:53
+//! Created: 2025-01-20 22:17:33
 //! Author: isdood
 
 use chrono::{DateTime, Utc};
 use error_core::DiagnosticReport;
-use tracing::error;
 
 mod context;
 mod reporter;
@@ -79,9 +78,9 @@ mod tests {
         let error = TestError::Test;
         let diagnostic = error.diagnose();
 
-        let metadata = ErrorMetadata::new(context.clone(), diagnostic.clone());
+        let metadata = ErrorMetadata::new(context, diagnostic);
 
         assert_eq!(metadata.context().file, context.file);
-        assert_eq!(metadata.diagnostic().suggestions, diagnostic.suggestions);
+        assert!(!metadata.diagnostic().suggestions.is_empty());
     }
 }

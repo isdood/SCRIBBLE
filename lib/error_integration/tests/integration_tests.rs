@@ -1,8 +1,7 @@
-//! Integration tests for error handling
-//! Created: 2025-01-20 22:05:27
+//! Integration tests for error integration
+//! Created: 2025-01-20 22:17:33
 //! Author: isdood
 
-use error_core::Diagnose;
 use error_derive::Diagnose;
 use error_integration::{DefaultErrorReporter, ErrorContext, ErrorReporter};
 use thiserror::Error;
@@ -25,4 +24,18 @@ fn test_error_reporting() {
     let stats = reporter.get_stats();
     assert_eq!(stats.total_errors, 1);
     assert!(stats.by_type.contains_key(std::any::type_name::<TestError>()));
+}
+
+#[test]
+fn test_error_context() {
+    let context = ErrorContext::current();
+    assert!(context.file.contains("integration_tests.rs"));
+    assert!(context.module_path.is_some());
+}
+
+#[test]
+fn test_reporter_config() {
+    let reporter = DefaultErrorReporter::default();
+    assert!(reporter.config().collect_stats);
+    assert!(reporter.config().include_backtraces);
 }
