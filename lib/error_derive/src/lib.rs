@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Lit, Meta, NestedMeta};
+use syn::{parse_macro_input, DeriveInput, Meta, parse::Parse, parse::ParseStream};
 use darling::{FromDeriveInput, FromMeta};
 
 #[derive(Debug, FromMeta)]
@@ -10,13 +10,18 @@ struct DiagnoseOpts {
     quick_fix: String,
 }
 
+impl Parse for DiagnoseOpts {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let meta = input.parse::<Meta>()?;
+        DiagnoseOpts::from_meta(&meta)
+        .map_err(|e| syn::Error::new_spanned(meta, e))
+    }
+}
+
 #[derive(Debug, FromDeriveInput)]
-#[darling(supports(enum_any), attributes(error_path))]
+#[darling(supports(enum_any))]
 struct ErrorDeriveOpts {
     ident: syn::Ident,
-    data: darling::ast::Data<(), ()>,
-    #[darling(default)]
-    error_path: Option<String>,
 }
 
 /// Derives the Diagnose trait for error types
@@ -30,7 +35,23 @@ pub fn derive_diagnose(input: TokenStream) -> TokenStream {
     };
 
     let name = &opts.ident;
-    let error_path = opts.error_path.unwrap_or_default();
+
+    // Parse error_path attribute
+    let error_path = input.attrs.iter()
+    .find(|attr| attr.path().is_ident("error_path"))
+    .and_then(|attr| {
+        let meta = attr.meta.require_name_value().ok()?;
+        if let syn::Expr::Lit(expr_lit) = &meta.value {
+            if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+                Some(lit_str.value())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    })
+    .unwrap_or_default();
 
     // Get enum variants
     let variants = if let syn::Data::Enum(data) = &input.data {
@@ -41,46 +62,50 @@ pub fn derive_diagnose(input: TokenStream) -> TokenStream {
 
     let match_arms = variants.iter().map(|variant| {
         let variant_name = &variant.ident;
-        let mut detect = String::new();
-        let mut suggestion = String::new();
-        let mut quick_fix = String::new();
 
         // Parse diagnose attributes
-        for attr in &variant.attrs {
-            if attr.path().is_ident("diagnose") {
-                attr.parse_nested_meta(|meta| {
-                    let path = meta.path.get_ident().unwrap().to_string();
-                    let value = meta.value()?;
-                    let str_val = value.parse::<syn::LitStr>()?.value();
+        if let Some(attr) = variant.attrs.iter().find(|attr| attr.path().is_ident("diagnose")) {
+            if let Ok(meta) = attr.parse_meta() {
+                if let Meta::List(meta_list) = meta {
+                    let mut detect = String::new();
+                    let mut suggestion = String::new();
+                    let mut quick_fix = String::new();
 
-                    match path.as_str() {
-                        "detect" => detect = str_val,
-                        "suggestion" => suggestion = str_val,
-                        "quick_fix" => quick_fix = str_val,
-                        _ => {}
+                    for nested in meta_list.nested.iter() {
+                        if let syn::NestedMeta::Meta(Meta::NameValue(nv)) = nested {
+                            if let syn::Lit::Str(lit_str) = &nv.lit {
+                                let value = lit_str.value();
+                                if nv.path.is_ident("detect") {
+                                    detect = value;
+                                } else if nv.path.is_ident("suggestion") {
+                                    suggestion = value;
+                                } else if nv.path.is_ident("quick_fix") {
+                                    quick_fix = value;
+                                }
+                            }
+                        }
                     }
-                    Ok(())
-                }).unwrap_or_default();
+
+                    if !detect.is_empty() {
+                        return quote! {
+                            Self::#variant_name => {
+                                let mut report = error_core::DiagnosticReport::new();
+                                report.message = format!("Detected condition: {}", #detect);
+                                report.suggestions.push(#suggestion.to_string());
+                                report.quick_fixes.push(error_core::QuickFix {
+                                    description: #suggestion.to_string(),
+                                                        code: #quick_fix.to_string(),
+                                });
+                                report
+                            }
+                        };
+                    }
+                }
             }
         }
 
-        if !detect.is_empty() {
-            quote! {
-                Self::#variant_name => {
-                    let mut report = error_core::DiagnosticReport::new();
-                    report.message = format!("Detected condition: {}", #detect);
-                    report.suggestions.push(#suggestion.to_string());
-                    report.quick_fixes.push(error_core::QuickFix {
-                        description: #suggestion.to_string(),
-                                            code: #quick_fix.to_string(),
-                    });
-                    report
-                }
-            }
-        } else {
-            quote! {
-                Self::#variant_name => error_core::DiagnosticReport::new()
-            }
+        quote! {
+            Self::#variant_name => error_core::DiagnosticReport::new()
         }
     });
 

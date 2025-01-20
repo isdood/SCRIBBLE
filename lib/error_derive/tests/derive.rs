@@ -8,15 +8,13 @@ fn test_basic_derive() {
     enum TestError {
         #[diagnose(detect = "value < 0", suggestion = "Value must be positive", quick_fix = "set_positive_value()")]
         NegativeValue,
-
-        // Variant without diagnose attribute
         SimpleError,
     }
 
     // Test variant with diagnose attribute
     let error = TestError::NegativeValue;
     let report = error.diagnose();
-    assert!(!report.quick_fixes.is_empty());
+    assert!(!report.quick_fixes.is_empty(), "Expected quick fixes for NegativeValue");
     assert_eq!(report.quick_fixes[0].code, "set_positive_value()");
     assert_eq!(report.suggestions[0], "Value must be positive");
     assert!(report.message.contains("value < 0"));
@@ -36,10 +34,13 @@ fn test_missing_error_path() {
     #[derive(Debug, Diagnose)]
     enum NoPathError {
         #[diagnose(detect = "test", suggestion = "test", quick_fix = "test()")]
-        TestError,
+        TestVariant,
     }
 
-    // Should have compile-time error due to missing error_path
+    let error = NoPathError::TestVariant;
+    let report = error.diagnose();
+    assert!(!report.quick_fixes.is_empty());
+
     let compile_error = NoPathError::check_at_compile_time().unwrap();
     assert!(compile_error.message.contains("error_path"));
 }

@@ -2,7 +2,6 @@
 name = "error_core"
 version = "0.1.0"
 edition = "2021"
-authors = ["Caleb J.D. Terkovics <isdood>"]
 description = "Core types for Scribble's error handling system"
 
 [dependencies]

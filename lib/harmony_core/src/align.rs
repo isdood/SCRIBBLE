@@ -60,7 +60,7 @@ impl AlignmentCore {
     /// Create a new alignment core
     pub const fn new() -> Self {
         Self {
-            shard: ShardUninit::new(),
+            shard: ShardUninit::uninit(), // Fix: Correcting method call
             state: AlignmentState::Unknown,
         }
     }

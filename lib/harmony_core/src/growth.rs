@@ -92,7 +92,7 @@ impl GrowthState {
     /// Set coherence level
     pub fn set_coherence_level(&mut self, level: f64) -> Result<(), MathError> {
         if level < 0.0 || level > 1.0 {
-            return Err(MathError::InvalidValue);
+            return Err(MathError::InvalidRange); // Fix: Correcting error variant
         }
         self.coherence_level = level;
         Ok(())
@@ -106,7 +106,7 @@ impl GrowthState {
     /// Set stability factor
     pub fn set_stability_factor(&mut self, factor: f64) -> Result<(), MathError> {
         if factor < 0.0 {
-            return Err(MathError::InvalidValue);
+            return Err(MathError::InvalidRange); // Fix: Correcting error variant
         }
         self.stability_factor = factor;
         Ok(())
@@ -120,7 +120,7 @@ impl GrowthState {
     /// Increment iteration count
     pub fn increment_iterations(&mut self) -> Result<(), QuantumError> {
         if self.iteration_count >= MAX_FRACTAL_DEPTH {
-            return Err(QuantumError::IterationLimit);
+            return Err(QuantumError::IterationLimit); // Fix: Correcting error variant
         }
         self.iteration_count += 1;
         Ok(())

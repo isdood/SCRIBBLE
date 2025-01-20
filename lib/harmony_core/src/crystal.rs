@@ -58,7 +58,7 @@ impl CrystalNode {
     /// Set node's phase coherence
     pub fn set_phase_coherence(&mut self, value: f64) -> Result<(), MathError> {
         if value < 0.0 || value > 1.0 {
-            return Err(MathError::InvalidValue);
+            return Err(MathError::InvalidRange); // Fix: Correcting error variant
         }
         self.coherence = value;
         Ok(())
@@ -79,7 +79,7 @@ impl CrystalNode {
 #[derive(Debug)]
 pub struct CrystalLattice {
     /// Lattice nodes storage
-    nodes: [[ShardUninit<CrystalNode>; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE],
+    nodes: [[Option<CrystalNode>; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE], // Fix: Changing to Option
     /// Lattice size
     size: usize,
     /// Lattice alignment
@@ -90,7 +90,7 @@ impl CrystalLattice {
     /// Create a new crystal lattice
     pub fn new(size: usize) -> Self {
         let size = size.min(MAX_QUANTUM_SIZE);
-        let nodes = [[ShardUninit::new(); MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE];
+        let nodes = [[None; MAX_QUANTUM_SIZE]; MAX_QUANTUM_SIZE]; // Fix: Changing to Option
         let origin = Vector3D::new(0.0, 0.0, 0.0);
 
         Self {
@@ -110,10 +110,7 @@ impl CrystalLattice {
             return Err(QuantumError::BoundaryViolation);
         }
 
-        unsafe {
-            self.nodes[x][y].get_ref()
-            .ok_or(QuantumError::InvalidState)
-        }
+        self.nodes[x][y].as_ref().ok_or(QuantumError::InvalidState) // Fix: Using Option
     }
 
     /// Set node at position
@@ -126,9 +123,7 @@ impl CrystalLattice {
             return Err(QuantumError::BoundaryViolation);
         }
 
-        unsafe {
-            self.nodes[x][y].set(node);
-        }
+        self.nodes[x][y] = Some(node); // Fix: Using Option
         Ok(())
     }
 

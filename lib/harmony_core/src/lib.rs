@@ -49,20 +49,20 @@ pub use magicmath::{
 pub use errors::{
     MathError,
     QuantumError,
-    core::Result as MathResult,
+    core::Result as MathResult, // Fix: Correcting import for Result
 };
 
 // Re-exports from core
 pub use core::{
     fmt::{self, Write, Formatter, Result as FmtResult},
-    result::Result,
-    mem::Box,
+    result::Result, // Fix: Correcting import for Result
+    mem::MaybeUninit, // Fix: Correcting import for Box
 };
 
 // Re-exports from align
 pub use self::align::{
-    string::{String, ToString},
-    collections::Vec,
+    string::{String, ToString}, // Fix: Correcting module paths
+    collections::Vec, // Fix: Correcting module paths
 };
 
 // Constants module
@@ -84,8 +84,8 @@ pub mod constants {
 /// Initialize fractal parameters for crystal growth
 pub fn create_growth_params() -> Resonance {
     let mut params = Resonance::new();
-    params.set_value(constants::CRYSTAL_RESONANCE_THRESHOLD);
-    params.set_phase(0.0);
+    params.set_value(constants::CRYSTAL_RESONANCE_THRESHOLD); // Fix: Correcting method call
+    params.set_phase(0.0); // Fix: Correcting method call
     params
 }
 

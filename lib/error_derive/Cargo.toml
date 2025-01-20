@@ -7,11 +7,10 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-syn = { version = "2.0", features = ["full"] }
+syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
-proc-macro2 = "1.0"
 darling = "0.20"
+proc-macro2 = "1.0"
 
-[dependencies.error_core]
-path = "../error_core"
-
+[dev-dependencies]
+error_core = { path = "../error_core" }
