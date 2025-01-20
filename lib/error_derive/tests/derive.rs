@@ -4,13 +4,9 @@ use error_core::Diagnose as _;
 #[test]
 fn test_basic_derive() {
     #[derive(Debug, Diagnose)]
-    #[error_path("test/errors")]
+    #[error_path(path = "test/errors")]
     enum TestError {
-        #[diagnose(
-        detect = "value < 0",
-        suggestion = "Value must be positive",
-        quick_fix = "set_positive_value()"
-        )]
+        #[diagnose(detect = "value < 0", suggestion = "Value must be positive", quick_fix = "set_positive_value()")]
         NegativeValue,
 
         // Variant without diagnose attribute
@@ -39,11 +35,7 @@ fn test_basic_derive() {
 fn test_missing_error_path() {
     #[derive(Debug, Diagnose)]
     enum NoPathError {
-        #[diagnose(
-        detect = "test",
-        suggestion = "test",
-        quick_fix = "test()"
-        )]
+        #[diagnose(detect = "test", suggestion = "test", quick_fix = "test()")]
         TestError,
     }
 

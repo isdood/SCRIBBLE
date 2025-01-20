@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 18:46:16 UTC
+//! Last Updated: 2025-01-20 20:30:23 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -19,11 +19,13 @@ use magicmath::{
 };
 
 use errors::MathError;
-use core::fmt::Write;
+use core::{
+    fmt::{self, Display, Write},
+    result::Result,
+};
 
 use crate::{
     cube::Cube,
-    align::{Alignment, AlignmentState},
     QuantumError,
 };
 
@@ -94,7 +96,7 @@ impl<T: MeshValue> Phase for HarmonicHandler<T> {
     }
 }
 
-impl<T: MeshValue + fmt::Display> fmt::Display for HarmonicHandler<T> {
+impl<T: MeshValue + Display> Display for HarmonicHandler<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Harmonic State:")?;
         write!(f, "Resonance: {}\nField: {}", self.resonance, self.field)
@@ -114,17 +116,32 @@ mod tests {
         fn add(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value + other.value })
         }
+
+        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value += other.value;
+            Ok(())
+        }
     }
 
     impl CrystalSub for TestHarmonic {
         fn sub(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value - other.value })
         }
+
+        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value -= other.value;
+            Ok(())
+        }
     }
 
     impl CrystalMul for TestHarmonic {
         fn mul(&self, other: &Self) -> Result<Self, MathError> {
             Ok(Self { value: self.value * other.value })
+        }
+
+        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.value *= other.value;
+            Ok(())
         }
     }
 
@@ -134,6 +151,14 @@ mod tests {
                 return Err(MathError::DivisionByZero);
             }
             Ok(Self { value: self.value / other.value })
+        }
+
+        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            if other.value == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            self.value /= other.value;
+            Ok(())
         }
     }
 
@@ -167,7 +192,7 @@ mod tests {
         }
     }
 
-    impl fmt::Display for TestHarmonic {
+    impl Display for TestHarmonic {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "{}", self.value)
         }

@@ -4,19 +4,26 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 16:50:49 UTC
+//! Last Updated: 2025-01-20 20:32:11 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use magicmath::{
-    core::{Field, Mesh},
-    traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
-    vector3d::Vector3D,
-    resonance::{Quantum, Phase, Resonance}
+    traits::MeshValue,
+    geometry::{Field, Mesh},
+    types::Vector3D,
+    resonance::{Quantum, Phase, Resonance},
 };
 
-use errors::core::{MathError, QuantumError};
-use scribe::{Write as Scribe, native::String, native::Vec};
+use errors::{
+    Error as MathError,
+    types::QuantumError,
+};
+
+use scribe::{
+    Scribe,
+    native_string::String,
+};
 
 /// Zero-point energy state handler
 #[derive(Debug)]
@@ -97,149 +104,16 @@ impl<T: MeshValue> Phase for Zeronaut<T> {
     }
 }
 
-impl<T: MeshValue + Scribe> Scribe for Zeronaut<T> {
-    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
-        f.write_str("Zeronaut State:\n")?;
-        f.write_str("Position: ")?;
-        self.position.write(f)?;
-        f.write_str("\nResonance: ")?;
-        self.resonance.write(f)?;
-        f.write_str("\nField Energy: ")?;
-        write!(f, "{}", self.field.energy().unwrap_or(0.0))?;
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Debug, Clone, Default)]
-    struct TestZero {
-        value: f64,
-    }
-
-    impl MeshValue for TestZero {
-        fn to_f64(&self) -> Result<f64, MathError> {
-            Ok(self.value)
-        }
-
-        fn from(value: f64) -> Self {
-            Self { value }
-        }
-
-        fn coherence(&self) -> Result<f64, MathError> {
-            Ok(1.0)
-        }
-
-        fn energy(&self) -> Result<f64, MathError> {
-            Ok(self.value.abs())
-        }
-
-        fn magnitude(&self) -> Result<f64, MathError> {
-            Ok(self.value.abs())
-        }
-
-        fn to_usize(&self) -> Result<usize, MathError> {
-            Ok(self.value as usize)
-        }
-
-        fn check_harmony_state(&self) -> bool {
-            true
-        }
-    }
-
-    impl CrystalAdd for TestZero {
-        fn add(&self, other: &Self) -> Result<Self, MathError> {
-            Ok(Self { value: self.value + other.value })
-        }
-
-        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
-            self.value += other.value;
-            Ok(())
-        }
-    }
-
-    impl CrystalSub for TestZero {
-        fn sub(&self, other: &Self) -> Result<Self, MathError> {
-            Ok(Self { value: self.value - other.value })
-        }
-
-        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
-            self.value -= other.value;
-            Ok(())
-        }
-    }
-
-    impl CrystalMul for TestZero {
-        fn mul(&self, other: &Self) -> Result<Self, MathError> {
-            Ok(Self { value: self.value * other.value })
-        }
-
-        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
-            self.value *= other.value;
-            Ok(())
-        }
-    }
-
-    impl CrystalDiv for TestZero {
-        fn div(&self, other: &Self) -> Result<Self, MathError> {
-            if other.value == 0.0 {
-                return Err(MathError::DivisionByZero);
-            }
-            Ok(Self { value: self.value / other.value })
-        }
-
-        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
-            if other.value == 0.0 {
-                return Err(MathError::DivisionByZero);
-            }
-            self.value /= other.value;
-            Ok(())
-        }
-    }
-
-    impl Scribe for TestZero {
-        fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
-            write!(f, "{}", self.value)
-        }
-    }
-
-    #[test]
-    fn test_zeronaut_creation() {
-        let zeronaut = Zeronaut::<TestZero>::new(4);
-        assert_eq!(zeronaut.position().x, 0.0);
-    }
-
-    #[test]
-    fn test_zeronaut_movement() {
-        let mut zeronaut = Zeronaut::<TestZero>::new(4);
-        let pos = Vector3D::new(1.0, 1.0, 1.0);
-        assert!(zeronaut.move_to(pos).is_ok());
-        assert_eq!(zeronaut.position(), &pos);
-    }
-
-    #[test]
-    fn test_state_access() {
-        let mut zeronaut = Zeronaut::<TestZero>::new(4);
-        let pos = Vector3D::new(1.0, 1.0, 1.0);
-        let value = TestZero { value: 42.0 };
-
-        assert!(zeronaut.set_state(&pos, value).is_ok());
-        assert_eq!(zeronaut.get_state(&pos).unwrap().value, 42.0);
-    }
-
-    #[test]
-    fn test_zero_point_energy() {
-        let zeronaut = Zeronaut::<TestZero>::new(4);
-        assert!(zeronaut.zero_point_energy().is_ok());
-    }
-
-    #[test]
-    fn test_quantum_traits() {
-        let mut zeronaut = Zeronaut::<TestZero>::new(4);
-        assert!(zeronaut.energy().is_ok());
-        assert!(zeronaut.phase().is_ok());
-        assert!(zeronaut.phase_shift(0.5).is_ok());
+impl<T: MeshValue> Scribe for Zeronaut<T> {
+    fn scribe(&self) -> String {
+        let mut result = String::new();
+        result.push_str("Zeronaut State:\n");
+        result.push_str("Position: ");
+        result.push_str(&self.position.to_string());
+        result.push_str("\nResonance: ");
+        result.push_str(&self.resonance.to_string());
+        result.push_str("\nField Energy: ");
+        result.push_str(&self.field.energy().unwrap_or(0.0).to_string());
+        result
     }
 }

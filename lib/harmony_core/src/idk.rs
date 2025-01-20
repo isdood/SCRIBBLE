@@ -1,196 +1,156 @@
-//! Harmony State Management
-//! =========================
+//! IDK - Internal Data Kernel
+//! ======================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:42:00 UTC
+//! Last Updated: 2025-01-20 20:29:06 UTC
 //! Version: 0.1.1
 //! License: MIT
 
-use core::fmt::{Display, Formatter, Result as FmtResult};
-use magicmath::traits::{
+use core::{
+    fmt::{self, Display},
+    marker::PhantomData,
+    mem::MaybeUninit,
+};
+
+use magicmath::{
     MeshValue,
-    CrystalAdd,
-    CrystalSub,
-    CrystalMul,
-    CrystalDiv,
-};
-use magicmath::errors::{Error as MathError, Result as MathResult};
-use scribe::{
-    native_string::String,
-    Scribe,
+    Vector3D,
 };
 
-use crate::align::AlignmentState;
-use crate::errors::CoherenceError;
+use errors::MathError;
 
-/// Result type for coherence operations
-pub type CoherenceResult<T> = Result<T, CoherenceError>;
-
-/// A shard that may or may not be initialized
+/// Uninitialized shard type
 #[derive(Debug)]
-#[repr(transparent)]
 pub struct ShardUninit<T> {
-    /// Inner value storage
-    value: Option<T>,
-}
-
-/// Core harmony state container
-#[derive(Debug, Clone)]
-pub struct HarmonyState<T> {
-    /// Inner value pointer
-    value: T,
+    data: MaybeUninit<T>,
+    initialized: bool,
+    _marker: PhantomData<T>,
 }
 
 impl<T> ShardUninit<T> {
-    /// Create a new uninitialized shard
-    #[inline]
+    /// Create new uninitialized shard
     pub const fn new() -> Self {
-        Self { value: None }
+        Self {
+            data: MaybeUninit::uninit(),
+            initialized: false,
+            _marker: PhantomData,
+        }
     }
 
-    /// Create a new initialized shard
-    #[inline]
-    pub fn new_init(value: T) -> Self {
-        Self { value: Some(value) }
+    /// Get reference to initialized data
+    /// # Safety
+    /// Caller must ensure data is initialized
+    pub unsafe fn get_ref(&self) -> Option<&T> {
+        if self.initialized {
+            Some(&*self.data.as_ptr())
+        } else {
+            None
+        }
     }
 
-    /// Get a reference to the inner value if initialized
-    #[inline]
-    pub fn get_ref(&self) -> Option<&T> {
-        self.value.as_ref()
+    /// Set data value
+    /// # Safety
+    /// Previous value is dropped if initialized
+    pub unsafe fn set(&mut self, value: T) {
+        if self.initialized {
+            self.data.assume_init_drop();
+        }
+        self.data.write(value);
+        self.initialized = true;
     }
 
-    /// Get a mutable reference to the inner value if initialized
-    #[inline]
-    pub fn get_mut(&mut self) -> Option<&mut T> {
-        self.value.as_mut()
-    }
-
-    /// Set the inner value
-    #[inline]
-    pub fn set(&mut self, value: T) {
-        self.value = Some(value);
-    }
-
-    /// Check if the shard is initialized
-    #[inline]
+    /// Check if data is initialized
     pub fn is_initialized(&self) -> bool {
-        self.value.is_some()
+        self.initialized
     }
 }
 
-impl<T> HarmonyState<T> {
-    /// Create a new harmony state
-    pub fn new(value: T) -> Self {
-        Self { value }
-    }
+/// Quantum harmony state
+#[derive(Debug, Clone)]
+pub struct HarmonyState<T> {
+    /// State value
+    value: T,
+    /// Position in lattice
+    position: Vector3D,
+}
 
-    /// Get the inner value
-    pub fn into_inner(self) -> T {
-        self.value
-    }
-
-    /// Check coherence of the state
-    pub fn check_coherence(&self) -> CoherenceResult<AlignmentState> {
-        Ok(AlignmentState::Perfect)
+impl<T: Default> Default for HarmonyState<T> {
+    fn default() -> Self {
+        Self {
+            value: T::default(),
+            position: Vector3D::new(0.0, 0.0, 0.0),
+        }
     }
 }
 
-impl<T> CrystalAdd for HarmonyState<T>
-where
-T: CrystalAdd + Clone,
-{
-    fn add(&self, other: &Self) -> MathResult<Self> {
-        Ok(Self::new(self.value.add(&other.value)?))
+impl<T: MeshValue + Display> HarmonyState<T> {
+    /// Create new harmony state
+    pub fn new(value: T, position: Vector3D) -> Self {
+        Self { value, position }
     }
 
-    fn add_assign(&mut self, other: &Self) -> MathResult<()> {
-        self.value.add_assign(&other.value)
-    }
-}
-
-impl<T> CrystalSub for HarmonyState<T>
-where
-T: CrystalSub + Clone,
-{
-    fn sub(&self, other: &Self) -> MathResult<Self> {
-        Ok(Self::new(self.value.sub(&other.value)?))
+    /// Get state value
+    pub fn value(&self) -> &T {
+        &self.value
     }
 
-    fn sub_assign(&mut self, other: &Self) -> MathResult<()> {
-        self.value.sub_assign(&other.value)
-    }
-}
-
-impl<T> CrystalMul for HarmonyState<T>
-where
-T: CrystalMul + Clone,
-{
-    fn mul(&self, other: &Self) -> MathResult<Self> {
-        Ok(Self::new(self.value.mul(&other.value)?))
+    /// Get position
+    pub fn position(&self) -> &Vector3D {
+        &self.position
     }
 
-    fn mul_assign(&mut self, other: &Self) -> MathResult<()> {
-        self.value.mul_assign(&other.value)
-    }
-}
-
-impl<T> CrystalDiv for HarmonyState<T>
-where
-T: CrystalDiv + Clone,
-{
-    fn div(&self, other: &Self) -> MathResult<Self> {
-        Ok(Self::new(self.value.div(&other.value)?))
+    /// Set position
+    pub fn set_position(&mut self, pos: Vector3D) {
+        self.position = pos;
     }
 
-    fn div_assign(&mut self, other: &Self) -> MathResult<()> {
-        self.value.div_assign(&other.value)
-    }
-}
-
-impl<T> MeshValue for HarmonyState<T>
-where
-T: MeshValue + CrystalAdd + CrystalSub + CrystalMul + CrystalDiv + Clone,
-{
-    fn to_f64(&self) -> MathResult<f64> {
-        self.value.to_f64()
-    }
-
-    fn from(value: f64) -> Self {
-        Self::new(T::from(value))
-    }
-
-    fn coherence(&self) -> MathResult<f64> {
-        self.value.coherence()
-    }
-
-    fn energy(&self) -> MathResult<f64> {
+    /// Calculate state energy
+    pub fn energy(&self) -> Result<f64, MathError> {
         self.value.energy()
     }
 
-    fn magnitude(&self) -> MathResult<f64> {
-        self.value.magnitude()
-    }
-
-    fn to_usize(&self) -> MathResult<usize> {
-        self.value.to_usize()
-    }
-
-    fn check_harmony_state(&self) -> bool {
-        self.value.check_harmony_state()
-    }
-}
-
-impl<T: Scribe> Scribe for HarmonyState<T> {
-    fn scribe(&self) -> String {
-        self.value.scribe()
+    /// Calculate state coherence
+    pub fn coherence(&self) -> Result<f64, MathError> {
+        self.value.coherence()
     }
 }
 
 impl<T: Display> Display for HarmonyState<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        write!(f, "{}", self.value)
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "State({}) at {}", self.value, self.position)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shard_uninit() {
+        let mut shard: ShardUninit<i32> = ShardUninit::new();
+        assert!(!shard.is_initialized());
+
+        unsafe {
+            shard.set(42);
+            assert!(shard.is_initialized());
+            assert_eq!(*shard.get_ref().unwrap(), 42);
+        }
+    }
+
+    #[test]
+    fn test_harmony_state() {
+        let pos = Vector3D::new(1.0, 2.0, 3.0);
+        let state = HarmonyState::new(42.0, pos.clone());
+        assert_eq!(*state.value(), 42.0);
+        assert_eq!(*state.position(), pos);
+    }
+
+    #[test]
+    fn test_harmony_state_default() {
+        let state: HarmonyState<f64> = HarmonyState::default();
+        assert_eq!(*state.value(), 0.0);
+        assert_eq!(*state.position(), Vector3D::new(0.0, 0.0, 0.0));
     }
 }

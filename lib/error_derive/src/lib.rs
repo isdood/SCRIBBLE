@@ -5,8 +5,11 @@ use darling::{FromDeriveInput, FromMeta, FromVariant};
 
 #[derive(Debug, FromMeta)]
 struct DiagnoseOpts {
+    #[darling(default)]
     detect: String,
+    #[darling(default)]
     suggestion: String,
+    #[darling(default)]
     quick_fix: String,
 }
 
@@ -15,41 +18,19 @@ struct DiagnoseOpts {
 struct DiagnoseVariant {
     ident: syn::Ident,
     #[darling(default)]
-    diagnose: Option<DiagnoseOpts>,
+    attrs: Vec<syn::Attribute>,
 }
 
 #[derive(Debug, FromDeriveInput)]
-#[darling(supports(enum_any), attributes(error_path))]
+#[darling(attributes(error_path), supports(enum_any))]
 struct ErrorDeriveOpts {
     ident: syn::Ident,
     data: darling::ast::Data<DiagnoseVariant, ()>,
     #[darling(default)]
-    error_path: Option<String>,
+    path: String,
 }
 
 /// Derives the Diagnose trait for error types
-///
-/// # Example
-///
-/// ```rust
-/// use error_derive::Diagnose;
-/// use error_core::Diagnose as _;
-///
-/// #[derive(Debug, Diagnose)]
-/// #[error_path("test/errors")]
-/// pub enum QuantumError {
-///     #[diagnose(
-///         detect = "quantum_state < 0.5",
-///         suggestion = "Consider increasing coherence threshold",
-///         quick_fix = "set_min_coherence(0.5)"
-///     )]
-///     InvalidState,
-/// }
-///
-/// let error = QuantumError::InvalidState;
-/// let report = error.diagnose();
-/// assert!(!report.quick_fixes.is_empty());
-/// ```
 #[proc_macro_derive(Diagnose, attributes(diagnose, error_path))]
 pub fn derive_diagnose(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -60,7 +41,7 @@ pub fn derive_diagnose(input: TokenStream) -> TokenStream {
     };
 
     let name = &opts.ident;
-    let error_path = opts.error_path.unwrap_or_else(|| String::from(""));
+    let error_path = &opts.path;
 
     let variants = match opts.data {
         darling::ast::Data::Enum(variants) => variants,
@@ -69,10 +50,18 @@ pub fn derive_diagnose(input: TokenStream) -> TokenStream {
 
     let match_arms = variants.into_iter().map(|variant| {
         let variant_name = &variant.ident;
-        if let Some(diagnose) = variant.diagnose {
-            let detect = &diagnose.detect;
-            let suggestion = &diagnose.suggestion;
-            let quick_fix = &diagnose.quick_fix;
+        let diagnose_attr = variant.attrs.iter().find(|attr| attr.path().is_ident("diagnose"));
+
+        if let Some(attr) = diagnose_attr {
+            let meta = attr.parse_args::<DiagnoseOpts>().unwrap_or_else(|_| DiagnoseOpts {
+                detect: String::new(),
+                                                                        suggestion: String::new(),
+                                                                        quick_fix: String::new(),
+            });
+
+            let detect = &meta.detect;
+            let suggestion = &meta.suggestion;
+            let quick_fix = &meta.quick_fix;
 
             quote! {
                 Self::#variant_name => {

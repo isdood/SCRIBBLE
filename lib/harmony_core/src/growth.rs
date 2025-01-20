@@ -1,210 +1,182 @@
 //! Crystal Growth Pattern Management
-//! ===============================
+//! ============================
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
-//! Created: 2025-01-19 13:13:04 UTC
-//! Last Updated: 2025-01-20 20:23:38 UTC
-//! Version: 0.1.0
+//! Created: 2025-01-18
+//! Last Updated: 2025-01-20 20:27:04 UTC
+//! Version: 0.1.1
 //! License: MIT
 
 use magicmath::{
-    fractal::{
-        FractalParams,
-        FractalState,
-        JuliaParams,
-        JuliaState,
-        JuliaVariant,
-        MandelbrotParams,
-        MandelbrotState,
-        MandelbrotVariant,
-        generate_fractal,
-        iterate_julia,
-        iterate_mandelbrot,
-    },
+    MeshValue,
+    Vector3D,
+    resonance::{Resonance, Phase},
 };
 
-use errors::{
-    Error as MathError,
-    Result as MathResult,
-    quantum::QuantumError,
-    coherence::CoherenceError,
+use errors::{MathError, QuantumError};
+use core::{
+    fmt::{self, Display, Write},
+    result::Result,
 };
 
-use scribe::{
-    Scribe,
-    string::ToString,
-    native_string::String,
+use crate::constants::{
+    MAX_FRACTAL_DEPTH,
+    QUANTUM_STABILITY_THRESHOLD,
+    CRYSTAL_RESONANCE_THRESHOLD,
 };
 
-use crate::{
-    crystal::{CrystalLattice, CrystalNode},
-    constants,
-    resonance::{ResonanceMath, ResonanceState},
-};
-
-/// Defines different types of crystal growth patterns
+/// Crystal growth pattern types
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GrowthPattern {
-    /// Local growth using Julia set patterns
+    /// Local growth within boundary
     Local,
-    /// Global restructuring using Mandelbrot patterns
+    /// Global growth across lattice
     Global,
-    /// Hybrid growth combining both patterns
-    Hybrid,
-    /// Quantum-stabilized growth pattern
-    Quantum,
+    /// Fractal pattern growth
+    Fractal,
+    /// Unknown growth pattern
+    Unknown,
 }
 
-impl Scribe for GrowthPattern {
-    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
+impl Display for GrowthPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GrowthPattern::Local => f.write_str("Local"),
-            GrowthPattern::Global => f.write_str("Global"),
-            GrowthPattern::Hybrid => f.write_str("Hybrid"),
-            GrowthPattern::Quantum => f.write_str("Quantum"),
+            GrowthPattern::Local => write!(f, "Local"),
+            GrowthPattern::Global => write!(f, "Global"),
+            GrowthPattern::Fractal => write!(f, "Fractal"),
+            GrowthPattern::Unknown => write!(f, "Unknown"),
         }
     }
 }
 
-/// Represents the current state of crystal growth
+/// Crystal growth state
 #[derive(Debug)]
 pub struct GrowthState {
+    /// Growth pattern
     pattern: GrowthPattern,
-    fractal_state: FractalState,
+    /// Coherence level (0.0 - 1.0)
     coherence_level: f64,
+    /// Stability factor
     stability_factor: f64,
+    /// Iteration count
     iteration_count: usize,
 }
 
 impl GrowthState {
-    /// Creates a new growth state with the specified pattern
+    /// Create a new growth state
     pub fn new(pattern: GrowthPattern) -> Self {
-        let initial_state = match pattern {
-            GrowthPattern::Local => {
-                FractalState::Julia(JuliaState::new(
-                    constants::JULIA_GROWTH_REAL,
-                    constants::JULIA_GROWTH_IMAG
-                ))
-            },
-            GrowthPattern::Global => {
-                FractalState::Mandelbrot(MandelbrotState::new(0.0, 0.0))
-            },
-            GrowthPattern::Hybrid | GrowthPattern::Quantum => {
-                FractalState::Julia(JuliaState::new(
-                    constants::QUANTUM_GOLDEN_RATIO - 1.0,
-                    constants::QUANTUM_STABILITY_THRESHOLD
-                ))
-            },
-        };
-
         Self {
             pattern,
-            fractal_state: initial_state,
-            coherence_level: constants::MAX_PHASE_COHERENCE,
-            stability_factor: constants::QUANTUM_STABILITY_THRESHOLD,
+            coherence_level: 1.0,
+            stability_factor: 1.0,
             iteration_count: 0,
         }
     }
 
-    /// Gets the current growth pattern
+    /// Get current growth pattern
     pub fn pattern(&self) -> GrowthPattern {
         self.pattern
     }
 
-    /// Gets the current coherence level
+    /// Set growth pattern
+    pub fn set_pattern(&mut self, pattern: GrowthPattern) {
+        self.pattern = pattern;
+    }
+
+    /// Get coherence level
     pub fn coherence_level(&self) -> f64 {
         self.coherence_level
     }
 
-    /// Gets the current stability factor
+    /// Set coherence level
+    pub fn set_coherence_level(&mut self, level: f64) -> Result<(), MathError> {
+        if level < 0.0 || level > 1.0 {
+            return Err(MathError::InvalidValue);
+        }
+        self.coherence_level = level;
+        Ok(())
+    }
+
+    /// Get stability factor
     pub fn stability_factor(&self) -> f64 {
         self.stability_factor
     }
 
-    /// Gets the current iteration count
+    /// Set stability factor
+    pub fn set_stability_factor(&mut self, factor: f64) -> Result<(), MathError> {
+        if factor < 0.0 {
+            return Err(MathError::InvalidValue);
+        }
+        self.stability_factor = factor;
+        Ok(())
+    }
+
+    /// Get iteration count
     pub fn iteration_count(&self) -> usize {
         self.iteration_count
     }
 
-    /// Updates the growth state based on resonance measurements
-    pub fn update_resonance_state(&mut self, resonance_math: &ResonanceMath) -> MathResult<()> {
-        self.coherence_level = resonance_math.get_state().harmony;
-        self.stability_factor = resonance_math.get_state().resonance;
+    /// Increment iteration count
+    pub fn increment_iterations(&mut self) -> Result<(), QuantumError> {
+        if self.iteration_count >= MAX_FRACTAL_DEPTH {
+            return Err(QuantumError::IterationLimit);
+        }
         self.iteration_count += 1;
         Ok(())
     }
-}
 
-impl Scribe for GrowthState {
-    fn write(&self, f: &mut scribe::Formatter) -> scribe::Result {
-        f.write_str("Growth State:\n")?;
-        f.write_str("Pattern: ")?;
-        self.pattern.write(f)?;
-        f.write_str("\nCoherence Level: ")?;
-        write_str!(f, "{}", self.coherence_level)?;
-        f.write_str("\nStability Factor: ")?;
-        write_str!(f, "{}", self.stability_factor)?;
-        f.write_str("\nIterations: ")?;
-        write_str!(f, "{}", self.iteration_count)
+    /// Check if growth is stable
+    pub fn is_stable(&self) -> bool {
+        self.coherence_level >= QUANTUM_STABILITY_THRESHOLD &&
+        self.stability_factor >= CRYSTAL_RESONANCE_THRESHOLD
     }
 }
 
-/// Manages crystal growth operations using fractal patterns
-pub struct CrystalGrowth {
-    state: GrowthState,
-    params: FractalParams,
-    resonance_math: ResonanceMath,
+impl Display for GrowthState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Growth State:")?;
+        writeln!(f, "Pattern: {}", self.pattern)?;
+        writeln!(f, "Coherence: {}", self.coherence_level)?;
+        writeln!(f, "Stability: {}", self.stability_factor)?;
+        write!(f, "Iterations: {}", self.iteration_count)
+    }
 }
-
-// Rest of the implementation remains unchanged...
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scribe::write_str;
 
     #[test]
-    fn test_growth_state_creation() {
+    fn test_growth_pattern() {
+        let pattern = GrowthPattern::Local;
+        assert_eq!(pattern, GrowthPattern::Local);
+        assert_ne!(pattern, GrowthPattern::Global);
+    }
+
+    #[test]
+    fn test_growth_state() {
         let state = GrowthState::new(GrowthPattern::Local);
         assert_eq!(state.pattern(), GrowthPattern::Local);
-        assert_eq!(state.coherence_level(), constants::MAX_PHASE_COHERENCE);
-        assert_eq!(state.stability_factor(), constants::QUANTUM_STABILITY_THRESHOLD);
+        assert_eq!(state.coherence_level(), 1.0);
+        assert_eq!(state.stability_factor(), 1.0);
         assert_eq!(state.iteration_count(), 0);
     }
 
     #[test]
-    fn test_crystal_growth_creation() {
-        let growth = CrystalGrowth::new(GrowthPattern::Local);
-        assert_eq!(growth.state.pattern(), GrowthPattern::Local);
+    fn test_coherence_limits() {
+        let mut state = GrowthState::new(GrowthPattern::Local);
+        assert!(state.set_coherence_level(0.5).is_ok());
+        assert!(state.set_coherence_level(-0.1).is_err());
+        assert!(state.set_coherence_level(1.1).is_err());
     }
 
     #[test]
-    fn test_growth_pattern_scribe() {
-        let mut output = String::new();
-        let mut formatter = scribe::Formatter::new(&mut output);
-
-        GrowthPattern::Local.write(&mut formatter).unwrap();
-        assert_eq!(output, "Local");
-
-        output.clear();
-        GrowthPattern::Global.write(&mut formatter).unwrap();
-        assert_eq!(output, "Global");
-
-        output.clear();
-        GrowthPattern::Hybrid.write(&mut formatter).unwrap();
-        assert_eq!(output, "Hybrid");
-
-        output.clear();
-        GrowthPattern::Quantum.write(&mut formatter).unwrap();
-        assert_eq!(output, "Quantum");
-    }
-
-    #[test]
-    fn test_resonance_state_update() {
-        let mut state = GrowthState::new(GrowthPattern::Quantum);
-        let resonance_math = ResonanceMath::new();
-        assert!(state.update_resonance_state(&resonance_math).is_ok());
-        assert_eq!(state.iteration_count(), 1);
+    fn test_iteration_limit() {
+        let mut state = GrowthState::new(GrowthPattern::Fractal);
+        for _ in 0..MAX_FRACTAL_DEPTH {
+            assert!(state.increment_iterations().is_ok());
+        }
+        assert!(state.increment_iterations().is_err());
     }
 }

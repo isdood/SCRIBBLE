@@ -4,18 +4,18 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 16:43:47 UTC
+//! Last Updated: 2025-01-20 20:24:38 UTC
 //! Version: 0.1.1
 //! License: MIT
 
 use magicmath::{
-    core::Operation,
-    vector3d::Vector3D,
-    traits::MathResult,
+    MeshValue,
+    Vector3D,
 };
 
+use errors::MathError;
+
 use crate::{
-    errors::QuantumError,
     constants::{QUANTUM_STABILITY_THRESHOLD, ALIGNMENT_THRESHOLD},
     idk::ShardUninit,
 };
@@ -34,7 +34,7 @@ pub enum AlignmentState {
 }
 
 /// Result type for alignment operations
-pub type AlignmentResult<T> = Result<T, QuantumError>;
+pub type AlignmentResult<T> = Result<T, MathError>;
 
 /// Core alignment type for crystal operations
 #[derive(Debug)]
