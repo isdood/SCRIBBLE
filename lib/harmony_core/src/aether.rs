@@ -4,22 +4,37 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 17:19:22 UTC
+//! Last Updated: 2025-01-20 17:59:37 UTC
 //! Version: 0.1.0
 //! License: MIT
 
+#![no_std]
+
+use core::fmt::{Display, Formatter, Result as FmtResult};
+
 use magicmath::{
-    ops::{Field, Mesh, PhaseField, AetherField},
-    traits::{MeshValue, CrystalAdd, CrystalSub, CrystalMul, CrystalDiv},
-    vector3d::Vector3D,
-    vector4d::Vector4D,
-    resonance::{Quantum, Phase, Resonance}
+    traits::MeshValue,
+    field::{
+        Field,
+        Mesh,
+        PhaseField,
+        AetherField,
+    },
+    resonance::{
+        Quantum,
+        Phase,
+        Resonance,
+    },
+    vector::{Vector3D, Vector4D},
+    math::sqrt,
 };
 
-use errors::MathError;
-use crate::{QuantumError, String};
-use core::fmt::{self, Write, Formatter, Result as FmtResult};
-use alloc::string::ToString;
+use errors::{
+    core::Error as MathError,
+    quantum::QuantumError,
+};
+
+use scribe::native_string::String;
 
 /// Aether field state handler
 #[derive(Debug)]
@@ -90,7 +105,7 @@ impl<T: Default + Clone + MeshValue> Aether<T> {
     /// Calculate aether potential
     pub fn potential(&self) -> Result<f64, MathError> {
         let field_energy = self.field.energy()?;
-        let density_factor = self.density.sqrt();
+        let density_factor = sqrt(self.density);
         Ok(field_energy * density_factor)
     }
 }
@@ -112,7 +127,7 @@ impl<T: MeshValue> Phase for Aether<T> {
     }
 }
 
-impl<T: MeshValue> fmt::Display for Aether<T> {
+impl<T: MeshValue> Display for Aether<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         writeln!(f, "Aether Field State:")?;
         writeln!(f, "Position: {}", self.position)?;
@@ -125,6 +140,7 @@ impl<T: MeshValue> fmt::Display for Aether<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use magicmath::traits::{CrystalAdd, CrystalSub, CrystalMul, CrystalDiv};
 
     #[derive(Debug, Clone, Default)]
     struct TestAether {
@@ -211,7 +227,7 @@ mod tests {
         }
     }
 
-    impl fmt::Display for TestAether {
+    impl Display for TestAether {
         fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
             write!(f, "{}", self.value)
         }

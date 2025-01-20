@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 17:56:36 UTC
+//! Last Updated: 2025-01-20 17:57:59 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -28,50 +28,41 @@ pub mod zeronaut;
 pub mod aether;
 
 // Re-export common types from magicmath
-pub use magicmath::traits::{
+pub use magicmath::{
+    // Core traits
     MeshValue,
     CrystalAdd,
     CrystalSub,
     CrystalMul,
     CrystalDiv,
-    Field,
-    Mesh,
-    PhaseField,
-    AetherField,
+    // Core types
+    resonance::{
+        Resonance,
+        Phase,
+        Quantum,
+    },
     Vector3D,
     Vector4D,
-};
-
-pub use magicmath::resonance::{
-    Resonance,
-    Phase,
-    Quantum,
 };
 
 // Re-exports from errors
 pub use errors::{
     MathError,
     QuantumError,
-    MathResult,
+    core::Result as MathResult,
 };
 
 // Re-exports from core
 pub use core::{
     fmt::{self, Write, Formatter, Result as FmtResult},
     result::Result,
-};
-
-// Re-exports from scribe
-pub use scribe::fmt::{
-    Write as ScribeWrite,
-    Result as ScribeResult,
-};
-
-// Expose our own types
-pub use crate::align::{
-    text::String,
-    data::Vec,
     mem::Box,
+};
+
+// Re-exports from align
+pub use self::align::{
+    string::{String, ToString},
+    collections::Vec,
 };
 
 // Constants module
@@ -91,10 +82,10 @@ pub mod constants {
 }
 
 /// Initialize fractal parameters for crystal growth
-pub fn create_growth_params() -> impl Phase {
+pub fn create_growth_params() -> Resonance {
     let mut params = Resonance::new();
-    params.set_max_iterations(constants::MAX_FRACTAL_DEPTH);
-    params.set_threshold(constants::CRYSTAL_RESONANCE_THRESHOLD);
+    params.set_value(constants::CRYSTAL_RESONANCE_THRESHOLD);
+    params.set_phase(0.0);
     params
 }
 
@@ -116,8 +107,8 @@ mod tests {
     #[test]
     fn test_growth_params() {
         let params = create_growth_params();
-        assert_eq!(params.max_iterations(), constants::MAX_FRACTAL_DEPTH);
-        assert_eq!(params.threshold(), constants::CRYSTAL_RESONANCE_THRESHOLD);
+        assert_eq!(params.value(), constants::CRYSTAL_RESONANCE_THRESHOLD);
+        assert_eq!(params.phase(), 0.0);
     }
 
     #[test]

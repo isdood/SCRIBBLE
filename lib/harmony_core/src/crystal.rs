@@ -4,15 +4,22 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-19 13:35:00 UTC
+//! Last Updated: 2025-01-20 17:59:18 UTC
 //! Version: 0.1.1
 //! License: MIT
 
-use magicmath::{floor, sqrt};
-use magicmath::resonance::{ResonanceMath, ResonanceState};
+use magicmath::{
+    MeshValue,
+    Vector3D,
+    resonance::Resonance,
+};
+
+use errors::{
+    MathError,
+    QuantumError,
+};
+
 use crate::{
-    vector::Vector3D,
-    errors::{QuantumError, CoherenceError},
     constants::{
         MAX_QUANTUM_SIZE,
         QUANTUM_STABILITY_THRESHOLD,
@@ -49,9 +56,9 @@ impl CrystalNode {
     }
 
     /// Set node's phase coherence
-    pub fn set_phase_coherence(&mut self, value: f64) -> Result<(), CoherenceError> {
+    pub fn set_phase_coherence(&mut self, value: f64) -> Result<(), MathError> {
         if value < 0.0 || value > 1.0 {
-            return Err(CoherenceError::InvalidValue);
+            return Err(MathError::InvalidValue);
         }
         self.coherence = value;
         Ok(())
@@ -95,9 +102,9 @@ impl CrystalLattice {
 
     /// Get node at position
     pub fn get_node(&self, pos: &Vector3D) -> Result<&CrystalNode, QuantumError> {
-        let x = floor(pos.x) as usize;
-        let y = floor(pos.y) as usize;
-        let z = floor(pos.z) as usize;
+        let x = pos.x.floor() as usize;
+        let y = pos.y.floor() as usize;
+        let z = pos.z.floor() as usize;
 
         if x >= self.size || y >= self.size || z >= self.size {
             return Err(QuantumError::BoundaryViolation);
@@ -111,9 +118,9 @@ impl CrystalLattice {
 
     /// Set node at position
     pub fn set_node(&mut self, pos: &Vector3D, node: CrystalNode) -> Result<(), QuantumError> {
-        let x = floor(pos.x) as usize;
-        let y = floor(pos.y) as usize;
-        let z = floor(pos.z) as usize;
+        let x = pos.x.floor() as usize;
+        let y = pos.y.floor() as usize;
+        let z = pos.z.floor() as usize;
 
         if x >= self.size || y >= self.size || z >= self.size {
             return Err(QuantumError::BoundaryViolation);
@@ -134,7 +141,7 @@ impl CrystalLattice {
             return Err(QuantumError::ResonanceFailure);
         }
 
-        Ok(sqrt(coherence * QUANTUM_STABILITY_THRESHOLD))
+        Ok((coherence * QUANTUM_STABILITY_THRESHOLD).sqrt())
     }
 
     /// Get lattice size
@@ -151,7 +158,6 @@ impl CrystalLattice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use magicmath::resonance::{ResonanceMath, ResonanceState};
 
     #[test]
     fn test_crystal_node_creation() {
