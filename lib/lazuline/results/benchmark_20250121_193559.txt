@@ -1,0 +1,84 @@
+    Finished `bench` profile [optimized] target(s) in 0.06s
+     Running unittests src/lib.rs (/home/guavabot1/scribble/scribble/target/release/deps/lazuline-bf285bc40ea4aa6a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running benches/lib.rs (/home/guavabot1/scribble/scribble/target/release/deps/lib-c478448fe8304792)
+Gnuplot not found, using plotters backend
+Benchmarking initialization
+Benchmarking initialization: Warming up for 3.0000 s
+Benchmarking initialization: Collecting 10 samples in estimated 5.0000 s (1.3B iterations)
+Benchmarking initialization: Analyzing
+initialization          time:   [3.4549 ns 3.5107 ns 3.5513 ns]
+                        change: [-6.2876% -2.1674% +1.9794%] (p = 0.36 > 0.05)
+                        No change in performance detected.
+
+Benchmarking channel_compute/10
+Benchmarking channel_compute/10: Warming up for 3.0000 s
+Benchmarking channel_compute/10: Collecting 10 samples in estimated 5.0000 s (126M iterations)
+Benchmarking channel_compute/10: Analyzing
+channel_compute/10      time:   [39.436 ns 54.920 ns 61.493 ns]
+                        change: [-0.4651% +13.985% +28.518%] (p = 0.15 > 0.05)
+                        No change in performance detected.
+Benchmarking channel_compute/100
+Benchmarking channel_compute/100: Warming up for 3.0000 s
+Benchmarking channel_compute/100: Collecting 10 samples in estimated 5.0000 s (84M iterations)
+Benchmarking channel_compute/100: Analyzing
+channel_compute/100     time:   [69.750 ns 80.085 ns 85.706 ns]
+                        change: [+11.283% +25.488% +39.733%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Benchmarking channel_compute/1000
+Benchmarking channel_compute/1000: Warming up for 3.0000 s
+Benchmarking channel_compute/1000: Collecting 10 samples in estimated 5.0000 s (9.5M iterations)
+Benchmarking channel_compute/1000: Analyzing
+channel_compute/1000    time:   [516.66 ns 518.41 ns 520.20 ns]
+                        change: [+7.2488% +14.332% +21.486%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking channel_compute/10000
+Benchmarking channel_compute/10000: Warming up for 3.0000 s
+Benchmarking channel_compute/10000: Collecting 10 samples in estimated 5.0005 s (385k iterations)
+Benchmarking channel_compute/10000: Analyzing
+channel_compute/10000   time:   [7.3135 µs 8.0108 µs 9.7334 µs]
+                        change: [+13.482% +38.840% +67.333%] (p = 0.01 < 0.05)
+                        Performance has regressed.
+Benchmarking channel_compute/100000
+Benchmarking channel_compute/100000: Warming up for 3.0000 s
+Benchmarking channel_compute/100000: Collecting 10 samples in estimated 5.0007 s (38k iterations)
+Benchmarking channel_compute/100000: Analyzing
+channel_compute/100000  time:   [115.64 µs 123.03 µs 130.82 µs]
+                        change: [-29.617% -20.033% -7.4615%] (p = 0.01 < 0.05)
+                        Performance has improved.
+
+Benchmarking multiple_operations/sequential/2
+Benchmarking multiple_operations/sequential/2: Warming up for 3.0000 s
+Benchmarking multiple_operations/sequential/2: Collecting 10 samples in estimated 5.0000 s (5.0M iterations)
+Benchmarking multiple_operations/sequential/2: Analyzing
+multiple_operations/sequential/2
+                        time:   [841.67 ns 866.53 ns 917.91 ns]
+                        change: [-21.631% -17.138% -12.475%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Benchmarking multiple_operations/sequential/5
+Benchmarking multiple_operations/sequential/5: Warming up for 3.0000 s
+Benchmarking multiple_operations/sequential/5: Collecting 10 samples in estimated 5.0001 s (2.3M iterations)
+Benchmarking multiple_operations/sequential/5: Analyzing
+multiple_operations/sequential/5
+                        time:   [2.1569 µs 2.2140 µs 2.2981 µs]
+                        change: [-10.873% -6.4209% -1.4698%] (p = 0.03 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking multiple_operations/sequential/10
+Benchmarking multiple_operations/sequential/10: Warming up for 3.0000 s
+Benchmarking multiple_operations/sequential/10: Collecting 10 samples in estimated 5.0001 s (1.2M iterations)
+Benchmarking multiple_operations/sequential/10: Analyzing
+multiple_operations/sequential/10
+                        time:   [4.0738 µs 4.1788 µs 4.2994 µs]
+                        change: [-9.0739% -5.5376% -2.0029%] (p = 0.01 < 0.05)
+                        Performance has improved.
+
+e detected.
+

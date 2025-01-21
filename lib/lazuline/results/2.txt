@@ -1,0 +1,50 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+initialization          time:   [3.2971 ns 3.3217 ns 3.3373 ns]
+                        change: [-4.7012% -2.8398% -1.0284%] (p = 0.01 < 0.05)
+                        Performance has improved.
+
+channel_compute/10      time:   [37.639 ns 38.001 ns 38.640 ns]
+                        change: [-1.1447% +0.1799% +1.4429%] (p = 0.80 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+channel_compute/100     time:   [54.055 ns 54.356 ns 54.559 ns]
+                        change: [-0.4743% +0.4853% +1.3132%] (p = 0.33 > 0.05)
+                        No change in performance detected.
+channel_compute/1000    time:   [381.53 ns 384.04 ns 385.94 ns]
+                        change: [-1.5647% -0.4358% +0.5555%] (p = 0.49 > 0.05)
+                        No change in performance detected.
+channel_compute/10000   time:   [5.3601 µs 5.6237 µs 5.8037 µs]
+                        change: [-3.2377% -0.0403% +3.5628%] (p = 0.99 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high mild
+channel_compute/100000  time:   [101.08 µs 102.90 µs 105.08 µs]
+                        change: [+35.867% +43.978% +52.082%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high mild
+
+multiple_operations/sequential/2
+                        time:   [858.51 ns 865.01 ns 871.69 ns]
+                        change: [+5.4401% +7.9731% +10.400%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+multiple_operations/sequential/5
+                        time:   [2.2129 µs 2.2241 µs 2.2488 µs]
+                        change: [+7.2578% +10.971% +14.519%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+multiple_operations/sequential/10
+                        time:   [4.1667 µs 4.1962 µs 4.2413 µs]
+                        change: [+2.2957% +6.1933% +9.9215%] (p = 0.01 < 0.05)
+                        Performance has regressed.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high severe
+

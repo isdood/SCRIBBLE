@@ -1,0 +1,8 @@
+#!/bin/bash
+# prettybench.sh
+# Created: 2025-01-21 19:48:37
+# Author: isdood
+
+# [Previous color definitions and functions remain the same until the display sections]
+
+# Box drawing section with exact character counts
