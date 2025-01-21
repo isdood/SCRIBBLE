@@ -214,7 +214,7 @@ mod tests {
         let pos = Vector3D::new(1.0, 0.0, 0.0);
 
         assert!(handler.apply_field(&pos).is_ok());
-        assert_eq!(handler.resonance().position(), &pos);
+        assert_eq!(handler.resonance().position(), pos);
     }
 
     #[test]

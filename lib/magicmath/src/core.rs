@@ -14,7 +14,6 @@ use crate::constants::{
 };
 use crate::traits::MeshValue;
 use errors::{MathError, MathResult};
-use scribe::native_string::String;
 
 /// Core harmony state tracking for all mathematical operations
 #[derive(Debug, PartialEq, Clone, Copy)]

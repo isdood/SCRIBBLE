@@ -10,6 +10,9 @@ use thiserror::Error;
 
 pub mod strategies;
 pub mod macros;
+pub mod validation;
+pub mod analysis;
+pub mod reporting;
 
 #[derive(Debug, Error)]
 pub enum RecoveryError {

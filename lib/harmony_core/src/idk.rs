@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-18
-//! Last Updated: 2025-01-20 20:44:16 UTC
+//! Last Updated: 2025-01-20 23:57:11 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -18,7 +18,10 @@ use core::{
 use magicmath::{
     MeshValue,
     Vector3D,
-    resonance::Resonance,
+    CrystalAdd,
+    CrystalSub,
+    CrystalMul,
+    CrystalDiv,
 };
 
 use errors::MathError;
@@ -145,6 +148,56 @@ mod tests {
     impl Display for TestValue {
         fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
             write!(f, "{}", self.0)
+        }
+    }
+
+    impl CrystalAdd for TestValue {
+        fn add(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(TestValue(self.0 + other.0))
+        }
+
+        fn add_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.0 += other.0;
+            Ok(())
+        }
+    }
+
+    impl CrystalSub for TestValue {
+        fn sub(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(TestValue(self.0 - other.0))
+        }
+
+        fn sub_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.0 -= other.0;
+            Ok(())
+        }
+    }
+
+    impl CrystalMul for TestValue {
+        fn mul(&self, other: &Self) -> Result<Self, MathError> {
+            Ok(TestValue(self.0 * other.0))
+        }
+
+        fn mul_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            self.0 *= other.0;
+            Ok(())
+        }
+    }
+
+    impl CrystalDiv for TestValue {
+        fn div(&self, other: &Self) -> Result<Self, MathError> {
+            if other.0 == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            Ok(TestValue(self.0 / other.0))
+        }
+
+        fn div_assign(&mut self, other: &Self) -> Result<(), MathError> {
+            if other.0 == 0.0 {
+                return Err(MathError::DivisionByZero);
+            }
+            self.0 /= other.0;
+            Ok(())
         }
     }
 

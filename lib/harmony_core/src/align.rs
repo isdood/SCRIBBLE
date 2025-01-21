@@ -25,7 +25,7 @@ use magicmath::constants::{
 };
 
 /// Alignment state for quantum nodes
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Alignment {
     /// Position in 3D space
     position: Vector3D,

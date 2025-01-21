@@ -9,6 +9,7 @@
 //! License: MIT
 
 // System Constants
+pub const MAX_QUANTUM_SIZE: usize = 1_000_000;  // Add this constant
 pub const MAX_LATTICE_SIZE: usize = 1_000_000;
 pub const MIN_LATTICE_SIZE: usize = 1;
 pub const MAX_ITERATIONS: usize = 10_000;

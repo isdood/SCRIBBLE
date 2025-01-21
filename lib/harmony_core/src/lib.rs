@@ -41,7 +41,7 @@ use magicmath::{
 };
 
 /// Core crystal node for quantum operations
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CrystalNode {
     /// Position in crystal lattice
     position: Vector3D,
