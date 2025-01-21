@@ -1,6 +1,6 @@
 //! Facet Build Configuration
 //! Author: isdood
-//! Created: 2025-01-21 14:03:01 UTC
+//! Created: 2025-01-21 15:12:25 UTC
 
 const std = @import("std");
 
@@ -10,13 +10,19 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Main library
-    const lib = b.addStaticLibrary(.{
+    const exe = b.addStaticLibrary(.{
         .name = "facet",
         .target = target,
         .optimize = optimize,
     });
-    lib.addSourceFile("src/main.zig");
-    b.installArtifact(lib);
+
+    // Add source file
+    const main_path = b.pathFromRoot("src/main.zig");
+    exe.addCSourceFile(.{
+        .file = .{ .cwd_relative = main_path },
+        .flags = &.{},
+    });
+    b.installArtifact(exe);
 
     // Tests
     const test_step = b.step("test", "Run all tests");
@@ -32,10 +38,10 @@ pub fn build(b: *std.Build) void {
 
     for (test_files) |test_file| {
         const test_case = b.addTest(.{
-            .target = target,
-            .optimize = optimize,
+            .root_source_file = .{ .cwd_relative = b.pathFromRoot(test_file) },
+                                    .target = target,
+                                    .optimize = optimize,
         });
-        test_case.addSourceFile(test_file);
         test_step.dependOn(&test_case.step);
     }
 
