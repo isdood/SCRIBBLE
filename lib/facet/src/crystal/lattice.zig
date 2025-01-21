@@ -1,9 +1,9 @@
 //! Facet Crystal Lattice Manager
 //! Author: @isdood
-//! Created: 2025-01-21 15:52:43 UTC
+//! Created: 2025-01-21 16:03:20 UTC
 
 const std = @import("std");
-const resonance_mod = @import("resonance.zig");  // Renamed to avoid shadowing
+const resonance_mod = @import("resonance.zig");
 const types = @import("../core/types.zig");
 
 const Result = types.Result;
@@ -76,16 +76,14 @@ pub const CrystalLattice = struct {
 
         lattice.* = .{
             .config = config orelse LatticeConfig{},
-            .pattern = .Hexagonal, // Default to hexagonal system
+            .pattern = .Hexagonal,
             .facets = std.ArrayList(Facet).init(std.heap.page_allocator),
             .clarity = 0.0,
             .symmetry = 0.0,
             .resonance_factor = 1.0,
         };
 
-        // Initialize crystal structure
         try lattice.initializeLattice();
-
         return lattice;
     }
 
@@ -101,7 +99,7 @@ pub const CrystalLattice = struct {
         self.facets.clearAndFree();
 
         // Calculate base angle for facet distribution
-        const base_angle = std.math.pi * 2.0 / @as(f64, @floatFromInt(self.config.facets));
+        const base_angle = std.math.tau / @as(f64, @floatFromInt(self.config.facets));
 
         // Create facets
         var i: u8 = 0;
@@ -129,7 +127,7 @@ pub const CrystalLattice = struct {
     }
 
     /// Attune crystal lattice
-    pub fn attune(self: *Self, resonance_value: f64) !void {  // Renamed parameter to avoid shadowing
+    pub fn attune(self: *Self, resonance_value: f64) !void {
         // Apply resonance to each facet
         for (self.facets.items) |*facet| {
             facet.alignment = @min(1.0, facet.alignment * resonance_value);
@@ -199,36 +197,36 @@ pub const CrystalLattice = struct {
 };
 
 test "lattice_basic" {
-    var crystal = try CrystalLattice.init(null);
-    defer crystal.deinit();
+    var test_lattice = try CrystalLattice.init(null);
+    defer test_lattice.deinit();
 
-    try std.testing.expect(crystal.facets.items.len > 0);
-    try std.testing.expect(crystal.clarity > 0.0);
+    try std.testing.expect(test_lattice.facets.items.len > 0);
+    try std.testing.expect(test_lattice.clarity > 0.0);
 }
 
 test "lattice_attunement" {
-    var crystal = try CrystalLattice.init(.{
+    var test_lattice = try CrystalLattice.init(.{
         .clarity = 0.95,
         .facets = 8,
     });
-    defer crystal.deinit();
+    defer test_lattice.deinit();
 
-    try crystal.attune(1.1);
-    const metrics = crystal.getMetrics();
+    try test_lattice.attune(1.1);
+    const metrics = test_lattice.getMetrics();
 
     try std.testing.expect(metrics.clarity >= 0.95);
     try std.testing.expect(metrics.symmetry > 0.0);
 }
 
 test "lattice_dispersion" {
-    var crystal = try CrystalLattice.init(.{
+    var test_lattice = try CrystalLattice.init(.{
         .clarity = 1.0,
         .enable_dispersion = true,
     });
-    defer crystal.deinit();
+    defer test_lattice.deinit();
 
-    const initial_clarity = crystal.clarity;
-    try crystal.applyDispersion();
+    const initial_clarity = test_lattice.clarity;
+    try test_lattice.applyDispersion();
 
-    try std.testing.expect(crystal.clarity != initial_clarity);
+    try std.testing.expect(test_lattice.clarity != initial_clarity);
 }
