@@ -1,145 +1,228 @@
-//! Facet - Crystal-Based Calculator
+//! Facet Core Calculator
 //! Author: @isdood
-//! Created: 2025-01-21 15:55:16 UTC
+//! Created: 2025-01-21 16:11:06 UTC
 
 const std = @import("std");
-const core = @import("core/calculator.zig");
-const resonance = @import("resonance/attunement.zig");
-const crystal = @import("crystal/lattice.zig");
-const ui = @import("ui/cli.zig");
+const types = @import("types.zig");
+const resonance_mod = @import("../resonance/attunement.zig");
+const crystal_mod = @import("../crystal/lattice.zig");
 
-const Calculator = core.Calculator;
-const Attunement = resonance.Attunement;  // Updated from ResonanceState
-const CrystalLattice = crystal.CrystalLattice;
-const CLI = ui.CLI;
+const Result = types.Result;
+const CalcError = types.CalcError;
+const Attunement = resonance_mod.Attunement;
+const CrystalLattice = crystal_mod.CrystalLattice;
 
-/// Default configuration values
-const Config = struct {
-    /// Minimum resonance threshold
-    resonance_threshold: f64 = 0.87,
-    /// Crystal attunement strength
-    attunement_strength: f64 = 0.93,
-    /// Crystal clarity requirement
-    crystal_clarity: f64 = 0.95,
+/// Calculator configuration
+pub const CalcConfig = struct {
+    /// Enable resonance checking
+    check_resonance: bool = true,
+    /// Maintain resonance during calculations
+    maintain_resonance: bool = true,
+    /// Minimum required clarity
+    min_clarity: f64 = 0.8,
+    /// Enable error correction
+    error_correction: bool = true,
 };
 
-/// Error set for main operations
-const MainError = error{
-    ResonanceLoss,
-    AttunementFailure,
-    CrystalMisalignment,
-    InvalidInput,
-    InitializationFailed,
-    WhimsyDepletion,
-};
+/// Core calculator implementation
+pub const Calculator = struct {
+    resonance_state: *Attunement,
+    crystal_lattice: *CrystalLattice,
+    config: CalcConfig,
 
-/// Global state type definition
-const GlobalState = struct {
-    calculator: ?Calculator = null,
-    resonance_state: ?Attunement = null,  // Updated from ResonanceState
-    crystal_lattice: ?CrystalLattice = null,
-    cli: ?CLI = null,
+    const Self = @This();
 
-    /// Initialize all components
-    pub fn init(self: *GlobalState) MainError!void {
-        if (self.calculator != null) return;
+    /// Initialize new calculator
+    pub fn init(options: struct {
+        resonance_state: *Attunement,
+        crystal_lattice: *CrystalLattice,
+        config: ?CalcConfig = null,
+    }) !*Self {
+        const calculator = try std.heap.page_allocator.create(Self);
 
-        // Initialize crystal lattice
-        self.crystal_lattice = try CrystalLattice.init(.{
-            .clarity = Config.crystal_clarity,
-            .facets = 3,
-            .sparkle_factor = 0.7,
-        });
+        calculator.* = .{
+            .resonance_state = options.resonance_state,
+            .crystal_lattice = options.crystal_lattice,
+            .config = options.config orelse CalcConfig{},
+        };
 
-        // Initialize resonance state with crystal lattice
-        self.resonance_state = try Attunement.init(self.crystal_lattice.?, .{
-            .min_resonance = Config.resonance_threshold,
-            .attunement_factor = Config.attunement_strength,
-            .adaptive_resonance = true,
-        });
-
-        // Initialize calculator with resonance state and crystal lattice
-        self.calculator = try Calculator.init(.{
-            .resonance_state = self.resonance_state.?,
-            .crystal_lattice = self.crystal_lattice.?,
-        });
-
-        // Initialize CLI
-        self.cli = try CLI.init(.{
-            .calculator = self.calculator.?,
-        });
+        return calculator;
     }
 
-    /// Deinitialize all components
-    pub fn deinit(self: *GlobalState) void {
-        if (self.cli) |cli| cli.deinit();
-        if (self.calculator) |calc| calc.deinit();
-        if (self.resonance_state) |res| res.deinit();
-        if (self.crystal_lattice) |lattice| lattice.deinit();
+    /// Clean up calculator resources
+    pub fn deinit(self: *Self) void {
+        std.heap.page_allocator.destroy(self);
     }
+
+    /// Compute result from expression
+    pub fn compute(self: *Self, expression: []const u8, options: struct {
+        check_resonance: bool = true,
+        maintain_resonance: bool = true,
+    }) !Result {
+        // Parse and evaluate expression
+        var result = try self.evaluate(expression);
+
+        // Apply resonance checks if enabled
+        if (options.check_resonance and self.config.check_resonance) {
+            try self.resonance_state.optimize(&result);
+
+            if (result.resonance < 0.5) {
+                return CalcError.ResonanceLoss;
+            }
+        }
+
+        // Maintain resonance if enabled
+        if (options.maintain_resonance and self.config.maintain_resonance) {
+            try self.crystal_lattice.attune(result.resonance);
+        }
+
+        // Check clarity requirements
+        if (result.clarity < self.config.min_clarity) {
+            return CalcError.ClarityTooLow;
+        }
+
+        return result;
+    }
+
+    /// Evaluate mathematical expression
+    fn evaluate(self: *Self, expression: []const u8) !Result {
+        _ = self;  // Autofix: self is unused
+        var parser = ExpressionParser.init(expression);
+        const value = try parser.parse();
+        return Result.init(value);
+    }
+
+    /// Expression parser helper
+    const ExpressionParser = struct {
+        input: []const u8,
+        index: usize,
+
+        fn init(input: []const u8) ExpressionParser {
+            return .{
+                .input = input,
+                .index = 0,
+            };
+        }
+
+        fn parse(self: *ExpressionParser) CalcError!f64 {
+            var result = try self.parseTerm();
+
+            while (self.index < self.input.len) {
+                const op = self.input[self.index];
+                if (op != '+' and op != '-') break;
+                self.index += 1;
+
+                const term = try self.parseTerm();
+                result = if (op == '+') result + term else result - term;
+            }
+
+            return result;
+        }
+
+        fn parseTerm(self: *ExpressionParser) CalcError!f64 {
+            var result = try self.parseFactor();
+
+            while (self.index < self.input.len) {
+                const op = self.input[self.index];
+                if (op != '*' and op != '/') break;
+                self.index += 1;
+
+                const factor = try self.parseFactor();
+                if (op == '*') {
+                    result *= factor;
+                } else {
+                    if (factor == 0.0) return CalcError.DivisionByZero;
+                    result /= factor;
+                }
+            }
+
+            return result;
+        }
+
+        fn parseFactor(self: *ExpressionParser) CalcError!f64 {
+            // Skip whitespace
+            while (self.index < self.input.len and self.input[self.index] == ' ') {
+                self.index += 1;
+            }
+
+            if (self.index >= self.input.len) return CalcError.InvalidOperation;
+
+            // Parse parentheses
+            if (self.input[self.index] == '(') {
+                self.index += 1;
+                const result = try self.parse();
+                if (self.index >= self.input.len or self.input[self.index] != ')') {
+                    return CalcError.InvalidOperation;
+                }
+                self.index += 1;
+                return result;
+            }
+
+            // Parse number
+            const start = self.index;
+            while (self.index < self.input.len) {
+                const c = self.input[self.index];
+                if (!std.ascii.isDigit(c) and c != '.') break;
+                self.index += 1;
+            }
+
+            if (start == self.index) return CalcError.InvalidOperation;
+
+            const number = std.fmt.parseFloat(f64, self.input[start..self.index]) catch {
+                return CalcError.InvalidOperation;
+            };
+            return number;
+        }
+    };
 };
 
-/// Global state instance
-var global_state = GlobalState{};
-
-/// Main entry point
-pub fn main() !void {
-    // Initialize logger
-    try std.log.init(.{
-        .level = .info,
-        .prefix = "[Facet] ",
+test "calculator_basic" {
+    var test_crystal = try CrystalLattice.init(.{
+        .clarity = 0.95,
+        .facets = 3,
     });
-    defer std.log.deinit();
+    defer test_crystal.deinit();
 
-    const log = std.log.scoped(.main);
-    log.info("Initializing Facet Calculator...", .{});
+    var test_resonance = try Attunement.init(test_crystal, null);
+    defer test_resonance.deinit();
 
-    // Initialize global state
-    try global_state.init();
-    defer global_state.deinit();
-
-    // Process command line arguments
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
-
-    // Handle CLI operations
-    if (args.len > 1) {
-        // Expression provided as argument
-        const result = try global_state.calculator.?.compute(args[1], .{
-            .check_resonance = true,
-            .maintain_resonance = true,  // Updated from maintain_attunement
-        });
-
-        try global_state.cli.?.displayResult(result);
-    } else {
-        // Interactive mode
-        try global_state.cli.?.runInteractive();
-    }
-}
-
-test "basic_initialization" {
-    try global_state.init();
-    defer global_state.deinit();
-
-    try std.testing.expect(global_state.calculator != null);
-    try std.testing.expect(global_state.resonance_state != null);
-    try std.testing.expect(global_state.crystal_lattice != null);
-    try std.testing.expect(global_state.cli != null);
-}
-
-test "crystal_resonance" {
-    try global_state.init();
-    defer global_state.deinit();
-
-    const result = try global_state.calculator.?.compute("2 + 2", .{
-        .check_resonance = true,
+    var calculator = try Calculator.init(.{
+        .resonance_state = test_resonance,
+        .crystal_lattice = test_crystal,
     });
+    defer calculator.deinit();
 
+    const result = try calculator.compute("2 + 2", .{});
     try std.testing.expectEqual(result.value, 4.0);
-    try std.testing.expect(result.resonance >= Config.resonance_threshold);
-    try std.testing.expect(result.clarity >= Config.crystal_clarity);
+}
+
+test "calculator_complex" {
+    var test_crystal = try CrystalLattice.init(.{
+        .clarity = 1.0,
+        .facets = 4,
+    });
+    defer test_crystal.deinit();
+
+    var test_resonance = try Attunement.init(test_crystal, .{
+        .min_resonance = 0.9,
+        .target_resonance = 0.95,
+    });
+    defer test_resonance.deinit();
+
+    var calculator = try Calculator.init(.{
+        .resonance_state = test_resonance,
+        .crystal_lattice = test_crystal,
+        .config = .{
+            .min_clarity = 0.9,
+        },
+    });
+    defer calculator.deinit();
+
+    const result = try calculator.compute("(3 + 4) * 2", .{
+        .check_resonance = true,
+        .maintain_resonance = true,
+    });
+
+    try std.testing.expectEqual(result.value, 14.0);
+    try std.testing.expect(result.clarity >= calculator.config.min_clarity);
 }

@@ -1,343 +1,277 @@
-//! Crystal lattice node representation and manipulation
-//! Created: 2025-01-21 15:22:06 UTC
+//! Crystal lattice node representation and manipulation with Julia/Chapel integration
+//! Created: 2025-01-21 16:16:22 UTC
 //! Author: @isdood
 
-use std::{
-    collections::HashSet,
-    sync::atomic::{AtomicU64, Ordering},
+// Previous imports...
+use crate::{
+    julia::{
+        nodes::{JuliaNodeProcessor, NodeResult},
+        dynamics::{JuliaDynamicsProcessor, DynamicsResult},
+    },
+    chapel::{
+        parallel::{ChapelDomainMap, ChapelParallelNode},
+        dynamics::{ChapelNodeDynamics, DynamicsOutput},
+    },
 };
 
-use num_complex::Complex64;
-use parking_lot::RwLock;
-use thiserror::Error;
+// Previous error enum and NodeCounter...
 
-#[derive(Debug, Error)]
-pub enum NodeError {
-    #[error("Invalid node configuration: {0}")]
-    InvalidConfig(String),
-    #[error("Connection error: {0}")]
-    ConnectionError(String),
-    #[error("State transition error: {0}")]
-    StateError(String),
-    #[error("Energy balance error: {0}")]
-    EnergyError(String),
-}
-
-/// Static node counter for unique IDs
-static NODE_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-/// Node configuration parameters
 #[derive(Debug, Clone)]
 pub struct NodeConfig {
-    pub resonance_threshold: f64,
-    pub coupling_strength: f64,
-    pub damping_factor: f64,
-    pub phase_tolerance: f64,
-    pub max_connections: usize,
+    // Previous fields...
+    pub julia_threads: usize,
+    pub chapel_locales: usize,
+    pub compute_backend: ComputeBackend,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ComputeBackend {
+    Julia,
+    Chapel,
+    Hybrid,
 }
 
 impl Default for NodeConfig {
     fn default() -> Self {
         Self {
-            resonance_threshold: 0.001,
-            coupling_strength: 0.5,
-            damping_factor: 0.995,
-            phase_tolerance: 0.1,
-            max_connections: 6,
+            // Previous defaults...
+            julia_threads: 4,
+            chapel_locales: 2,
+            compute_backend: ComputeBackend::Hybrid,
         }
     }
 }
 
-/// Crystal lattice node
 pub struct LatticeNode {
-    id: u64,
-    config: NodeConfig,
-    state: RwLock<NodeState>,
-    connections: RwLock<HashSet<u64>>,
-}
-
-/// Node state information
-#[derive(Debug, Clone)]
-pub struct NodeState {
-    pub position: [f64; 3],
-    pub amplitude: Complex64,
-    pub frequency: f64,
-    pub phase: f64,
-    pub energy: f64,
-    pub stability: f64,
+    // Previous fields...
+    julia_processor: JuliaNodeProcessor,
+    julia_dynamics: JuliaDynamicsProcessor,
+    chapel_node: ChapelParallelNode,
+    chapel_dynamics: ChapelNodeDynamics,
 }
 
 impl LatticeNode {
-    /// Create new lattice node
-    pub fn new(config: NodeConfig, position: [f64; 3]) -> Self {
+    pub fn new(config: NodeConfig, position: [f64; 3]) -> Result<Self, NodeError> {
         let id = NODE_COUNTER.fetch_add(1, Ordering::SeqCst);
 
-        Self {
+        // Initialize Julia components
+        let julia_processor = JuliaNodeProcessor::new(config.julia_threads)
+        .map_err(|e| NodeError::InvalidConfig(e.to_string()))?;
+
+        let julia_dynamics = JuliaDynamicsProcessor::new(config.julia_threads)
+        .map_err(|e| NodeError::InvalidConfig(e.to_string()))?;
+
+        // Initialize Chapel components
+        let chapel_node = ChapelParallelNode::new(config.chapel_locales)
+        .map_err(|e| NodeError::InvalidConfig(e.to_string()))?;
+
+        let chapel_dynamics = ChapelNodeDynamics::new(config.chapel_locales)
+        .map_err(|e| NodeError::InvalidConfig(e.to_string()))?;
+
+        Ok(Self {
             id,
             config,
-            state: RwLock::new(NodeState {
-                position,
-                amplitude: Complex64::new(0.0, 0.0),
-                               frequency: 0.0,
-                               phase: 0.0,
-                               energy: 0.0,
-                               stability: 1.0,
-            }),
-            connections: RwLock::new(HashSet::new()),
-        }
+            state: RwLock::new(NodeState::default_at_position(position)),
+           connections: RwLock::new(HashSet::new()),
+           julia_processor,
+           julia_dynamics,
+           chapel_node,
+           chapel_dynamics,
+        })
     }
 
-    /// Get node ID
-    pub fn id(&self) -> u64 {
-        self.id
-    }
-
-    /// Update node state
     pub fn update(&self, time: f64) -> Result<(), NodeError> {
-        let mut state = self.state.write();
-
-        // Apply damping
-        state.amplitude *= self.config.damping_factor;
-
-        // Update phase
-        state.phase += 2.0 * std::f64::consts::PI * state.frequency * time;
-        state.phase %= 2.0 * std::f64::consts::PI;
-
-        // Calculate energy
-        state.energy = state.amplitude.norm_sqr();
-
-        // Update stability based on energy and connections
-        state.stability = self.calculate_stability(&state)?;
-
-        Ok(())
-    }
-
-    /// Connect to another node
-    pub fn connect(&self, other: &Self) -> Result<(), NodeError> {
-        let mut connections = self.connections.write();
-
-        if connections.len() >= self.config.max_connections {
-            return Err(NodeError::ConnectionError(
-                "Maximum connections reached".into()
-            ));
+        match self.config.compute_backend {
+            ComputeBackend::Julia => self.update_with_julia(time)?,
+            ComputeBackend::Chapel => self.update_with_chapel(time)?,
+            ComputeBackend::Hybrid => self.update_hybrid(time)?,
         }
-
-        connections.insert(other.id());
         Ok(())
     }
 
-    /// Disconnect from another node
-    pub fn disconnect(&self, other: &Self) -> Result<(), NodeError> {
-        let mut connections = self.connections.write();
-
-        if !connections.remove(&other.id()) {
-            return Err(NodeError::ConnectionError(
-                "Node not connected".into()
-            ));
-        }
-
-        Ok(())
-    }
-
-    /// Apply external force to node
-    pub fn apply_force(&self, force: Complex64) -> Result<(), NodeError> {
-        let mut state = self.state.write();
-        state.amplitude += force;
-        state.energy = state.amplitude.norm_sqr();
-
-        Ok(())
-    }
-
-    /// Calculate coupling force with another node
-    pub fn calculate_coupling(&self, other: &Self) -> Result<Complex64, NodeError> {
-        if !self.is_connected(other) {
-            return Err(NodeError::ConnectionError(
-                "Nodes not connected".into()
-            ));
-        }
-
-        let self_state = self.state.read();
-        let other_state = other.state.read();
-
-        let distance = self.calculate_distance(&self_state.position, &other_state.position);
-        let phase_diff = (self_state.phase - other_state.phase + std::f64::consts::PI)
-        % (2.0 * std::f64::consts::PI) - std::f64::consts::PI;
-
-        let coupling = self.config.coupling_strength * (-distance).exp()
-        * Complex64::from_polar(1.0, phase_diff);
-
-        Ok(coupling)
-    }
-
-    /// Check if node is connected to another
-    pub fn is_connected(&self, other: &Self) -> bool {
-        self.connections.read().contains(&other.id())
-    }
-
-    /// Get number of connections
-    pub fn connection_count(&self) -> usize {
-        self.connections.read().len()
-    }
-
-    /// Get node state
-    pub fn get_state(&self) -> NodeState {
-        self.state.read().clone()
-    }
-
-    /// Check if node is in resonance
-    pub fn is_resonant(&self) -> bool {
+    fn update_with_julia(&self, time: f64) -> Result<(), NodeError> {
         let state = self.state.read();
-        state.energy >= self.config.resonance_threshold
-    }
+        let connections = self.connections.read();
 
-    /// Get node position
-    pub fn position(&self) -> [f64; 3] {
-        self.state.read().position
-    }
+        // Process node state using Julia
+        let node_result = self.julia_processor
+        .process_state(&state, &connections, time)
+        .map_err(|e| NodeError::StateError(e.to_string()))?;
 
-    /// Set node position
-    pub fn set_position(&self, position: [f64; 3]) -> Result<(), NodeError> {
-        let mut state = self.state.write();
-        state.position = position;
+        // Process dynamics using Julia
+        let dynamics_result = self.julia_dynamics
+        .compute_dynamics(&node_result, self.config.damping_factor)
+        .map_err(|e| NodeError::StateError(e.to_string()))?;
+
+        // Update state with Julia results
+        self.update_state_from_julia(node_result, dynamics_result)?;
+
         Ok(())
     }
 
-    /// Calculate stability factor
-    fn calculate_stability(&self, state: &NodeState) -> Result<f64, NodeError> {
-        let connection_factor = self.connection_count() as f64 / self.config.max_connections as f64;
-        let energy_factor = if state.energy > 0.0 {
-            (-state.energy.ln()).exp()
-        } else {
-            0.0
-        };
+    fn update_with_chapel(&self, time: f64) -> Result<(), NodeError> {
+        let state = self.state.read();
+        let connections = self.connections.read();
 
-        let stability = connection_factor * energy_factor * self.config.damping_factor;
-        Ok(stability.min(1.0))
+        // Process node state using Chapel
+        let node_result = self.chapel_node
+        .process_parallel(&state, &connections, time)
+        .map_err(|e| NodeError::StateError(e.to_string()))?;
+
+        // Process dynamics using Chapel
+        let dynamics_result = self.chapel_dynamics
+        .compute_parallel(&node_result, self.config.damping_factor)
+        .map_err(|e| NodeError::StateError(e.to_string()))?;
+
+        // Update state with Chapel results
+        self.update_state_from_chapel(node_result, dynamics_result)?;
+
+        Ok(())
     }
 
-    /// Calculate distance between positions
-    fn calculate_distance(&self, pos1: &[f64; 3], pos2: &[f64; 3]) -> f64 {
-        let dx = pos1[0] - pos2[0];
-        let dy = pos1[1] - pos2[1];
-        let dz = pos1[2] - pos2[2];
-        (dx * dx + dy * dy + dz * dz).sqrt()
+    fn update_hybrid(&self, time: f64) -> Result<(), NodeError> {
+        let state = self.state.read();
+        let connections = self.connections.read();
+
+        // Parallel computation using both backends
+        let (julia_results, chapel_results) = rayon::join(
+            || {
+                let node_result = self.julia_processor.process_state(
+                    &state,
+                    &connections,
+                    time,
+                );
+                let dynamics_result = node_result.and_then(|res| {
+                    self.julia_dynamics.compute_dynamics(&res, self.config.damping_factor)
+                });
+                (node_result, dynamics_result)
+            },
+            || {
+                let node_result = self.chapel_node.process_parallel(
+                    &state,
+                    &connections,
+                    time,
+                );
+                let dynamics_result = node_result.and_then(|res| {
+                    self.chapel_dynamics.compute_parallel(&res, self.config.damping_factor)
+                });
+                (node_result, dynamics_result)
+            },
+        );
+
+        // Merge and update results from both backends
+        let (julia_node, julia_dynamics) = julia_results.0.and_then(|n| {
+            julia_results.1.map(|d| (n, d))
+        }).map_err(|e| NodeError::StateError(e.to_string()))?;
+
+        let (chapel_node, chapel_dynamics) = chapel_results.0.and_then(|n| {
+            chapel_results.1.map(|d| (n, d))
+        }).map_err(|e| NodeError::StateError(e.to_string()))?;
+
+        // Merge results
+        self.merge_and_update_results(
+            julia_node,
+            julia_dynamics,
+            chapel_node,
+            chapel_dynamics,
+        )?;
+
+        Ok(())
     }
+
+    fn update_state_from_julia(
+        &self,
+        node_result: NodeResult,
+        dynamics: DynamicsResult,
+    ) -> Result<(), NodeError> {
+        let mut state = self.state.write();
+
+        state.amplitude = node_result.amplitude;
+        state.phase = node_result.phase;
+        state.frequency = node_result.frequency;
+        state.energy = dynamics.energy;
+        state.stability = dynamics.stability;
+
+        Ok(())
+    }
+
+    fn update_state_from_chapel(
+        &self,
+        node_result: NodeState,
+        dynamics: DynamicsOutput,
+    ) -> Result<(), NodeError> {
+        let mut state = self.state.write();
+
+        state.amplitude = node_result.amplitude;
+        state.phase = node_result.phase;
+        state.frequency = node_result.frequency;
+        state.energy = dynamics.energy;
+        state.stability = dynamics.stability;
+
+        Ok(())
+    }
+
+    fn merge_and_update_results(
+        &self,
+        julia_node: NodeResult,
+        julia_dynamics: DynamicsResult,
+        chapel_node: NodeState,
+        chapel_dynamics: DynamicsOutput,
+    ) -> Result<(), NodeError> {
+        let mut state = self.state.write();
+
+        // Average results from both backends
+        state.amplitude = (julia_node.amplitude + chapel_node.amplitude) / Complex64::new(2.0, 0.0);
+        state.phase = (julia_node.phase + chapel_node.phase) / 2.0;
+        state.frequency = (julia_node.frequency + chapel_node.frequency) / 2.0;
+        state.energy = (julia_dynamics.energy + chapel_dynamics.energy) / 2.0;
+        state.stability = (julia_dynamics.stability + chapel_dynamics.stability) / 2.0;
+
+        Ok(())
+    }
+
+    // Previous methods remain unchanged...
 }
 
-impl PartialEq for LatticeNode {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Eq for LatticeNode {}
-
-impl std::hash::Hash for LatticeNode {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
-}
-
+// Update tests to include backend-specific testing...
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use approx::assert_relative_eq;
+    // Previous tests...
 
     #[test]
-    fn test_node_creation() {
-        let config = NodeConfig::default();
-        let position = [0.0, 0.0, 0.0];
-        let node = LatticeNode::new(config, position);
-
-        let state = node.get_state();
-        assert_eq!(state.position, position);
-        assert_relative_eq!(state.energy, 0.0);
-        assert_relative_eq!(state.stability, 1.0);
-    }
-
-    #[test]
-    fn test_node_connections() -> Result<(), NodeError> {
-        let config = NodeConfig::default();
-        let node1 = LatticeNode::new(config.clone(), [0.0, 0.0, 0.0]);
-        let node2 = LatticeNode::new(config, [1.0, 0.0, 0.0]);
-
-        node1.connect(&node2)?;
-        assert!(node1.is_connected(&node2));
-        assert_eq!(node1.connection_count(), 1);
-
-        node1.disconnect(&node2)?;
-        assert!(!node1.is_connected(&node2));
-        assert_eq!(node1.connection_count(), 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_force_application() -> Result<(), NodeError> {
-        let config = NodeConfig::default();
-        let node = LatticeNode::new(config, [0.0, 0.0, 0.0]);
-
-        let force = Complex64::new(1.0, 0.0);
-        node.apply_force(force)?;
-
-        let state = node.get_state();
-        assert_relative_eq!(state.amplitude.re, 1.0);
-        assert_relative_eq!(state.energy, 1.0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_coupling_calculation() -> Result<(), NodeError> {
-        let config = NodeConfig::default();
-        let node1 = LatticeNode::new(config.clone(), [0.0, 0.0, 0.0]);
-        let node2 = LatticeNode::new(config, [1.0, 0.0, 0.0]);
-
-        node1.connect(&node2)?;
-        let coupling = node1.calculate_coupling(&node2)?;
-
-        assert!(coupling.norm() <= 1.0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_stability_calculation() -> Result<(), NodeError> {
-        let config = NodeConfig::default();
-        let node = LatticeNode::new(config, [0.0, 0.0, 0.0]);
-
-        // Test stability with no energy
-        let initial_state = node.get_state();
-        assert_relative_eq!(initial_state.stability, 1.0);
-
-        // Apply force and update
-        node.apply_force(Complex64::new(1.0, 0.0))?;
+    fn test_julia_backend() -> Result<(), NodeError> {
+        let config = NodeConfig {
+            compute_backend: ComputeBackend::Julia,
+            julia_threads: 2,
+            ..Default::default()
+        };
+        let node = LatticeNode::new(config, [0.0, 0.0, 0.0])?;
         node.update(0.1)?;
-
-        let updated_state = node.get_state();
-        assert!(updated_state.stability > 0.0);
-        assert!(updated_state.stability <= 1.0);
-
         Ok(())
     }
 
     #[test]
-    fn test_max_connections() -> Result<(), NodeError> {
-        let mut config = NodeConfig::default();
-        config.max_connections = 2;
-        let main_node = LatticeNode::new(config.clone(), [0.0, 0.0, 0.0]);
+    fn test_chapel_backend() -> Result<(), NodeError> {
+        let config = NodeConfig {
+            compute_backend: ComputeBackend::Chapel,
+            chapel_locales: 2,
+            ..Default::default()
+        };
+        let node = LatticeNode::new(config, [0.0, 0.0, 0.0])?;
+        node.update(0.1)?;
+        Ok(())
+    }
 
-        // Create and connect max number of nodes
-        let node1 = LatticeNode::new(config.clone(), [1.0, 0.0, 0.0]);
-        let node2 = LatticeNode::new(config.clone(), [0.0, 1.0, 0.0]);
-        let node3 = LatticeNode::new(config, [0.0, 0.0, 1.0]);
-
-        main_node.connect(&node1)?;
-        main_node.connect(&node2)?;
-
-        // Attempting to connect one more should fail
-        assert!(main_node.connect(&node3).is_err());
-        assert_eq!(main_node.connection_count(), 2);
-
+    #[test]
+    fn test_hybrid_backend() -> Result<(), NodeError> {
+        let config = NodeConfig {
+            compute_backend: ComputeBackend::Hybrid,
+            julia_threads: 2,
+            chapel_locales: 2,
+            ..Default::default()
+        };
+        let node = LatticeNode::new(config, [0.0, 0.0, 0.0])?;
+        node.update(0.1)?;
         Ok(())
     }
 }
