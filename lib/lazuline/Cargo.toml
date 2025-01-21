@@ -1,0 +1,40 @@
+[package]
+name = "lazuline"
+version = "0.1.0"
+edition = "2021"
+authors = ["Caleb J.D. Terkovics <isdood>"]
+description = "Lazuline component for the Scribble project"
+repository = "https://github.com/isdood/scribble"
+license = "MIT"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+rayon = "1.7"
+crossbeam = "0.8"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "lib"
+harness = false
+
+[package.metadata]
+created = "2025-01-21"
+updated = "2025-01-21 18:50:15"
+current_user = "isdood"
+
+[lib]
+name = "lazuline"
+path = "src/lib.rs"
+
+[[test]]
+name = "lib"
+path = "tests/lib.rs"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "lib"
+harness = false

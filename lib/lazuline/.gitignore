@@ -1,0 +1,11 @@
+/target
+**/*.rs.bk
+Cargo.lock
+zig-cache/
+zig-out/
+*.o
+*.so
+*.dylib
+.julia/
+.DS_Store
+.env

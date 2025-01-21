@@ -12,7 +12,7 @@ mkdir -p src/{core,render,physics,systems,low_level,parallel}
 
 # Create core Rust module files
 echo -e "${GREEN}Creating Rust core modules...${NC}"
-for module in core render physics systems; do
+for module in core render physics systems parallel; do
     touch src/${module}/mod.rs
 done
 
@@ -21,6 +21,7 @@ core_files=(engine crystal reality quantum)
 render_files=(crystal_renderer shader pipeline cache)
 physics_files=(quantum_physics collision dynamics)
 systems_files=(world entity components)
+parallel_files=(distribution sync coherence) # Moved from Chapel to Rust
 
 for file in "${core_files[@]}"; do
     touch src/core/${file}.rs
@@ -38,18 +39,15 @@ for file in "${systems_files[@]}"; do
     touch src/systems/${file}.rs
 done
 
+for file in "${parallel_files[@]}"; do
+    touch src/parallel/${file}.rs
+done
+
 # Create Zig files
 echo -e "${GREEN}Creating Zig low-level components...${NC}"
 zig_files=(memory geometry cache vulkan)
 for file in "${zig_files[@]}"; do
     touch src/low_level/${file}.zig
-done
-
-# Create Chapel files
-echo -e "${GREEN}Creating Chapel parallel computing files...${NC}"
-chapel_files=(distribution sync coherence)
-for file in "${chapel_files[@]}"; do
-    touch src/parallel/${file}.chpl
 done
 
 # Create additional directories
@@ -58,13 +56,13 @@ mkdir -p include/ffi \
          examples/{basic_game,physics_demo,render_test} \
          tests/{core,render,physics,integration} \
          benches/{render,physics,memory} \
-         build/{rust,zig,julia,chapel} \
+         build/{rust,zig,julia} \
          docs/{api,guides,examples} \
          scripts
 
 # Create FFI headers
 touch include/prismancer.h
-touch include/ffi/{julia_bridge,zig_bridge,chapel_bridge}.h
+touch include/ffi/{julia_bridge,zig_bridge}.h
 
 # Create build and utility scripts
 echo -e "${GREEN}Creating utility scripts...${NC}"
@@ -87,7 +85,7 @@ A crystal-based high-performance game engine built on the Scribble framework.
   - `physics/` - Julia integration for physics
   - `systems/` - Game systems and ECS
   - `low_level/` - Zig-based performance critical code
-  - `parallel/` - Chapel-based distributed computing
+  - `parallel/` - Rust-based distributed computing
 - `include/` - Public headers and FFI interfaces
 - `examples/` - Example implementations
 - `tests/` - Test suites
@@ -116,6 +114,9 @@ authors = ["isdood"]
 
 [dependencies]
 # Core dependencies will go here
+rayon = "1.8" # For parallel processing
+crossbeam = "0.8" # For concurrent data structures
+parking_lot = "0.12" # For efficient synchronization primitives
 
 [build-dependencies]
 # Build dependencies will go here

@@ -1,0 +1,9 @@
+[criterion]
+significance_level = 0.05
+sample_size = 100
+warm_up_time = 3
+measurement_time = 5
+
+[plots]
+only_save_targets = true
+size = { width = 1200, height = 800 }

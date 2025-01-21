@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Lazuline Project Structure Setup Script
-# Created: 2025-01-21 17:58:39 UTC
+# Created: 2025-01-21 18:02:21 UTC
 # Author: isdood
 # Platform: Arch Linux
 # Description: Sets up the multi-language parallel processing framework
@@ -44,29 +44,9 @@ check_dependencies() {
     fi
 }
 
-# Create XDG compliant config directory
-setup_config() {
-    local config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/lazuline"
-    mkdir -p "$config_dir"
-
-    # Create default config
-    cat > "$config_dir/config.toml" << EOL
-# Lazuline Configuration
-[core]
-threads = "auto"
-memory_limit = "90%"
-
-[zig]
-optimization = "ReleaseSafe"
-
-[julia]
-threads = "auto"
-EOL
-}
-
-# Main setup function
+# Create project structure
 setup_lazuline() {
-    local project_dir="$HOME/dev/lazuline"
+    local project_dir="."
 
     echo -e "${BLUE}🔮 Creating Lazuline Project Structure...${NC}"
 
@@ -109,7 +89,7 @@ EOL
     cat > "$project_dir/src/lib.rs" << EOL
 //! Lazuline: A crystalline parallel processing framework
 //! Platform: Arch Linux
-//! Created: 2025-01-21 17:58:39 UTC
+//! Created: 2025-01-21 18:02:21 UTC
 //! Author: isdood
 
 #![forbid(unsafe_code)]
@@ -157,6 +137,20 @@ pub fn build(b: *std.Build) void {
 }
 EOL
 
+    # Create main Zig source
+    mkdir -p "$project_dir/zig/src"
+    cat > "$project_dir/zig/src/main.zig" << EOL
+const std = @import("std");
+
+pub const Resonator = struct {
+    // Zig-powered parallel processing core
+    pub fn init() Resonator {
+        // Initialize the resonator
+        return Resonator{};
+    }
+};
+EOL
+
     # Setup Julia with system integration
     mkdir -p "$project_dir/julia"/{src,test}
     cat > "$project_dir/julia/Project.toml" << EOL
@@ -174,22 +168,23 @@ CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 julia = "1.9"
 EOL
 
-    # Create systemd user service
-    mkdir -p "$HOME/.config/systemd/user"
-    cat > "$HOME/.config/systemd/user/lazuline.service" << EOL
-[Unit]
-Description=Lazuline Parallel Processing Service
-After=network.target
+    # Create main Julia source
+    mkdir -p "$project_dir/julia/src"
+    cat > "$project_dir/julia/src/Lazuline.jl" << EOL
+module Lazuline
 
-[Service]
-Type=notify
-ExecStart=%h/dev/lazuline/target/release/lazuline-service
-Environment=RUST_LOG=info
-WorkingDirectory=%h/dev/lazuline
-Restart=on-failure
+using LinearAlgebra
+using Distributed
+using CUDA
 
-[Install]
-WantedBy=default.target
+# Julia-powered quantum computing core
+struct QuantumState
+    # Quantum state implementation
+end
+
+export QuantumState
+
+end
 EOL
 
     # Create development environment script
@@ -209,10 +204,10 @@ alias lz-bench='cargo bench && julia --project=julia bench/runbench.jl'
 EOL
     chmod +x "$project_dir/dev.sh"
 
-    # Setup git repository
-    cd "$project_dir"
-    git init
-    cat > .gitignore << EOL
+    # Setup git repository (only if not already in a git repo)
+    if [ ! -d .git ]; then
+        git init
+        cat > .gitignore << EOL
 /target
 **/*.rs.bk
 Cargo.lock
@@ -225,19 +220,14 @@ zig-out/
 .DS_Store
 .env
 EOL
-
-    # Create first commit
-    git add .
-    git commit -m "Initial commit: Lazuline project structure (Arch Linux)"
+        git add .
+        git commit -m "Initial commit: Lazuline project structure (Arch Linux)"
+    fi
 
     echo -e "${GREEN}✨ Lazuline project structure created successfully!${NC}"
     echo -e "${CYAN}Next steps:${NC}"
-    echo "1. cd $project_dir"
-    echo "2. source dev.sh"
-    echo "3. lz-build"
-    echo -e "${BLUE}Configuration:${NC}"
-    echo "- Config directory: ${XDG_CONFIG_HOME:-$HOME/.config}/lazuline"
-    echo "- Systemd service: ~/.config/systemd/user/lazuline.service"
+    echo "1. source dev.sh"
+    echo "2. lz-build"
     echo -e "${YELLOW}Note: Run 'systemctl --user enable lazuline' to enable the service${NC}"
 }
 
@@ -245,7 +235,6 @@ EOL
 main() {
     echo -e "${BLUE}🔮 Lazuline Setup for Arch Linux${NC}"
     check_dependencies
-    setup_config
     setup_lazuline
 }
 

@@ -9,6 +9,7 @@ license = "MIT"
 
 [workspace]
 members = [
+    "lib/lazuline",
     "lib/unstable_matter",
     "lib/shard",
     "lib/wanda",
@@ -61,6 +62,7 @@ error_core = { path = "lib/error_core" }
 error_integration = { path = "lib/error_integration" }
 ziggy = { path = "lib/ziggy" }
 prism = { path = "lib/prism" }
+lazuline = { path = "lib/lazuline" }
 
 [lib]
 path = "src/lib.rs"
