@@ -1,4 +1,4 @@
-// types.rs - Core types for Prism runtime
+// src/rust/types.rs - Core types for Prism runtime
 // Created by: isdood
 // Date: 2025-01-21 11:01:25 UTC
 
@@ -230,7 +230,7 @@ mod tests {
     fn test_task_metadata_timing() {
         let handle = TaskHandle::new();
         let mut metadata = TaskMetadata::new(handle, Priority::Normal);
-        
+
         metadata.start_time = Some(std::time::Instant::now());
         thread::sleep(Duration::from_millis(10));
         metadata.completion_time = Some(std::time::Instant::now());
