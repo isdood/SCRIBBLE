@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# First, backup the original if it exists
+# Backup the original if it exists
 if [ -f "prettybench.sh" ]; then
     cp prettybench.sh prettybench.sh.bak
 fi
@@ -9,7 +9,7 @@ fi
 cat > prettybench.sh << 'EOF'
 #!/bin/bash
 # prettybench.sh
-# Created: 2025-01-21 19:50:23
+# Created: 2025-01-21 19:52:25
 # Author: isdood
 
 # Create results directory if it doesn't exist
@@ -73,12 +73,13 @@ spinner() {
 # Clear screen and show header
 clear
 
-echo -e "${PURPLE}╔═══════════════════════════════════════════════════╗${RESET}"
-echo -e "${PURPLE}║${RESET}             Lazuline Benchmark Suite              ${PURPLE}║${RESET}"
-echo -e "${PURPLE}╠═══════════════════════════════════════════════════╣${RESET}"
-echo -e "${PURPLE}║${RESET} Started: 2025-01-21 19:50:23 UTC                  ${PURPLE}║${RESET}"
-echo -e "${PURPLE}║${RESET} Runner:  isdood                                   ${PURPLE}║${RESET}"
-echo -e "${PURPLE}╚═══════════════════════════════════════════════════╝${RESET}"
+# Header - exactly 49 chars between ║
+echo -e "${PURPLE}╔═════════════════════════════════════════════════════╗${RESET}"
+echo -e "${PURPLE}║${RESET}              Lazuline Benchmark Suite               ${PURPLE}║${RESET}"
+echo -e "${PURPLE}╠═════════════════════════════════════════════════════╣${RESET}"
+echo -e "${PURPLE}║${RESET} Started: 2025-01-21 19:52:25 UTC                    ${PURPLE}║${RESET}"
+echo -e "${PURPLE}║${RESET} Runner:  isdood                                     ${PURPLE}║${RESET}"
+echo -e "${PURPLE}╚═════════════════════════════════════════════════════╝${RESET}"
 echo
 
 # Run benchmarks
@@ -95,40 +96,40 @@ wait $benchmark_pid
 RESULTS=$(cat bench_output.tmp)
 INIT_TIME=$(echo "$RESULTS" | grep "initialization" | grep "time:" | awk -F'[\\[\\]]' '{print $2}')
 
-# Display results
-echo -e "${PURPLE}╔═══════════════════════════════════════════════════╗${RESET}"
-echo -e "${PURPLE}║${RESET}                Benchmark Results                  ${PURPLE}║${RESET}"
-echo -e "${PURPLE}╠═══════════════════════════════════════════════════╣${RESET}"
+# Display results - exactly 49 chars between ║
+echo -e "${PURPLE}╔═════════════════════════════════════════════════════╗${RESET}"
+echo -e "${PURPLE}║${RESET}                 Benchmark Results                    ${PURPLE}║${RESET}"
+echo -e "${PURPLE}╠═════════════════════════════════════════════════════╣${RESET}"
 
-echo -e "${PURPLE}║${RESET} ${GREEN}Initialization:${RESET}                                  ${PURPLE}║${RESET}"
+echo -e "${PURPLE}║${RESET} ${GREEN}Initialization:${RESET}                                    ${PURPLE}║${RESET}"
 printf "${PURPLE}║${RESET} %-11s [%-32s] ${PURPLE}║${RESET}\n" "$INIT_TIME" "$(create_progress_bar 1 1)"
 
-echo -e "${PURPLE}╟───────────────────────────────────────────────────╢${RESET}"
-echo -e "${PURPLE}║${RESET} ${GREEN}Channel Compute:${RESET}                                ${PURPLE}║${RESET}"
+echo -e "${PURPLE}╟─────────────────────────────────────────────────────╢${RESET}"
+echo -e "${PURPLE}║${RESET} ${GREEN}Channel Compute:${RESET}                                  ${PURPLE}║${RESET}"
 echo "$RESULTS" | grep "channel_compute/" | grep "time:" | while read -r line; do
     size=$(echo $line | grep -o "channel_compute/[0-9]*" | cut -d"/" -f2)
     time=$(echo $line | awk -F"[\\[\\]]" '{print $2}')
     printf "${PURPLE}║${RESET} Size %6d: %-11s [%-32s] ${PURPLE}║${RESET}\n" "$size" "$time" "$(create_progress_bar $size 100000)"
 done
 
-echo -e "${PURPLE}╟───────────────────────────────────────────────────╢${RESET}"
-echo -e "${PURPLE}║${RESET} ${GREEN}Multiple Operations:${RESET}                            ${PURPLE}║${RESET}"
+echo -e "${PURPLE}╟─────────────────────────────────────────────────────╢${RESET}"
+echo -e "${PURPLE}║${RESET} ${GREEN}Multiple Operations:${RESET}                              ${PURPLE}║${RESET}"
 echo "$RESULTS" | grep "multiple_operations/sequential" | grep "time:" | while read -r line; do
     ops=$(echo $line | grep -o "sequential/[0-9]*" | cut -d"/" -f2)
     time=$(echo $line | awk -F"[\\[\\]]" '{print $2}')
     printf "${PURPLE}║${RESET} Ops %7d: %-11s [%-32s] ${PURPLE}║${RESET}\n" "$ops" "$time" "$(create_progress_bar $ops 10)"
 done
 
-echo -e "${PURPLE}╟───────────────────────────────────────────────────╢${RESET}"
-echo -e "${PURPLE}║${RESET} ${GREEN}System Information:${RESET}                             ${PURPLE}║${RESET}"
+echo -e "${PURPLE}╟─────────────────────────────────────────────────────╢${RESET}"
+echo -e "${PURPLE}║${RESET} ${GREEN}System Information:${RESET}                               ${PURPLE}║${RESET}"
 CPU_INFO=$(grep "model name" /proc/cpuinfo | head -n1 | cut -d: -f2 | xargs)
 MEM_INFO=$(free -h | awk '/^Mem:/ {print $2}')
 RUST_VERSION=$(rustc --version)
-printf "${PURPLE}║${RESET} %-44s ${PURPLE}║${RESET}\n" "CPU: ${CPU_INFO:0:40}..."
-printf "${PURPLE}║${RESET} %-44s ${PURPLE}║${RESET}\n" "Memory: ${MEM_INFO} total"
-printf "${PURPLE}║${RESET} %-44s ${PURPLE}║${RESET}\n" "Rust: ${RUST_VERSION}"
+printf "${PURPLE}║${RESET} %-45s ${PURPLE}║${RESET}\n" "CPU: ${CPU_INFO:0:41}..."
+printf "${PURPLE}║${RESET} %-45s ${PURPLE}║${RESET}\n" "Memory: ${MEM_INFO} total"
+printf "${PURPLE}║${RESET} %-45s ${PURPLE}║${RESET}\n" "Rust: ${RUST_VERSION}"
 
-echo -e "${PURPLE}╚═══════════════════════════════════════════════════╝${RESET}"
+echo -e "${PURPLE}╚═════════════════════════════════════════════════════╝${RESET}"
 
 # Clean up
 rm bench_output.tmp
@@ -138,9 +139,9 @@ EOF
 chmod +x prettybench.sh
 
 echo "Updated prettybench.sh with:"
-echo "- Current time: 2025-01-21 19:50:23"
+echo "- Current time: 2025-01-21 19:52:25"
 echo "- Current user: isdood"
-echo "- Fixed alignment"
+echo "- Fixed alignment (49 chars between borders)"
 echo "- Rainbow spinner"
 echo "- Proper box drawing"
 echo "Original script backed up as prettybench.sh.bak"
