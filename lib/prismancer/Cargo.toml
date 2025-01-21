@@ -1,0 +1,15 @@
+[package]
+name = "prismancer"
+version = "0.1.0"
+edition = "2021"
+description = "Crystal-based high-performance game engine"
+authors = ["isdood"]
+
+[dependencies]
+# Core dependencies will go here
+
+[build-dependencies]
+# Build dependencies will go here
+
+[dev-dependencies]
+# Development dependencies will go here
