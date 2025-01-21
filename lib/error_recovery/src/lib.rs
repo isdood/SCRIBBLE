@@ -13,6 +13,11 @@ pub mod macros;
 pub mod validation;
 pub mod analysis;
 pub mod reporting;
+pub mod core;
+pub mod monitor;
+
+pub use core::{RecoveryCore, recover};
+pub use monitor::{RecoveryMonitor, RecoveryMetrics, Alert, AlertSeverity};
 
 #[derive(Debug, Error)]
 pub enum RecoveryError {

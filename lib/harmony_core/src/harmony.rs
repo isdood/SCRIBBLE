@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-20 20:30:23 UTC
+//! Last Updated: 2025-01-21 00:02:18 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -99,7 +99,7 @@ impl<T: MeshValue> Phase for HarmonicHandler<T> {
 impl<T: MeshValue + Display> Display for HarmonicHandler<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Harmonic State:")?;
-        write!(f, "Resonance: {}\nField: {}", self.resonance, self.field)
+        write!(f, "Resonance: {:?}\nField: {}", self.resonance, self.field)  // Changed to use {:?} for debug formatting
     }
 }
 
