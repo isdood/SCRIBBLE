@@ -1,56 +1,52 @@
 //! Facet CLI Interface
 //! Author: @isdood
-//! Created: 2025-01-21 15:56:28 UTC
+//! Created: 2025-01-21 16:19:43 UTC
 
 const std = @import("std");
-const Calculator = @import("../core/calculator.zig").Calculator;
-const Result = @import("../core/types.zig").Result;
+const calc = @import("../core/calculator.zig");
+const types = @import("../core/types.zig");
 
-/// CLI color configuration
-const Color = struct {
-    const reset = "\x1b[0m";
-    const bright = "\x1b[1m";
-    const crystal = "\x1b[38;5;159m";
-    const harmony = "\x1b[38;5;183m";
-    const sparkle = "\x1b[38;5;219m";
-    const error_color = "\x1b[38;5;203m";
-};
+const Calculator = calc.Calculator;
+const Result = types.Result;
+const CalcError = types.CalcError;
 
-/// CLI configuration options
-const Config = struct {
-    /// Show crystal clarity metrics
+/// CLI configuration
+pub const CLIConfig = struct {
+    /// Show calculation clarity
     show_clarity: bool = true,
-    /// Display harmony levels
-    show_harmony: bool = true,
-    /// Enable sparkle effects
-    enable_sparkle: bool = true,
-    /// History size
-    history_size: usize = 100,
+    /// Show resonance values
+    show_resonance: bool = true,
+    /// Enable command history
+    enable_history: bool = true,
+    /// Maximum history size
+    max_history: usize = 100,
 };
 
-/// CLI state and functionality
+/// CLI interface
 pub const CLI = struct {
-    calculator: Calculator,
-    config: Config,
-    history: std.ArrayList([]const u8),
+    calculator: *Calculator,
+    config: CLIConfig,
     allocator: std.mem.Allocator,
+    history: std.ArrayList([]const u8),
+    stdin: std.fs.File.Reader,
+    stdout: std.fs.File.Writer,
 
     const Self = @This();
 
-    /// Initialize new CLI instance
+    /// Initialize new CLI interface
     pub fn init(options: struct {
-        calculator: Calculator,
-        config: ?Config = null,
-        allocator: ?std.mem.Allocator = null,
+        calculator: *Calculator,
+        config: ?CLIConfig = null,
     }) !*Self {
-        const alloc = options.allocator orelse std.heap.page_allocator;
-        const cli = try alloc.create(Self);
+        const cli = try std.heap.page_allocator.create(Self);
 
         cli.* = .{
             .calculator = options.calculator,
-            .config = options.config orelse Config{},
-            .history = std.ArrayList([]const u8).init(alloc),
-            .allocator = alloc,
+            .config = options.config orelse CLIConfig{},
+            .allocator = std.heap.page_allocator,
+            .history = std.ArrayList([]const u8).init(std.heap.page_allocator),
+            .stdin = std.io.getStdIn().reader(),
+            .stdout = std.io.getStdOut().writer(),
         };
 
         return cli;
@@ -62,182 +58,157 @@ pub const CLI = struct {
             self.allocator.free(item);
         }
         self.history.deinit();
-        self.allocator.destroy(self);
+        std.heap.page_allocator.destroy(self);
     }
 
-    /// Run interactive CLI mode
-    pub fn runInteractive(self: *Self) !void {
-        const stdout = std.io.getStdOut().writer();
-        const stdin = std.io.getStdIn().reader();
+    /// Run CLI interface
+    pub fn run(self: *Self) !void {
+        var buffer: [1024]u8 = undefined;
 
-        try self.displayWelcome();
-
-        var buf: [1024]u8 = undefined;
         while (true) {
-            // Display prompt
-            try stdout.print("{s}crystal>{s} ", .{ Color.crystal, Color.reset });
+            // Print prompt
+            try self.stdout.writeAll("> ");
 
             // Read input
-            const input = (try stdin.readUntilDelimiter(&buf, '\n')) orelse break;
-            if (input.len == 0) continue;
+            const input = (try self.stdin.readUntilDelimiterOrEof(buffer[0..], '\n')) orelse break;
+            const trimmed = std.mem.trim(u8, input, " \t\r\n");
 
-            // Handle special commands
-            if (std.mem.eql(u8, input, "exit") or std.mem.eql(u8, input, "quit")) {
-                try self.displayFarewell();
-                break;
-            }
+            if (trimmed.len == 0) continue;
 
-            if (std.mem.eql(u8, input, "help")) {
-                try self.displayHelp();
+            // Handle commands
+            if (std.mem.eql(u8, trimmed, "exit")) break;
+            if (std.mem.eql(u8, trimmed, "help")) {
+                try self.printHelp();
                 continue;
             }
-
-            // Process calculation
-            const result = self.calculator.compute(input, .{
-                .check_resonance = true,
-                .maintain_resonance = true,
-            }) catch |err| {
-                try self.displayError(err);
+            if (std.mem.eql(u8, trimmed, "history")) {
+                try self.printHistory();
                 continue;
-            };
+            }
+            if (std.mem.eql(u8, trimmed, "clear")) {
+                try self.clearHistory();
+                continue;
+            }
 
             // Add to history
-            const saved_input = try self.allocator.dupe(u8, input);
-            try self.history.append(saved_input);
-            if (self.history.items.len > self.config.history_size) {
-                const removed = self.history.orderedRemove(0);
-                self.allocator.free(removed);
+            if (self.config.enable_history) {
+                try self.addToHistory(trimmed);
             }
 
-            // Display result
-            try self.displayResult(result);
+            // Calculate result
+            self.calculate(trimmed) catch |err| {
+                try self.printError(err);
+                continue;
+            };
         }
     }
 
-    /// Display calculation result
-    pub fn displayResult(self: *Self, result: Result) !void {
-        const stdout = std.io.getStdOut().writer();
-
-        // Display main result
-        try stdout.print("{s}Result:{s} {d}\n", .{
-            Color.bright,
-            Color.reset,
-            result.value,
-        });
-
-        // Display harmony metrics if enabled
-        if (self.config.show_harmony) {
-            try stdout.print("{s}Harmony:{s} {d:.2}\n", .{
-                Color.harmony,
-                Color.reset,
-                result.resonance,
-            });
+    /// Add expression to history
+    fn addToHistory(self: *Self, expression: []const u8) !void {
+        if (self.history.items.len >= self.config.max_history) {
+            const removed = self.history.orderedRemove(0);
+            self.allocator.free(removed);
         }
 
-        // Display crystal clarity if enabled
-        if (self.config.show_clarity) {
-            try stdout.print("{s}Clarity:{s} {d:.2}\n", .{
-                Color.crystal,
-                Color.reset,
-                result.clarity,
-            });
-        }
+        const duped = try self.allocator.dupe(u8, expression);
+        try self.history.append(duped);
+    }
 
-        // Add sparkle effect if enabled
-        if (self.config.enable_sparkle and result.resonance >= 0.95) {
-            try stdout.print("{s}✨ Perfect Harmony! ✨{s}\n", .{
-                Color.sparkle,
-                Color.reset,
-            });
+    /// Print command history
+    fn printHistory(self: *Self) !void {
+        for (self.history.items, 0..) |item, i| {
+            try self.stdout.print("{d}: {s}\n", .{ i + 1, item });
         }
     }
 
-    /// Display error message
-    fn displayError(_: *Self, err: anyerror) !void {
-        const stdout = std.io.getStdOut().writer();
-        try stdout.print("{s}Error:{s} {s}\n", .{
-            Color.error_color,
-            Color.reset,
-            @errorName(err),
-        });
+    /// Clear command history
+    fn clearHistory(self: *Self) !void {
+        for (self.history.items) |item| {
+            self.allocator.free(item);
+        }
+        try self.history.resize(0);
     }
 
-    /// Display welcome message
-    fn displayWelcome(_: *Self) !void {
-        const stdout = std.io.getStdOut().writer();
-        try stdout.print(
-            \\{s}Welcome to Facet - Crystal Calculator{s}
-            \\{s}✨ Version 0.1.0 ✨{s}
-            \\Type 'help' for commands, 'exit' to quit
+    /// Print help message
+    fn printHelp(self: *Self) !void {
+        try self.stdout.writeAll(
+            \\Commands:
+            \\  help    - Show this help message
+            \\  history - Show calculation history
+            \\  clear   - Clear calculation history
+            \\  exit    - Exit calculator
             \\
-            \\
-            , .{
-                Color.crystal,
-                Color.reset,
-                Color.sparkle,
-                Color.reset,
-            });
-    }
-
-    /// Display farewell message
-    fn displayFarewell(_: *Self) !void {
-        const stdout = std.io.getStdOut().writer();
-        try stdout.print(
-            \\{s}Thank you for using Facet!{s}
-            \\{s}✨ May your calculations stay harmonious ✨{s}
-            \\
-            , .{
-                Color.crystal,
-                Color.reset,
-                Color.sparkle,
-                Color.reset,
-            });
-    }
-
-    /// Display help message
-    fn displayHelp(_: *Self) !void {
-        const stdout = std.io.getStdOut().writer();
-        try stdout.print(
-            \\{s}Facet Commands:{s}
-            \\  help  - Display this help message
-            \\  exit  - Exit the calculator
-            \\  quit  - Same as exit
-            \\
-            \\{s}Examples:{s}
-            \\  2 + 2
-            \\  5 * (3 + 2)
-        \\  10 / 2
+            \\Enter mathematical expressions to calculate
+            \\Example: 2 + 2 * (3 + 4)
         \\
-        \\{s}Crystal Tips:{s}
-        \\  - Higher harmony leads to more accurate results
-        \\  - Maintain crystal clarity for best performance
-        \\  - Watch for the sparkle effect on perfect calculations!
-        \\
-        , .{
-            Color.bright,
-            Color.reset,
-            Color.crystal,
-            Color.reset,
-            Color.harmony,
-            Color.reset,
+        );
+    }
+
+    /// Calculate and print result
+    fn calculate(self: *Self, expression: []const u8) !void {
+        const result = try self.calculator.compute(expression, .{
+            .check_resonance = true,
+            .maintain_resonance = true,
         });
+
+        if (self.config.show_clarity or self.config.show_resonance) {
+            try self.stdout.print("= {}\n", .{result});
+        } else {
+            try self.stdout.print("= {d:.4}\n", .{result.value});
+        }
+    }
+
+    /// Print error message
+    fn printError(self: *Self, err: anyerror) !void {
+        const msg = switch (err) {
+            CalcError.DivisionByZero => "Error: Division by zero",
+            CalcError.InvalidOperation => "Error: Invalid operation",
+            CalcError.ResonanceLoss => "Error: Resonance loss exceeded threshold",
+            CalcError.ClarityTooLow => "Error: Crystal clarity too low",
+            CalcError.Overflow => "Error: Numeric overflow",
+            CalcError.Underflow => "Error: Numeric underflow",
+            else => "Error: Unknown error occurred",
+        };
+            try self.stdout.print("{s}\n", .{msg});
     }
 };
 
 test "cli_basic" {
-    const calculator = try Calculator.init(.{});
+    var test_crystal = try crystal.CrystalLattice.init(.{
+        .clarity = 0.95,
+        .facets = 3,
+    });
+    defer test_crystal.deinit();
+
+    var test_resonance = try resonance.Attunement.init(test_crystal, null);
+    defer test_resonance.deinit();
+
+    var calculator = try Calculator.init(.{
+        .resonance_state = test_resonance,
+        .crystal_lattice = test_crystal,
+    });
     defer calculator.deinit();
 
     const cli = try CLI.init(.{ .calculator = calculator });
     defer cli.deinit();
 
     try std.testing.expect(cli.config.show_clarity);
-    try std.testing.expect(cli.config.show_harmony);
-    try std.testing.expect(cli.config.enable_sparkle);
 }
 
 test "cli_history" {
-    const calculator = try Calculator.init(.{});
+    var test_crystal = try crystal.CrystalLattice.init(.{
+        .clarity = 0.95,
+        .facets = 3,
+    });
+    defer test_crystal.deinit();
+
+    var test_resonance = try resonance.Attunement.init(test_crystal, null);
+    defer test_resonance.deinit();
+
+    var calculator = try Calculator.init(.{
+        .resonance_state = test_resonance,
+        .crystal_lattice = test_crystal,
+    });
     defer calculator.deinit();
 
     const cli = try CLI.init(.{ .calculator = calculator });

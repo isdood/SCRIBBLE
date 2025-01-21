@@ -1,17 +1,17 @@
 //! Facet - Crystal-Based Calculator
 //! Author: @isdood
-//! Created: 2025-01-21 16:17:57 UTC
+//! Created: 2025-01-21 16:23:15 UTC
 
 const std = @import("std");
 const ui = @import("ui/mod.zig");
 const resonance = @import("resonance/attunement.zig");
 const crystal = @import("crystal/lattice.zig");
-const calc = @import("core/calculator.zig");
+const core_calc = @import("core/calculator.zig");  // Renamed from calc to core_calc
 const types = @import("core/types.zig");
 
 const CLI = ui.cli.CLI;
 const Result = types.Result;
-const Calculator = calc.Calculator;
+const Calculator = core_calc.Calculator;  // Updated reference
 const Attunement = resonance.Attunement;
 const CrystalLattice = crystal.CrystalLattice;
 
@@ -45,7 +45,7 @@ pub fn main() !void {
 /// Initialize all components
 fn initComponents() !GlobalState {
     // Initialize crystal lattice
-    var crystal_lattice = try CrystalLattice.init(.{
+    const crystal_lattice = try CrystalLattice.init(.{  // Changed var to const
         .clarity = Config.clarity,
         .facets = 6,
         .symmetry = 1.0,
@@ -53,19 +53,19 @@ fn initComponents() !GlobalState {
     });
 
     // Initialize resonance state
-    var resonance_state = try Attunement.init(crystal_lattice, .{
+    const resonance_state = try Attunement.init(crystal_lattice, .{  // Changed var to const
         .min_resonance = Config.resonance_threshold,
         .target_resonance = Config.attunement_strength,
     });
 
     // Initialize calculator
-    var calculator = try Calculator.init(.{
+    const calculator = try Calculator.init(.{  // Changed var to const
         .resonance_state = resonance_state,
         .crystal_lattice = crystal_lattice,
     });
 
     // Initialize CLI interface
-    var cli = try CLI.init(.{
+    const cli = try CLI.init(.{  // Changed var to const
         .calculator = calculator,
     });
 
@@ -86,13 +86,13 @@ const GlobalState = struct {
 
     /// Deinitialize all components
     pub fn deinit(self: *GlobalState) void {
-        if (self.cli) |cli| {
-            const mutable_cli: *CLI = @constCast(cli);
+        if (self.cli) |cli_inst| {
+            const mutable_cli: *CLI = @constCast(cli_inst);
             mutable_cli.deinit();
         }
-        if (self.calculator) |calc| calc.deinit();
-        if (self.resonance_state) |res| res.deinit();
-        if (self.crystal_lattice) |lattice| lattice.deinit();
+        if (self.calculator) |calculator_inst| calculator_inst.deinit();
+        if (self.resonance_state) |res_inst| res_inst.deinit();
+        if (self.crystal_lattice) |lattice_inst| lattice_inst.deinit();
     }
 };
 
