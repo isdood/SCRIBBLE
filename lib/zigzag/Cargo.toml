@@ -1,0 +1,17 @@
+[package]
+name = "zigzag"
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
+description = "Quantum-aware vector operations library"
+
+[workspace]
+
+[dependencies]
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "vector_ops"
+harness = false
