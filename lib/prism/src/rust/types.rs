@@ -5,7 +5,7 @@
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Created: 2025-01-21
-//! Last Updated: 2025-01-21 13:02:37 UTC
+//! Last Updated: 2025-01-21 13:05:02 UTC
 //! Current User: isdood
 
 use std::fmt;
@@ -32,11 +32,27 @@ pub enum PrismError {
     #[error("Binding error: {0}")]
     Binding(String),
 
-    /// General system errors
+    /// System-level errors
     #[error("System error: {0}")]
-    System(String),
+    SystemError(String),
 
-    /// Success (for FFI)
+    /// Invalid argument errors
+    #[error("Invalid argument: {0}")]
+    InvalidArgument(String),
+
+    /// Memory allocation errors
+    #[error("Out of memory: {0}")]
+    OutOfMemory(String),
+
+    /// Operation timeout errors
+    #[error("Operation timed out: {0}")]
+    Timeout(String),
+
+    /// System not initialized
+    #[error("System not initialized")]
+    NotInitialized,
+
+    /// Operation completed successfully
     #[error("Success")]
     Success,
 }
@@ -111,7 +127,12 @@ impl From<i32> for PrismError {
             2 => PrismError::Task("Unknown task error".into()),
             3 => PrismError::Crystal("Unknown crystal error".into()),
             4 => PrismError::Binding("Unknown binding error".into()),
-            _ => PrismError::System(format!("Unknown error code: {}", code)),
+            5 => PrismError::SystemError("Unknown system error".into()),
+            6 => PrismError::InvalidArgument("Unknown invalid argument".into()),
+            7 => PrismError::OutOfMemory("Unknown memory error".into()),
+            8 => PrismError::Timeout("Unknown timeout error".into()),
+            9 => PrismError::NotInitialized,
+            _ => PrismError::SystemError(format!("Unknown error code: {}", code)),
         }
     }
 }
@@ -124,7 +145,11 @@ impl From<PrismError> for i32 {
             PrismError::Task(_) => 2,
             PrismError::Crystal(_) => 3,
             PrismError::Binding(_) => 4,
-            PrismError::System(_) => 5,
+            PrismError::SystemError(_) => 5,
+            PrismError::InvalidArgument(_) => 6,
+            PrismError::OutOfMemory(_) => 7,
+            PrismError::Timeout(_) => 8,
+            PrismError::NotInitialized => 9,
         }
     }
 }
