@@ -1,49 +1,41 @@
-//! Prism: Crystal-based High Performance Computing Framework
-//! ======================================================
+//! Prism Internal Implementation Module
+//! ==================================
 //!
-//! A quantum-harmonic computational framework leveraging crystal lattice patterns
-//! for distributed parallel processing and resonance-based task scheduling.
+//! Core implementation layer for the quantum-harmonic computational framework.
+//! This module provides the internal components and implementations that are
+//! re-exported through the public API.
 //!
-//! Architecture:
-//! ------------
-//! - Crystal Core: Quantum-harmonic computational patterns
-//! - Runtime: Resonance-mapped task scheduling
-//! - Bindings: Rust/Zig FFI interface for crystal operations
+//! Module Structure:
+//! ---------------
+//! - binding: FFI interface for Zig crystal operations
+//! - crystal: Core quantum pattern implementation
+//! - runtime: Task scheduling and execution engine
+//! - types: Shared types and error definitions
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Created: 2025-01-21
-//! Last Updated: 2025-01-21 12:58:17 UTC
+//! Last Updated: 2025-01-21 13:01:07 UTC
 //! Current User: isdood
 
-// Import the rust module and its submodules
-pub(crate) mod rust;
+// Public modules
+pub mod binding;
+pub mod crystal;
+pub mod runtime;
+pub mod types;
 
-// Re-export public interfaces
-pub use rust::{
-    binding,
-    crystal,
-    runtime,
-    types,
-};
-
+// Standard library imports
 use std::sync::Arc;
 use std::future::Future;
 
-// Re-export core types
-pub use rust::{
-    crystal::bridge::{Crystal, CrystalNode, CrystalSystem},
-    runtime::task::{Task, TaskConfig, TaskExecutor},
-    types::{PrismError, PrismResult, Priority, TaskStatus},
-};
-
-/// Framework version from Cargo manifest
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+// Internal re-exports
+pub use self::crystal::bridge::{Crystal, CrystalNode, CrystalSystem};
+pub use self::runtime::task::{Task, TaskConfig, TaskExecutor};
+pub use self::types::{PrismError, PrismResult, Priority, TaskStatus};
 
 /// Result type for quantum-harmonic operations
 pub type Result<T> = std::result::Result<T, PrismError>;
 
 /// Quantum Runtime Configuration
-/// Controls crystal lattice parameters and resonance patterns
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
     /// Number of quantum threads in crystal lattice
@@ -67,17 +59,16 @@ impl Default for RuntimeConfig {
     }
 }
 
-/// Prism Quantum Runtime
-/// Manages crystal patterns and task execution through resonance mapping
-pub struct Runtime {
+/// Internal runtime implementation
+#[derive(Debug)]
+pub(crate) struct InternalRuntime {
     executor: TaskExecutor,
     crystal: Arc<Crystal>,
     config: RuntimeConfig,
 }
 
-impl Runtime {
-    /// Initialize a new quantum-harmonic runtime with the given configuration
-    pub fn init(config: RuntimeConfig) -> Result<Self> {
+impl InternalRuntime {
+    pub fn new(config: RuntimeConfig) -> Result<Self> {
         let crystal = Arc::new(Crystal::new(CrystalSystem::Cubic)?);
         let executor = TaskExecutor::new(Some(Arc::clone(&crystal)))
         .map_err(|e| PrismError::Runtime(e.to_string()))?;
@@ -89,7 +80,6 @@ impl Runtime {
         })
     }
 
-    /// Create a new quantum task with the specified configuration
     pub fn create_task<F>(&self, future: F, config: TaskConfig) -> Result<Task<F>>
     where
     F: Future<Output = PrismResult<()>> + Send + 'static,
@@ -98,7 +88,6 @@ impl Runtime {
         .map_err(|e| PrismError::Task(e.to_string()))
     }
 
-    /// Execute a task through the crystal lattice
     pub async fn execute<F>(&self, task: Task<F>) -> Result<()>
     where
     F: Future<Output = PrismResult<()>> + Send + 'static,
@@ -108,12 +97,10 @@ impl Runtime {
         .map_err(|e| PrismError::Runtime(e.to_string()))
     }
 
-    /// Get a reference to the current crystal system
     pub fn crystal(&self) -> &Arc<Crystal> {
         &self.crystal
     }
 
-    /// Get the current quantum runtime configuration
     pub fn config(&self) -> &RuntimeConfig {
         &self.config
     }
@@ -132,37 +119,15 @@ mod tests {
     #[tokio::test]
     async fn test_runtime_init() {
         let config = RuntimeConfig::default();
-        let runtime = Runtime::init(config).unwrap();
+        let runtime = InternalRuntime::new(config).unwrap();
         assert!(Arc::strong_count(&runtime.crystal) >= 1);
     }
 
     #[tokio::test]
     async fn test_task_creation() {
-        let runtime = Runtime::init(RuntimeConfig::default()).unwrap();
+        let runtime = InternalRuntime::new(RuntimeConfig::default()).unwrap();
         let task_config = TaskConfig::default();
         let task = runtime.create_task(test_task(), task_config).unwrap();
         assert_eq!(task.status(), TaskStatus::Ready);
     }
-
-    #[test]
-    fn test_version() {
-        assert!(!VERSION.is_empty());
-    }
-}
-
-/// Prism Framework Prelude
-/// Common types for quantum-harmonic computing
-pub mod prelude {
-    pub use super::{
-        Crystal,
-        CrystalSystem,
-        PrismError,
-        PrismResult,
-        Runtime,
-        RuntimeConfig,
-        Task,
-        TaskConfig,
-        TaskExecutor,
-        TaskStatus,
-    };
 }
