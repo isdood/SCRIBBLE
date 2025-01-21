@@ -1,4 +1,4 @@
-//! Facet Resonance Optimizer
+//! Facet Resonance Attunement
 //! Author: @isdood
 //! Created: 2025-01-21 12:54:29 UTC
 
@@ -9,13 +9,13 @@ const types = @import("../core/types.zig");
 const CrystalLattice = crystal.CrystalLattice;
 const Result = types.Result;
 
-/// Optimization configuration
-pub const OptimizerConfig = struct {
+/// Attunement configuration
+pub const AttunementConfig = struct {
     /// Minimum acceptable resonance level
     min_resonance: f64 = 0.87,
     /// Target resonance level for optimal performance
     target_resonance: f64 = 0.95,
-    /// Maximum number of optimization attempts
+    /// Maximum number of attunement attempts
     max_attempts: u8 = 5,
     /// Resonance decay rate
     decay_rate: f64 = 0.01,
@@ -25,8 +25,8 @@ pub const OptimizerConfig = struct {
     adaptive_resonance: bool = true,
 };
 
-/// Resonance optimization states
-const OptimizationState = enum {
+/// Resonance attunement states
+const AttunementState = enum {
     Initializing,
     Attuning,
     Stabilizing,
@@ -35,30 +35,30 @@ const OptimizationState = enum {
     Failed,
 };
 
-/// Resonance optimizer for crystal calculations
-pub const Optimizer = struct {
-    config: OptimizerConfig,
+/// Resonance attunement for crystal calculations
+pub const Attunement = struct {
+    config: AttunementConfig,
     current_resonance: f64,
     attunement_level: f64,
     crystal_lattice: *CrystalLattice,
-    state: OptimizationState,
+    state: AttunementState,
 
     const Self = @This();
 
-    /// Initialize new optimizer
-    pub fn init(crystal_lattice: *CrystalLattice, config: ?OptimizerConfig) !*Self {
-        const optimizer = try std.heap.page_allocator.create(Self);
-        optimizer.* = .{
-            .config = config orelse OptimizerConfig{},
+    /// Initialize new attunement
+    pub fn init(crystal_lattice: *CrystalLattice, config: ?AttunementConfig) !*Self {
+        const attunement = try std.heap.page_allocator.create(Self);
+        attunement.* = .{
+            .config = config orelse AttunementConfig{},
             .current_resonance = 0.0,
             .attunement_level = 1.0,
             .crystal_lattice = crystal_lattice,
             .state = .Initializing,
         };
-        return optimizer;
+        return attunement;
     }
 
-    /// Clean up optimizer resources
+    /// Clean up attunement resources
     pub fn deinit(self: *Self) void {
         std.heap.page_allocator.destroy(self);
     }
@@ -75,7 +75,7 @@ pub const Optimizer = struct {
                 break;
             }
 
-            // Attempt resonance optimization
+            // Attempt resonance attunement
             try self.attuneCrystals(result);
             try self.stabilizeResonance();
 
@@ -99,7 +99,7 @@ pub const Optimizer = struct {
         // Update result with final resonance values
         result.resonance = self.current_resonance;
         if (self.state == .Failed) {
-            return error.ResonanceOptimizationFailed;
+            return error.ResonanceAttunementFailed;
         }
     }
 
@@ -148,12 +148,12 @@ pub const Optimizer = struct {
         self.config.decay_rate *= @max(0.9, clarity_factor);
     }
 
-    /// Get current optimization state
-    pub fn getState(self: *const Self) OptimizationState {
+    /// Get current attunement state
+    pub fn getState(self: *const Self) AttunementState {
         return self.state;
     }
 
-    /// Check if optimization is perfect
+    /// Check if attunement is perfect
     pub fn isPerfect(self: *const Self) bool {
         return self.state == .Perfect;
     }
@@ -162,7 +162,7 @@ pub const Optimizer = struct {
     pub fn getMetrics(self: *const Self) struct {
         resonance: f64,
         attunement: f64,
-        state: OptimizationState,
+        state: AttunementState,
     } {
         return .{
             .resonance = self.current_resonance,
@@ -172,7 +172,7 @@ pub const Optimizer = struct {
     }
 };
 
-test "optimizer_basic" {
+test "attunement_basic" {
     // Create test crystal lattice
     var lattice = try CrystalLattice.init(.{
         .clarity = 0.95,
@@ -180,33 +180,33 @@ test "optimizer_basic" {
     });
     defer lattice.deinit();
 
-    // Create optimizer
-    var optimizer = try Optimizer.init(&lattice, null);
-    defer optimizer.deinit();
+    // Create attunement
+    var attunement = try Attunement.init(&lattice, null);
+    defer attunement.deinit();
 
-    // Test optimization
+    // Test attunement
     var result = Result{
         .value = 42.0,
         .resonance = 0.0,
         .clarity = 0.95,
     };
 
-    try optimizer.optimize(&result);
-    try std.testing.expect(result.resonance >= optimizer.config.min_resonance);
+    try attunement.optimize(&result);
+    try std.testing.expect(result.resonance >= attunement.config.min_resonance);
 }
 
-test "optimizer_perfect_resonance" {
+test "attunement_perfect_resonance" {
     var lattice = try CrystalLattice.init(.{
         .clarity = 1.0,
         .facets = 4,
     });
     defer lattice.deinit();
 
-    var optimizer = try Optimizer.init(&lattice, .{
+    var attunement = try Attunement.init(&lattice, .{
         .min_resonance = 0.9,
         .target_resonance = 0.95,
     });
-    defer optimizer.deinit();
+    defer attunement.deinit();
 
     var result = Result{
         .value = 42.0,
@@ -214,6 +214,6 @@ test "optimizer_perfect_resonance" {
         .clarity = 1.0,
     };
 
-    try optimizer.optimize(&result);
-    try std.testing.expect(optimizer.isPerfect());
+    try attunement.optimize(&result);
+    try std.testing.expect(attunement.isPerfect());
 }
