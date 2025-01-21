@@ -15,9 +15,13 @@ pub mod analysis;
 pub mod reporting;
 pub mod core;
 pub mod monitor;
+pub mod metrics;
+pub mod diagnostics;
 
 pub use core::{RecoveryCore, recover};
 pub use monitor::{RecoveryMonitor, RecoveryMetrics, Alert, AlertSeverity};
+pub use metrics::{MetricsCollector, MetricsSnapshot, RecoveryMetricsData};
+pub use diagnostics::{DiagnosticsEngine, DiagnosticReport};
 
 #[derive(Debug, Error)]
 pub enum RecoveryError {

@@ -4,7 +4,7 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-21 00:02:18 UTC
+//! Last Updated: 2025-01-21 00:20:01 UTC
 //! Version: 0.1.1
 //! License: MIT
 
@@ -20,7 +20,7 @@ use magicmath::{
 
 use errors::MathError;
 use core::{
-    fmt::{self, Display, Write},
+    fmt::{self, Display},
     result::Result,
 };
 
@@ -99,7 +99,7 @@ impl<T: MeshValue> Phase for HarmonicHandler<T> {
 impl<T: MeshValue + Display> Display for HarmonicHandler<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Harmonic State:")?;
-        write!(f, "Resonance: {:?}\nField: {}", self.resonance, self.field)  // Changed to use {:?} for debug formatting
+        write!(f, "Resonance: {:?}\nField: {}", self.resonance, self.field)
     }
 }
 
@@ -228,7 +228,18 @@ mod tests {
 
     #[test]
     fn test_coherence() {
-        let handler = HarmonicHandler::<TestHarmonic>::new(2);
-        assert!(handler.check_coherence().is_ok());
+        let mut handler = HarmonicHandler::<TestHarmonic>::new(2);
+
+        // Initialize with a stable state
+        let pos = Vector3D::new(1.0, 0.0, 0.0);
+        handler.apply_field(&pos).expect("Failed to apply field");
+
+        // Set a test state with known coherence
+        let test_value = TestHarmonic { value: 1.0 };
+        handler.set_state(&pos, test_value).expect("Failed to set state");
+
+        // Check coherence - should succeed with value > 0
+        let coherence = handler.check_coherence().expect("Coherence check failed");
+        assert!(coherence > 0.0, "Coherence should be positive");
     }
 }
