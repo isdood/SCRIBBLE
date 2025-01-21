@@ -1,9 +1,22 @@
 #!/bin/bash
 # setup_benchmarks.sh
-# Created: 2025-01-21 18:56:45
+# Created: 2025-01-21 19:09:45
 # Author: isdood
 
 echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Setting up benchmark infrastructure..."
+
+# Clean up existing benchmark files
+rm -f benches/lazuline_benchmarks.rs
+rm -rf target/criterion
+
+# First, read the existing Cargo.toml
+if [ -f Cargo.toml ]; then
+    # Create backup
+    cp Cargo.toml Cargo.toml.bak
+    # Remove existing sections we'll be adding
+    sed -i '/\[dev-dependencies\]/,/^$/d' Cargo.toml
+    sed -i '/\[\[bench\]\]/,/^$/d' Cargo.toml
+fi
 
 # Create benches directory
 mkdir -p benches
@@ -24,12 +37,13 @@ fn bench_initialization(c: &mut Criterion) {
 
 fn bench_channel_compute(c: &mut Criterion) {
     let mut group = c.benchmark_group("channel_compute");
+    let sizes = [10usize, 100, 1000, 10_000, 100_000];
 
-    for size in [10, 100, 1000, 10_000, 100_000].iter() {
+    for &size in sizes.iter() {
         let mut instance = Lazuline::new().unwrap();
-        let data = vec![1.0f64; *size];
+        let data = vec![1.0f64; size];
 
-        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &_| {
             b.iter(|| {
                 black_box(instance.channel_compute(black_box(&data)).unwrap());
             })
@@ -42,13 +56,14 @@ fn bench_channel_compute(c: &mut Criterion) {
 fn bench_multiple_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("multiple_operations");
     let mut instance = Lazuline::new().unwrap();
+    let operations = [2usize, 5, 10];
 
-    for ops in [2, 5, 10].iter() {
+    for &ops in operations.iter() {
         let data = vec![1.0f64; 1000];
 
-        group.bench_with_input(BenchmarkId::new("sequential", ops), ops, |b, &ops| {
+        group.bench_with_input(BenchmarkId::new("sequential", ops), &ops, |b, &_| {
             b.iter(|| {
-                for _ in 0..*ops {
+                for _ in 0..ops {
                     black_box(instance.channel_compute(black_box(&data)).unwrap());
                 }
             })
@@ -59,10 +74,9 @@ fn bench_multiple_operations(c: &mut Criterion) {
 }
 
 criterion_group!(
-    benches,
-    bench_initialization,
-    bench_channel_compute,
-    bench_multiple_operations
+    name = benches;
+    config = Criterion::default().sample_size(10);
+    targets = bench_initialization, bench_channel_compute, bench_multiple_operations
 );
 criterion_main!(benches);
 END
@@ -73,51 +87,29 @@ cat > bench.sh << 'END'
 
 echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Running Lazuline benchmarks..."
 
+# Clean any previous benchmark results
+rm -rf target/criterion/report
+
 # Run benchmarks
-cargo bench
+RUSTFLAGS="-C target-cpu=native" cargo bench
 
-# Generate benchmark report
-echo -e "\nGenerating benchmark report..."
-REPORT_DIR="target/criterion/report"
-mkdir -p "$REPORT_DIR"
-
-echo "<!DOCTYPE html>
-<html>
-<head>
-    <title>Lazuline Benchmark Results</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 2em; }
-        .benchmark { margin-bottom: 2em; }
-        .chart { margin: 1em 0; }
-    </style>
-</head>
-<body>
-    <h1>Lazuline Benchmark Results</h1>
-    <p>Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')</p>
-    <div class='benchmark'>
-        <h2>Results</h2>
-        <pre>" > "$REPORT_DIR/index.html"
-
-# Append benchmark results
-cargo bench --no-run --message-format=json \
-    | jq -r 'select(.profile.test == true) | .filenames[]' \
-    | while read -r benchmark; do
-        "$benchmark" --bench | tee -a "$REPORT_DIR/index.html"
-    done
-
-echo "</pre>
-    </div>
-</body>
-</html>" >> "$REPORT_DIR/index.html"
+# Wait for criterion to finish generating reports
+sleep 2
 
 echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] ✨ Benchmarks completed!"
-echo "View the report at target/criterion/report/index.html"
+
+# List available reports
+echo "Available benchmark reports:"
+find target/criterion -name "report" -type d | while read -r dir; do
+    echo "  - file://$PWD/$dir/index.html"
+done
 END
 
 chmod +x bench.sh
 
-# Update Cargo.toml to ensure benchmark configuration
-cat >> Cargo.toml << 'END'
+# Update Cargo.toml
+cat > Cargo.toml.new << END
+$(cat Cargo.toml)
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -127,6 +119,8 @@ name = "lib"
 harness = false
 END
 
+# Replace the original with the new version
+mv Cargo.toml.new Cargo.toml
+
 echo "✨ Benchmark infrastructure created!"
 echo "Run './bench.sh' to execute benchmarks."
-echo "View results in 'target/criterion/report/index.html'"
