@@ -17,6 +17,7 @@ mod growth;
 mod harmony;
 mod phantom;
 mod zeronaut;
+mod cell;
 
 pub use align::*;
 pub use crystal::*;
@@ -27,6 +28,7 @@ pub use growth::*;
 pub use harmony::*;
 pub use phantom::*;
 pub use zeronaut::*;
+pub use cell::*;
 
 use magicmath::constants::{
     HARMONY_RESONANCE_THRESHOLD,
@@ -39,6 +41,14 @@ use magicmath::{
     Vector3D,
     resonance::Resonance,
 };
+
+// Define the Protected trait at the crate root
+pub trait Protected {
+    fn protect(&self) -> bool;
+    fn unprotect(&self) -> bool;
+    fn get_coherence(&self) -> f64;
+    fn is_harmonically_stable(&self) -> bool;
+}
 
 /// Core crystal node for quantum operations
 #[derive(Debug, Clone)]
