@@ -23,7 +23,8 @@ members = [
     "lib/error_derive",
     "lib/error_core",
     "lib/error_integration",
-    "lib/ziggy"
+    "lib/ziggy",
+    "lib/prism"  # Added prism to workspace
 ]
 resolver = "2"
 
@@ -40,6 +41,10 @@ serde_json = "1.0"
 thiserror = "1.0"
 tracing = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
+num_cpus = "1.15"
+parking_lot = "0.12"
+tokio = { version = "1.0", features = ["full"] }
+tokio-test = "0.4"
 
 # Testing & benchmarking
 criterion = "0.5"
@@ -55,6 +60,7 @@ error_derive = { path = "lib/error_derive" }
 error_core = { path = "lib/error_core" }
 error_integration = { path = "lib/error_integration" }
 ziggy = { path = "lib/ziggy" }
+prism = { path = "lib/prism" }
 
 [lib]
 path = "src/lib.rs"
@@ -76,6 +82,7 @@ error_derive = { path = "lib/error_derive" }
 error_core = { path = "lib/error_core" }
 error_integration = { path = "lib/error_integration" }
 ziggy = { path = "lib/ziggy" }
+prism = { path = "lib/prism" }
 
 [dev-dependencies]
 criterion.workspace = true
@@ -83,5 +90,5 @@ criterion.workspace = true
 # Metadata
 [package.metadata]
 created = "2025-01-19"
-updated = "2025-01-20 21:35:48"
+updated = "2025-01-21 11:57:13"
 current_user = "isdood"

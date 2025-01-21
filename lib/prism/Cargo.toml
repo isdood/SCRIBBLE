@@ -1,130 +1,27 @@
-# Cargo.toml - Prism project configuration
-# Created by: isdood
-# Date: 2025-01-21 11:10:59 UTC
-
 [package]
 name = "prism"
 version = "0.1.0"
+authors = ["Caleb J.D. Terkovics <isdood>"]
 edition = "2021"
-authors = ["isdood"]
-description = "A crystal-aligned task execution runtime"
 license = "MIT"
-repository = "https://github.com/isdood/prism"
-documentation = "https://docs.rs/prism"
-readme = "README.md"
-keywords = ["async", "runtime", "crystal", "task", "executor"]
-categories = ["asynchronous", "concurrency"]
+repository = "https://github.com/isdood/scribble"
+description = "Prism - A high-performance crystal pattern simulation system"
+
+[dependencies]
+num_cpus = { workspace = true }
+parking_lot = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
 
 [lib]
 name = "prism"
-crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
 
-[dependencies]
-# Async runtime
-tokio = { version = "1.35", features = ["full"] }
-futures = "0.3"
-async-trait = "0.1"
-
-# Error handling
-thiserror = "1.0"
-anyhow = "1.0"
-
-# Synchronization and threading
-parking_lot = "0.12"
-crossbeam = "0.8"
-rayon = "1.8"
-
-# Memory management
-bytes = "1.5"
-smallvec = "1.11"
-
-# Logging and diagnostics
-tracing = "0.1"
-tracing-subscriber = "0.3"
-
-# Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-# FFI and system interfaces
-libc = "0.2"
-cfg-if = "1.0"
-ctor = "0.2"
-
-[dev-dependencies]
-criterion = "0.5"
-quickcheck = "1.0"
-mockall = "0.12"
-test-case = "3.3"
-tokio-test = "0.4"
-
-[build-dependencies]
-cmake = "0.1"
-bindgen = "0.69"
-cbindgen = "0.26"
-
-[features]
-default = ["runtime", "crystal"]
-runtime = []
-crystal = []
-ffi = []
-tracing = ["tracing/release_max_level_info"]
-testing = []
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
-debug = false
-
-[profile.dev]
-opt-level = 0
-debug = true
-
-[profile.test]
-opt-level = 0
-debug = true
-panic = "unwind"
-
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
-
-[package.metadata.release]
-sign-commit = true
-pre-release-replacements = [
-    {file="README.md", search="prism = .*", replace="prism = \"{{version}}\""},
-    {file="src/lib.rs", search="version = .*", replace="version = \"{{version}}\""}
-]
-
-[[bench]]
-name = "task_execution"
-harness = false
-
-[[bench]]
-name = "crystal_operations"
-harness = false
-
-[[example]]
-name = "basic_tasks"
-required-features = ["runtime"]
-
-[[example]]
-name = "crystal_patterns"
-required-features = ["crystal"]
-
-[workspace]
-members = [
-    "crates/prism-core",
-    "crates/prism-crystal",
-    "crates/prism-ffi",
-    "crates/prism-macros",
-]
-
-[patch.crates-io]
-prism-core = { path = "crates/prism-core" }
-prism-crystal = { path = "crates/prism-crystal" }
-prism-ffi = { path = "crates/prism-ffi" }
-prism-macros = { path = "crates/prism-macros" }
+# Metadata
+[package.metadata]
+created = "2025-01-19"
+updated = "2025-01-21 11:57:13"
+current_user = "isdood"

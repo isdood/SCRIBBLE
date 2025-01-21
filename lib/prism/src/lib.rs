@@ -1,22 +1,12 @@
-// lib.rs - Main entry point for Prism library
-// Created by: isdood
-// Date: 2025-01-21 11:37:46 UTC
-
-//! Prism - A high-performance crystal pattern simulation system
-//! 
-//! This library provides tools for generating, analyzing, and optimizing crystal structures
-//! with a focus on performance and accuracy.
-
+// src/rust/lib.rs - Main entry point for Prism library
+pub mod binding;
 pub mod crystal;
-pub mod pattern;
 pub mod runtime;
 pub mod types;
-pub mod integration;
 
 use std::sync::Arc;
 
 pub use crate::crystal::bridge::{Crystal, CrystalNode, CrystalSystem};
-pub use crate::pattern::{Pattern, PatternConfig, PatternType};
 pub use crate::runtime::task::{Task, TaskConfig, TaskExecutor};
 pub use crate::types::{PrismError, PrismResult, Priority, TaskStatus};
 
@@ -117,17 +107,13 @@ pub mod prelude {
     pub use super::{
         Crystal,
         CrystalSystem,
-        Pattern,
-        PatternConfig,
-        PatternType,
         PrismError,
         PrismResult,
-        Priority,
-        Result,
         Runtime,
         RuntimeConfig,
         Task,
         TaskConfig,
+        TaskExecutor,
         TaskStatus,
     };
 }
