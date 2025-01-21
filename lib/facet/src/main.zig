@@ -118,7 +118,7 @@ pub fn main() !void {
     }
 }
 
-/// Test main functionality
+// Test main functionality
 test "basic_initialization" {
     try global_state.init();
     defer global_state.deinit();

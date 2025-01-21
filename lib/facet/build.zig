@@ -1,6 +1,6 @@
 //! Facet Build Configuration
 //! Author: isdood
-//! Created: 2025-01-21 15:12:25 UTC
+//! Created: 2025-01-21 15:17:06 UTC
 
 const std = @import("std");
 
@@ -25,7 +25,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     // Tests
-    const test_step = b.step("test", "Run all tests");
+    const test_step = b.step("test", "Run Zig tests only");  // Changed description to clarify
 
     const test_files = &[_][]const u8{
         "src/main.zig",
@@ -45,14 +45,15 @@ pub fn build(b: *std.Build) void {
         test_step.dependOn(&test_case.step);
     }
 
-    // Rust tests
+    // Create a separate step for Rust tests
+    const rust_test_step = b.step("test-rust", "Run Rust tests");
     const rust_tests = b.addSystemCommand(&[_][]const u8{
         "cargo",
         "test",
         "--manifest-path",
         "rust/Cargo.toml",
     });
-    test_step.dependOn(&rust_tests.step);
+    rust_test_step.dependOn(&rust_tests.step);
 
     // Add benchmarks
     const bench_step = b.step("bench", "Run benchmarks");
