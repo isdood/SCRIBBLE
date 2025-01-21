@@ -1,0 +1,99 @@
+[package]
+name = "facet-rust"
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
+description = "Rust implementation of the Facet crystal computation engine"
+repository = "https://github.com/isdood/scribble"
+license = "MIT"
+readme = "README.md"
+keywords = ["crystal", "computation", "high-performance", "zig", "math"]
+categories = ["science", "mathematics", "algorithms"]
+rust-version = "1.70"
+
+[lib]
+name = "facet_rust"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Core dependencies
+rayon = "1.8"           # Parallel computation support
+num = "0.4"            # Advanced numerical operations
+rand = "0.8"           # Random number generation for crystal simulation
+crossbeam = "0.8"      # Concurrent data structures
+parking_lot = "0.12"   # Fast synchronization primitives
+
+# SIMD and optimization
+packed_simd = "0.3"    # SIMD operations support
+criterion = "0.5"      # Benchmarking
+cacheline = "0.1"      # Cache-line optimization
+
+# Error handling and logging
+thiserror = "1.0"      # Error handling
+log = "0.4"            # Logging support
+env_logger = "0.10"    # Environment-based logging
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"        # Binary serialization
+postcard = "1.0"       # Compact serialization for embedded
+
+# FFI and interop
+cxx = "1.0"           # C++ interop (for potential future use)
+libc = "0.2"          # C bindings
+zig = "0.1"           # Zig interop helpers
+
+[dev-dependencies]
+proptest = "1.3"       # Property testing
+quickcheck = "1.0"     # Property-based testing
+test-case = "3.1"      # Test organization
+pretty_assertions = "1.4" # Better test output
+
+[features]
+default = ["simd", "parallel"]
+simd = []              # SIMD optimizations
+parallel = []          # Parallel computation
+debug = []             # Debug logging and assertions
+crystal_metrics = []   # Detailed crystal performance metrics
+whimsy = []           # Enable whimsical computations
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false
+strip = true
+
+[profile.dev]
+opt-level = 1
+debug = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.crystal]
+clarity_threshold = 0.87
+resonance_factor = 1.0
+enable_whimsy = true
+sparkle_threshold = 0.95
+
+[[bench]]
+name = "crystal_ops"
+harness = false
+
+[[bench]]
+name = "resonance"
+harness = false
+
+[workspace]
+members = [
+    "crystal",
+    "resonance",
+    "bridge",
+    "compute"
+]
+
+[badges]
+maintenance = { status = "actively-developed" }
