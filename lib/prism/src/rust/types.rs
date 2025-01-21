@@ -1,4 +1,4 @@
-// src/rust/types.rs - Core types for Prism runtime
+// src/types.rs - Core types for Prism runtime
 // Created by: isdood
 // Date: 2025-01-21 11:01:25 UTC
 

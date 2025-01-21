@@ -1,4 +1,5 @@
-// src/rust/lib.rs - Main entry point for Prism library
+// src/lib.rs - Main entry point for Prism library
+
 pub mod binding;
 pub mod crystal;
 pub mod runtime;
