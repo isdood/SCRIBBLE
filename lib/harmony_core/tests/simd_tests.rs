@@ -7,16 +7,11 @@
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Current User: isdood
 //! Created: 2025-01-19
-//! Last Updated: 2025-01-21 00:06:52 UTC
+//! Last Updated: 2025-01-21 00:12:38 UTC
 //! Version: 0.1.0
 //! License: MIT
 
 use harmony_core::ShardUninit;
-use magicmath::{
-    vector3d::Vector3D,
-    traits::MeshValue,
-};
-
 use core::arch::x86_64::*;
 
 /// Test fixture for SIMD operations
