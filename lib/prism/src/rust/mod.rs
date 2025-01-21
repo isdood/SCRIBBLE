@@ -14,7 +14,7 @@
 //!
 //! Author: Caleb J.D. Terkovics <isdood>
 //! Created: 2025-01-21
-//! Last Updated: 2025-01-21 13:01:07 UTC
+//! Last Updated: 2025-01-21 13:02:37 UTC
 //! Current User: isdood
 
 // Public modules
@@ -27,24 +27,26 @@ pub mod types;
 use std::sync::Arc;
 use std::future::Future;
 
-// Internal re-exports
-pub use self::crystal::bridge::{Crystal, CrystalNode, CrystalSystem};
-pub use self::runtime::task::{Task, TaskConfig, TaskExecutor};
-pub use self::types::{PrismError, PrismResult, Priority, TaskStatus};
+// Re-exports
+pub use crystal::bridge::{Crystal, CrystalNode, CrystalSystem};
+pub use runtime::task::{Task, TaskConfig, TaskExecutor};
+pub use types::{PrismError, PrismResult, Priority, TaskStatus};
 
 /// Result type for quantum-harmonic operations
-pub type Result<T> = std::result::Result<T, PrismError>;
+pub type Result<T> = PrismResult<T>;
 
-/// Quantum Runtime Configuration
+#[derive(Clone)]
+pub(crate) struct InternalRuntime {
+    executor: TaskExecutor,
+    crystal: Arc<Crystal>,
+    config: RuntimeConfig,
+}
+
 #[derive(Debug, Clone)]
 pub struct RuntimeConfig {
-    /// Number of quantum threads in crystal lattice
     pub thread_count: u32,
-    /// Stack size for resonance patterns
     pub stack_size: usize,
-    /// Enable hardware-level quantum threading
     pub use_hardware_threads: bool,
-    /// Optional memory limit for crystal growth
     pub memory_limit: Option<usize>,
 }
 
@@ -52,24 +54,18 @@ impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
             thread_count: num_cpus::get() as u32,
-            stack_size: 2 * 1024 * 1024, // 2MB quantum buffer
+            stack_size: 2 * 1024 * 1024,
             use_hardware_threads: true,
             memory_limit: None,
         }
     }
 }
 
-/// Internal runtime implementation
-#[derive(Debug)]
-pub(crate) struct InternalRuntime {
-    executor: TaskExecutor,
-    crystal: Arc<Crystal>,
-    config: RuntimeConfig,
-}
-
 impl InternalRuntime {
     pub fn new(config: RuntimeConfig) -> Result<Self> {
-        let crystal = Arc::new(Crystal::new(CrystalSystem::Cubic)?);
+        let crystal = Arc::new(Crystal::new(CrystalSystem::Cubic)
+        .map_err(|e| PrismError::Crystal(e.to_string()))?);
+
         let executor = TaskExecutor::new(Some(Arc::clone(&crystal)))
         .map_err(|e| PrismError::Runtime(e.to_string()))?;
 
@@ -82,17 +78,16 @@ impl InternalRuntime {
 
     pub fn create_task<F>(&self, future: F, config: TaskConfig) -> Result<Task<F>>
     where
-    F: Future<Output = PrismResult<()>> + Send + 'static,
+    F: Future<Output = Result<()>> + Send + 'static,
     {
         Task::new(future, config, Some(Arc::clone(&self.crystal)))
-        .map_err(|e| PrismError::Task(e.to_string()))
     }
 
     pub async fn execute<F>(&self, task: Task<F>) -> Result<()>
     where
-    F: Future<Output = PrismResult<()>> + Send + 'static,
+    F: Future<Output = Result<()>> + Send + 'static,
     {
-        self.executor.submit(task)
+        self.executor.submit(task, Default::default())
         .await
         .map_err(|e| PrismError::Runtime(e.to_string()))
     }
@@ -110,9 +105,10 @@ impl InternalRuntime {
 mod tests {
     use super::*;
     use std::time::Duration;
+    use tokio::time;
 
-    async fn test_task() -> PrismResult<()> {
-        tokio::time::sleep(Duration::from_millis(100)).await;
+    async fn test_task() -> Result<()> {
+        time::sleep(Duration::from_millis(100)).await;
         Ok(())
     }
 
