@@ -1,6 +1,6 @@
 //! Facet CLI Interface
 //! Author: @isdood
-//! Created: 2025-01-21 15:45:02 UTC
+//! Created: 2025-01-21 15:56:28 UTC
 
 const std = @import("std");
 const Calculator = @import("../core/calculator.zig").Calculator;
@@ -13,7 +13,7 @@ const Color = struct {
     const crystal = "\x1b[38;5;159m";
     const harmony = "\x1b[38;5;183m";
     const sparkle = "\x1b[38;5;219m";
-    const error_color = "\x1b[38;5;203m";  // Changed from 'error' to 'error_color'
+    const error_color = "\x1b[38;5;203m";
 };
 
 /// CLI configuration options
@@ -35,7 +35,7 @@ pub const CLI = struct {
     history: std.ArrayList([]const u8),
     allocator: std.mem.Allocator,
 
-    const Self = @This();  // Added this line to define Self
+    const Self = @This();
 
     /// Initialize new CLI instance
     pub fn init(options: struct {
@@ -130,7 +130,7 @@ pub const CLI = struct {
             try stdout.print("{s}Harmony:{s} {d:.2}\n", .{
                 Color.harmony,
                 Color.reset,
-                result.harmony,
+                result.resonance,
             });
         }
 
@@ -144,7 +144,7 @@ pub const CLI = struct {
         }
 
         // Add sparkle effect if enabled
-        if (self.config.enable_sparkle and result.harmony >= 0.95) {
+        if (self.config.enable_sparkle and result.resonance >= 0.95) {
             try stdout.print("{s}✨ Perfect Harmony! ✨{s}\n", .{
                 Color.sparkle,
                 Color.reset,
@@ -153,17 +153,17 @@ pub const CLI = struct {
     }
 
     /// Display error message
-    fn displayError(self: *Self, err: anyerror) !void {
+    fn displayError(_: *Self, err: anyerror) !void {
         const stdout = std.io.getStdOut().writer();
         try stdout.print("{s}Error:{s} {s}\n", .{
-            Color.error_color,  // Updated from Color.error
+            Color.error_color,
             Color.reset,
             @errorName(err),
         });
     }
 
     /// Display welcome message
-    fn displayWelcome(self: *Self) !void {
+    fn displayWelcome(_: *Self) !void {
         const stdout = std.io.getStdOut().writer();
         try stdout.print(
             \\{s}Welcome to Facet - Crystal Calculator{s}
@@ -180,7 +180,7 @@ pub const CLI = struct {
     }
 
     /// Display farewell message
-    fn displayFarewell(self: *Self) !void {
+    fn displayFarewell(_: *Self) !void {
         const stdout = std.io.getStdOut().writer();
         try stdout.print(
             \\{s}Thank you for using Facet!{s}
@@ -195,7 +195,7 @@ pub const CLI = struct {
     }
 
     /// Display help message
-    fn displayHelp(self: *Self) !void {
+    fn displayHelp(_: *Self) !void {
         const stdout = std.io.getStdOut().writer();
         try stdout.print(
             \\{s}Facet Commands:{s}

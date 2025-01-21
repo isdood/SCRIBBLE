@@ -1,6 +1,6 @@
 //! Facet Crystal Lattice Manager
 //! Author: @isdood
-//! Created: 2025-01-21 15:39:49 UTC
+//! Created: 2025-01-21 15:52:43 UTC
 
 const std = @import("std");
 const resonance_mod = @import("resonance.zig");  // Renamed to avoid shadowing
@@ -197,3 +197,38 @@ pub const CrystalLattice = struct {
         return self.clarity >= 0.99 and self.symmetry >= 0.99;
     }
 };
+
+test "lattice_basic" {
+    var crystal = try CrystalLattice.init(null);
+    defer crystal.deinit();
+
+    try std.testing.expect(crystal.facets.items.len > 0);
+    try std.testing.expect(crystal.clarity > 0.0);
+}
+
+test "lattice_attunement" {
+    var crystal = try CrystalLattice.init(.{
+        .clarity = 0.95,
+        .facets = 8,
+    });
+    defer crystal.deinit();
+
+    try crystal.attune(1.1);
+    const metrics = crystal.getMetrics();
+
+    try std.testing.expect(metrics.clarity >= 0.95);
+    try std.testing.expect(metrics.symmetry > 0.0);
+}
+
+test "lattice_dispersion" {
+    var crystal = try CrystalLattice.init(.{
+        .clarity = 1.0,
+        .enable_dispersion = true,
+    });
+    defer crystal.deinit();
+
+    const initial_clarity = crystal.clarity;
+    try crystal.applyDispersion();
+
+    try std.testing.expect(crystal.clarity != initial_clarity);
+}

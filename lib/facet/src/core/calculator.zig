@@ -1,193 +1,145 @@
-//! Facet Core Calculator
+//! Facet - Crystal-Based Calculator
 //! Author: @isdood
-//! Created: 2025-01-21 15:42:04 UTC
+//! Created: 2025-01-21 15:55:16 UTC
 
 const std = @import("std");
-const crystal = @import("../crystal/lattice.zig");
-const resonance = @import("../resonance/attunement.zig");
-const types = @import("types.zig");
+const core = @import("core/calculator.zig");
+const resonance = @import("resonance/attunement.zig");
+const crystal = @import("crystal/lattice.zig");
+const ui = @import("ui/cli.zig");
 
+const Calculator = core.Calculator;
+const Attunement = resonance.Attunement;  // Updated from ResonanceState
 const CrystalLattice = crystal.CrystalLattice;
-const Attunement = resonance.Attunement;  // Updated to match new name
-const Result = types.Result;
+const CLI = ui.CLI;
 
-/// Calculator configuration options
-pub const CalculatorConfig = struct {
-    /// Crystal lattice instance
-    crystal_lattice: *CrystalLattice,
-    /// Resonance state instance
-    resonance_state: *Attunement,  // Updated to match new name
-    /// Enable resonance checking
-    check_resonance: bool = true,
-    /// Enable result caching
-    enable_cache: bool = true,
-    /// Maximum cache size
-    max_cache_size: usize = 1000,
+/// Default configuration values
+const Config = struct {
+    /// Minimum resonance threshold
+    resonance_threshold: f64 = 0.87,
+    /// Crystal attunement strength
+    attunement_strength: f64 = 0.93,
+    /// Crystal clarity requirement
+    crystal_clarity: f64 = 0.95,
 };
 
-// ... (Operation enum remains unchanged) ...
-
-/// Calculator result cache entry
-const CacheEntry = struct {
-    expression: []const u8,
-    result: Result,
-    timestamp: i64,
+/// Error set for main operations
+const MainError = error{
+    ResonanceLoss,
+    AttunementFailure,
+    CrystalMisalignment,
+    InvalidInput,
+    InitializationFailed,
+    WhimsyDepletion,
 };
 
-/// Core calculator implementation
-pub const Calculator = struct {
-    config: CalculatorConfig,
-    cache: std.ArrayList(CacheEntry),
-    allocator: std.mem.Allocator,
+/// Global state type definition
+const GlobalState = struct {
+    calculator: ?Calculator = null,
+    resonance_state: ?Attunement = null,  // Updated from ResonanceState
+    crystal_lattice: ?CrystalLattice = null,
+    cli: ?CLI = null,
 
-    const Self = @This();
+    /// Initialize all components
+    pub fn init(self: *GlobalState) MainError!void {
+        if (self.calculator != null) return;
 
-    /// Initialize new calculator
-    pub fn init(config: CalculatorConfig) !*Self {
-        const calculator = try std.heap.page_allocator.create(Self);
+        // Initialize crystal lattice
+        self.crystal_lattice = try CrystalLattice.init(.{
+            .clarity = Config.crystal_clarity,
+            .facets = 3,
+            .sparkle_factor = 0.7,
+        });
 
-        calculator.* = .{
-            .config = config,
-            .cache = std.ArrayList(CacheEntry).init(std.heap.page_allocator),
-            .allocator = std.heap.page_allocator,
-        };
+        // Initialize resonance state with crystal lattice
+        self.resonance_state = try Attunement.init(self.crystal_lattice.?, .{
+            .min_resonance = Config.resonance_threshold,
+            .attunement_factor = Config.attunement_strength,
+            .adaptive_resonance = true,
+        });
 
-        return calculator;
+        // Initialize calculator with resonance state and crystal lattice
+        self.calculator = try Calculator.init(.{
+            .resonance_state = self.resonance_state.?,
+            .crystal_lattice = self.crystal_lattice.?,
+        });
+
+        // Initialize CLI
+        self.cli = try CLI.init(.{
+            .calculator = self.calculator.?,
+        });
     }
 
-    /// Clean up calculator resources
-    pub fn deinit(self: *Self) void {
-        for (self.cache.items) |entry| {
-            self.allocator.free(entry.expression);
-        }
-        self.cache.deinit();
-        std.heap.page_allocator.destroy(self);
-    }
-
-    /// Compute result for expression
-    pub fn compute(self: *Self, expression: []const u8, options: struct {
-        check_resonance: bool = true,
-        maintain_resonance: bool = true,
-    }) !Result {
-        // Check cache first if enabled
-        if (self.config.enable_cache) {
-            if (self.checkCache(expression)) |cached| {
-                return cached;
-            }
-        }
-
-        // Parse and evaluate expression
-        var result = try self.evaluate(expression);
-
-        // Apply crystal resonance if enabled
-        if (options.check_resonance) {
-            try self.applyResonance(&result);
-        }
-
-        // Maintain resonance state if requested
-        if (options.maintain_resonance) {
-            try self.maintainResonance(&result);
-        }
-
-        // Cache result if enabled
-        if (self.config.enable_cache) {
-            try self.cacheResult(expression, result);
-        }
-
-        return result;
-    }
-
-    // ... (checkCache and cacheResult methods remain unchanged) ...
-
-    /// Evaluate mathematical expression
-    fn evaluate(self: *Self, expression: []const u8) !Result {
-        _ = self;  // Mark self as unused
-        var parser = ExpressionParser.init(expression);
-        const ast = try parser.parse();
-        return ast;  // Return the Result directly since parse() now returns Result
-    }
-
-    /// Apply crystal resonance to result
-    fn applyResonance(self: *Self, result: *Result) !void {
-        // Update crystal lattice state
-        try self.config.crystal_lattice.attune(result.resonance);
-
-        // Apply resonance effects
-        try self.config.resonance_state.optimize(result);  // Changed from apply to optimize to match new API
-
-        // Update result clarity based on crystal state
-        result.clarity = self.config.crystal_lattice.clarity;
-    }
-
-    /// Maintain stable resonance state
-    fn maintainResonance(self: *Self, _: *Result) !void {  // Mark result as unused with _
-        const metrics = self.config.resonance_state.getMetrics();
-
-        // Adjust resonance if needed
-        if (metrics.resonance < 0.85) {
-            try self.config.crystal_lattice.applyDispersion();
-            // Note: stabilize method is now part of the optimize workflow
-            try self.config.resonance_state.optimize(&Result{
-                .value = 0.0,
-                .resonance = metrics.resonance,
-                .clarity = self.config.crystal_lattice.clarity,
-            });
-        }
-    }
-
-    /// Get calculator metrics
-    pub fn getMetrics(self: *const Self) struct {
-        cache_size: usize,
-        crystal_clarity: f64,
-        resonance_level: f64,
-    } {
-        const resonance_metrics = self.config.resonance_state.getMetrics();
-        return .{
-            .cache_size = self.cache.items.len,
-            .crystal_clarity = self.config.crystal_lattice.clarity,
-            .resonance_level = resonance_metrics.resonance,  // Updated to use new metrics struct
-        };
+    /// Deinitialize all components
+    pub fn deinit(self: *GlobalState) void {
+        if (self.cli) |cli| cli.deinit();
+        if (self.calculator) |calc| calc.deinit();
+        if (self.resonance_state) |res| res.deinit();
+        if (self.crystal_lattice) |lattice| lattice.deinit();
     }
 };
 
-// ... (ExpressionParser struct remains unchanged) ...
+/// Global state instance
+var global_state = GlobalState{};
 
-test "calculator_basic" {
-    var lattice = try CrystalLattice.init(.{
-        .clarity = 0.95,
-        .facets = 3,
+/// Main entry point
+pub fn main() !void {
+    // Initialize logger
+    try std.log.init(.{
+        .level = .info,
+        .prefix = "[Facet] ",
     });
-    defer lattice.deinit();
+    defer std.log.deinit();
 
-    var resonance_state = try Attunement.init(lattice, null);  // Updated to match new API
-    defer resonance_state.deinit();
+    const log = std.log.scoped(.main);
+    log.info("Initializing Facet Calculator...", .{});
 
-    var calculator = try Calculator.init(.{
-        .crystal_lattice = lattice,
-        .resonance_state = resonance_state,
-    });
-    defer calculator.deinit();
+    // Initialize global state
+    try global_state.init();
+    defer global_state.deinit();
 
-    const result = try calculator.compute("2 + 2", .{});
-    try std.testing.expectEqual(result.value, 4.0);
+    // Process command line arguments
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    // Handle CLI operations
+    if (args.len > 1) {
+        // Expression provided as argument
+        const result = try global_state.calculator.?.compute(args[1], .{
+            .check_resonance = true,
+            .maintain_resonance = true,  // Updated from maintain_attunement
+        });
+
+        try global_state.cli.?.displayResult(result);
+    } else {
+        // Interactive mode
+        try global_state.cli.?.runInteractive();
+    }
 }
 
-test "calculator_cache" {
-    var lattice = try CrystalLattice.init(null);
-    defer lattice.deinit();
+test "basic_initialization" {
+    try global_state.init();
+    defer global_state.deinit();
 
-    var resonance_state = try Attunement.init(lattice, null);  // Updated to match new API
-    defer resonance_state.deinit();
+    try std.testing.expect(global_state.calculator != null);
+    try std.testing.expect(global_state.resonance_state != null);
+    try std.testing.expect(global_state.crystal_lattice != null);
+    try std.testing.expect(global_state.cli != null);
+}
 
-    var calculator = try Calculator.init(.{
-        .crystal_lattice = lattice,
-        .resonance_state = resonance_state,
-        .enable_cache = true,
+test "crystal_resonance" {
+    try global_state.init();
+    defer global_state.deinit();
+
+    const result = try global_state.calculator.?.compute("2 + 2", .{
+        .check_resonance = true,
     });
-    defer calculator.deinit();
 
-    _ = try calculator.compute("1 + 1", .{});
-    const metrics = calculator.getMetrics();
-
-    try std.testing.expect(metrics.cache_size > 0);
+    try std.testing.expectEqual(result.value, 4.0);
+    try std.testing.expect(result.resonance >= Config.resonance_threshold);
+    try std.testing.expect(result.clarity >= Config.crystal_clarity);
 }

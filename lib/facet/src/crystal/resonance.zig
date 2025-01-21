@@ -1,250 +1,192 @@
-//! Facet Crystal Resonance Manager
+//! Crystal Resonance Network
 //! Author: @isdood
-//! Created: 2025-01-21 12:57:30 UTC
+//! Created: 2025-01-21 15:58:34 UTC
 
 const std = @import("std");
-const lattice = @import("lattice.zig");
+const crystal_lattice = @import("lattice.zig");
 const types = @import("../core/types.zig");
 
-const CrystalLattice = lattice.CrystalLattice;
+const CrystalLattice = crystal_lattice.CrystalLattice;
 const Result = types.Result;
 
-/// Crystal resonance configuration
+/// Resonance node configuration
 pub const ResonanceConfig = struct {
-    /// Base resonance frequency
-    base_frequency: f64 = 432.0,
-    /// Crystal attunement threshold
-    attunement_threshold: f64 = 0.87,
-    /// Resonance stability factor
-    stability_factor: f64 = 0.93,
-    /// Enable harmonic overtones
-    enable_overtones: bool = true,
-    /// Number of resonance nodes
-    node_count: u8 = 7,
+    /// Base frequency for resonance calculations
+    base_frequency: f64 = 440.0,
+    /// Resonance stability threshold
+    stability_threshold: f64 = 0.85,
+    /// Enable harmonic patterns
+    enable_harmonics: bool = true,
+    /// Node count
+    node_count: u8 = 8,
 };
 
-/// Crystal resonance patterns
-pub const ResonancePattern = enum {
-    /// Clear, pristine resonance
-    Pure,
-    /// Flowing, dynamic resonance
-    Flowing,
-    /// Deep, grounding resonance
-    Earthen,
-    /// High, ethereal resonance
-    Celestial,
-    /// Perfect crystal resonance
-    Prismatic,
-
-    /// Get pattern frequency modifier
-    pub fn frequency(self: ResonancePattern) f64 {
-        return switch (self) {
-            .Pure => 1.0,
-            .Flowing => 1.618, // Golden ratio
-            .Earthen => 0.882, // Earth frequency
-            .Celestial => 2.0, // Octave up
-            .Prismatic => 2.718, // e (natural resonance)
-        };
-    }
-};
-
-/// Resonance node in crystal structure
+/// Resonance node structure
 const ResonanceNode = struct {
+    /// Node frequency
     frequency: f64,
+    /// Node amplitude
     amplitude: f64,
+    /// Node phase
     phase: f64,
+    /// Node stability
     stability: f64,
 };
 
-/// Crystal resonance manager
-pub const Resonance = struct {
+/// Resonance pattern types
+const ResonancePattern = enum {
+    /// Standing wave pattern
+    Standing,
+    /// Traveling wave pattern
+    Traveling,
+    /// Harmonic series pattern
+    Harmonic,
+    /// Chaotic pattern
+    Chaotic,
+    /// Perfect resonance pattern
+    Perfect,
+};
+
+/// Crystal resonance network
+pub const ResonanceNetwork = struct {
     config: ResonanceConfig,
-    pattern: ResonancePattern,
     nodes: std.ArrayList(ResonanceNode),
-    current_frequency: f64,
+    pattern: ResonancePattern,
     stability: f64,
-    crystal_lattice: *CrystalLattice,
+    allocator: std.mem.Allocator,
 
     const Self = @This();
 
-    /// Initialize new resonance manager
-    pub fn init(crystal_lattice: *CrystalLattice, config: ?ResonanceConfig) !*Self {
-        const resonance = try std.heap.page_allocator.create(Self);
+    /// Initialize new resonance network
+    pub fn init(config: ?ResonanceConfig) !*Self {
+        const network = try std.heap.page_allocator.create(Self);
 
-        resonance.* = .{
+        network.* = .{
             .config = config orelse ResonanceConfig{},
-            .pattern = .Pure,
             .nodes = std.ArrayList(ResonanceNode).init(std.heap.page_allocator),
-            .current_frequency = 0.0,
-            .stability = 1.0,
-            .crystal_lattice = crystal_lattice,
+            .pattern = .Standing,
+            .stability = 0.0,
+            .allocator = std.heap.page_allocator,
         };
 
-        // Initialize resonance nodes
-        try resonance.initNodes();
-
-        return resonance;
+        try network.initializeNodes();
+        return network;
     }
 
-    /// Clean up resonance resources
+    /// Clean up network resources
     pub fn deinit(self: *Self) void {
         self.nodes.deinit();
         std.heap.page_allocator.destroy(self);
     }
 
     /// Initialize resonance nodes
-    fn initNodes(self: *Self) !void {
+    fn initializeNodes(self: *Self) !void {
+        // Clear existing nodes
+        self.nodes.clearAndFree();
+
+        // Create resonance nodes
         var i: u8 = 0;
         while (i < self.config.node_count) : (i += 1) {
             const node = ResonanceNode{
-                .frequency = self.config.base_frequency * (1.0 + @intToFloat(f64, i) * 0.5),
-                .amplitude = 1.0 / @intToFloat(f64, i + 1),
+                .frequency = self.config.base_frequency * (1.0 + @as(f64, @floatFromInt(i)) * 0.5),
+                .amplitude = 1.0,
                 .phase = 0.0,
                 .stability = 1.0,
             };
             try self.nodes.append(node);
         }
+
+        self.stability = 1.0;
     }
 
-    /// Apply resonance patterns to crystal
-    pub fn applyResonance(self: *Self, result: *Result) !void {
-        // Select appropriate resonance pattern
-        self.pattern = self.selectPattern(result);
-
-        // Apply base frequency modulation
-        self.current_frequency = self.config.base_frequency * self.pattern.frequency();
-
-        // Process resonance nodes
-        try self.processNodes();
-
-        // Calculate final resonance stability
-        self.calculateStability();
-
-        // Update result with resonance metrics
-        result.resonance = self.getResonanceLevel();
-        result.clarity *= self.stability;
-    }
-
-    /// Process resonance nodes
-    fn processNodes(self: *Self) !void {
-        const clarity = self.crystal_lattice.clarity;
-
-        for (self.nodes.items) |*node| {
-            // Adjust node frequency based on pattern
-            node.frequency *= self.pattern.frequency();
-
-            // Apply crystal clarity to amplitude
-            node.amplitude *= clarity;
-
-            // Update stability based on resonance
-            node.stability = @min(1.0, node.stability * self.config.stability_factor);
-        }
-
-        // Apply harmonic overtones if enabled
-        if (self.config.enable_overtones) {
-            try self.processOvertones();
-        }
-    }
-
-    /// Process harmonic overtones
-    fn processOvertones(self: *Self) !void {
-        const base_freq = self.current_frequency;
-
-        for (self.nodes.items) |*node| {
-            // Generate harmonic overtones
-            const overtone_freq = base_freq * node.frequency;
-            node.frequency = (node.frequency + overtone_freq) * 0.5;
-
-            // Adjust amplitude for harmonics
-            node.amplitude *= self.pattern.frequency();
-        }
-    }
-
-    /// Calculate overall stability
-    fn calculateStability(self: *Self) void {
+    /// Update network state
+    pub fn update(self: *Self) !void {
         var total_stability: f64 = 0.0;
 
-        for (self.nodes.items) |node| {
+        // Update each node
+        for (self.nodes.items) |*node| {
+            // Update phase
+            node.phase = @mod(node.phase + node.frequency * 0.01, std.math.tau);
+
+            // Calculate node stability using std.math.fabs
+            node.stability = std.math.fabs(@sin(node.phase)) * node.amplitude;
             total_stability += node.stability;
         }
 
-        self.stability = total_stability / @intToFloat(f64, self.nodes.items.len);
+        // Update overall stability
+        self.stability = total_stability / @as(f64, @floatFromInt(self.nodes.items.len));
+
+        // Update resonance pattern
+        self.pattern = self.selectPattern();
     }
 
-    /// Select resonance pattern based on crystal state
-    fn selectPattern(self: *Self, result: *const Result) ResonancePattern {
-        const clarity = self.crystal_lattice.clarity;
-
-        return if (clarity >= 0.98) .Prismatic
-        else if (clarity >= 0.95) .Celestial
-            else if (clarity >= 0.90) .Flowing
-                else if (clarity >= 0.85) .Earthen
-                    else .Pure;
+    /// Select resonance pattern based on network state
+    fn selectPattern(self: *Self) ResonancePattern {
+        if (self.stability >= 0.99) return .Perfect;
+        if (self.stability >= 0.9) return .Harmonic;
+        if (self.stability >= 0.8) return .Standing;
+        if (self.stability >= 0.7) return .Traveling;
+        return .Chaotic;
     }
 
     /// Get current resonance level
-    pub fn getResonanceLevel(self: *const Self) f64 {
+    pub fn getResonance(self: *Self) f64 {
         var total_resonance: f64 = 0.0;
 
         for (self.nodes.items) |node| {
-            total_resonance += node.amplitude * node.stability;
+            total_resonance += node.stability * node.amplitude;
         }
 
-        return @min(1.0, total_resonance / @intToFloat(f64, self.nodes.items.len));
+        return @min(1.0, total_resonance / @as(f64, @floatFromInt(self.nodes.items.len)));
     }
 
-    /// Get resonance metrics
+    /// Get network metrics
     pub fn getMetrics(self: *const Self) struct {
-        frequency: f64,
-        pattern: ResonancePattern,
         stability: f64,
+        pattern: ResonancePattern,
         node_count: usize,
     } {
         return .{
-            .frequency = self.current_frequency,
-            .pattern = self.pattern,
             .stability = self.stability,
+            .pattern = self.pattern,
             .node_count = self.nodes.items.len,
         };
     }
 };
 
 test "resonance_basic" {
-    var lattice = try CrystalLattice.init(.{
+    var test_crystal = try CrystalLattice.init(.{
         .clarity = 0.95,
         .facets = 3,
     });
-    defer lattice.deinit();
+    defer test_crystal.deinit();
 
-    var resonance = try Resonance.init(&lattice, null);
-    defer resonance.deinit();
+    var network = try ResonanceNetwork.init(null);
+    defer network.deinit();
 
-    var result = Result{
-        .value = 42.0,
-        .resonance = 0.0,
-        .clarity = 0.95,
-    };
+    try network.update();
+    const metrics = network.getMetrics();
 
-    try resonance.applyResonance(&result);
-    try std.testing.expect(result.resonance > 0.0);
+    try std.testing.expect(metrics.stability > 0.0);
+    try std.testing.expect(metrics.node_count > 0);
 }
 
-test "resonance_patterns" {
-    var lattice = try CrystalLattice.init(.{
+test "resonance_stability" {
+    var test_crystal = try CrystalLattice.init(.{
         .clarity = 1.0,
         .facets = 4,
     });
-    defer lattice.deinit();
+    defer test_crystal.deinit();
 
-    var resonance = try Resonance.init(&lattice, null);
-    defer resonance.deinit();
+    var network = try ResonanceNetwork.init(.{
+        .base_frequency = 440.0,
+        .stability_threshold = 0.9,
+    });
+    defer network.deinit();
 
-    var result = Result{
-        .value = 42.0,
-        .resonance = 0.0,
-        .clarity = 1.0,
-    };
+    try network.update();
+    const resonance = network.getResonance();
 
-    try resonance.applyResonance(&result);
-    try std.testing.expect(resonance.pattern == .Prismatic);
+    try std.testing.expect(resonance > 0.0);
+    try std.testing.expect(resonance <= 1.0);
 }
