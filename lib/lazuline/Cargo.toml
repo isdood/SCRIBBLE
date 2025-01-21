@@ -1,3 +1,6 @@
+# Cargo.toml for Lazuline
+# Updated: 2025-01-21 19:14:46 UTC
+# Author: guavabot1
 [package]
 name = "lazuline"
 version = "0.1.0"
@@ -19,6 +22,7 @@ path = "src/lib.rs"
 [[test]]
 name = "lib"
 path = "tests/lib.rs"
+
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

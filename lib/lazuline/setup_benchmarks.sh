@@ -1,22 +1,21 @@
 #!/bin/bash
 # setup_benchmarks.sh
-# Created: 2025-01-21 19:09:45
+# Created: 2025-01-21 19:13:55
 # Author: isdood
 
 echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Setting up benchmark infrastructure..."
 
+# Create backup of original Cargo.toml
+cp Cargo.toml Cargo.toml.bak
+
+# Remove any existing benchmark configurations
+sed -i '/\[dev-dependencies\]/,/^$/d' Cargo.toml
+sed -i '/\[\[bench\]\]/,/^$/d' Cargo.toml
+sed -i '/criterion =/d' Cargo.toml
+
 # Clean up existing benchmark files
 rm -f benches/lazuline_benchmarks.rs
 rm -rf target/criterion
-
-# First, read the existing Cargo.toml
-if [ -f Cargo.toml ]; then
-    # Create backup
-    cp Cargo.toml Cargo.toml.bak
-    # Remove existing sections we'll be adding
-    sed -i '/\[dev-dependencies\]/,/^$/d' Cargo.toml
-    sed -i '/\[\[bench\]\]/,/^$/d' Cargo.toml
-fi
 
 # Create benches directory
 mkdir -p benches
@@ -75,7 +74,7 @@ fn bench_multiple_operations(c: &mut Criterion) {
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().sample_size(10);
+    config = Criterion::default().sample_size(10).without_plots();
     targets = bench_initialization, bench_channel_compute, bench_multiple_operations
 );
 criterion_main!(benches);
@@ -87,29 +86,51 @@ cat > bench.sh << 'END'
 
 echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Running Lazuline benchmarks..."
 
-# Clean any previous benchmark results
-rm -rf target/criterion/report
+# Create results directory
+mkdir -p results
 
-# Run benchmarks
-RUSTFLAGS="-C target-cpu=native" cargo bench
-
-# Wait for criterion to finish generating reports
-sleep 2
+# Run benchmarks and capture output
+RUSTFLAGS="-C target-cpu=native" cargo bench | tee results/benchmark_output.txt
 
 echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] ✨ Benchmarks completed!"
 
-# List available reports
-echo "Available benchmark reports:"
-find target/criterion -name "report" -type d | while read -r dir; do
-    echo "  - file://$PWD/$dir/index.html"
+# Parse and display summary
+echo -e "\n📊 Performance Summary:"
+echo "========================"
+
+# Extract median times
+echo "Initialization:"
+grep "initialization" results/benchmark_output.txt | grep "time:" | awk -F'[\\[\\]]' '{print "  Median: " $2}'
+
+echo -e "\nChannel Compute:"
+grep "channel_compute/" results/benchmark_output.txt | grep "time:" | while read -r line; do
+    size=$(echo $line | grep -o 'channel_compute/[0-9]*' | cut -d'/' -f2)
+    time=$(echo $line | awk -F'[\\[\\]]' '{print $2}')
+    echo "  Size $size: $time"
 done
+
+echo -e "\nMultiple Operations:"
+grep "multiple_operations/sequential" results/benchmark_output.txt | grep "time:" | while read -r line; do
+    ops=$(echo $line | grep -o 'sequential/[0-9]*' | cut -d'/' -f2)
+    time=$(echo $line | awk -F'[\\[\\]]' '{print $2}')
+    echo "  Ops $ops: $time"
+done
+
+echo -e "\nDetailed results saved in: results/benchmark_output.txt"
 END
 
 chmod +x bench.sh
 
-# Update Cargo.toml
-cat > Cargo.toml.new << END
-$(cat Cargo.toml)
+# Create a temporary file for the new Cargo.toml content
+echo "# Cargo.toml for Lazuline
+# Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+# Author: $USER" > Cargo.toml.new
+
+# Add existing content without dev-dependencies and bench sections
+grep -v -e '\[dev-dependencies\]' -e 'criterion =' -e '\[\[bench\]\]' Cargo.toml >> Cargo.toml.new
+
+# Add benchmark configuration
+cat >> Cargo.toml.new << END
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

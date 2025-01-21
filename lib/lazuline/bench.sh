@@ -2,19 +2,34 @@
 
 echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] Running Lazuline benchmarks..."
 
-# Clean any previous benchmark results
-rm -rf target/criterion/report
+# Create results directory
+mkdir -p results
 
-# Run benchmarks
-RUSTFLAGS="-C target-cpu=native" cargo bench
-
-# Wait for criterion to finish generating reports
-sleep 2
+# Run benchmarks and capture output
+RUSTFLAGS="-C target-cpu=native" cargo bench | tee results/benchmark_output.txt
 
 echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] ✨ Benchmarks completed!"
 
-# List available reports
-echo "Available benchmark reports:"
-find target/criterion -name "report" -type d | while read -r dir; do
-    echo "  - file://$PWD/$dir/index.html"
+# Parse and display summary
+echo -e "\n📊 Performance Summary:"
+echo "========================"
+
+# Extract median times
+echo "Initialization:"
+grep "initialization" results/benchmark_output.txt | grep "time:" | awk -F'[\\[\\]]' '{print "  Median: " $2}'
+
+echo -e "\nChannel Compute:"
+grep "channel_compute/" results/benchmark_output.txt | grep "time:" | while read -r line; do
+    size=$(echo $line | grep -o 'channel_compute/[0-9]*' | cut -d'/' -f2)
+    time=$(echo $line | awk -F'[\\[\\]]' '{print $2}')
+    echo "  Size $size: $time"
 done
+
+echo -e "\nMultiple Operations:"
+grep "multiple_operations/sequential" results/benchmark_output.txt | grep "time:" | while read -r line; do
+    ops=$(echo $line | grep -o 'sequential/[0-9]*' | cut -d'/' -f2)
+    time=$(echo $line | awk -F'[\\[\\]]' '{print $2}')
+    echo "  Ops $ops: $time"
+done
+
+echo -e "\nDetailed results saved in: results/benchmark_output.txt"

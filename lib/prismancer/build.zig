@@ -1,8 +1,12 @@
+// build.zig
+// Created: 2025-01-21 18:55:31 UTC
+// Author: isdood
+
 const std = @import("std");
 const builtin = @import("builtin");
 
 // Build timestamp and metadata
-const BUILD_TIMESTAMP = "2025-01-21 18:37:57";
+const BUILD_TIMESTAMP = "2025-01-21 18:55:31";
 const BUILD_USER = "isdood";
 
 pub fn build(b: *std.Build) void {
@@ -115,7 +119,7 @@ pub fn build(b: *std.Build) void {
         "memory",
         "geometry",
         "cache",
-        "vulkan",
+        "harmony",  // Changed from "quantum"
     };
 
     inline for (components) |component| {

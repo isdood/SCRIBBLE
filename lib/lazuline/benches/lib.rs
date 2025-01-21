@@ -50,7 +50,7 @@ fn bench_multiple_operations(c: &mut Criterion) {
 
 criterion_group!(
     name = benches;
-    config = Criterion::default().sample_size(10);
+    config = Criterion::default().sample_size(10).without_plots();
     targets = bench_initialization, bench_channel_compute, bench_multiple_operations
 );
 criterion_main!(benches);
