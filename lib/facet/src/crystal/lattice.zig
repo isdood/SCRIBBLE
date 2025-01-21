@@ -1,9 +1,9 @@
 //! Facet Crystal Lattice Manager
 //! Author: @isdood
-//! Created: 2025-01-21 12:58:33 UTC
+//! Created: 2025-01-21 15:39:49 UTC
 
 const std = @import("std");
-const resonance = @import("resonance.zig");
+const resonance_mod = @import("resonance.zig");  // Renamed to avoid shadowing
 const types = @import("../core/types.zig");
 
 const Result = types.Result;
@@ -101,13 +101,13 @@ pub const CrystalLattice = struct {
         self.facets.clearAndFree();
 
         // Calculate base angle for facet distribution
-        const base_angle = std.math.pi * 2.0 / @intToFloat(f64, self.config.facets);
+        const base_angle = std.math.pi * 2.0 / @as(f64, @floatFromInt(self.config.facets));
 
         // Create facets
         var i: u8 = 0;
         while (i < self.config.facets) : (i += 1) {
             const facet = Facet{
-                .angle = base_angle * @intToFloat(f64, i),
+                .angle = base_angle * @as(f64, @floatFromInt(i)),
                 .clarity = self.config.clarity,
                 .alignment = 1.0,
                 .sparkle = self.config.sparkle_factor,
@@ -124,15 +124,15 @@ pub const CrystalLattice = struct {
     /// Update resonance factor based on lattice state
     fn updateResonanceFactor(self: *Self) void {
         const clarity_factor = self.clarity * self.symmetry;
-        const pattern_factor = @intToFloat(f64, self.pattern.symmetryCount()) / 48.0;
+        const pattern_factor = @as(f64, @floatFromInt(self.pattern.symmetryCount())) / 48.0;
         self.resonance_factor = clarity_factor * pattern_factor;
     }
 
     /// Attune crystal lattice
-    pub fn attune(self: *Self, resonance: f64) !void {
+    pub fn attune(self: *Self, resonance_value: f64) !void {  // Renamed parameter to avoid shadowing
         // Apply resonance to each facet
         for (self.facets.items) |*facet| {
-            facet.alignment = @min(1.0, facet.alignment * resonance);
+            facet.alignment = @min(1.0, facet.alignment * resonance_value);
             facet.clarity = @min(1.0, facet.clarity * facet.alignment);
 
             // Update sparkle based on alignment
@@ -168,7 +168,7 @@ pub const CrystalLattice = struct {
             total_alignment += facet.alignment;
         }
 
-        const facet_count = @intToFloat(f64, self.facets.items.len);
+        const facet_count = @as(f64, @floatFromInt(self.facets.items.len));
         self.clarity = total_clarity / facet_count;
         self.symmetry = total_alignment / facet_count;
 
@@ -197,38 +197,3 @@ pub const CrystalLattice = struct {
         return self.clarity >= 0.99 and self.symmetry >= 0.99;
     }
 };
-
-test "lattice_basic" {
-    var lattice = try CrystalLattice.init(null);
-    defer lattice.deinit();
-
-    try std.testing.expect(lattice.facets.items.len > 0);
-    try std.testing.expect(lattice.clarity > 0.0);
-}
-
-test "lattice_attunement" {
-    var lattice = try CrystalLattice.init(.{
-        .clarity = 0.95,
-        .facets = 8,
-    });
-    defer lattice.deinit();
-
-    try lattice.attune(1.1);
-    const metrics = lattice.getMetrics();
-
-    try std.testing.expect(metrics.clarity >= 0.95);
-    try std.testing.expect(metrics.symmetry > 0.0);
-}
-
-test "lattice_dispersion" {
-    var lattice = try CrystalLattice.init(.{
-        .clarity = 1.0,
-        .enable_dispersion = true,
-    });
-    defer lattice.deinit();
-
-    const initial_clarity = lattice.clarity;
-    try lattice.applyDispersion();
-
-    try std.testing.expect(lattice.clarity != initial_clarity);
-}

@@ -1,6 +1,6 @@
 //! Facet - Crystal-Based Calculator
 //! Author: @isdood
-//! Created: 2025-01-21 12:53:30 UTC
+//! Created: 2025-01-21 15:43:35 UTC
 
 const std = @import("std");
 const core = @import("core/calculator.zig");
@@ -9,7 +9,7 @@ const crystal = @import("crystal/lattice.zig");
 const ui = @import("ui/cli.zig");
 
 const Calculator = core.Calculator;
-const ResonanceState = resonance.ResonanceState;
+const Attunement = resonance.Attunement;  // Updated from ResonanceState
 const CrystalLattice = crystal.CrystalLattice;
 const CLI = ui.CLI;
 
@@ -33,51 +33,54 @@ const MainError = error{
     WhimsyDepletion,
 };
 
-/// Global state management
-var global_state = struct {
+/// Global state type definition
+const GlobalState = struct {  // Define the type first
     calculator: ?Calculator = null,
-    resonance_state: ?ResonanceState = null,
+    resonance_state: ?Attunement = null,  // Updated from ResonanceState
     crystal_lattice: ?CrystalLattice = null,
     cli: ?CLI = null,
 
     /// Initialize all components
-    pub fn init() MainError!void {
-        if (global_state.calculator != null) return;
+    pub fn init(self: *GlobalState) MainError!void {
+        if (self.calculator != null) return;
 
         // Initialize crystal lattice
-        global_state.crystal_lattice = try CrystalLattice.init(.{
+        self.crystal_lattice = try CrystalLattice.init(.{
             .clarity = Config.crystal_clarity,
             .facets = 3,
             .sparkle_factor = 0.7,
         });
 
-        // Initialize resonance state
-        global_state.resonance_state = try ResonanceState.init(.{
-            .resonance = Config.resonance_threshold,
-            .attunement = Config.attunement_strength,
-            .whimsy = 1.0,
+        // Initialize resonance state with crystal lattice
+        self.resonance_state = try Attunement.init(self.crystal_lattice.?, .{
+            .min_resonance = Config.resonance_threshold,
+            .attunement_factor = Config.attunement_strength,
+            .adaptive_resonance = true,
         });
 
         // Initialize calculator with resonance state and crystal lattice
-        global_state.calculator = try Calculator.init(.{
-            .resonance_state = global_state.resonance_state.?,
-            .crystal_lattice = global_state.crystal_lattice.?,
+        self.calculator = try Calculator.init(.{
+            .resonance_state = self.resonance_state.?,
+            .crystal_lattice = self.crystal_lattice.?,
         });
 
         // Initialize CLI
-        global_state.cli = try CLI.init(.{
-            .calculator = global_state.calculator.?,
+        self.cli = try CLI.init(.{
+            .calculator = self.calculator.?,
         });
     }
 
     /// Deinitialize all components
-    pub fn deinit() void {
-        if (global_state.cli) |cli| cli.deinit();
-        if (global_state.calculator) |calc| calc.deinit();
-        if (global_state.resonance_state) |res| res.deinit();
-        if (global_state.crystal_lattice) |lattice| lattice.deinit();
+    pub fn deinit(self: *GlobalState) void {
+        if (self.cli) |cli| cli.deinit();
+        if (self.calculator) |calc| calc.deinit();
+        if (self.resonance_state) |res| res.deinit();
+        if (self.crystal_lattice) |lattice| lattice.deinit();
     }
 };
+
+/// Global state instance
+var global_state = GlobalState{};
 
 /// Main entry point
 pub fn main() !void {
@@ -108,7 +111,7 @@ pub fn main() !void {
         // Expression provided as argument
         const result = try global_state.calculator.?.compute(args[1], .{
             .check_resonance = true,
-            .maintain_attunement = true,
+            .maintain_resonance = true,  // Updated from maintain_attunement
         });
 
         try global_state.cli.?.displayResult(result);
