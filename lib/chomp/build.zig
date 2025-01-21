@@ -1,7 +1,7 @@
 ///! Chomp Build System
 ///! ===============
 ///! Author: isdood
-///! Created: 2025-01-21 03:11:15 UTC
+///! Created: 2025-01-21 03:16:08 UTC
 ///! License: MIT
 
 const std = @import("std");
@@ -9,6 +9,11 @@ const std = @import("std");
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+
+    // Create module
+    const chomp_module = b.addModule("chomp", .{
+        .root_source_file = .{ .cwd_relative = "src/main.zig" },
+    });
 
     // Main library
     const lib = b.addStaticLibrary(.{
@@ -20,7 +25,7 @@ pub fn build(b: *std.Build) !void {
     b.installArtifact(lib);
 
     // Build Rust components
-    var rust_build = RustBuild.create(b);  // Changed to var
+    var rust_build = RustBuild.create(b);
     try rust_build.build();
 
     // Test step
@@ -39,8 +44,8 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    // Add the chomp module to integration tests
-    integration_tests.addModule("chomp", lib.getModule("chomp"));
+    // Add dependencies to integration tests
+    integration_tests.root_module.addImport("chomp", chomp_module);
 
     const run_integration_tests = b.addRunArtifact(integration_tests);
 
@@ -63,7 +68,9 @@ pub fn build(b: *std.Build) !void {
                                         .target = target,
                                         .optimize = optimize,
         });
-        example.addModule("chomp", lib.getModule("chomp"));
+
+        // Add module to example
+        example.root_module.addImport("chomp", chomp_module);
 
         const run_cmd = b.addRunArtifact(example);
         const run_step = b.step(
@@ -84,26 +91,18 @@ const RustBuild = struct {
     }
 
     pub fn build(self: *RustBuild) !void {
-        const cargo_args = [_][]const u8{
+        // Create cargo step
+        const cargo_step = self.builder.addSystemCommand(&[_][]const u8{
             "cargo",
             "build",
             "--release",
-        };
+        });
 
-        var child = try std.ChildProcess.init(&cargo_args, self.builder.allocator);
-        defer child.deinit();
+        // Set working directory for cargo
+        cargo_step.setCwd(.{ .cwd_relative = "rust" });
 
-        child.cwd = "rust";
-        try child.spawn();
-
-        const result = try child.wait();
-        switch (result) {
-            .Exited => |code| {
-                if (code != 0) {
-                    return error.CargoFailed;
-                }
-            },
-            else => return error.CargoFailed,
-        }
+        // Add cargo step to the build pipeline
+        const step = self.builder.step("cargo", "Build Rust components");
+        step.dependOn(&cargo_step.step);
     }
 };
