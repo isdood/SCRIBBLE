@@ -4,96 +4,51 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Create crystal module
-    const crystal_module = b.addModule("crystal", .{
-        .root_source_file = .{ .cwd_relative = "zig/crystal/src/main.zig" },
+    // Create main module
+    const main_module = b.addModule("lazuline", .{
+        .root_source_file = .{ .cwd_relative = "src/lib.zig" },
     });
 
-    // Main Crystal Runtime Library
+    // Create the library
     const lib = b.addStaticLibrary(.{
-        .name = "crystal_runtime",
-        .root_source_file = .{ .cwd_relative = "zig/crystal/src/main.zig" },
+        .name = "lazuline",
+        .root_source_file = .{ .cwd_relative = "src/wave_runtime.zig" },
         .target = target,
         .optimize = optimize,
-        .link_libc = true,
     });
-    lib.root_module.addImport("crystal", crystal_module);
+    b.installArtifact(lib);
 
-    // FFI Layer
-    const ffi = b.addSharedLibrary(.{
-        .name = "crystal_ffi",
-        .root_source_file = .{ .cwd_relative = "zig/ffi/bridge.zig" },
+    // Create and configure tests
+    const main_tests = b.addTest(.{
+        .root_source_file = .{ .cwd_relative = "tests/main.zig" },
         .target = target,
         .optimize = optimize,
-        .link_libc = true,
     });
-    ffi.root_module.addImport("crystal", crystal_module);
 
-    // Julia Integration
-    const julia_bridge = b.addSharedLibrary(.{
-        .name = "crystal_julia",
-        .root_source_file = .{ .cwd_relative = "zig/ffi/julia_bridge.zig" },
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-    julia_bridge.root_module.addImport("crystal", crystal_module);
-
-    // Unit Tests
-    const unit_tests = b.addTest(.{
-        .root_source_file = .{ .cwd_relative = "zig/crystal/src/tests/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    unit_tests.root_module.addImport("crystal", crystal_module);
-
-    // FFI Tests
-    const ffi_tests = b.addTest(.{
-        .root_source_file = .{ .cwd_relative = "zig/crystal/src/tests/ffi/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    ffi_tests.root_module.addImport("crystal", crystal_module);
-    ffi_tests.linkLibrary(ffi);
-    ffi_tests.linkLibrary(julia_bridge);
-
-    // Error Handling Tests
-    const error_tests = b.addTest(.{
-        .root_source_file = .{ .cwd_relative = "zig/crystal/src/tests/errors/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    error_tests.root_module.addImport("crystal", crystal_module);
-    error_tests.linkLibrary(ffi);
-    error_tests.linkLibrary(julia_bridge);
-
-    // Performance Tests
-    const perf_tests = b.addTest(.{
-        .root_source_file = .{ .cwd_relative = "zig/crystal/src/tests/perf/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    perf_tests.root_module.addImport("crystal", crystal_module);
-    perf_tests.linkLibrary(ffi);
-    perf_tests.linkLibrary(julia_bridge);
+    // Add module dependency to tests
+    main_tests.root_module.addImport("lazuline", main_module);
 
     // Create test step
-    const test_step = b.step("test", "Run all tests");
+    const test_step = b.step("test", "Run library tests");
+    const run_main_tests = b.addRunArtifact(main_tests);
+    test_step.dependOn(&run_main_tests.step);
 
-    // Add test runners
-    const run_unit_tests = b.addRunArtifact(unit_tests);
-    const run_ffi_tests = b.addRunArtifact(ffi_tests);
-    const run_error_tests = b.addRunArtifact(error_tests);
-    const run_perf_tests = b.addRunArtifact(perf_tests);
+    // Create benchmark executable
+    const bench = b.addExecutable(.{
+        .name = "bench",
+        .root_source_file = .{ .cwd_relative = "bench/main.zig" },
+        .target = target,
+        .optimize = .ReleaseFast,
+    });
 
-    // Add dependencies to test step
-    test_step.dependOn(&run_unit_tests.step);
-    test_step.dependOn(&run_ffi_tests.step);
-    test_step.dependOn(&run_error_tests.step);
-    test_step.dependOn(&run_perf_tests.step);
+    // Add module dependency to benchmark
+    bench.root_module.addImport("lazuline", main_module);
 
-    // Install artifacts
-    b.installArtifact(lib);
-    b.installArtifact(ffi);
-    b.installArtifact(julia_bridge);
+    // Create benchmark step
+    const bench_step = b.step("bench", "Run benchmarks");
+    const run_bench = b.addRunArtifact(bench);
+    bench_step.dependOn(&run_bench.step);
+
+    // Install benchmark binary
+    b.installArtifact(bench);
 }

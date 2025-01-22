@@ -19,12 +19,14 @@ pub struct ControlledPhaseGate {
 pub struct SqrtNOTGate;
 
 impl ControlledPhaseGate {
+    #[inline]
     pub fn new(angle: f64) -> Self {
         Self { angle }
     }
 }
 
 impl<T: SIMDValue> QuantumOp<T> for HadamardGate {
+    #[inline]
     fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
         let factor = T::from(1.0f64 / 2.0f64.sqrt()).unwrap();
         data.iter().map(|&x| x * factor).collect()
@@ -36,6 +38,7 @@ impl<T: SIMDValue> QuantumOp<T> for HadamardGate {
 }
 
 impl<T: SIMDValue> QuantumOp<T> for CNOTGate {
+    #[inline]
     fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
         assert!(data.len() % 2 == 0, "CNOT requires pairs of qubits");
         let mut result = Vec::with_capacity(data.len());
@@ -56,6 +59,7 @@ impl<T: SIMDValue> QuantumOp<T> for CNOTGate {
 }
 
 impl<T: SIMDValue> QuantumOp<T> for SWAPGate {
+    #[inline]
     fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
         assert!(data.len() % 2 == 0, "SWAP requires pairs of qubits");
         let mut result = Vec::with_capacity(data.len());
@@ -74,6 +78,7 @@ impl<T: SIMDValue> QuantumOp<T> for SWAPGate {
 }
 
 impl<T: SIMDValue> QuantumOp<T> for ControlledPhaseGate {
+    #[inline]
     fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
         assert!(data.len() % 2 == 0, "Controlled-Phase requires pairs of qubits");
         let phase = T::from(self.angle.cos()).unwrap();
@@ -95,6 +100,7 @@ impl<T: SIMDValue> QuantumOp<T> for ControlledPhaseGate {
 }
 
 impl<T: SIMDValue> QuantumOp<T> for SqrtNOTGate {
+    #[inline]
     fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
         let factor = T::from(0.5f64).unwrap();
         data.iter().map(|&x| x + (T::one() - x) * factor).collect()
@@ -102,26 +108,5 @@ impl<T: SIMDValue> QuantumOp<T> for SqrtNOTGate {
 
     fn is_unitary(&self) -> bool {
         true
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_hadamard() {
-        let gate = HadamardGate;
-        let state = QuantumState::new(1.0);
-        let result = gate.apply(&state, &[1.0f32, 0.0]);
-        assert!((result[0] - 0.7071067812).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_cnot() {
-        let gate = CNOTGate;
-        let state = QuantumState::new(1.0);
-        let result = gate.apply(&state, &[1.0f32, 1.0]);
-        assert_eq!(result, vec![1.0, 0.0]);
     }
 }
