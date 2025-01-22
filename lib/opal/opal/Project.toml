@@ -1,0 +1,8 @@
+name = "Opal"
+uuid = "$(julia -e 'using Random; print(uuid4())')"
+authors = ["isdood"]
+version = "0.1.0"
+
+[deps]
+ZigBindings = "0.1.0"
+Crystallography = "0.1.0"

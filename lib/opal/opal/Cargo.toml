@@ -1,0 +1,15 @@
+[package]
+name = "opal"
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
+description = "OPAL - Optimized Performance Adaptive Lattice"
+
+[dependencies]
+zig = "0.1.0"
+julia = "0.1.0"
+tokio = { version = "1.0", features = ["full"] }
+
+[lib]
+name = "opal"
+crate-type = ["cdylib", "rlib"]

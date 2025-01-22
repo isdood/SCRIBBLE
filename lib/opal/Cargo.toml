@@ -1,0 +1,19 @@
+[package]
+name = "opal"
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
+description = "OPAL - Optimized Performance Adaptive Lattice"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+
+[dev-dependencies]
+criterion = "0.3"
+
+[lib]
+name = "opal"
+path = "src/lib.rs"
+
+[workspace]
+members = ["."]
