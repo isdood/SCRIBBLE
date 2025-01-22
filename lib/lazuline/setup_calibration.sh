@@ -1,4 +1,3 @@
-cat > setup_calibration.sh << 'EOF'
 #!/bin/bash
 
 # Timestamp: 2025-01-22 02:28:46
@@ -297,9 +296,3 @@ echo "2. Implement MAX31856 thermocouple interface"
 echo "3. Add temperature logging and analysis"
 echo "[INFO] Run tests with: zig build test"
 
-EOF
-
-chmod +x setup_calibration.sh
-
-echo "[DONE] Created calibration setup script"
-echo "[INFO] Run './setup_calibration.sh' to set up calibration support"
