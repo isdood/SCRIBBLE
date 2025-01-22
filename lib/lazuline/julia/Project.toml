@@ -1,12 +1,11 @@
-name = "Lazuline"
-uuid = "a52dfe5f-052d-45fa-a12c-2353c53c6928"
+name = "CrystalHarmony"
+uuid = "$(julia -e 'using UUIDs; println(uuid4())')"
 authors = ["isdood"]
 version = "0.1.0"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 
 [compat]
 julia = "1.9"

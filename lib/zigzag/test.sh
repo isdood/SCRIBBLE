@@ -1,24 +1,42 @@
-#!/bin/bash
-# test.sh - Run all tests for ZigZag
+cat > src/zig/vector/vector3d.zig << 'END_ZIG'
+const std = @import("std");
+const testing = std.testing;
+const math = std.math;
 
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-NC='\033[0m'
+pub const Vector3D = struct {
+    x: f64,
+    y: f64,
+    z: f64,
+    quantum_coherence: f64,
 
-echo -e "${BLUE}Running ZigZag tests...${NC}"
+    pub fn init(x: f64, y: f64, z: f64) Vector3D {
+        return Vector3D{
+            .x = x,
+            .y = y,
+            .z = z,
+            .quantum_coherence = 1.0,
+        };
+    }
 
-echo -e "\n${BLUE}Running Zig tests:${NC}"
-if ! zig build test; then
-    echo -e "${RED}Zig tests failed${NC}"
-fi
+    pub fn dot(self: Vector3D, other: Vector3D) f64 {
+        return self.x * other.x + self.y * other.y + self.z * other.z;
+    }
 
-echo -e "\n${BLUE}Running Rust tests:${NC}"
-if ! cargo test; then
-    echo -e "${RED}Rust tests failed${NC}"
-fi
+    pub fn magnitude(self: Vector3D) f64 {
+        return @sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
+    }
+};
 
-echo -e "\n${BLUE}To run Julia tests:${NC}"
-echo "Start julia and run:"
-echo "include(\"src/julia/quantum/quantum_vector.jl\")"
-echo "QuantumVector.run_tests()"
+test "vector creation" {
+    const v = Vector3D.init(1.0, 2.0, 3.0);
+    try testing.expectEqual(v.x, 1.0);
+    try testing.expectEqual(v.y, 2.0);
+    try testing.expectEqual(v.z, 3.0);
+}
+
+test "dot product" {
+    const v1 = Vector3D.init(1.0, 2.0, 3.0);
+    const v2 = Vector3D.init(4.0, 5.0, 6.0);
+    try testing.expectEqual(v1.dot(v2), 32.0);
+}
+END_ZIG

@@ -1,9 +1,6 @@
-// ZigZag Vector3D Implementation
-// Created: 2025-01-21 20:31:24 UTC
-// Author: isdood
-
 const std = @import("std");
 const testing = std.testing;
+const math = std.math;
 
 pub const Vector3D = struct {
     x: f64,
@@ -21,7 +18,9 @@ pub const Vector3D = struct {
     }
 
     pub fn dot(self: Vector3D, other: Vector3D) f64 {
-        return self.x * other.x + self.y * other.y + self.z * other.z;
+        const classical_dot = self.x * other.x + self.y * other.y + self.z * other.z;
+        const coherence = @min(self.quantum_coherence, other.quantum_coherence);
+        return classical_dot * coherence;
     }
 
     pub fn magnitude(self: Vector3D) f64 {

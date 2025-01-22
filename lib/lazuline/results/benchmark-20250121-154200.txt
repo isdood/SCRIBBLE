@@ -1,0 +1,16 @@
+Lazuline Benchmark Results
+=========================
+Date: 2025-01-21 20:42:00 UTC
+Runner: isdood
+
+Initialization:
+
+
+Channel Compute:
+
+Multiple Operations:
+
+System Information:
+CPU: 
+Memory: 
+Rust: 

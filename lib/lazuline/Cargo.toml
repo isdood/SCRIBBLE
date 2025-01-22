@@ -1,32 +1,16 @@
-# Cargo.toml for Lazuline
-# Updated: 2025-01-21 19:14:46 UTC
-# Author: guavabot1
 [package]
 name = "lazuline"
 version = "0.1.0"
 edition = "2021"
-authors = ["Caleb J.D. Terkovics <isdood>"]
-description = "Lazuline component for the Scribble project"
+authors = ["isdood"]
+description = "Crystal-based high-performance computing framework"
 repository = "https://github.com/isdood/scribble"
 license = "MIT"
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-rayon = "1.7"
-crossbeam = "0.8"
+futures = "0.3"
+num_cpus = "1.15"
 
 [lib]
 name = "lazuline"
-path = "src/lib.rs"
-
-[[test]]
-name = "lib"
-path = "tests/lib.rs"
-
-
-[dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
-
-[[bench]]
-name = "lib"
-harness = false
+crate-type = ["cdylib", "rlib"]

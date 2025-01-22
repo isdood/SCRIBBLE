@@ -3,15 +3,35 @@ name = "zigzag"
 version = "0.1.0"
 edition = "2021"
 authors = ["isdood"]
-description = "Quantum-aware vector operations library"
 
 [workspace]
 
 [dependencies]
+num-traits = "0.2"
+parking_lot = "0.12"
 
 [dev-dependencies]
 criterion = "0.5"
+rand = "0.8"
+proptest = "1.0"
 
 [[bench]]
-name = "vector_ops"
+name = "quantum_ops"
 harness = false
+
+[[bench]]
+name = "lattice_ops"
+harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+debug = false
+
+[profile.bench]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = false

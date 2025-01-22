@@ -63,6 +63,7 @@ error_integration = { path = "lib/error_integration" }
 ziggy = { path = "lib/ziggy" }
 prism = { path = "lib/prism" }
 lazuline = { path = "lib/lazuline" }
+zigzag = { path = "lib/zigzag" }
 
 [lib]
 path = "src/lib.rs"
