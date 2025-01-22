@@ -2,18 +2,16 @@
 name = "zigzag"
 version = "0.1.0"
 edition = "2021"
-authors = ["isdood"]
 
 [workspace]
 
 [dependencies]
-num-traits = "0.2"
 parking_lot = "0.12"
+num-traits = "0.2"
 
 [dev-dependencies]
 criterion = "0.5"
-rand = "0.8"
-proptest = "1.0"
+proptest = "1.2"
 
 [[bench]]
 name = "quantum_ops"

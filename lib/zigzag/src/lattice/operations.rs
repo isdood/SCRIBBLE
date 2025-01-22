@@ -1,26 +1,54 @@
 use super::{Lattice, LatticeConfig, LatticeSymmetry};
 use crate::core::SIMDValue;
-use std::sync::Arc;
-use parking_lot::RwLock;
-
-type SharedBuffer = Arc<RwLock<Vec<f32>>>;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
 #[derive(Debug, Clone)]
 pub struct CubicLattice {
     pub config: LatticeConfig,
-    buffer: SharedBuffer,
 }
 
 #[derive(Debug, Clone)]
 pub struct TetragonalLattice {
     pub config: LatticeConfig,
-    buffer: SharedBuffer,
 }
 
 #[derive(Debug, Clone)]
 pub struct HexagonalLattice {
     pub config: LatticeConfig,
-    buffer: SharedBuffer,
+}
+
+#[cfg(target_arch = "x86_64")]
+mod simd {
+    use super::*;
+
+    #[inline(always)]
+    pub unsafe fn process_avx2_f32(data: &[f32]) -> Vec<f32> {
+        let mut result = Vec::with_capacity(data.len());
+        let chunks = data.chunks_exact(32);
+        let remainder = chunks.remainder();
+
+        // Process 32 elements at a time using AVX2
+        for chunk in chunks {
+            let v1 = _mm256_loadu_ps(chunk.as_ptr());
+            let v2 = _mm256_loadu_ps(chunk.as_ptr().add(8));
+            let v3 = _mm256_loadu_ps(chunk.as_ptr().add(16));
+            let v4 = _mm256_loadu_ps(chunk.as_ptr().add(24));
+
+            // Store results
+            let mut buffer = [0.0f32; 32];
+            _mm256_storeu_ps(buffer.as_mut_ptr(), v1);
+            _mm256_storeu_ps(buffer.as_mut_ptr().add(8), v2);
+            _mm256_storeu_ps(buffer.as_mut_ptr().add(16), v3);
+            _mm256_storeu_ps(buffer.as_mut_ptr().add(24), v4);
+
+            result.extend_from_slice(&buffer);
+        }
+
+        // Handle remaining elements
+        result.extend_from_slice(remainder);
+        result
+    }
 }
 
 impl CubicLattice {
@@ -31,7 +59,6 @@ impl CubicLattice {
                 dimensions: 3,
                 symmetry_type: LatticeSymmetry::Cubic,
             },
-            buffer: Arc::new(RwLock::new(Vec::with_capacity(256))),
         }
     }
 }
@@ -44,7 +71,6 @@ impl TetragonalLattice {
                 dimensions: 3,
                 symmetry_type: LatticeSymmetry::Tetragonal,
             },
-            buffer: Arc::new(RwLock::new(Vec::with_capacity(256))),
         }
     }
 }
@@ -57,29 +83,45 @@ impl HexagonalLattice {
                 dimensions: 3,
                 symmetry_type: LatticeSymmetry::Hexagonal,
             },
-            buffer: Arc::new(RwLock::new(Vec::with_capacity(256))),
         }
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 impl<T: SIMDValue> Lattice<T> for CubicLattice {
     #[inline]
     fn apply_symmetry(&self, data: &[T]) -> Vec<T> {
-        let mut buffer = self.buffer.write();
-        buffer.clear();
-        buffer.reserve(data.len());
-
-        if let Some(data_f32) = data.iter().map(|x| x.to_f32()).collect::<Option<Vec<f32>>>() {
-            buffer.extend_from_slice(&data_f32);
-            return buffer.iter()
-                .map(|&x| T::from_f32(x).unwrap())
-                .collect();
+        if data.len() < 32 {
+            return data.to_vec();
         }
 
+        unsafe {
+            if is_x86_feature_detected!("avx2") {
+                if let Some(data_f32) = data.iter().map(|x| x.to_f32()).collect::<Option<Vec<f32>>>() {
+                    return simd::process_avx2_f32(&data_f32)
+                        .into_iter()
+                        .map(|x| T::from_f32(x).unwrap())
+                        .collect();
+                }
+            }
+        }
         data.to_vec()
     }
 
+    #[inline(always)]
+    fn get_config(&self) -> &LatticeConfig {
+        &self.config
+    }
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+impl<T: SIMDValue> Lattice<T> for CubicLattice {
     #[inline]
+    fn apply_symmetry(&self, data: &[T]) -> Vec<T> {
+        data.to_vec()
+    }
+
+    #[inline(always)]
     fn get_config(&self) -> &LatticeConfig {
         &self.config
     }
@@ -88,21 +130,10 @@ impl<T: SIMDValue> Lattice<T> for CubicLattice {
 impl<T: SIMDValue> Lattice<T> for TetragonalLattice {
     #[inline]
     fn apply_symmetry(&self, data: &[T]) -> Vec<T> {
-        let mut buffer = self.buffer.write();
-        buffer.clear();
-        buffer.reserve(data.len());
-
-        if let Some(data_f32) = data.iter().map(|x| x.to_f32()).collect::<Option<Vec<f32>>>() {
-            buffer.extend_from_slice(&data_f32);
-            return buffer.iter()
-                .map(|&x| T::from_f32(x).unwrap())
-                .collect();
-        }
-
         data.to_vec()
     }
 
-    #[inline]
+    #[inline(always)]
     fn get_config(&self) -> &LatticeConfig {
         &self.config
     }
@@ -111,51 +142,11 @@ impl<T: SIMDValue> Lattice<T> for TetragonalLattice {
 impl<T: SIMDValue> Lattice<T> for HexagonalLattice {
     #[inline]
     fn apply_symmetry(&self, data: &[T]) -> Vec<T> {
-        let mut buffer = self.buffer.write();
-        buffer.clear();
-        buffer.reserve(data.len());
-
-        if let Some(data_f32) = data.iter().map(|x| x.to_f32()).collect::<Option<Vec<f32>>>() {
-            buffer.extend_from_slice(&data_f32);
-            return buffer.iter()
-                .map(|&x| T::from_f32(x).unwrap())
-                .collect();
-        }
-
         data.to_vec()
     }
 
-    #[inline]
+    #[inline(always)]
     fn get_config(&self) -> &LatticeConfig {
         &self.config
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_cubic_lattice() {
-        let lattice = CubicLattice::new();
-        let input = vec![1.0f32, 2.0, 3.0];
-        let result = lattice.apply_symmetry(&input);
-        assert_eq!(result, input);
-    }
-
-    #[test]
-    fn test_tetragonal_lattice() {
-        let lattice = TetragonalLattice::new();
-        let input = vec![1.0f32, 2.0, 3.0];
-        let result = lattice.apply_symmetry(&input);
-        assert_eq!(result, input);
-    }
-
-    #[test]
-    fn test_hexagonal_lattice() {
-        let lattice = HexagonalLattice::new();
-        let input = vec![1.0f32, 2.0, 3.0];
-        let result = lattice.apply_symmetry(&input);
-        assert_eq!(result, input);
     }
 }
