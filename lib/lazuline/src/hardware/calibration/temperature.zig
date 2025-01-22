@@ -1,4 +1,5 @@
 const std = @import("std");
+const CalibrationStorage = @import("persistence/storage.zig").CalibrationStorage;
 
 pub const CalibrationPoint = struct {
     reference_temp: f64,
@@ -15,16 +16,49 @@ pub const CalibrationCurve = struct {
         scale: f64 = 1.0,
         quadratic: f64 = 0.0,
     },
+    storage: ?CalibrationStorage = null,
 
     pub fn init(allocator: std.mem.Allocator) Self {
         return Self{
             .points = std.ArrayList(CalibrationPoint).init(allocator),
             .coefficients = .{},
+            .storage = null,
         };
+    }
+
+    pub fn initWithStorage(allocator: std.mem.Allocator, storage_path: []const u8) !Self {
+        var self = Self{
+            .points = std.ArrayList(CalibrationPoint).init(allocator),
+            .coefficients = .{},
+            .storage = try CalibrationStorage.init(allocator, storage_path),
+        };
+
+        // Try to load existing calibration points
+        if (self.storage) |*storage| {
+            if (storage.load()) |loaded_points| {
+                for (loaded_points) |point| {
+                    try self.points.append(point);
+                }
+                try self.recalculateCoefficients();
+            } else |_| {
+                // Ignore load errors, start with empty calibration
+            }
+        }
+
+        return self;
     }
 
     pub fn deinit(self: *Self) void {
         self.points.deinit();
+        if (self.storage) |*storage| {
+            storage.deinit();
+        }
+    }
+
+    pub fn save(self: *Self) !void {
+        if (self.storage) |*storage| {
+            try storage.save(self.points.items);
+        }
     }
 
     pub fn addPoint(self: *Self, reference: f64, measured: f64) !void {
@@ -35,6 +69,7 @@ pub const CalibrationCurve = struct {
             .timestamp = now,
         });
         try self.recalculateCoefficients();
+        try self.save();
     }
 
     pub fn calibrate(self: Self, measured: f64) f64 {
@@ -45,8 +80,12 @@ pub const CalibrationCurve = struct {
 
     fn recalculateCoefficients(self: *Self) !void {
         if (self.points.items.len < 2) {
-            // Not enough points for calibration
-            self.coefficients = .{};
+            // Not enough points for calibration, use identity transform
+            self.coefficients = .{
+                .offset = 0.0,
+                .scale = 1.0,
+                .quadratic = 0.0,
+            };
             return;
         }
 
@@ -108,22 +147,22 @@ pub const CalibrationCurve = struct {
             };
         }
 
-        var max_error: f64 = 0;
-        var total_error: f64 = 0;
+        var max_err: f64 = 0;
+        var total_err: f64 = 0;
         var latest_ts: i64 = std.math.minInt(i64);
 
         for (self.points.items) |point| {
             const calibrated = self.calibrate(point.measured_temp);
-            const error = std.math.fabs(calibrated - point.reference_temp);
-            max_error = @max(max_error, error);
-            total_error += error;
+            const temp_err = std.math.fabs(calibrated - point.reference_temp);
+            max_err = @max(max_err, temp_err);
+            total_err += temp_err;
             latest_ts = @max(latest_ts, point.timestamp);
         }
 
         return .{
             .point_count = self.points.items.len,
-            .max_error = max_error,
-            .avg_error = total_error / @as(f64, @floatFromInt(self.points.items.len)),
+            .max_error = max_err,
+            .avg_error = total_err / @as(f64, @floatFromInt(self.points.items.len)),
             .latest_timestamp = latest_ts,
         };
     }

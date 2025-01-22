@@ -6,4 +6,8 @@ pub const sensors = struct {
 pub const crystal = @import("crystal/frequency.zig");
 pub const i2c = @import("i2c/bus.zig");
 pub const onewire = @import("onewire/bus.zig");
-pub const calibration = @import("calibration/temperature.zig");
+pub const calibration = struct {
+    pub const CalibrationCurve = @import("calibration/temperature.zig").CalibrationCurve;
+    pub const CalibrationPoint = @import("calibration/temperature.zig").CalibrationPoint;
+    pub const persistence = @import("calibration/persistence/storage.zig");
+};

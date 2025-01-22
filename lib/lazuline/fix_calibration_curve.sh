@@ -1,4 +1,3 @@
-cat > fix_calibration_curve.sh << 'EOF'
 #!/bin/bash
 
 # Timestamp: 2025-01-22 02:35:15
@@ -185,9 +184,3 @@ echo "[FIX] Added identity transform for insufficient points"
 echo "[FIX] Updated timestamp to: 2025-01-22 02:35:15"
 echo "[INFO] Try running 'zig build test' again"
 
-EOF
-
-chmod +x fix_calibration_curve.sh
-
-echo "[DONE] Created calibration curve fix script"
-echo "[INFO] Run './fix_calibration_curve.sh' to apply the fixes"
