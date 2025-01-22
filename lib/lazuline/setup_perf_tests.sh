@@ -1,6 +1,6 @@
 #!/bin/bash
 # Crystal Runtime Performance Test Setup Script
-# Created: 2025-01-22 00:51:55 UTC
+# Created: 2025-01-22 00:57:22 UTC
 # Author: isdood
 
 # Colors for output
@@ -20,7 +20,7 @@ const crystal = @import("crystal");
 const testing = std.testing;
 
 const PerformanceMetrics = struct {
-    operation_time: i64,
+    operation_time: u64,
     memory_used: usize,
     iterations: usize,
 };
@@ -31,20 +31,22 @@ pub fn main() !void {
     // Core Operation Performance
     std.debug.print("\nTesting Core Operation Performance:\n", .{});
     const core_metrics = try testCorePerformance();
-    const avg_time = @divTrunc(core_metrics.operation_time, @intCast(i64, core_metrics.iterations));
+    const iterations_u64: u64 = @as(u64, @intCast(core_metrics.iterations));
+    const avg_time = @divTrunc(core_metrics.operation_time, iterations_u64);
     std.debug.print("✓ Core operations: {d}ns/op ({d} iterations)\n",
         .{ avg_time, core_metrics.iterations });
 
     // Memory Usage Performance
     std.debug.print("\nTesting Memory Usage:\n", .{});
     const memory_metrics = try testMemoryPerformance();
-    const avg_memory = @divTrunc(memory_metrics.memory_used, memory_metrics.iterations);
+    const avg_memory = memory_metrics.memory_used / memory_metrics.iterations;
     std.debug.print("✓ Memory usage: {d} bytes/op\n", .{avg_memory});
 
     // Concurrent Operations Performance
     std.debug.print("\nTesting Concurrent Operations:\n", .{});
     const concurrent_metrics = try testConcurrentPerformance();
-    const avg_concurrent_time = @divTrunc(concurrent_metrics.operation_time, @intCast(i64, concurrent_metrics.iterations));
+    const concurrent_iterations_u64: u64 = @as(u64, @intCast(concurrent_metrics.iterations));
+    const avg_concurrent_time = @divTrunc(concurrent_metrics.operation_time, concurrent_iterations_u64);
     std.debug.print("✓ Concurrent operations: {d}ns/op\n", .{avg_concurrent_time});
 
     std.debug.print("\n✨ All performance tests completed successfully! ✨\n", .{});
@@ -142,7 +144,108 @@ test {
 }
 END_PERF_TEST
 
-[Previous build.zig content remains the same...]
+# Create complete build.zig
+cat > build.zig << 'END_BUILD'
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    // Create crystal module
+    const crystal_module = b.addModule("crystal", .{
+        .root_source_file = .{ .cwd_relative = "zig/crystal/src/main.zig" },
+    });
+
+    // Main Crystal Runtime Library
+    const lib = b.addStaticLibrary(.{
+        .name = "crystal_runtime",
+        .root_source_file = .{ .cwd_relative = "zig/crystal/src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    lib.root_module.addImport("crystal", crystal_module);
+
+    // FFI Layer
+    const ffi = b.addSharedLibrary(.{
+        .name = "crystal_ffi",
+        .root_source_file = .{ .cwd_relative = "zig/ffi/bridge.zig" },
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    ffi.root_module.addImport("crystal", crystal_module);
+
+    // Julia Integration
+    const julia_bridge = b.addSharedLibrary(.{
+        .name = "crystal_julia",
+        .root_source_file = .{ .cwd_relative = "zig/ffi/julia_bridge.zig" },
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    julia_bridge.root_module.addImport("crystal", crystal_module);
+
+    // Unit Tests
+    const unit_tests = b.addTest(.{
+        .root_source_file = .{ .cwd_relative = "zig/crystal/src/tests/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    unit_tests.root_module.addImport("crystal", crystal_module);
+
+    // FFI Tests
+    const ffi_tests = b.addTest(.{
+        .root_source_file = .{ .cwd_relative = "zig/crystal/src/tests/ffi/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    ffi_tests.root_module.addImport("crystal", crystal_module);
+    ffi_tests.linkLibrary(ffi);
+    ffi_tests.linkLibrary(julia_bridge);
+
+    // Error Handling Tests
+    const error_tests = b.addTest(.{
+        .root_source_file = .{ .cwd_relative = "zig/crystal/src/tests/errors/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    error_tests.root_module.addImport("crystal", crystal_module);
+    error_tests.linkLibrary(ffi);
+    error_tests.linkLibrary(julia_bridge);
+
+    // Performance Tests
+    const perf_tests = b.addTest(.{
+        .root_source_file = .{ .cwd_relative = "zig/crystal/src/tests/perf/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    perf_tests.root_module.addImport("crystal", crystal_module);
+    perf_tests.linkLibrary(ffi);
+    perf_tests.linkLibrary(julia_bridge);
+
+    // Create test step
+    const test_step = b.step("test", "Run all tests");
+
+    // Add test runners
+    const run_unit_tests = b.addRunArtifact(unit_tests);
+    const run_ffi_tests = b.addRunArtifact(ffi_tests);
+    const run_error_tests = b.addRunArtifact(error_tests);
+    const run_perf_tests = b.addRunArtifact(perf_tests);
+
+    // Add dependencies to test step
+    test_step.dependOn(&run_unit_tests.step);
+    test_step.dependOn(&run_ffi_tests.step);
+    test_step.dependOn(&run_error_tests.step);
+    test_step.dependOn(&run_perf_tests.step);
+
+    // Install artifacts
+    b.installArtifact(lib);
+    b.installArtifact(ffi);
+    b.installArtifact(julia_bridge);
+}
+END_BUILD
 
 echo -e "${GREEN}Crystal Runtime performance test suite has been set up successfully!${NC}"
 echo -e "${BLUE}Test instructions:${NC}"

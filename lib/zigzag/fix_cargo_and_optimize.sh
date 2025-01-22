@@ -1,60 +1,145 @@
 #!/bin/bash
-# fix_module_structure.sh
+# fix_implementations.sh
 # Created by: isdood
-# Date: 2025-01-22 00:51:08 UTC
+# Date: 2025-01-22 01:03:33 UTC
 
-echo "Creating module directory structure..."
+echo "Fixing missing implementations and unused imports..."
 
-# Create module directories
-mkdir -p src/{core,quantum,lattice}
+# Fix quantum operations
+cat > src/quantum/operations.rs << 'EOF_QUANTUM_OPS'
+use super::{QuantumState, QuantumOp};
+use crate::core::SIMDValue;
 
-# Create mod.rs files
-echo "Creating core module..."
-cat > src/core/mod.rs << 'EOF_CORE'
-//! Core module providing fundamental types and traits
+#[derive(Debug, Clone)]
+pub struct HadamardGate;
 
-use num_traits::{Float, Zero, One};
+#[derive(Debug, Clone)]
+pub struct CNOTGate;
 
-pub trait SIMDValue: Float + Zero + One + Copy + Send + Sync {
-    fn to_f32(self) -> Option<f32>;
-    fn from_f32(v: f32) -> Option<Self>;
+#[derive(Debug, Clone)]
+pub struct SWAPGate;
+
+#[derive(Debug, Clone)]
+pub struct ControlledPhaseGate {
+    pub angle: f64,
 }
 
-impl SIMDValue for f32 {
-    fn to_f32(self) -> Option<f32> {
-        Some(self)
-    }
+#[derive(Debug, Clone)]
+pub struct SqrtNOTGate;
 
-    fn from_f32(v: f32) -> Option<Self> {
-        Some(v)
+impl ControlledPhaseGate {
+    pub fn new(angle: f64) -> Self {
+        Self { angle }
     }
 }
 
-impl SIMDValue for f64 {
-    fn to_f32(self) -> Option<f32> {
-        if self.is_finite() {
-            Some(self as f32)
-        } else {
-            None
+impl<T: SIMDValue> QuantumOp<T> for HadamardGate {
+    fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
+        let factor = T::from(1.0f64 / 2.0f64.sqrt()).unwrap();
+        data.iter().map(|&x| x * factor).collect()
+    }
+
+    fn is_unitary(&self) -> bool {
+        true
+    }
+}
+
+impl<T: SIMDValue> QuantumOp<T> for CNOTGate {
+    fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
+        assert!(data.len() % 2 == 0, "CNOT requires pairs of qubits");
+        let mut result = Vec::with_capacity(data.len());
+
+        for chunk in data.chunks(2) {
+            let control = chunk[0];
+            let target = chunk[1];
+            result.push(control);
+            result.push(if control > T::zero() { T::one() - target } else { target });
         }
+
+        result
     }
 
-    fn from_f32(v: f32) -> Option<Self> {
-        if v.is_finite() {
-            Some(v as f64)
-        } else {
-            None
-        }
+    fn is_unitary(&self) -> bool {
+        true
     }
 }
-EOF_CORE
 
-echo "Creating quantum module..."
-cat > src/quantum/mod.rs << 'EOF_QUANTUM'
+impl<T: SIMDValue> QuantumOp<T> for SWAPGate {
+    fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
+        assert!(data.len() % 2 == 0, "SWAP requires pairs of qubits");
+        let mut result = Vec::with_capacity(data.len());
+
+        for chunk in data.chunks(2) {
+            result.push(chunk[1]);
+            result.push(chunk[0]);
+        }
+
+        result
+    }
+
+    fn is_unitary(&self) -> bool {
+        true
+    }
+}
+
+impl<T: SIMDValue> QuantumOp<T> for ControlledPhaseGate {
+    fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
+        assert!(data.len() % 2 == 0, "Controlled-Phase requires pairs of qubits");
+        let phase = T::from(self.angle.cos()).unwrap();
+        let mut result = Vec::with_capacity(data.len());
+
+        for chunk in data.chunks(2) {
+            let control = chunk[0];
+            let target = chunk[1];
+            result.push(control);
+            result.push(if control > T::zero() { target * phase } else { target });
+        }
+
+        result
+    }
+
+    fn is_unitary(&self) -> bool {
+        true
+    }
+}
+
+impl<T: SIMDValue> QuantumOp<T> for SqrtNOTGate {
+    fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
+        let factor = T::from(0.5f64).unwrap();
+        data.iter().map(|&x| x + (T::one() - x) * factor).collect()
+    }
+
+    fn is_unitary(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hadamard() {
+        let gate = HadamardGate;
+        let state = QuantumState::new(1.0);
+        let result = gate.apply(&state, &[1.0f32, 0.0]);
+        assert!((result[0] - 0.7071067812).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_cnot() {
+        let gate = CNOTGate;
+        let state = QuantumState::new(1.0);
+        let result = gate.apply(&state, &[1.0f32, 1.0]);
+        assert_eq!(result, vec![1.0, 0.0]);
+    }
+}
+EOF_QUANTUM_OPS
+
+# Update quantum module to re-export QuantumOp trait
+cat > src/quantum/mod.rs << 'EOF_QUANTUM_MOD'
 //! Quantum operations module
 
-use std::sync::Arc;
-use num_traits::Float;
 use crate::core::SIMDValue;
 
 mod operations;
@@ -87,165 +172,85 @@ pub trait QuantumOp<T: SIMDValue> {
     fn apply(&self, state: &QuantumState, data: &[T]) -> Vec<T>;
     fn is_unitary(&self) -> bool;
 }
-EOF_QUANTUM
+EOF_QUANTUM_MOD
 
-echo "Creating quantum operations..."
-cat > src/quantum/operations.rs << 'EOF_QUANTUM_OPS'
-//! Quantum gate implementations
+# Update quantum benchmarks to import QuantumOp trait
+cat > benches/quantum_ops.rs << 'EOF_QUANTUM_BENCH'
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use zigzag::quantum::{
+    QuantumState,
+    QuantumOp,
+    HadamardGate,
+    CNOTGate,
+    SWAPGate,
+    ControlledPhaseGate,
+    SqrtNOTGate,
+};
 
-use super::{QuantumState, QuantumOp};
-use crate::core::SIMDValue;
-use std::f64::consts::PI;
-use std::arch::x86_64::*;
+fn quantum_gate_benchmark(c: &mut Criterion) {
+    let state = QuantumState::new(1.0);
+    let mut group = c.benchmark_group("quantum_gates");
 
-pub struct HadamardGate;
-pub struct CNOTGate;
-pub struct SWAPGate;
-pub struct ControlledPhaseGate {
-    angle: f64,
-}
+    let data_sizes = [16, 64, 256];
 
-// Implementation of HadamardGate
-impl<T: SIMDValue> QuantumOp<T> for HadamardGate {
-    fn apply(&self, _state: &QuantumState, data: &[T]) -> Vec<T> {
-        let factor = T::from(1.0f64 / 2.0f64.sqrt()).unwrap();
-        let mut result = Vec::with_capacity(data.len());
+    for size in data_sizes.iter() {
+        let data: Vec<f32> = (0..*size).map(|i| (i as f32).sin()).collect();
 
-        unsafe {
-            if is_x86_feature_detected!("avx512f") {
-                for chunk in data.chunks(16) {
-                    if chunk.len() == 16 {
-                        let input = _mm512_loadu_ps(chunk.as_ptr() as *const f32);
-                        let factor_vec = _mm512_set1_ps(factor.to_f32().unwrap());
-                        let output = _mm512_mul_ps(input, factor_vec);
-                        let mut buffer = vec![0.0f32; 16];
-                        _mm512_storeu_ps(buffer.as_mut_ptr(), output);
-                        result.extend(buffer.iter().map(|&x| T::from(x).unwrap()));
-                    }
-                }
-            } else {
-                for &x in data {
-                    result.push(x * factor);
-                }
-            }
-        }
+        group.bench_function(format!("hadamard_gate_{}", size), |b| {
+            let gate = HadamardGate;
+            b.iter(|| {
+                let gate: &dyn QuantumOp<f32> = &gate;
+                gate.apply(black_box(&state), black_box(&data))
+            })
+        });
 
-        result
+        group.bench_function(format!("cnot_gate_{}", size), |b| {
+            let gate = CNOTGate;
+            b.iter(|| {
+                let gate: &dyn QuantumOp<f32> = &gate;
+                gate.apply(black_box(&state), black_box(&data))
+            })
+        });
+
+        group.bench_function(format!("swap_gate_{}", size), |b| {
+            let gate = SWAPGate;
+            b.iter(|| {
+                let gate: &dyn QuantumOp<f32> = &gate;
+                gate.apply(black_box(&state), black_box(&data))
+            })
+        });
+
+        group.bench_function(format!("controlled_phase_{}", size), |b| {
+            let gate = ControlledPhaseGate::new(std::f64::consts::PI / 4.0);
+            b.iter(|| {
+                let gate: &dyn QuantumOp<f32> = &gate;
+                gate.apply(black_box(&state), black_box(&data))
+            })
+        });
+
+        group.bench_function(format!("sqrt_not_{}", size), |b| {
+            let gate = SqrtNOTGate;
+            b.iter(|| {
+                let gate: &dyn QuantumOp<f32> = &gate;
+                gate.apply(black_box(&state), black_box(&data))
+            })
+        });
     }
 
-    fn is_unitary(&self) -> bool {
-        true
-    }
+    group.finish();
 }
 
-// Rest of the implementations follow...
-EOF_QUANTUM_OPS
+criterion_group!(benches, quantum_gate_benchmark);
+criterion_main!(benches);
+EOF_QUANTUM_BENCH
 
-echo "Creating lattice module..."
-cat > src/lattice/mod.rs << 'EOF_LATTICE'
-//! Lattice operations module
-
-use std::sync::Arc;
-use crate::core::SIMDValue;
-
-mod operations;
-mod group;
-pub use operations::*;
-pub use group::*;
-
-#[derive(Debug, Clone)]
-pub struct LatticeConfig {
-    dimensions: usize,
-    symmetry_type: LatticeSymmetry,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum LatticeSymmetry {
-    Cubic,
-    Tetragonal,
-    Hexagonal,
-}
-
-pub trait Lattice<T: SIMDValue> {
-    fn apply_symmetry(&self, data: &[T]) -> Vec<T>;
-    fn get_config(&self) -> &LatticeConfig;
-}
-EOF_LATTICE
-
-echo "Creating lattice operations..."
-cat > src/lattice/operations.rs << 'EOF_LATTICE_OPS'
-//! Lattice symmetry implementations
-
-use super::{Lattice, LatticeConfig, LatticeSymmetry};
-use crate::core::SIMDValue;
-use std::arch::x86_64::*;
-
-pub struct CubicLattice {
-    config: LatticeConfig,
-}
-
-impl CubicLattice {
-    pub fn new() -> Self {
-        Self {
-            config: LatticeConfig {
-                dimensions: 3,
-                symmetry_type: LatticeSymmetry::Cubic,
-            },
-        }
-    }
-}
-
-// Implementation follows...
-EOF_LATTICE_OPS
-
-echo "Creating lattice group operations..."
-cat > src/lattice/group.rs << 'EOF_LATTICE_GROUP'
-//! Lattice group operations
-
-use super::{Lattice, LatticeSymmetry};
-use crate::core::SIMDValue;
-use std::collections::HashMap;
-
-pub struct LatticeGroup<T: SIMDValue> {
-    operations: Vec<Box<dyn Lattice<T>>>,
-    cache: HashMap<LatticeSymmetry, Vec<T>>,
-}
-
-impl<T: SIMDValue> LatticeGroup<T> {
-    pub fn new() -> Self {
-        Self {
-            operations: Vec::new(),
-            cache: HashMap::new(),
-        }
-    }
-
-    pub fn add_operation(&mut self, operation: Box<dyn Lattice<T>>) {
-        self.operations.push(operation);
-    }
-
-    // Implementation follows...
-}
-EOF_LATTICE_GROUP
-
-# Update lib.rs to use the modules
-cat > src/lib.rs << 'EOF_LIB'
-//! # ZigZag
-//!
-//! `zigzag` is a high-performance quantum computing and lattice symmetry library
-//! that provides SIMD-optimized implementations of quantum gates and lattice transformations.
-
-pub mod core;
-pub mod quantum;
-pub mod lattice;
-
-pub use crate::quantum::QuantumState;
-pub use crate::lattice::LatticeSymmetry;
-EOF_LIB
-
-echo "Module structure fixed!"
-echo "All necessary module files have been created with proper paths."
+echo "Fixed implementation issues:"
+echo "1. Added proper trait implementations"
+echo "2. Fixed imports"
+echo "3. Updated benchmarks to use trait objects"
+echo "4. Added more test cases"
+echo "5. Cleaned up unused imports"
 echo ""
 echo "Try running:"
-echo "cargo build"
 echo "cargo test"
 echo "cargo bench"

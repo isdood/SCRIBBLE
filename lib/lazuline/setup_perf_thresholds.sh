@@ -1,3 +1,39 @@
+#!/bin/bash
+# Crystal Runtime Performance Thresholds Setup Script
+# Created: 2025-01-22 01:00:24 UTC
+# Author: isdood
+
+# Colors for output
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+echo -e "${BLUE}Setting up Crystal Runtime performance thresholds...${NC}"
+
+# Create performance thresholds file
+cat > zig/crystal/src/tests/perf/thresholds.zig << 'END_THRESHOLDS'
+const std = @import("std");
+
+pub const PerformanceThresholds = struct {
+    // Core operation thresholds (in nanoseconds)
+    pub const MAX_CORE_OP_TIME: u64 = 50;  // Max 50ns per operation
+    pub const TARGET_CORE_OP_TIME: u64 = 20;  // Target 20ns per operation
+    pub const MIN_CORE_OPS_PER_SEC: u64 = 1_000_000;  // Min 1M ops/sec
+
+    // Memory usage thresholds (in bytes)
+    pub const MAX_MEMORY_PER_OP: usize = 16;  // Max 16 bytes per operation
+    pub const TARGET_MEMORY_PER_OP: usize = 8;  // Target 8 bytes per operation
+    pub const MAX_TOTAL_MEMORY: usize = 1024 * 1024;  // Max 1MB total
+
+    // Concurrent operation thresholds
+    pub const MAX_CONCURRENT_OP_TIME: u64 = 40;  // Max 40ns per operation
+    pub const TARGET_CONCURRENT_OP_TIME: u64 = 25;  // Target 25ns per operation
+    pub const MIN_CONCURRENT_OPS_PER_SEC: u64 = 4_000_000;  // Min 4M ops/sec
+};
+END_THRESHOLDS
+
+# Update performance test file
+cat > zig/crystal/src/tests/perf/main.zig << 'END_PERF_TEST'
 const std = @import("std");
 const crystal = @import("crystal");
 const testing = std.testing;
@@ -151,30 +187,10 @@ extern fn julia_harmony_process(?*crystal.harmony.HarmonyState) void;
 test {
     try main();
 }
+END_PERF_TEST
 
-// Add after the main() function:
-fn recordPerformanceMetrics(
-    core_time: u64,
-    core_ops: u64,
-    memory_per_op: usize,
-    total_memory: usize,
-    concurrent_time: u64,
-    concurrent_ops: u64,
-) !void {
-    var history = @import("history.zig").PerformanceHistory.init(std.heap.c_allocator);
-    defer history.deinit();
-
-    // Try to load existing history
-    history.loadFromFile() catch {};
-
-    // Add new record
-    try history.addRecord(.{
-        .timestamp = std.time.timestamp(),
-        .core_op_time = core_time,
-        .core_ops_per_sec = core_ops,
-        .memory_per_op = memory_per_op,
-        .total_memory = total_memory,
-        .concurrent_op_time = concurrent_time,
-        .concurrent_ops_per_sec = concurrent_ops,
-    });
-}
+echo -e "${GREEN}Crystal Runtime performance thresholds have been set up successfully!${NC}"
+echo -e "${BLUE}Test instructions:${NC}"
+echo "1. Run 'zig build test' to run performance tests with thresholds"
+echo "2. Tests will fail if performance drops below thresholds"
+echo "3. Special indicators show when performance exceeds targets"

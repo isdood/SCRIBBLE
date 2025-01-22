@@ -1,7 +1,5 @@
 //! Quantum operations module
 
-use std::sync::Arc;
-use num_traits::Float;
 use crate::core::SIMDValue;
 
 mod operations;
