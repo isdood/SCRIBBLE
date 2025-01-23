@@ -1,3 +1,7 @@
+#!/bin/bash
+
+# Update the module file
+cat > src/Resonance.jl << 'EOL'
 module Resonance
 
 using DifferentialEquations
@@ -53,3 +57,37 @@ function compute_harmony(state::CrystalStructure)
 end
 
 end # module
+EOL
+
+# Update Project.toml
+cat > Project.toml << 'EOL'
+name = "Resonance"
+uuid = "12345678-1234-5678-1234-567812345678"
+authors = ["isdood"]
+version = "0.1.0"
+
+[deps]
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
+[compat]
+julia = "1.6"
+DifferentialEquations = "7"
+CUDA = "5"
+EOL
+
+# Reinitialize the package
+julia --project=. -e '
+using Pkg
+Pkg.activate(".")
+Pkg.resolve()
+Pkg.instantiate()
+'
+
+echo "Julia module updated with Statistics package."
+echo "Try running the example again:"
+echo "julia --project=."
+echo "julia> using Resonance"
+echo "julia> include(\"../../examples/harmony_example.jl\")"

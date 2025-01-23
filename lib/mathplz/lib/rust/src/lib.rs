@@ -1,6 +1,10 @@
 mod crystal;
+mod quantum;
+mod dna;
 
 pub use crystal::ShardedLattice as CrystalLattice;
+pub use quantum::QuantumState;
+pub use dna::DNASequence;
 
 #[cfg(test)]
 mod tests {

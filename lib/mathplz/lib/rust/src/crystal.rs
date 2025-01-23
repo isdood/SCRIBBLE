@@ -3,9 +3,6 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 use hashbrown::HashMap;
 
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
-
 #[derive(Clone)]
 pub struct ShardedLattice {
     points: Vec<[f64; 3]>,
@@ -53,51 +50,8 @@ impl ShardedLattice {
             .collect();
     }
 
-    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-    unsafe fn calculate_shard_energy_simd(points: &[[f64; 3]]) -> f64 {
-        let mut sum = _mm256_setzero_pd();
-
-        for chunk in points.chunks(4) {
-            let mut chunk_sum = _mm256_setzero_pd();
-
-            // Load x, y, z coordinates
-            for i in 0..chunk.len() {
-                let point = chunk[i];
-                let coord = _mm256_set_pd(0.0, point[2], point[1], point[0]);
-                chunk_sum = _mm256_fmadd_pd(coord, coord, chunk_sum);
-            }
-
-            sum = _mm256_add_pd(sum, chunk_sum);
-        }
-
-        // Horizontal sum
-        let sum_arr = std::mem::transmute::<__m256d, [f64; 4]>(sum);
-        sum_arr.iter().sum()
-    }
-
-    #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
-    fn calculate_shard_energy_simd(_points: &[[f64; 3]]) -> f64 {
-        unimplemented!("SIMD not available on this platform")
-    }
-
     fn calculate_shard_energy(points: &[[f64; 3]]) -> f64 {
-        #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
-        {
-            if points.len() >= 4 {
-                unsafe { Self::calculate_shard_energy_simd(points) }
-            } else {
-                Self::calculate_shard_energy_scalar(points)
-            }
-        }
-
-        #[cfg(not(all(target_arch = "x86_64", target_feature = "avx2")))]
-        {
-            Self::calculate_shard_energy_scalar(points)
-        }
-    }
-
-    fn calculate_shard_energy_scalar(points: &[[f64; 3]]) -> f64 {
-        points.iter()
+        points.par_iter()
             .map(|[x, y, z]| x * x + y * y + z * z)
             .sum()
     }

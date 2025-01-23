@@ -3,6 +3,11 @@ name = "mathplz"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/lib.rs"
+name = "mathplz"
+bench = true
+
 [dependencies]
 rand = "0.8"
 num-complex = "0.4"
@@ -14,9 +19,17 @@ hashbrown = "0.14"
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
 
-[profile.release]
-lto = "fat"
-codegen-units = 1
-panic = "abort"
-opt-level = 3
-debug = false
+[[bench]]
+name = "crystal_bench"
+path = "benches/crystal_bench.rs"
+harness = false
+
+[[bench]]
+name = "quantum_bench"
+path = "benches/quantum_bench.rs"
+harness = false
+
+[[bench]]
+name = "dna_bench"
+path = "benches/dna_bench.rs"
+harness = false

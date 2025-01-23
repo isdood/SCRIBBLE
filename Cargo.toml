@@ -1,6 +1,18 @@
 [workspace]
 resolver = "2"
 members = [
-    "lib/resonance",
     "lib/mathplz/lib/rust"
 ]
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+debug = false
+
+[profile.bench]
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+debug = false
