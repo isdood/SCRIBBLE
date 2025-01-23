@@ -1,7 +1,5 @@
-//! Visualization Engine Module
-//! =========================
-
 pub mod core;
 pub mod crystal;
+pub mod shader;
 
-pub use core::VisEngine;
+pub use core::engine::VisEngine;

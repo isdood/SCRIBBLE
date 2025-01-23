@@ -1,6 +1,6 @@
 //! Mathematical utilities and constants
 //! Author: isdood
-//! Created: 2025-01-23 02:13:29 UTC
+//! Created: 2025-01-23 02:24:21 UTC
 
 pub mod constants {
     pub const PHI: f64 = 1.618033988749895;

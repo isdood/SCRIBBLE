@@ -1,6 +1,6 @@
 //! Error handling for the Scribble ecosystem
 //! Author: isdood
-//! Created: 2025-01-23 02:13:29 UTC
+//! Created: 2025-01-23 02:24:21 UTC
 
 use scribe::String;
 

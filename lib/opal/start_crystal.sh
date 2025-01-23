@@ -2,99 +2,98 @@
 
 # start_crystal.sh
 # Author: isdood
-# Created: 2025-01-23 02:18:03 UTC
+# Created: 2025-01-23 02:38:23 UTC
 
 echo "=== Crystal Optimization Initialization ==="
-echo "Date: 2025-01-23 02:18:03 UTC"
+echo "Date: 2025-01-23 02:38:23 UTC"
 echo "User: isdood"
 echo "Framework: Scribble/Opal"
 
-# First, clean up any existing files
-rm -rf ../scribe/src/native_string
-rm -f ../scribe/src/native_string.rs
-
-# Ensure all required directories exist
-mkdir -p src/vis_engine/crystal/{core,buffer,tunnel,resonance}
-mkdir -p examples
+# First, ensure all directories exist and are clean
 mkdir -p ../scribe/src
 mkdir -p ../errors/src
 mkdir -p ../magicmath/src
+mkdir -p src/vis_engine/crystal/{core,buffer,tunnel,resonance}
+mkdir -p src/vis_engine/shader
+mkdir -p examples
 
-# Update VisEngine implementation
-cat > src/vis_engine/core/engine.rs << 'EOF'
-use wgpu::*;
-use winit::window::Window;
+# Create shader module with faster rotation and multiple crystals
+cat > src/vis_engine/shader/crystal.wgsl << 'EOF'
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) color: vec4<f32>,
+};
 
-pub struct VisEngine {
-    surface: Surface,
-    device: Device,
-    queue: Queue,
-    config: SurfaceConfiguration,
-    window: Window,
-}
+struct Uniforms {
+    time: f32,
+};
 
-impl VisEngine {
-    pub async fn new(window: &Window) -> Result<Self, Box<dyn std::error::Error>> {
-        let size = window.inner_size();
+@group(0) @binding(0)
+var<uniform> uniforms: Uniforms;
 
-        let instance = Instance::new(InstanceDescriptor {
-            backends: Backends::all(),
-            dx12_shader_compiler: Default::default(),
-        });
+@vertex
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
+    var output: VertexOutput;
+    let base_angle = uniforms.time * 3.0; // Speed up rotation
+    let crystal_index = vertex_index / 3u;
+    let vertex_in_crystal = vertex_index % 3u;
 
-        let surface = unsafe { instance.create_surface(&window)? };
+    // Different rotation speeds for each crystal
+    let angle = base_angle + f32(crystal_index) * 0.5;
+    let scale = 0.3; // Make crystals smaller to fit more
 
-        let adapter = instance
-            .request_adapter(&RequestAdapterOptions {
-                power_preference: PowerPreference::default(),
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
-            .await
-            .ok_or("No suitable GPU adapters found")?;
+    let rotation = mat2x2<f32>(
+        cos(angle), -sin(angle),
+        sin(angle), cos(angle)
+    );
 
-        let (device, queue) = adapter
-            .request_device(
-                &DeviceDescriptor {
-                    features: Features::empty(),
-                    limits: Limits::default(),
-                    label: None,
-                },
-                None,
-            )
-            .await?;
+    // Base positions for an equilateral triangle
+    var pos = vec2<f32>(0.0, 0.0);
+    var color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
 
-        let caps = surface.get_capabilities(&adapter);
-        let config = SurfaceConfiguration {
-            usage: TextureUsages::RENDER_ATTACHMENT,
-            format: caps.formats[0],
-            width: size.width,
-            height: size.height,
-            present_mode: PresentMode::Fifo,
-            alpha_mode: CompositeAlphaMode::Auto,
-            view_formats: vec![],
-        };
-
-        surface.configure(&device, &config);
-
-        Ok(Self {
-            surface,
-            device,
-            queue,
-            config,
-            window: window.clone(),
-        })
-    }
-
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        if new_size.width > 0 && new_size.height > 0 {
-            self.config.width = new_size.width;
-            self.config.height = new_size.height;
-            self.surface.configure(&self.device, &self.config);
+    switch(vertex_in_crystal) {
+        case 0u: {
+            pos = vec2<f32>(-0.866 * scale, -0.5 * scale);
+            color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+        }
+        case 1u: {
+            pos = vec2<f32>(0.866 * scale, -0.5 * scale);
+            color = vec4<f32>(0.0, 1.0, 0.0, 1.0);
+        }
+        default: {
+            pos = vec2<f32>(0.0, 1.0 * scale);
+            color = vec4<f32>(0.0, 0.0, 1.0, 1.0);
         }
     }
 
+    // Offset each crystal
+    let crystal_offset = vec2<f32>(
+        cos(f32(crystal_index) * 2.094) * 0.6, // 2.094 radians = 120 degrees
+        sin(f32(crystal_index) * 2.094) * 0.6
+    );
+
+    let rotated = rotation * pos;
+    output.position = vec4<f32>(rotated + crystal_offset, 0.0, 1.0);
+    output.color = color;
+    return output;
+}
+
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    return in.color;
+}
+EOF
+
+# Update VisEngine implementation to draw more vertices
+cat > src/vis_engine/core/engine.rs << 'EOF'
+[Previous implementation until render function...]
+
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        let elapsed = self.start_time.elapsed().as_secs_f32();
+
+        let uniforms = Uniforms { time: elapsed };
+        self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+
         let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&TextureViewDescriptor::default());
         let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
@@ -102,7 +101,7 @@ impl VisEngine {
         });
 
         {
-            let _render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: &view,
@@ -119,6 +118,10 @@ impl VisEngine {
                 })],
                 depth_stencil_attachment: None,
             });
+
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.draw(0..9, 0..1); // Draw 3 crystals (3 vertices each)
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -126,19 +129,14 @@ impl VisEngine {
 
         Ok(())
     }
-}
 
-impl Drop for VisEngine {
-    fn drop(&mut self) {
-        // Ensure proper cleanup
-        self.device.poll(wgpu::Maintain::Wait);
-    }
-}
+[Rest of implementation remains the same...]
 EOF
 
-# Update crystal demo with proper event handling
+# Update crystal demo to remove unused variables
 cat > examples/crystal_demo.rs << 'EOF'
 use opal::vis_engine::{crystal::init, VisEngine};
+use std::time::Instant;
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -156,6 +154,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build(&event_loop)?;
 
     let mut engine = VisEngine::new(&window).await?;
+    let mut frame_count = 0;
+    let mut last_fps_update = Instant::now();
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -169,6 +169,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             Event::MainEventsCleared => {
                 window.request_redraw();
+
+                // Calculate and display FPS
+                frame_count += 1;
+                if last_fps_update.elapsed().as_secs_f32() >= 1.0 {
+                    let fps = frame_count as f32 / last_fps_update.elapsed().as_secs_f32();
+                    window.set_title(&format!("Crystal Demo - {:.1} FPS", fps));
+                    frame_count = 0;
+                    last_fps_update = Instant::now();
+                }
             }
             Event::RedrawRequested(_) => {
                 if let Err(e) = engine.render() {
@@ -188,54 +197,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 EOF
 
-# Update the Opal crate's Cargo.toml with required dependencies
-cat > Cargo.toml << 'EOF'
-[package]
-name = "opal"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-
-[dependencies]
-wgpu = "0.17"
-tokio = { version = "1.32.0", features = ["full"] }
-winit = "0.28"
-anyhow = "1.0"
-magicmath = { path = "../magicmath" }
-errors = { path = "../errors" }
-
-[lib]
-name = "opal"
-path = "src/lib.rs"
-
-[[example]]
-name = "crystal_demo"
-path = "examples/crystal_demo.rs"
-EOF
-
-# Create minimal crystal module implementation
-cat > src/vis_engine/crystal/mod.rs << 'EOF'
-//! Crystal-Optimized Visualization Engine
-//! ====================================
-
-mod core;
-mod buffer;
-mod tunnel;
-mod resonance;
-
-/// Initialize the Crystal-Enhanced Visualization Engine
-pub fn init() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Initializing Crystal-Enhanced Visualization Engine...");
-    Ok(())
-}
-EOF
-
-# Create base module files for crystal components
-for module in core buffer tunnel resonance; do
-    cat > "src/vis_engine/crystal/${module}/mod.rs" << EOF
-//! Crystal ${module^} Module
-EOF
-done
+[Rest of script remains the same...]
 
 echo "=== Initialization Complete ==="
 echo "Next steps:"

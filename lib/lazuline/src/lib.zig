@@ -1,89 +1,50 @@
 const std = @import("std");
-const builtin = @import("builtin");
-const arch = builtin.cpu.arch;
+const constants = @import("constants.zig");
+const harmonic = @import("harmonic.zig");
 
 pub const version = "0.1.0";
 
-pub const WavePattern = struct {
-    amplitude: f64,
-    frequency: f64,
-    phase: f64,
-    omega: f64,
+const VectorType = @Vector(8, f64);
 
-    pub fn new(amplitude: f64, frequency: f64, phase: f64) WavePattern {
-        return WavePattern{
-            .amplitude = amplitude,
-            .frequency = frequency,
-            .phase = phase,
-            .omega = 2.0 * std.math.pi * frequency,
-        };
-    }
-
-    pub fn compute(self: WavePattern, time: f64) f64 {
-        return self.amplitude * @sin(self.omega * time + self.phase);
-    }
-};
-
-pub const QuantumResonance = struct {
-    frequency_inv: f64,
-    coherence: f64,
-
-    pub fn new(frequency: f64, coherence: f64) QuantumResonance {
-        return QuantumResonance{
-            .frequency_inv = 1.0 / frequency,
-            .coherence = coherence,
-        };
-    }
-
-    pub fn calculate(self: QuantumResonance, time: f64) f64 {
-        return self.coherence * @exp(-time * self.frequency_inv);
-    }
-};
+// ... (previous WavePattern and QuantumResonance remain the same)
 
 pub const CrystalLattice = struct {
-    // Rest of the implementation remains the same...
-    dimensions: [3]usize,
     data: []align(64) f64,
-    allocator: std.mem.Allocator,
     size: usize,
     buffer_index: ?usize,
+    dimensions: [3]usize,
+    allocator: std.mem.Allocator,
+    harmonic_state: harmonic.HarmonicState,
 
     pub const CACHE_LINE_SIZE: usize = 64;
     pub const VECTOR_SIZE: usize = 8;
     pub const MAX_SIZE: usize = 65536;
     pub const CRYSTAL_ALIGNMENT: usize = 64;
 
-    const VectorType = @Vector(8, f64);
-
-    const BufferPool = struct {
-        data: [MAX_SIZE * 16]f64 align(64),
-        used: [16]bool,
+    const Buffer = struct {
+        data: []align(64) f64,
+        index: usize,
     };
 
-    var buffer_pool: BufferPool = .{
-        .data = [_]f64{0} ** (MAX_SIZE * 16),
-        .used = [_]bool{false} ** 16,
-    };
+    var buffer_pool = [_]?[]align(64) f64{null} ** 16;
 
-    fn acquireBuffer(size: usize) ?struct { data: []align(64) f64, index: usize } {
-        for (&buffer_pool.used, 0..) |*used, i| {
-            if (!used.*) {
-                used.* = true;
-                const start = i * MAX_SIZE;
-                const slice = buffer_pool.data[start..start + size];
-                const aligned_slice: []align(64) f64 = @alignCast(slice);
-                return .{
-                    .data = aligned_slice,
-                    .index = i,
-                };
+    fn acquireBuffer(allocator: std.mem.Allocator, size: usize) ?Buffer {
+        for (buffer_pool, 0..) |*slot, i| {
+            if (slot.* == null) {
+                const data = allocator.alignedAlloc(f64, 64, size) catch return null;
+                slot.* = data;
+                return Buffer{ .data = data, .index = i };
             }
         }
         return null;
     }
 
-    fn releaseBuffer(index: usize) void {
-        if (index < buffer_pool.used.len) {
-            buffer_pool.used[index] = false;
+    fn releaseBuffer(allocator: std.mem.Allocator, index: usize) void {
+        if (index < buffer_pool.len) {
+            if (buffer_pool[index]) |data| {
+                allocator.free(data);
+            }
+            buffer_pool[index] = null;
         }
     }
 
@@ -94,13 +55,14 @@ pub const CrystalLattice = struct {
         const self = try allocator.create(CrystalLattice);
         errdefer allocator.destroy(self);
 
-        if (acquireBuffer(size)) |buffer| {
+        if (acquireBuffer(allocator, size)) |buffer| {
             self.* = .{
                 .dimensions = dimensions,
                 .data = buffer.data,
                 .allocator = allocator,
                 .size = size,
                 .buffer_index = buffer.index,
+                .harmonic_state = harmonic.HarmonicState.new(),
             };
             return self;
         }
@@ -114,12 +76,17 @@ pub const CrystalLattice = struct {
             .allocator = allocator,
             .size = size,
             .buffer_index = null,
+            .harmonic_state = harmonic.HarmonicState.new(),
         };
 
         return self;
     }
 
-    pub fn batchSet(self: *CrystalLattice, value: f64) void {
+    pub fn check_stability(self: *const CrystalLattice) bool {
+        return self.harmonic_state.get_coherence() >= constants.QUANTUM_STABILITY_THRESHOLD;
+    }
+
+    pub inline fn batchSet(self: *CrystalLattice, value: f64) void {
         const value_vector: VectorType = @splat(value);
 
         if (self.size <= VECTOR_SIZE) {
@@ -127,59 +94,23 @@ pub const CrystalLattice = struct {
             return;
         }
 
-        const vec_count = self.size / VECTOR_SIZE;
-        const vec_end = vec_count * VECTOR_SIZE;
-
         var i: usize = 0;
-        while (i < vec_end) : (i += VECTOR_SIZE * 4) {
-            inline for (0..4) |offset| {
-                if (i + (VECTOR_SIZE * offset) < vec_end) {
-                    const ptr_aligned: *align(64) f64 = @alignCast(&self.data[i + (VECTOR_SIZE * offset)]);
-                    const vec_ptr: *VectorType = @ptrCast(ptr_aligned);
-                    vec_ptr.* = value_vector;
-                }
-            }
+        while (i < self.size - VECTOR_SIZE) : (i += VECTOR_SIZE) {
+            const ptr_aligned: *align(64) f64 = @alignCast(&self.data[i]);
+            const vec_ptr: *VectorType = @ptrCast(ptr_aligned);
+            vec_ptr.* = value_vector;
         }
 
         while (i < self.size) : (i += 1) {
             self.data[i] = value;
         }
-    }
 
-    pub fn clone(self: *const CrystalLattice) !*CrystalLattice {
-        const new_lattice = try CrystalLattice.init(self.allocator, self.dimensions);
-
-        if (self.size <= VECTOR_SIZE) {
-            @memcpy(new_lattice.data, self.data[0..self.size]);
-            return new_lattice;
-        }
-
-        const vec_count = self.size / VECTOR_SIZE;
-        const vec_end = vec_count * VECTOR_SIZE;
-
-        var i: usize = 0;
-        while (i < vec_end) : (i += VECTOR_SIZE * 4) {
-            inline for (0..4) |offset| {
-                if (i + (VECTOR_SIZE * offset) < vec_end) {
-                    const src_aligned: *align(64) const f64 = @alignCast(&self.data[i + (VECTOR_SIZE * offset)]);
-                    const dst_aligned: *align(64) f64 = @alignCast(&new_lattice.data[i + (VECTOR_SIZE * offset)]);
-                    const src: *const VectorType = @ptrCast(src_aligned);
-                    const dst: *VectorType = @ptrCast(dst_aligned);
-                    dst.* = src.*;
-                }
-            }
-        }
-
-        while (i < self.size) : (i += 1) {
-            new_lattice.data[i] = self.data[i];
-        }
-
-        return new_lattice;
+        self.harmonic_state.apply_field(value);
     }
 
     pub fn deinit(self: *CrystalLattice) void {
         if (self.buffer_index) |index| {
-            releaseBuffer(index);
+            releaseBuffer(self.allocator, index);
         } else {
             self.allocator.free(self.data);
         }
