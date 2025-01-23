@@ -1,7 +1,3 @@
-//! Error handling for the Scribble ecosystem
-//! Author: isdood
-//! Created: 2025-01-23 02:24:21 UTC
-
 use scribe::String;
 
 #[derive(Debug)]
@@ -15,4 +11,16 @@ impl Error {
             message: message.into(),
         }
     }
+
+    pub fn message(&self) -> &str {
+        self.message.as_ref()
+    }
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message())
+    }
+}
+
+impl std::error::Error for Error {}

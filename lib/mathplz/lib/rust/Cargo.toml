@@ -1,0 +1,8 @@
+[package]
+name = "mathplz-rust"
+version = "0.1.0"
+edition = "2025"
+authors = ["Caleb J.D. Terkovics <isdood>"]
+
+[dependencies]
+julia = "0.1.0"

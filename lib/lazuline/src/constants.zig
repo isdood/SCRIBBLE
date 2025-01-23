@@ -1,6 +1,10 @@
+// Quantum stability threshold based on the golden ratio
 pub const QUANTUM_STABILITY_THRESHOLD: f64 = 0.618033988749895;
-pub const AETHER_RESONANCE_FACTOR: f64 = 0.999999999999;
-pub const MAX_QUANTUM_VARIANCE: f64 = 0.000000000001;
-pub const MAX_COHERENCE_DEVIATION: f64 = 0.000000000001;
-pub const QUANTUM_GOLDEN_RATIO: f64 = 1.618033988749895;
-pub const DECOHERENCE_RATE: f64 = 0.9;
+
+// Quantum decay rate for harmonic field interactions
+// Using inverse of golden ratio for optimal crystal resonance
+pub const QUANTUM_DECAY_RATE: f64 = 1.618033988749895;
+
+// Crystal lattice constants
+pub const CRYSTAL_RESONANCE_FACTOR: f64 = 2.236067977499790; // sqrt(5)
+pub const HARMONIC_COUPLING_STRENGTH: f64 = 0.090169943749474; // (sqrt(5)-2)/2

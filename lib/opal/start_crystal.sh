@@ -2,96 +2,197 @@
 
 # start_crystal.sh
 # Author: isdood
-# Created: 2025-01-23 02:38:23 UTC
+# Created: 2025-01-23 03:02:00 UTC
 
 echo "=== Crystal Optimization Initialization ==="
-echo "Date: 2025-01-23 02:38:23 UTC"
+echo "Date: 2025-01-23 03:02:00 UTC"
 echo "User: isdood"
 echo "Framework: Scribble/Opal"
 
-# First, ensure all directories exist and are clean
-mkdir -p ../scribe/src
-mkdir -p ../errors/src
-mkdir -p ../magicmath/src
-mkdir -p src/vis_engine/crystal/{core,buffer,tunnel,resonance}
-mkdir -p src/vis_engine/shader
-mkdir -p examples
+# Create complete engine implementation
+cat > src/vis_engine/core/engine.rs << 'EOF'
+use std::time::Instant;
+use wgpu::*;
+use winit::window::Window;
+use crate::vis_engine::shader::CRYSTAL_SHADER;
 
-# Create shader module with faster rotation and multiple crystals
-cat > src/vis_engine/shader/crystal.wgsl << 'EOF'
-struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) color: vec4<f32>,
-};
-
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Uniforms {
     time: f32,
-};
+    resolution: [f32; 2],
+    _padding: [f32; 1],
+}
 
-@group(0) @binding(0)
-var<uniform> uniforms: Uniforms;
+pub struct VisEngine {
+    surface: Surface,
+    device: Device,
+    queue: Queue,
+    config: SurfaceConfiguration,
+    size: winit::dpi::PhysicalSize<u32>,
+    start_time: Instant,
+    render_pipeline: RenderPipeline,
+    uniform_buffer: Buffer,
+    uniform_bind_group: BindGroup,
+}
 
-@vertex
-fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
-    var output: VertexOutput;
-    let base_angle = uniforms.time * 3.0; // Speed up rotation
-    let crystal_index = vertex_index / 3u;
-    let vertex_in_crystal = vertex_index % 3u;
+impl VisEngine {
+    pub async fn new(window: &Window) -> Result<Self, Box<dyn std::error::Error>> {
+        let size = window.inner_size();
 
-    // Different rotation speeds for each crystal
-    let angle = base_angle + f32(crystal_index) * 0.5;
-    let scale = 0.3; // Make crystals smaller to fit more
+        let instance = Instance::new(InstanceDescriptor {
+            backends: Backends::all(),
+            dx12_shader_compiler: Default::default(),
+        });
 
-    let rotation = mat2x2<f32>(
-        cos(angle), -sin(angle),
-        sin(angle), cos(angle)
-    );
+        let surface = unsafe { instance.create_surface(&window)? };
 
-    // Base positions for an equilateral triangle
-    var pos = vec2<f32>(0.0, 0.0);
-    var color = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+        let adapter = instance
+            .request_adapter(&RequestAdapterOptions {
+                power_preference: PowerPreference::default(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .ok_or("No suitable GPU adapters found")?;
 
-    switch(vertex_in_crystal) {
-        case 0u: {
-            pos = vec2<f32>(-0.866 * scale, -0.5 * scale);
-            color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
-        }
-        case 1u: {
-            pos = vec2<f32>(0.866 * scale, -0.5 * scale);
-            color = vec4<f32>(0.0, 1.0, 0.0, 1.0);
-        }
-        default: {
-            pos = vec2<f32>(0.0, 1.0 * scale);
-            color = vec4<f32>(0.0, 0.0, 1.0, 1.0);
-        }
+        let (device, queue) = adapter
+            .request_device(
+                &DeviceDescriptor {
+                    features: Features::empty(),
+                    limits: Limits::default(),
+                    label: None,
+                },
+                None,
+            )
+            .await?;
+
+        let caps = surface.get_capabilities(&adapter);
+        let config = SurfaceConfiguration {
+            usage: TextureUsages::RENDER_ATTACHMENT,
+            format: caps.formats[0],
+            width: size.width,
+            height: size.height,
+            present_mode: PresentMode::Fifo,
+            alpha_mode: CompositeAlphaMode::Auto,
+            view_formats: vec![],
+        };
+
+        let shader = device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("Crystal Shader"),
+            source: ShaderSource::Wgsl(CRYSTAL_SHADER.into()),
+        });
+
+        let uniform_buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("Uniform Buffer"),
+            size: std::mem::size_of::<Uniforms>() as u64,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let uniform_bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("Uniform Bind Group Layout"),
+            entries: &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::VERTEX_FRAGMENT,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        });
+
+        let uniform_bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("Uniform Bind Group"),
+            layout: &uniform_bind_group_layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: uniform_buffer.as_entire_binding(),
+            }],
+        });
+
+        let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("Pipeline Layout"),
+            bind_group_layouts: &[&uniform_bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        let render_pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&pipeline_layout),
+            vertex: VertexState {
+                module: &shader,
+                entry_point: "vs_main",
+                buffers: &[],
+            },
+            fragment: Some(FragmentState {
+                module: &shader,
+                entry_point: "fs_main",
+                targets: &[Some(ColorTargetState {
+                    format: config.format,
+                    blend: Some(BlendState {
+                        color: BlendComponent {
+                            src_factor: BlendFactor::SrcAlpha,
+                            dst_factor: BlendFactor::OneMinusSrcAlpha,
+                            operation: BlendOperation::Add,
+                        },
+                        alpha: BlendComponent::REPLACE,
+                    }),
+                    write_mask: ColorWrites::ALL,
+                })],
+            }),
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: FrontFace::Ccw,
+                cull_mode: Some(Face::Back),
+                unclipped_depth: false,
+                polygon_mode: PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+        });
+
+        surface.configure(&device, &config);
+
+        Ok(Self {
+            surface,
+            device,
+            queue,
+            config,
+            size,
+            start_time: Instant::now(),
+            render_pipeline,
+            uniform_buffer,
+            uniform_bind_group,
+        })
     }
 
-    // Offset each crystal
-    let crystal_offset = vec2<f32>(
-        cos(f32(crystal_index) * 2.094) * 0.6, // 2.094 radians = 120 degrees
-        sin(f32(crystal_index) * 2.094) * 0.6
-    );
-
-    let rotated = rotation * pos;
-    output.position = vec4<f32>(rotated + crystal_offset, 0.0, 1.0);
-    output.color = color;
-    return output;
-}
-
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return in.color;
-}
-EOF
-
-# Update VisEngine implementation to draw more vertices
-cat > src/vis_engine/core/engine.rs << 'EOF'
-[Previous implementation until render function...]
+    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        if new_size.width > 0 && new_size.height > 0 {
+            self.size = new_size;
+            self.config.width = new_size.width;
+            self.config.height = new_size.height;
+            self.surface.configure(&self.device, &self.config);
+        }
+    }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let elapsed = self.start_time.elapsed().as_secs_f32();
 
-        let uniforms = Uniforms { time: elapsed };
+        let uniforms = Uniforms {
+            time: elapsed,
+            resolution: [self.size.width as f32, self.size.height as f32],
+            _padding: [0.0],
+        };
         self.queue.write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
 
         let output = self.surface.get_current_texture()?;
@@ -108,9 +209,9 @@ cat > src/vis_engine/core/engine.rs << 'EOF'
                     resolve_target: None,
                     ops: Operations {
                         load: LoadOp::Clear(Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
+                            r: 0.05,
+                            g: 0.1,
+                            b: 0.15,
                             a: 1.0,
                         }),
                         store: true,
@@ -121,7 +222,7 @@ cat > src/vis_engine/core/engine.rs << 'EOF'
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            render_pass.draw(0..9, 0..1); // Draw 3 crystals (3 vertices each)
+            render_pass.draw(0..9, 0..1); // Draw exactly 3 crystals (3 vertices each)
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -129,71 +230,12 @@ cat > src/vis_engine/core/engine.rs << 'EOF'
 
         Ok(())
     }
+}
 
-[Rest of implementation remains the same...]
-EOF
-
-# Update crystal demo to remove unused variables
-cat > examples/crystal_demo.rs << 'EOF'
-use opal::vis_engine::{crystal::init, VisEngine};
-use std::time::Instant;
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
-};
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Crystal-Enhanced Visualization Demo");
-    init()?;
-
-    let event_loop = EventLoop::new();
-    let window = WindowBuilder::new()
-        .with_title("Crystal Demo")
-        .build(&event_loop)?;
-
-    let mut engine = VisEngine::new(&window).await?;
-    let mut frame_count = 0;
-    let mut last_fps_update = Instant::now();
-
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
-
-        match event {
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
-                *control_flow = ControlFlow::Exit;
-            }
-            Event::MainEventsCleared => {
-                window.request_redraw();
-
-                // Calculate and display FPS
-                frame_count += 1;
-                if last_fps_update.elapsed().as_secs_f32() >= 1.0 {
-                    let fps = frame_count as f32 / last_fps_update.elapsed().as_secs_f32();
-                    window.set_title(&format!("Crystal Demo - {:.1} FPS", fps));
-                    frame_count = 0;
-                    last_fps_update = Instant::now();
-                }
-            }
-            Event::RedrawRequested(_) => {
-                if let Err(e) = engine.render() {
-                    eprintln!("Render error: {:?}", e);
-                    *control_flow = ControlFlow::Exit;
-                }
-            }
-            Event::WindowEvent {
-                event: WindowEvent::Resized(size),
-                ..
-            } => {
-                engine.resize(size);
-            }
-            _ => {}
-        }
-    });
+impl Drop for VisEngine {
+    fn drop(&mut self) {
+        self.device.poll(wgpu::Maintain::Wait);
+    }
 }
 EOF
 

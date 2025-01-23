@@ -11,7 +11,7 @@ members = [
     "lib/magicmath",
     "lib/errors",
     "lib/scribe"
-]
+, "lib/mathplz/lib/rust"]
 
 [workspace.package]
 version = "0.1.0"
