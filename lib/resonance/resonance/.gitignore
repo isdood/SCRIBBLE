@@ -1,0 +1,8 @@
+/target
+/zig-cache
+/zig-out
+**/*.o
+**/*.so
+**/*.dylib
+**/*.dll
+Manifest.toml

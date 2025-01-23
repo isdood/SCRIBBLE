@@ -1,14 +1,15 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+mod crystal;
+
+pub use crystal::ShardedLattice as CrystalLattice;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    fn test_crystal_lattice() {
+        let points = vec![[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]];
+        let lattice = CrystalLattice::new(points);
+        assert!(lattice.calculate_energy() > 0.0);
     }
 }

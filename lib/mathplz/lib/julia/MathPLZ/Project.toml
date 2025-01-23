@@ -1,0 +1,15 @@
+name = "MathPLZ"
+uuid = "f8a8b4e2-d967-4c3e-b89c-6f3c9d42f714"
+authors = ["isdood"]
+version = "0.1.0"
+
+[deps]
+BioStructures = "de9282ab-8554-53be-b2d6-f6c222edabfc"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
+[compat]
+BioStructures = "4.3.0"
+LinearAlgebra = "1.11.0"
+StaticArrays = "1.9.10"
+julia = "1.11"

@@ -1,8 +1,22 @@
 [package]
-name = "mathplz-rust"
+name = "mathplz"
 version = "0.1.0"
-edition = "2025"
-authors = ["Caleb J.D. Terkovics <isdood>"]
+edition = "2021"
 
 [dependencies]
-julia = "0.1.0"
+rand = "0.8"
+num-complex = "0.4"
+rayon = "1.7"
+crossbeam = "0.8"
+parking_lot = "0.12"
+hashbrown = "0.14"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+debug = false
