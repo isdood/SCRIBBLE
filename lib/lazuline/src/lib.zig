@@ -1,43 +1,26 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const math = std.math;
-const mem = std.mem;
+const builtin = @import("builtin");
 
 pub const version = "0.1.0";
-
-// SIMD vector types for better performance
-const Vec4f64 = @Vector(4, f64);
 
 pub const WavePattern = struct {
     amplitude: f64,
     frequency: f64,
     phase: f64,
     omega: f64,
-    // Pre-calculated vectors for SIMD
-    amp_vec: Vec4f64,
-    phase_vec: Vec4f64,
 
     pub fn new(amplitude: f64, frequency: f64, phase: f64) WavePattern {
-        const omega = 2.0 * math.pi * frequency;
         return WavePattern{
             .amplitude = amplitude,
             .frequency = frequency,
             .phase = phase,
-            .omega = omega,
-            .amp_vec = @splat(amplitude),
-            .phase_vec = @splat(phase),
+            .omega = 2.0 * math.pi * frequency,
         };
     }
 
     pub fn compute(self: WavePattern, time: f64) f64 {
-        // Using pre-calculated values
         return self.amplitude * @sin(self.omega * time + self.phase);
-    }
-
-    // Vectorized computation for multiple time points
-    pub fn computeVector(self: WavePattern, times: Vec4f64) Vec4f64 {
-        const omega_vec = @splat(self.omega);
-        return self.amp_vec * @sin(omega_vec * times + self.phase_vec);
     }
 };
 
@@ -46,88 +29,113 @@ pub const CrystalLattice = struct {
     data: []align(32) f64,
     allocator: std.mem.Allocator,
     size: usize,
+    buffer_index: ?usize,
 
     pub const CACHE_LINE_SIZE: usize = 64;
     pub const VECTOR_SIZE: usize = 4;
-    pub const PREFETCH_DISTANCE: usize = 8;
+    pub const DEFAULT_BLOCK_SIZE: usize = 16;
+    pub const MAX_SIZE: usize = DEFAULT_BLOCK_SIZE * DEFAULT_BLOCK_SIZE * DEFAULT_BLOCK_SIZE;
 
-    // Memory pool for faster allocations
-    pub const Pool = struct {
-        allocator: mem.Allocator,
-        pre_allocated: []align(CACHE_LINE_SIZE) u8,
-        current_offset: usize,
-
-        pub fn init(allocator: mem.Allocator, total_size: usize) !Pool {
-            const aligned_size = mem.alignForward(usize, total_size, CACHE_LINE_SIZE);
-            const pre_allocated = try allocator.alignedAlloc(u8, CACHE_LINE_SIZE, aligned_size);
-            return Pool{
-                .allocator = allocator,
-                .pre_allocated = pre_allocated,
-                .current_offset = 0,
-            };
-        }
-
-        pub fn deinit(self: *Pool) void {
-            self.allocator.free(self.pre_allocated);
-        }
-
-        pub fn allocate(self: *Pool, size: usize) ?[]align(CACHE_LINE_SIZE) u8 {
-            const aligned_size = mem.alignForward(usize, size, CACHE_LINE_SIZE);
-            if (self.current_offset + aligned_size > self.pre_allocated.len) return null;
-
-            const result = self.pre_allocated[self.current_offset..][0..aligned_size];
-            self.current_offset += aligned_size;
-            return result;
-        }
+    // Static buffer for small lattices
+    const StaticBuffer = struct {
+        data: [MAX_SIZE]f64 align(32),
+        used: bool,
     };
 
+    var static_buffers: [4]StaticBuffer = .{
+        .{ .data = undefined, .used = false },
+        .{ .data = undefined, .used = false },
+        .{ .data = undefined, .used = false },
+        .{ .data = undefined, .used = false },
+    };
+
+    fn acquireStaticBuffer() struct { buffer: ?[]align(32) f64, index: ?usize } {
+        for (&static_buffers, 0..) |*buffer, i| {
+            if (!buffer.used) {
+                buffer.used = true;
+                return .{
+                    .buffer = buffer.data[0..MAX_SIZE],
+                    .index = i,
+                };
+            }
+        }
+        return .{ .buffer = null, .index = null };
+    }
+
+    fn releaseStaticBuffer(index: usize) void {
+        if (index < static_buffers.len) {
+            static_buffers[index].used = false;
+        }
+    }
+
     pub fn init(allocator: std.mem.Allocator, dimensions: [3]usize) !*CrystalLattice {
-        const self = try allocator.create(CrystalLattice);
         const size = dimensions[0] * dimensions[1] * dimensions[2];
+        if (size > MAX_SIZE) return error.SizeTooLarge;
+
+        const self = try allocator.create(CrystalLattice);
+        errdefer allocator.destroy(self);
+
+        // Try to use static buffer first
+        const static_result = acquireStaticBuffer();
+        if (static_result.buffer) |buffer| {
+            self.* = .{
+                .dimensions = dimensions,
+                .data = buffer[0..size],
+                .allocator = allocator,
+                .size = size,
+                .buffer_index = static_result.index,
+            };
+            @memset(self.data, 0);
+            return self;
+        }
+
+        // Fall back to dynamic allocation
         const data = try allocator.alignedAlloc(f64, CACHE_LINE_SIZE, size);
+        errdefer allocator.free(data);
 
         self.* = .{
             .dimensions = dimensions,
             .data = data,
             .allocator = allocator,
             .size = size,
+            .buffer_index = null,
         };
 
-        // Use SIMD for faster initialization
-        const vec_zero: Vec4f64 = @splat(0);
-        const aligned_size = size & ~@as(usize, VECTOR_SIZE - 1);
-
-        var i: usize = 0;
-        while (i < aligned_size) : (i += VECTOR_SIZE) {
-            const vec_ptr = @as(*align(32) Vec4f64, @ptrCast(data[i..].ptr));
-            vec_ptr.* = vec_zero;
-        }
-        while (i < size) : (i += 1) {
-            data[i] = 0;
-        }
-
+        @memset(data, 0);
         return self;
     }
 
     pub fn deinit(self: *CrystalLattice) void {
-        self.allocator.free(self.data);
+        if (self.buffer_index) |index| {
+            releaseStaticBuffer(index);
+        } else {
+            self.allocator.free(self.data);
+        }
         self.allocator.destroy(self);
     }
 
     pub fn batchSet(self: *CrystalLattice, value: f64) void {
-        const vec_value: Vec4f64 = @splat(value);
-        const aligned_size = self.size & ~@as(usize, VECTOR_SIZE - 1);
+        const AlignVector = @Vector(4, f64);
+        const value_vector: AlignVector = @splat(value);
 
         var i: usize = 0;
-        // SIMD vectorized setting
-        while (i < aligned_size) : (i += VECTOR_SIZE) {
-            // Prefetch next cache line
-            if (i + PREFETCH_DISTANCE < aligned_size) {
-                std.prefetch.prefetchWrite(self.data[i + PREFETCH_DISTANCE..].ptr, 1);
-            }
-            const vec_ptr = @as(*align(32) Vec4f64, @ptrCast(self.data[i..].ptr));
-            vec_ptr.* = vec_value;
+        const aligned_size = self.size & ~@as(usize, 3);
+
+        // Vector operations for 16-element chunks
+        while (i + 15 < aligned_size) : (i += 16) {
+            const ptr = @as(*align(32) [4]AlignVector, @ptrCast(@alignCast(self.data[i..].ptr)));
+            ptr[0] = value_vector;
+            ptr[1] = value_vector;
+            ptr[2] = value_vector;
+            ptr[3] = value_vector;
         }
+
+        // Handle remaining aligned elements
+        while (i < aligned_size) : (i += 4) {
+            const ptr = @as(*align(32) AlignVector, @ptrCast(@alignCast(self.data[i..].ptr)));
+            ptr.* = value_vector;
+        }
+
         // Handle remaining elements
         while (i < self.size) : (i += 1) {
             self.data[i] = value;
@@ -135,32 +143,8 @@ pub const CrystalLattice = struct {
     }
 
     pub fn clone(self: *const CrystalLattice) !*CrystalLattice {
-        const new_lattice = try self.allocator.create(CrystalLattice);
-        const new_data = try self.allocator.alignedAlloc(f64, CACHE_LINE_SIZE, self.size);
-
-        // Use SIMD for faster copying
-        const aligned_size = self.size & ~@as(usize, VECTOR_SIZE - 1);
-        var i: usize = 0;
-        while (i < aligned_size) : (i += VECTOR_SIZE) {
-            if (i + PREFETCH_DISTANCE < aligned_size) {
-                std.prefetch.prefetchRead(self.data[i + PREFETCH_DISTANCE..].ptr, 1);
-                std.prefetch.prefetchWrite(new_data[i + PREFETCH_DISTANCE..].ptr, 1);
-            }
-            const src_ptr = @as(*align(32) const Vec4f64, @ptrCast(self.data[i..].ptr));
-            const dst_ptr = @as(*align(32) Vec4f64, @ptrCast(new_data[i..].ptr));
-            dst_ptr.* = src_ptr.*;
-        }
-        while (i < self.size) : (i += 1) {
-            new_data[i] = self.data[i];
-        }
-
-        new_lattice.* = .{
-            .dimensions = self.dimensions,
-            .data = new_data,
-            .allocator = self.allocator,
-            .size = self.size,
-        };
-
+        const new_lattice = try init(self.allocator, self.dimensions);
+        @memcpy(new_lattice.data, self.data);
         return new_lattice;
     }
 };
@@ -168,24 +152,15 @@ pub const CrystalLattice = struct {
 pub const QuantumResonance = struct {
     frequency_inv: f64,
     coherence: f64,
-    coherence_vec: Vec4f64,
-    freq_inv_vec: Vec4f64,
 
     pub fn new(frequency: f64, coherence: f64) QuantumResonance {
         return QuantumResonance{
             .frequency_inv = 1.0 / frequency,
             .coherence = coherence,
-            .coherence_vec = @splat(coherence),
-            .freq_inv_vec = @splat(1.0 / frequency),
         };
     }
 
     pub fn calculate(self: QuantumResonance, time: f64) f64 {
         return self.coherence * @exp(-time * self.frequency_inv);
-    }
-
-    // Vectorized calculation for multiple time points
-    pub fn calculateVector(self: QuantumResonance, times: Vec4f64) Vec4f64 {
-        return self.coherence_vec * @exp(-times * self.freq_inv_vec);
     }
 };

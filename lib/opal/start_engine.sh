@@ -1,11 +1,11 @@
 #!/bin/bash
 
 echo "[INFO] Starting Lazuline build configuration fix..."
-echo "[INFO] Current time: 2025-01-23 00:39:15 UTC"
+echo "[INFO] Current time: 2025-01-23 00:40:40 UTC"
 echo "[INFO] User: isdood"
 echo "[INFO] Zig version: 0.13.0"
 
-# Update lib.zig with fixed pointer types
+# Update lib.zig with optimized SIMD and precaching
 cat > src/lib.zig << 'EOF'
 const std = @import("std");
 const math = std.math;
@@ -41,22 +41,29 @@ pub const CrystalLattice = struct {
     buffer_index: ?usize,
 
     pub const CACHE_LINE_SIZE: usize = 64;
-    pub const VECTOR_SIZE: usize = 4;
+    pub const VECTOR_SIZE: usize = 8; // Increased vector size
     pub const DEFAULT_BLOCK_SIZE: usize = 16;
     pub const MAX_SIZE: usize = DEFAULT_BLOCK_SIZE * DEFAULT_BLOCK_SIZE * DEFAULT_BLOCK_SIZE;
+    pub const PREFETCH_DISTANCE: usize = 8;
 
-    // Static buffer for small lattices
     const StaticBuffer = struct {
         data: [MAX_SIZE]f64 align(32),
         used: bool,
     };
 
-    var static_buffers: [4]StaticBuffer = .{
+    var static_buffers: [8]StaticBuffer = .{
+        .{ .data = undefined, .used = false },
+        .{ .data = undefined, .used = false },
+        .{ .data = undefined, .used = false },
+        .{ .data = undefined, .used = false },
         .{ .data = undefined, .used = false },
         .{ .data = undefined, .used = false },
         .{ .data = undefined, .used = false },
         .{ .data = undefined, .used = false },
     };
+
+    // Pre-initialized zero buffer for fast clearing
+    var zero_buffer: [MAX_SIZE]f64 align(32) = [_]f64{0} ** MAX_SIZE;
 
     fn acquireStaticBuffer() struct { buffer: ?[]align(32) f64, index: ?usize } {
         for (&static_buffers, 0..) |*buffer, i| {
@@ -84,7 +91,6 @@ pub const CrystalLattice = struct {
         const self = try allocator.create(CrystalLattice);
         errdefer allocator.destroy(self);
 
-        // Try to use static buffer first
         const static_result = acquireStaticBuffer();
         if (static_result.buffer) |buffer| {
             self.* = .{
@@ -94,11 +100,11 @@ pub const CrystalLattice = struct {
                 .size = size,
                 .buffer_index = static_result.index,
             };
-            @memset(self.data, 0);
+            // Fast clear using pre-initialized zero buffer
+            @memcpy(self.data, zero_buffer[0..size]);
             return self;
         }
 
-        // Fall back to dynamic allocation
         const data = try allocator.alignedAlloc(f64, CACHE_LINE_SIZE, size);
         errdefer allocator.free(data);
 
@@ -110,7 +116,7 @@ pub const CrystalLattice = struct {
             .buffer_index = null,
         };
 
-        @memset(data, 0);
+        @memcpy(data, zero_buffer[0..size]);
         return self;
     }
 
@@ -124,14 +130,22 @@ pub const CrystalLattice = struct {
     }
 
     pub fn batchSet(self: *CrystalLattice, value: f64) void {
-        const AlignVector = @Vector(4, f64);
+        const AlignVector = @Vector(8, f64);
         const value_vector: AlignVector = @splat(value);
 
         var i: usize = 0;
-        const aligned_size = self.size & ~@as(usize, 3);
+        const aligned_size = self.size & ~@as(usize, 7);
 
-        // Vector operations for 16-element chunks
-        while (i + 15 < aligned_size) : (i += 16) {
+        // Prefetch next cache lines
+        if (aligned_size >= PREFETCH_DISTANCE) {
+            var prefetch_idx: usize = PREFETCH_DISTANCE;
+            while (prefetch_idx < aligned_size) : (prefetch_idx += CACHE_LINE_SIZE) {
+                @prefetch(&self.data[prefetch_idx], .{.locality = 3});
+            }
+        }
+
+        // Vector operations for 32-element chunks
+        while (i + 31 < aligned_size) : (i += 32) {
             const ptr = @as(*align(32) [4]AlignVector, @ptrCast(@alignCast(self.data[i..].ptr)));
             ptr[0] = value_vector;
             ptr[1] = value_vector;
@@ -140,7 +154,7 @@ pub const CrystalLattice = struct {
         }
 
         // Handle remaining aligned elements
-        while (i < aligned_size) : (i += 4) {
+        while (i < aligned_size) : (i += 8) {
             const ptr = @as(*align(32) AlignVector, @ptrCast(@alignCast(self.data[i..].ptr)));
             ptr.* = value_vector;
         }
@@ -153,7 +167,31 @@ pub const CrystalLattice = struct {
 
     pub fn clone(self: *const CrystalLattice) !*CrystalLattice {
         const new_lattice = try init(self.allocator, self.dimensions);
-        @memcpy(new_lattice.data, self.data);
+
+        var i: usize = 0;
+        const aligned_size = self.size & ~@as(usize, 7);
+
+        // Prefetch for clone operation
+        if (aligned_size >= PREFETCH_DISTANCE) {
+            var prefetch_idx: usize = PREFETCH_DISTANCE;
+            while (prefetch_idx < aligned_size) : (prefetch_idx += CACHE_LINE_SIZE) {
+                @prefetch(&self.data[prefetch_idx], .{.locality = 3});
+                @prefetch(&new_lattice.data[prefetch_idx], .{.locality = 3});
+            }
+        }
+
+        // Use SIMD for copying
+        while (i < aligned_size) : (i += 8) {
+            const src = @as(*align(32) const @Vector(8, f64), @ptrCast(@alignCast(self.data[i..].ptr)));
+            const dst = @as(*align(32) @Vector(8, f64), @ptrCast(@alignCast(new_lattice.data[i..].ptr)));
+            dst.* = src.*;
+        }
+
+        // Copy remaining elements
+        while (i < self.size) : (i += 1) {
+            new_lattice.data[i] = self.data[i];
+        }
+
         return new_lattice;
     }
 };
@@ -184,8 +222,8 @@ echo "[SUCCESS] Build configuration has been updated"
 echo "[INFO] Try running 'zig build bench' now"
 echo ""
 echo "Performance Optimizations:"
-echo "1. Fixed static buffer management"
-echo "2. Improved pointer type safety"
-echo "3. Enhanced buffer tracking"
-echo "4. Optimized SIMD operations"
-echo "5. Updated timestamp"
+echo "1. Increased vector size to 8"
+echo "2. Added prefetching"
+echo "3. Pre-initialized zero buffer"
+echo "4. Optimized SIMD copy"
+echo "5. Doubled static buffers"

@@ -63,7 +63,9 @@ fn runWavePatternBenchmark(config: BenchmarkConfig) !void {
 fn runCrystalLatticeBenchmark(config: BenchmarkConfig, allocator: std.mem.Allocator) !void {
     print("\nCrystal Lattice Benchmark:\n", .{});
     const dims = [3]usize{ 16, 16, 16 };
+    const size = dims[0] * dims[1] * dims[2];
 
+    // Create template lattice
     const template_lattice = try lazuline.CrystalLattice.init(allocator, dims);
     defer template_lattice.deinit();
 
@@ -94,7 +96,7 @@ fn runCrystalLatticeBenchmark(config: BenchmarkConfig, allocator: std.mem.Alloca
     const end = timer.lap();
     const elapsed_ns = end - start;
     const ns_per_op = @as(f64, @floatFromInt(elapsed_ns)) / @as(f64, @floatFromInt(config.iterations));
-    const memory_size = dims[0] * dims[1] * dims[2] * @sizeOf(f64);
+    const memory_size = size * @sizeOf(f64);
 
     print("  Allocation + Init: {d:.2} ns/op\n", .{ns_per_op});
     print("  Warmup: {d:.2} ns/op\n", .{warmup_ns});
@@ -149,7 +151,7 @@ pub fn main() !void {
     const config = BenchmarkConfig.default();
 
     print("\n=== Lazuline Benchmark Suite ===\n", .{});
-    print("Date: 2025-01-23 00:13:22 UTC\n", .{});
+    print("Date: 2025-01-23 00:31:01 UTC\n", .{});
     print("Configuration:\n", .{});
     print("  Iterations: {d}\n", .{config.iterations});
     print("  Warmup iterations: {d}\n", .{config.warmup_iterations});

@@ -3,33 +3,22 @@ name = "opal"
 version = "0.1.0"
 edition = "2021"
 authors = ["isdood"]
-description = "OPAL - Optimized Performance Adaptive Lattice"
+description = "OPAL - High Performance Computing Visualization Engine"
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
+wgpu = "0.19"
+winit = "0.29"
+pollster = "0.3"
+bytemuck = { version = "1.14", features = ["derive"] }
+cgmath = "0.18"
+log = "0.4"
+env_logger = "0.10"
+futures = "0.3"
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
+tokio = { version = "1.35", features = ["full"] }
+async-std = "1.12"
 
-[[bench]]
-name = "benchmark"
-harness = false
-
-[profile.release]
-opt-level = 3
-debug = false
-lto = true
-codegen-units = 1
-panic = "abort"
-
-[profile.bench]
-opt-level = 3
-debug = false
-codegen-units = 1
-
-[lib]
-name = "opal"
-path = "src/lib.rs"
-
-[workspace]
-members = ["."]
+[[example]]
+name = "basic"
+path = "examples/visualization/basic.rs"

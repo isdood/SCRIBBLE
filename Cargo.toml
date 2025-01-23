@@ -1,97 +1,12 @@
 [package]
-name = "scribble-workspace"
+name = "scribble"
 version = "0.1.0"
 edition = "2021"
-authors = ["Caleb J.D. Terkovics <isdood>"]
-description = "A kernel & OS written in rust - Workspace Root"
-repository = "https://github.com/isdood/scribble"
-license = "MIT"
 
 [workspace]
-members = [
-    "lib/lazuline",
-    "lib/unstable_matter",
-    "lib/shard",
-    "lib/wanda",
-    "lib/scribble",
-    "lib/carve",
-    "lib/magicmath",
-    "lib/harmony_core",
-    "lib/garnet",
-    "lib/quartz",
-    "lib/scribe",
-    "lib/errors",
-    "lib/error_derive",
-    "lib/error_core",
-    "lib/error_integration",
-    "lib/ziggy",
-    "lib/prism"  # Added prism to workspace
-]
 resolver = "2"
-
-[workspace.package]
-version = "0.1.0"
-authors = ["Caleb J.D. Terkovics <isdood>"]
-edition = "2021"
-
-[workspace.dependencies]
-# Core dependencies
-libm = "0.2.11"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-tracing = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
-num_cpus = "1.15"
-parking_lot = "0.12"
-tokio = { version = "1.0", features = ["full"] }
-tokio-test = "0.4"
-
-# Testing & benchmarking
-criterion = "0.5"
-tracing-subscriber = "0.3"
-
-# Internal crates
-harmony_core = { path = "lib/harmony_core" }
-shard = { path = "lib/shard" }
-quartz = { path = "lib/quartz" }
-scribe = { path = "lib/scribe" }
-errors = { path = "lib/errors" }
-error_derive = { path = "lib/error_derive" }
-error_core = { path = "lib/error_core" }
-error_integration = { path = "lib/error_integration" }
-ziggy = { path = "lib/ziggy" }
-prism = { path = "lib/prism" }
-lazuline = { path = "lib/lazuline" }
-zigzag = { path = "lib/zigzag" }
-
-[lib]
-path = "src/lib.rs"
-
-[[bin]]
-name = "bench_compare"
-path = "tools/bench_compare.rs"
+members = [
+    "lib/opal"
+]
 
 [dependencies]
-libm.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-
-# Internal dependencies
-scribble = { path = "lib/scribble" }
-scribe = { path = "lib/scribe" }
-errors = { path = "lib/errors" }
-error_derive = { path = "lib/error_derive" }
-error_core = { path = "lib/error_core" }
-error_integration = { path = "lib/error_integration" }
-ziggy = { path = "lib/ziggy" }
-prism = { path = "lib/prism" }
-
-[dev-dependencies]
-criterion.workspace = true
-
-# Metadata
-[package.metadata]
-created = "2025-01-19"
-updated = "2025-01-21 11:57:13"
-current_user = "isdood"
