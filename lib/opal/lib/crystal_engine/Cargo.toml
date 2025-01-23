@@ -1,0 +1,13 @@
+[package]
+name = "crystal_engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
+description = "Crystal-based optimization engine for Scribble Framework"
+
+[dependencies]
+harmony_core = { path = "../harmony_core" }
+magicmath = { path = "../magicmath" }
+
+[dev-dependencies]
+criterion = "0.5"

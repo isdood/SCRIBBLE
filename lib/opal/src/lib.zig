@@ -1,57 +1,14 @@
-#!/bin/bash
-
-echo "[INFO] Starting Lazuline optimization..."
-echo "[INFO] Current time: 2025-01-23 02:18:30 UTC"
-echo "[INFO] User: isdood"
-echo "[INFO] Zig version: 0.13.0"
-
-cat > src/lib.zig << 'EOF'
 const std = @import("std");
 const builtin = @import("builtin");
 const arch = builtin.cpu.arch;
 
 pub const version = "0.1.0";
 
-pub const WavePattern = struct {
-    amplitude: f64,
-    frequency: f64,
-    phase: f64,
-    omega: f64,
-
-    pub fn new(amplitude: f64, frequency: f64, phase: f64) WavePattern {
-        return WavePattern{
-            .amplitude = amplitude,
-            .frequency = frequency,
-            .phase = phase,
-            .omega = 2.0 * std.math.pi * frequency,
-        };
-    }
-
-    pub fn compute(self: WavePattern, time: f64) f64 {
-        return self.amplitude * @sin(self.omega * time + self.phase);
-    }
-};
-
-pub const QuantumResonance = struct {
-    frequency_inv: f64,
-    coherence: f64,
-
-    pub fn new(frequency: f64, coherence: f64) QuantumResonance {
-        return QuantumResonance{
-            .frequency_inv = 1.0 / frequency,
-            .coherence = coherence,
-        };
-    }
-
-    pub fn calculate(self: QuantumResonance, time: f64) f64 {
-        return self.coherence * @exp(-time * self.frequency_inv);
-    }
-};
+// Previous WavePattern and QuantumResonance implementations remain unchanged...
 
 pub const CrystalLattice = struct {
-    // Rest of the implementation remains the same...
     dimensions: [3]usize,
-    data: []align(64) f64,
+    data: []align(32) f64,
     allocator: std.mem.Allocator,
     size: usize,
     buffer_index: ?usize,
@@ -59,12 +16,12 @@ pub const CrystalLattice = struct {
     pub const CACHE_LINE_SIZE: usize = 64;
     pub const VECTOR_SIZE: usize = 8;
     pub const MAX_SIZE: usize = 65536;
-    pub const CRYSTAL_ALIGNMENT: usize = 64;
+    pub const CRYSTAL_ALIGNMENT: usize = 32;
 
     const VectorType = @Vector(8, f64);
 
     const BufferPool = struct {
-        data: [MAX_SIZE * 16]f64 align(64),
+        data: [MAX_SIZE * 16]f64 align(32),
         used: [16]bool,
     };
 
@@ -73,15 +30,13 @@ pub const CrystalLattice = struct {
         .used = [_]bool{false} ** 16,
     };
 
-    fn acquireBuffer(size: usize) ?struct { data: []align(64) f64, index: usize } {
+    fn acquireBuffer(size: usize) ?struct { data: []align(32) f64, index: usize } {
         for (&buffer_pool.used, 0..) |*used, i| {
             if (!used.*) {
                 used.* = true;
                 const start = i * MAX_SIZE;
-                const slice = buffer_pool.data[start..start + size];
-                const aligned_slice: []align(64) f64 = @alignCast(slice);
                 return .{
-                    .data = aligned_slice,
+                    .data = buffer_pool.data[start..start + size],
                     .index = i,
                 };
             }
@@ -130,25 +85,34 @@ pub const CrystalLattice = struct {
     pub fn batchSet(self: *CrystalLattice, value: f64) void {
         const value_vector: VectorType = @splat(value);
 
+        // Fast path for small sizes
         if (self.size <= VECTOR_SIZE) {
-            @memset(self.data, value);
+            var i: usize = 0;
+            while (i < self.size) : (i += 1) {
+                self.data[i] = value;
+            }
             return;
         }
 
+        // Main vectorized loop with manual unrolling
+        var i: usize = 0;
         const vec_count = self.size / VECTOR_SIZE;
         const vec_end = vec_count * VECTOR_SIZE;
 
-        var i: usize = 0;
+        // Ensure proper SIMD alignment
+        const data_aligned = @alignCast(32, self.data);
+
         while (i < vec_end) : (i += VECTOR_SIZE * 4) {
+            // Process 4 vectors at once
             inline for (0..4) |offset| {
                 if (i + (VECTOR_SIZE * offset) < vec_end) {
-                    const ptr_aligned: *align(64) f64 = @alignCast(&self.data[i + (VECTOR_SIZE * offset)]);
-                    const vec_ptr: *VectorType = @ptrCast(ptr_aligned);
-                    vec_ptr.* = value_vector;
+                    const ptr = @ptrCast(*VectorType, &data_aligned[i + (VECTOR_SIZE * offset)]);
+                    ptr.* = value_vector;
                 }
             }
         }
 
+        // Handle remaining elements
         while (i < self.size) : (i += 1) {
             self.data[i] = value;
         }
@@ -157,27 +121,33 @@ pub const CrystalLattice = struct {
     pub fn clone(self: *const CrystalLattice) !*CrystalLattice {
         const new_lattice = try CrystalLattice.init(self.allocator, self.dimensions);
 
+        // Fast path for small sizes
         if (self.size <= VECTOR_SIZE) {
             @memcpy(new_lattice.data, self.data[0..self.size]);
             return new_lattice;
         }
 
+        // Main vectorized copy loop with manual unrolling
+        var i: usize = 0;
         const vec_count = self.size / VECTOR_SIZE;
         const vec_end = vec_count * VECTOR_SIZE;
 
-        var i: usize = 0;
+        // Ensure proper SIMD alignment for source and destination
+        const src_aligned = @alignCast(32, self.data);
+        const dst_aligned = @alignCast(32, new_lattice.data);
+
         while (i < vec_end) : (i += VECTOR_SIZE * 4) {
+            // Copy 4 vectors at once
             inline for (0..4) |offset| {
                 if (i + (VECTOR_SIZE * offset) < vec_end) {
-                    const src_aligned: *align(64) const f64 = @alignCast(&self.data[i + (VECTOR_SIZE * offset)]);
-                    const dst_aligned: *align(64) f64 = @alignCast(&new_lattice.data[i + (VECTOR_SIZE * offset)]);
-                    const src: *const VectorType = @ptrCast(src_aligned);
-                    const dst: *VectorType = @ptrCast(dst_aligned);
+                    const src = @ptrCast(*const VectorType, &src_aligned[i + (VECTOR_SIZE * offset)]);
+                    const dst = @ptrCast(*VectorType, &dst_aligned[i + (VECTOR_SIZE * offset)]);
                     dst.* = src.*;
                 }
             }
         }
 
+        // Copy remaining elements
         while (i < self.size) : (i += 1) {
             new_lattice.data[i] = self.data[i];
         }
@@ -194,7 +164,41 @@ pub const CrystalLattice = struct {
         self.allocator.destroy(self);
     }
 };
-EOF
 
-echo "[SUCCESS] Build configuration has been updated"
-echo "[INFO] Try running 'zig build bench' now"
+// WavePattern implementation
+pub const WavePattern = struct {
+    amplitude: f64,
+    frequency: f64,
+    phase: f64,
+    omega: f64,
+
+    pub fn new(amplitude: f64, frequency: f64, phase: f64) WavePattern {
+        return WavePattern{
+            .amplitude = amplitude,
+            .frequency = frequency,
+            .phase = phase,
+            .omega = 2.0 * std.math.pi * frequency,
+        };
+    }
+
+    pub fn compute(self: WavePattern, time: f64) f64 {
+        return self.amplitude * @sin(self.omega * time + self.phase);
+    }
+};
+
+// QuantumResonance implementation
+pub const QuantumResonance = struct {
+    frequency_inv: f64,
+    coherence: f64,
+
+    pub fn new(frequency: f64, coherence: f64) QuantumResonance {
+        return QuantumResonance{
+            .frequency_inv = 1.0 / frequency,
+            .coherence = coherence,
+        };
+    }
+
+    pub fn calculate(self: QuantumResonance, time: f64) f64 {
+        return self.coherence * @exp(-time * self.frequency_inv);
+    }
+};

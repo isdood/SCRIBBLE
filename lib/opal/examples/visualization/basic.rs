@@ -6,9 +6,12 @@ use winit::{
 };
 
 async fn run() {
+    env_logger::init();
+
     let event_loop = EventLoop::new().unwrap();
     let window = WindowBuilder::new()
         .with_title("OPAL Visualizer")
+        .with_inner_size(winit::dpi::PhysicalSize::new(800, 600))
         .build(&event_loop)
         .unwrap();
 
@@ -28,13 +31,15 @@ async fn run() {
                     WindowEvent::RedrawRequested => {
                         match vis_engine.render() {
                             Ok(_) => {}
+                            Err(wgpu::SurfaceError::Lost) => vis_engine.resize(vis_engine.window().inner_size()),
+                            Err(wgpu::SurfaceError::OutOfMemory) => target.exit(),
                             Err(e) => eprintln!("Render error: {}", e),
                         }
                     }
                     _ => {}
                 }
             }
-            Event::RedrawRequested(_) => {
+            Event::AboutToWait => {
                 vis_engine.window().request_redraw();
             }
             _ => {}

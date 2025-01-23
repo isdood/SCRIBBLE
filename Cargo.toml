@@ -2,11 +2,20 @@
 name = "scribble"
 version = "0.1.0"
 edition = "2021"
+authors = ["isdood"]
 
 [workspace]
 resolver = "2"
 members = [
-    "lib/opal"
+    "lib/opal",
+    "lib/magicmath",
+    "lib/errors",
+    "lib/scribe"
 ]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
 
 [dependencies]

@@ -1,15 +1,11 @@
 [package]
 name = "scribe"
-version = "0.1.0"
-edition = "2021"
-authors = ["Caleb J.D. Terkovics <isdood>"]
-description = "Native string formatting and display system for crystal computing"
-license = "MIT"
-repository = "https://github.com/isdood/scribble"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[lib]
+name = "scribe"
+path = "src/lib.rs"
 
 [dependencies]
-
-[package.metadata]
-created = "2025-01-19 14:32:23"
-updated = "2025-01-19 18:05:24"
-current_user = "isdood"

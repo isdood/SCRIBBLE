@@ -1,6 +1,6 @@
 const std = @import("std");
-const math = std.math;
 const builtin = @import("builtin");
+const arch = builtin.cpu.arch;
 
 pub const version = "0.1.0";
 
@@ -15,137 +15,12 @@ pub const WavePattern = struct {
             .amplitude = amplitude,
             .frequency = frequency,
             .phase = phase,
-            .omega = 2.0 * math.pi * frequency,
+            .omega = 2.0 * std.math.pi * frequency,
         };
     }
 
     pub fn compute(self: WavePattern, time: f64) f64 {
         return self.amplitude * @sin(self.omega * time + self.phase);
-    }
-};
-
-pub const CrystalLattice = struct {
-    dimensions: [3]usize,
-    data: []align(32) f64,
-    allocator: std.mem.Allocator,
-    size: usize,
-    buffer_index: ?usize,
-
-    pub const CACHE_LINE_SIZE: usize = 64;
-    pub const VECTOR_SIZE: usize = 4;
-    pub const DEFAULT_BLOCK_SIZE: usize = 16;
-    pub const MAX_SIZE: usize = DEFAULT_BLOCK_SIZE * DEFAULT_BLOCK_SIZE * DEFAULT_BLOCK_SIZE;
-
-    // Static buffer for small lattices
-    const StaticBuffer = struct {
-        data: [MAX_SIZE]f64 align(32),
-        used: bool,
-    };
-
-    var static_buffers: [4]StaticBuffer = .{
-        .{ .data = undefined, .used = false },
-        .{ .data = undefined, .used = false },
-        .{ .data = undefined, .used = false },
-        .{ .data = undefined, .used = false },
-    };
-
-    fn acquireStaticBuffer() struct { buffer: ?[]align(32) f64, index: ?usize } {
-        for (&static_buffers, 0..) |*buffer, i| {
-            if (!buffer.used) {
-                buffer.used = true;
-                return .{
-                    .buffer = buffer.data[0..MAX_SIZE],
-                    .index = i,
-                };
-            }
-        }
-        return .{ .buffer = null, .index = null };
-    }
-
-    fn releaseStaticBuffer(index: usize) void {
-        if (index < static_buffers.len) {
-            static_buffers[index].used = false;
-        }
-    }
-
-    pub fn init(allocator: std.mem.Allocator, dimensions: [3]usize) !*CrystalLattice {
-        const size = dimensions[0] * dimensions[1] * dimensions[2];
-        if (size > MAX_SIZE) return error.SizeTooLarge;
-
-        const self = try allocator.create(CrystalLattice);
-        errdefer allocator.destroy(self);
-
-        // Try to use static buffer first
-        const static_result = acquireStaticBuffer();
-        if (static_result.buffer) |buffer| {
-            self.* = .{
-                .dimensions = dimensions,
-                .data = buffer[0..size],
-                .allocator = allocator,
-                .size = size,
-                .buffer_index = static_result.index,
-            };
-            @memset(self.data, 0);
-            return self;
-        }
-
-        // Fall back to dynamic allocation
-        const data = try allocator.alignedAlloc(f64, CACHE_LINE_SIZE, size);
-        errdefer allocator.free(data);
-
-        self.* = .{
-            .dimensions = dimensions,
-            .data = data,
-            .allocator = allocator,
-            .size = size,
-            .buffer_index = null,
-        };
-
-        @memset(data, 0);
-        return self;
-    }
-
-    pub fn deinit(self: *CrystalLattice) void {
-        if (self.buffer_index) |index| {
-            releaseStaticBuffer(index);
-        } else {
-            self.allocator.free(self.data);
-        }
-        self.allocator.destroy(self);
-    }
-
-    pub fn batchSet(self: *CrystalLattice, value: f64) void {
-        const AlignVector = @Vector(4, f64);
-        const value_vector: AlignVector = @splat(value);
-
-        var i: usize = 0;
-        const aligned_size = self.size & ~@as(usize, 3);
-
-        // Vector operations for 16-element chunks
-        while (i + 15 < aligned_size) : (i += 16) {
-            const ptr = @as(*align(32) [4]AlignVector, @ptrCast(@alignCast(self.data[i..].ptr)));
-            ptr[0] = value_vector;
-            ptr[1] = value_vector;
-            ptr[2] = value_vector;
-            ptr[3] = value_vector;
-        }
-
-        // Handle remaining aligned elements
-        while (i < aligned_size) : (i += 4) {
-            const ptr = @as(*align(32) AlignVector, @ptrCast(@alignCast(self.data[i..].ptr)));
-            ptr.* = value_vector;
-        }
-
-        // Handle remaining elements
-        while (i < self.size) : (i += 1) {
-            self.data[i] = value;
-        }
-    }
-
-    pub fn clone(self: *const CrystalLattice) !*CrystalLattice {
-        const new_lattice = try init(self.allocator, self.dimensions);
-        @memcpy(new_lattice.data, self.data);
-        return new_lattice;
     }
 };
 
@@ -162,5 +37,152 @@ pub const QuantumResonance = struct {
 
     pub fn calculate(self: QuantumResonance, time: f64) f64 {
         return self.coherence * @exp(-time * self.frequency_inv);
+    }
+};
+
+pub const CrystalLattice = struct {
+    // Rest of the implementation remains the same...
+    dimensions: [3]usize,
+    data: []align(64) f64,
+    allocator: std.mem.Allocator,
+    size: usize,
+    buffer_index: ?usize,
+
+    pub const CACHE_LINE_SIZE: usize = 64;
+    pub const VECTOR_SIZE: usize = 8;
+    pub const MAX_SIZE: usize = 65536;
+    pub const CRYSTAL_ALIGNMENT: usize = 64;
+
+    const VectorType = @Vector(8, f64);
+
+    const BufferPool = struct {
+        data: [MAX_SIZE * 16]f64 align(64),
+        used: [16]bool,
+    };
+
+    var buffer_pool: BufferPool = .{
+        .data = [_]f64{0} ** (MAX_SIZE * 16),
+        .used = [_]bool{false} ** 16,
+    };
+
+    fn acquireBuffer(size: usize) ?struct { data: []align(64) f64, index: usize } {
+        for (&buffer_pool.used, 0..) |*used, i| {
+            if (!used.*) {
+                used.* = true;
+                const start = i * MAX_SIZE;
+                const slice = buffer_pool.data[start..start + size];
+                const aligned_slice: []align(64) f64 = @alignCast(slice);
+                return .{
+                    .data = aligned_slice,
+                    .index = i,
+                };
+            }
+        }
+        return null;
+    }
+
+    fn releaseBuffer(index: usize) void {
+        if (index < buffer_pool.used.len) {
+            buffer_pool.used[index] = false;
+        }
+    }
+
+    pub fn init(allocator: std.mem.Allocator, dimensions: [3]usize) !*CrystalLattice {
+        const size = dimensions[0] * dimensions[1] * dimensions[2];
+        if (size > MAX_SIZE) return error.SizeTooLarge;
+
+        const self = try allocator.create(CrystalLattice);
+        errdefer allocator.destroy(self);
+
+        if (acquireBuffer(size)) |buffer| {
+            self.* = .{
+                .dimensions = dimensions,
+                .data = buffer.data,
+                .allocator = allocator,
+                .size = size,
+                .buffer_index = buffer.index,
+            };
+            return self;
+        }
+
+        const data = try allocator.alignedAlloc(f64, CRYSTAL_ALIGNMENT, size);
+        errdefer allocator.free(data);
+
+        self.* = .{
+            .dimensions = dimensions,
+            .data = data,
+            .allocator = allocator,
+            .size = size,
+            .buffer_index = null,
+        };
+
+        return self;
+    }
+
+    pub fn batchSet(self: *CrystalLattice, value: f64) void {
+        const value_vector: VectorType = @splat(value);
+
+        if (self.size <= VECTOR_SIZE) {
+            @memset(self.data, value);
+            return;
+        }
+
+        const vec_count = self.size / VECTOR_SIZE;
+        const vec_end = vec_count * VECTOR_SIZE;
+
+        var i: usize = 0;
+        while (i < vec_end) : (i += VECTOR_SIZE * 4) {
+            inline for (0..4) |offset| {
+                if (i + (VECTOR_SIZE * offset) < vec_end) {
+                    const ptr_aligned: *align(64) f64 = @alignCast(&self.data[i + (VECTOR_SIZE * offset)]);
+                    const vec_ptr: *VectorType = @ptrCast(ptr_aligned);
+                    vec_ptr.* = value_vector;
+                }
+            }
+        }
+
+        while (i < self.size) : (i += 1) {
+            self.data[i] = value;
+        }
+    }
+
+    pub fn clone(self: *const CrystalLattice) !*CrystalLattice {
+        const new_lattice = try CrystalLattice.init(self.allocator, self.dimensions);
+
+        if (self.size <= VECTOR_SIZE) {
+            @memcpy(new_lattice.data, self.data[0..self.size]);
+            return new_lattice;
+        }
+
+        const vec_count = self.size / VECTOR_SIZE;
+        const vec_end = vec_count * VECTOR_SIZE;
+
+        var i: usize = 0;
+        while (i < vec_end) : (i += VECTOR_SIZE * 4) {
+            inline for (0..4) |offset| {
+                if (i + (VECTOR_SIZE * offset) < vec_end) {
+                    const src_aligned: *align(64) const f64 = @alignCast(&self.data[i + (VECTOR_SIZE * offset)]);
+                    const dst_aligned: *align(64) f64 = @alignCast(&new_lattice.data[i + (VECTOR_SIZE * offset)]);
+                    const src: *const VectorType = @ptrCast(src_aligned);
+                    const dst: *VectorType = @ptrCast(dst_aligned);
+                    dst.* = src.*;
+                }
+            }
+        }
+
+        while (i < self.size) : (i += 1) {
+            new_lattice.data[i] = self.data[i];
+        }
+
+        return new_lattice;
+    }
+
+    pub fn deinit(self: *CrystalLattice) void {
+        if (self.buffer_index) |index| {
+            releaseBuffer(index);
+        } else {
+            self.allocator.free(self.data);
+        }
+        self.allocator.destroy(self);
     }
 };

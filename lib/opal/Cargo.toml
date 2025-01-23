@@ -1,24 +1,21 @@
 [package]
 name = "opal"
-version = "0.1.0"
-edition = "2021"
-authors = ["isdood"]
-description = "OPAL - High Performance Computing Visualization Engine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
 
 [dependencies]
-wgpu = "0.19"
-winit = "0.29"
-pollster = "0.3"
-bytemuck = { version = "1.14", features = ["derive"] }
-cgmath = "0.18"
-log = "0.4"
-env_logger = "0.10"
-futures = "0.3"
+wgpu = "0.17"
+tokio = { version = "1.32.0", features = ["full"] }
+winit = "0.28"
+anyhow = "1.0"
+magicmath = { path = "../magicmath" }
+errors = { path = "../errors" }
 
-[dev-dependencies]
-tokio = { version = "1.35", features = ["full"] }
-async-std = "1.12"
+[lib]
+name = "opal"
+path = "src/lib.rs"
 
 [[example]]
-name = "basic"
-path = "examples/visualization/basic.rs"
+name = "crystal_demo"
+path = "examples/crystal_demo.rs"

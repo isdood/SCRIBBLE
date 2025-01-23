@@ -1,22 +1,8 @@
 [package]
 name = "errors"
 version.workspace = true
-authors.workspace = true
 edition.workspace = true
-description = "Error integration layer for Scribble"
-repository = "https://github.com/isdood/scribble"
-license = "MIT"
+authors.workspace = true
 
 [dependencies]
 scribe = { path = "../scribe" }
-error_core = { workspace = true }
-error_derive = { workspace = true }
-tracing = "0.1"
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-
-[dev-dependencies]
-tracing-subscriber = "0.3"
-criterion = { workspace = true }
