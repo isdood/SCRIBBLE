@@ -5,16 +5,25 @@ using .OpalCore
 
 function benchmark_resonance_field()
     field = ResonanceField()
-    @btime optimize!($field)
+    println("\nBenchmarking Resonance Field optimization:")
+    result = @benchmark optimize!($field) samples=100 seconds=2
+    display(result)
+    return field  # Return for validation
 end
 
 function benchmark_crystal_lattice()
     lattice = CrystalLattice()
-    @btime optimize!($lattice)
+    println("\nBenchmarking Crystal Lattice optimization:")
+    result = @benchmark optimize!($lattice) samples=100 seconds=2
+    display(result)
+    return lattice  # Return for validation
 end
 
-println("Benchmarking Resonance Field:")
-benchmark_resonance_field()
+# Run benchmarks with validation
+field = benchmark_resonance_field()
+@assert field.intensity <= field.max_intensity "Intensity exceeded maximum"
+@assert 0.0 <= field.phase <= 2π "Phase out of bounds"
 
-println("Benchmarking Crystal Lattice:")
-benchmark_crystal_lattice()
+lattice = benchmark_crystal_lattice()
+@assert lattice.spacing <= lattice.max_spacing "Spacing exceeded maximum"
+@assert 0.0 <= lattice.orientation <= 2π "Orientation out of bounds"

@@ -1,9 +1,15 @@
 const std = @import("std");
-const Builder = std.build.Builder;
 
-pub fn build(b: *Builder) void {
-    const mode = b.standardReleaseOptions();
-    const exe = b.addExecutable("zig_benchmark", "benchmarks/zig/benchmark.zig");
-    exe.setBuildMode(mode);
-    exe.install();
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    const exe = b.addExecutable(.{
+        .name = "zig_benchmark",
+        .root_source_file = .{ .cwd_relative = "benchmarks/zig/benchmark.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    b.installArtifact(exe);
 }
