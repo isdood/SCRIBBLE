@@ -50,6 +50,30 @@ Author: isdood
 | 1024      | 100,000    | 16,347,655      | 163.48   | 24 KB        |
 | 4096      | 100,000    | 109,608,129     | 1,096.08 | 96 KB        |
 
+Latest benchmark results from 2025-01-23:
+
+### Wave Pattern Operations
+- **Creation + Computation**: 23.70 ns/op
+- **Throughput**: 42.20 MOps/s
+- **Warmup**: 4.93 ns/op
+
+### Crystal Lattice Operations
+- **Allocation + Init**: 2881.88 ns/op
+- **Throughput**: 0.35 MOps/s
+- **Memory Usage**: 32768 bytes per lattice
+- **Cache Line Size**: 64 bytes
+- **Warmup**: 2844.13 ns/op
+
+### Quantum Resonance Calculations
+- **Computation**: 9.85 ns/op
+- **Throughput**: 101.55 MOps/s
+- **Warmup**: 3.30 ns/op
+
+## Configuration
+- **Iterations**: 1,000,000
+- **Warmup Iterations**: 10,000
+- **Thread Count**: 4
+
 ## Usage
 
 ```zig
