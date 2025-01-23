@@ -13,7 +13,7 @@ echo "- Julia: $(julia --version)"
 echo
 
 echo "Running Zig benchmark..."
-RUSTFLAGS="-C target-cpu=native" zig build -Doptimize=ReleaseFast
+zig build -Doptimize=ReleaseFast
 if [ -f "./zig-out/bin/zig_benchmark" ]; then
     # Warmup run
     ./zig-out/bin/zig_benchmark > /dev/null 2>&1 || true
@@ -27,8 +27,11 @@ fi
 echo -e "\nRunning Rust benchmark..."
 # Run tests first
 RUSTFLAGS="-C target-cpu=native" cargo test --release
-# Then run benchmarks
-RUSTFLAGS="-C target-cpu=native -C opt-level=3 -C lto=thin" cargo bench
+
+# Clean and rebuild for benchmarks
+cargo clean
+# Use simpler optimization flags to avoid conflicts
+RUSTFLAGS="-C target-cpu=native" cargo bench
 
 echo -e "\nRunning Julia benchmark..."
 if command -v julia >/dev/null 2>&1; then
@@ -48,8 +51,8 @@ echo "Summary of results:"
 echo "===================="
 echo "Language   | Median Time (ns) | Memory Allocs"
 echo "---------------------------------------"
-echo "Zig       | ~101             | 0"
-echo "Rust      | ~87              | 0"
-echo "Julia RF  | ~28              | 0"
-echo "Julia CL  | ~36              | 0"
+echo "Zig       | ~104             | 0"
+echo "Rust      | (pending)        | 0"
+echo "Julia RF  | (pending)        | 0"
+echo "Julia CL  | (pending)        | 0"
 echo "===================="

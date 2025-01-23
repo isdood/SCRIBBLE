@@ -18,14 +18,13 @@ harness = false
 [profile.release]
 opt-level = 3
 debug = false
-lto = "thin"
+lto = true
 codegen-units = 1
 panic = "abort"
 
 [profile.bench]
 opt-level = 3
 debug = false
-lto = "thin"
 codegen-units = 1
 
 [lib]
