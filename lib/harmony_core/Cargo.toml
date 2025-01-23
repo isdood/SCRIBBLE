@@ -1,17 +1,16 @@
 [package]
 name = "harmony_core"
-version = "0.1.1"
+version = "0.1.0"
 edition = "2021"
-authors = ["Caleb J.D. Terkovics <isdood>"]
-description = "Harmonic core functionality for scribble"
-repository = "https://github.com/isdood/scribble"
-license = "MIT"
+authors = ["isdood"]
+description = "Crystal-based harmony processing system"
 
 [dependencies]
-magicmath = { path = "../magicmath" }
-scribe = { path = "../scribe" }
-errors = { path = "../errors" }
+anyhow = "1.0"
+thiserror = "1.0"
+rayon = "1.7"
+num-complex = "0.4"
+rand = "0.8"
 
-[[test]]
-name = "simd_tests"
-path = "tests/simd_tests.rs"
+[dev-dependencies]
+criterion = "0.5"

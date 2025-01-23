@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# harmony_now.sh
+# Created: 2025-01-23 14:03:23 UTC
+# Author: isdood
+
+set -euo pipefail
+
+# Create directories
+mkdir -p {src/{rust,zig,julia}/{core,crystal,harmony,pattern},tests,examples,benches/zig}
+
+# Create build.zig with correct Zig 0.13.0 LazyPath syntax
+cat > build.zig << 'EOF'
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = std.builtin.Mode.ReleaseFast;
+
+    const harmony = b.addStaticLibrary(.{
+        .name = "harmony_core",
+        .root_source_file = .{ .value = "src/zig/crystal_weaver.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // Add module for others to import
+    const harmony_module = b.addModule("harmony", .{
+        .source_file = .{ .value = "src/zig/crystal_weaver.zig" },
+    });
+
+    // Benchmarks
+    const bench = b.addExecutable(.{
+        .name = "harmony_bench",
+        .root_source_file = .{ .value = "benches/zig/bench_main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    bench.addModule("harmony", harmony_module);
+
+    const run_bench = b.addRunArtifact(bench);
+    const bench_step = b.step("bench", "Run benchmarks");
+    bench_step.dependOn(&run_bench.step);
+
+    // Tests
+    const main_tests = b.addTest(.{
+        .root_source_file = .{ .value = "src/zig/crystal_weaver.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const run_tests = b.addRunArtifact(main_tests);
+    const test_step = b.step("test", "Run library tests");
+    test_step.dependOn(&run_tests.step);
+
+    b.installArtifact(harmony);
+}
+EOF
+
+# Rest of the files remain unchanged
+cat > src/zig/crystal_weaver.zig << 'EOF'
+const std = @import("std");
+
+pub const CrystalWeaver = struct {
+    allocator: std.mem.Allocator,
+    lattice: [][]f64,
+    size: usize,
+
+    const Self = @This();
+
+    pub fn init(allocator: std.mem.Allocator, size: usize) !Self {
+        var lattice = try allocator.alloc([]f64, size);
+        for (lattice) |*row| {
+            row.* = try allocator.alloc(f64, size);
+            @memset(row.*, 0);
+        }
+
+        return Self{
+            .allocator = allocator,
+            .lattice = lattice,
+            .size = size,
+        };
+    }
+
+    pub fn deinit(self: *Self) void {
+        for (self.lattice) |row| {
+            self.allocator.free(row);
+        }
+        self.allocator.free(self.lattice);
+    }
+
+    pub fn weavePattern(self: *Self, pattern: []const u8) !void {
+        for (pattern, 0..) |value, i| {
+            const x = i % self.size;
+            const y = i / self.size;
+            if (y < self.size) {
+                const phase = @as(f64, @floatFromInt(value)) * std.math.pi / 128.0;
+                self.lattice[y][x] = @sin(phase);
+            }
+        }
+    }
+};
+
+test "basic pattern weaving" {
+    const allocator = std.testing.allocator;
+    var weaver = try CrystalWeaver.init(allocator, 4);
+    defer weaver.deinit();
+
+    const pattern = &[_]u8{ 65, 84, 67, 71 };
+    try weaver.weavePattern(pattern);
+}
+EOF
+
+cat > benches/zig/bench_main.zig << 'EOF'
+const std = @import("std");
+const harmony = @import("harmony");
+
+pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+    var timer = try std.time.Timer.start();
+    
+    // Initialize test data
+    var weaver = try harmony.CrystalWeaver.init(allocator, 64);
+    defer weaver.deinit();
+    
+    const pattern = &[_]u8{ 65, 84, 67, 71 };
+    const iterations: usize = 10_000;
+    
+    // Benchmark pattern weaving
+    std.debug.print("\nBenchmark: Pattern Weaving ({d} iterations)\n", .{iterations});
+    timer.reset();
+    
+    var i: usize = 0;
+    while (i < iterations) : (i += 1) {
+        try weaver.weavePattern(pattern);
+    }
+    
+    const elapsed = timer.lap();
+    const avg_ns = @as(f64, @floatFromInt(elapsed)) / @as(f64, @floatFromInt(iterations));
+    std.debug.print("Average: {d:.2} ns/op\n", .{avg_ns});
+}
+EOF
+
+# Make script executable
+chmod +x harmony_now.sh
+
+echo "Crystal harmony infrastructure updated with correct Zig 0.13.0 LazyPath syntax!"
+echo "Run benchmarks with: zig build bench"
