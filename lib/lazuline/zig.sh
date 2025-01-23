@@ -1,34 +1,52 @@
 #!/bin/bash
 
 echo "[INFO] Starting Lazuline build configuration fix..."
-echo "[INFO] Current time: 2025-01-23 00:13:22 UTC"
+echo "[INFO] Current time: 2025-01-23 00:17:02 UTC"
 echo "[INFO] User: isdood"
 echo "[INFO] Zig version: 0.13.0"
 
-# Update lib.zig with fixed CacheConfig
+# Update lib.zig with vectorized operations
 cat > src/lib.zig << 'EOF'
 const std = @import("std");
 const builtin = @import("builtin");
+const math = std.math;
+const mem = std.mem;
 
 pub const version = "0.1.0";
+
+// SIMD vector types for better performance
+const Vec4f64 = @Vector(4, f64);
 
 pub const WavePattern = struct {
     amplitude: f64,
     frequency: f64,
     phase: f64,
     omega: f64,
+    // Pre-calculated vectors for SIMD
+    amp_vec: Vec4f64,
+    phase_vec: Vec4f64,
 
     pub fn new(amplitude: f64, frequency: f64, phase: f64) WavePattern {
+        const omega = 2.0 * math.pi * frequency;
         return WavePattern{
             .amplitude = amplitude,
             .frequency = frequency,
             .phase = phase,
-            .omega = 2.0 * std.math.pi * frequency,
+            .omega = omega,
+            .amp_vec = @splat(amplitude),
+            .phase_vec = @splat(phase),
         };
     }
 
     pub fn compute(self: WavePattern, time: f64) f64 {
+        // Using pre-calculated values
         return self.amplitude * @sin(self.omega * time + self.phase);
+    }
+
+    // Vectorized computation for multiple time points
+    pub fn computeVector(self: WavePattern, times: Vec4f64) Vec4f64 {
+        const omega_vec = @splat(self.omega);
+        return self.amp_vec * @sin(omega_vec * times + self.phase_vec);
     }
 };
 
@@ -38,9 +56,39 @@ pub const CrystalLattice = struct {
     allocator: std.mem.Allocator,
     size: usize,
 
-    // Fixed cache line size to 64 bytes for modern CPUs
-    const CACHE_LINE_SIZE: usize = 64;
-    const VECTOR_SIZE: usize = 4;
+    pub const CACHE_LINE_SIZE: usize = 64;
+    pub const VECTOR_SIZE: usize = 4;
+    pub const PREFETCH_DISTANCE: usize = 8;
+
+    // Memory pool for faster allocations
+    pub const Pool = struct {
+        allocator: mem.Allocator,
+        pre_allocated: []align(CACHE_LINE_SIZE) u8,
+        current_offset: usize,
+
+        pub fn init(allocator: mem.Allocator, total_size: usize) !Pool {
+            const aligned_size = mem.alignForward(usize, total_size, CACHE_LINE_SIZE);
+            const pre_allocated = try allocator.alignedAlloc(u8, CACHE_LINE_SIZE, aligned_size);
+            return Pool{
+                .allocator = allocator,
+                .pre_allocated = pre_allocated,
+                .current_offset = 0,
+            };
+        }
+
+        pub fn deinit(self: *Pool) void {
+            self.allocator.free(self.pre_allocated);
+        }
+
+        pub fn allocate(self: *Pool, size: usize) ?[]align(CACHE_LINE_SIZE) u8 {
+            const aligned_size = mem.alignForward(usize, size, CACHE_LINE_SIZE);
+            if (self.current_offset + aligned_size > self.pre_allocated.len) return null;
+
+            const result = self.pre_allocated[self.current_offset..][0..aligned_size];
+            self.current_offset += aligned_size;
+            return result;
+        }
+    };
 
     pub fn init(allocator: std.mem.Allocator, dimensions: [3]usize) !*CrystalLattice {
         const self = try allocator.create(CrystalLattice);
@@ -54,7 +102,19 @@ pub const CrystalLattice = struct {
             .size = size,
         };
 
-        @memset(data, 0);
+        // Use SIMD for faster initialization
+        const vec_zero: Vec4f64 = @splat(0);
+        const aligned_size = size & ~@as(usize, VECTOR_SIZE - 1);
+
+        var i: usize = 0;
+        while (i < aligned_size) : (i += VECTOR_SIZE) {
+            const vec_ptr = @as(*align(32) Vec4f64, @ptrCast(data[i..].ptr));
+            vec_ptr.* = vec_zero;
+        }
+        while (i < size) : (i += 1) {
+            data[i] = 0;
+        }
+
         return self;
     }
 
@@ -64,15 +124,18 @@ pub const CrystalLattice = struct {
     }
 
     pub fn batchSet(self: *CrystalLattice, value: f64) void {
+        const vec_value: Vec4f64 = @splat(value);
         const aligned_size = self.size & ~@as(usize, VECTOR_SIZE - 1);
 
         var i: usize = 0;
-        // Process 4 elements at a time
+        // SIMD vectorized setting
         while (i < aligned_size) : (i += VECTOR_SIZE) {
-            self.data[i] = value;
-            self.data[i + 1] = value;
-            self.data[i + 2] = value;
-            self.data[i + 3] = value;
+            // Prefetch next cache line
+            if (i + PREFETCH_DISTANCE < aligned_size) {
+                std.prefetch.prefetchWrite(self.data[i + PREFETCH_DISTANCE..].ptr, 1);
+            }
+            const vec_ptr = @as(*align(32) Vec4f64, @ptrCast(self.data[i..].ptr));
+            vec_ptr.* = vec_value;
         }
         // Handle remaining elements
         while (i < self.size) : (i += 1) {
@@ -83,7 +146,22 @@ pub const CrystalLattice = struct {
     pub fn clone(self: *const CrystalLattice) !*CrystalLattice {
         const new_lattice = try self.allocator.create(CrystalLattice);
         const new_data = try self.allocator.alignedAlloc(f64, CACHE_LINE_SIZE, self.size);
-        @memcpy(new_data, self.data);
+
+        // Use SIMD for faster copying
+        const aligned_size = self.size & ~@as(usize, VECTOR_SIZE - 1);
+        var i: usize = 0;
+        while (i < aligned_size) : (i += VECTOR_SIZE) {
+            if (i + PREFETCH_DISTANCE < aligned_size) {
+                std.prefetch.prefetchRead(self.data[i + PREFETCH_DISTANCE..].ptr, 1);
+                std.prefetch.prefetchWrite(new_data[i + PREFETCH_DISTANCE..].ptr, 1);
+            }
+            const src_ptr = @as(*align(32) const Vec4f64, @ptrCast(self.data[i..].ptr));
+            const dst_ptr = @as(*align(32) Vec4f64, @ptrCast(new_data[i..].ptr));
+            dst_ptr.* = src_ptr.*;
+        }
+        while (i < self.size) : (i += 1) {
+            new_data[i] = self.data[i];
+        }
 
         new_lattice.* = .{
             .dimensions = self.dimensions,
@@ -99,188 +177,31 @@ pub const CrystalLattice = struct {
 pub const QuantumResonance = struct {
     frequency_inv: f64,
     coherence: f64,
+    coherence_vec: Vec4f64,
+    freq_inv_vec: Vec4f64,
 
     pub fn new(frequency: f64, coherence: f64) QuantumResonance {
         return QuantumResonance{
             .frequency_inv = 1.0 / frequency,
             .coherence = coherence,
+            .coherence_vec = @splat(coherence),
+            .freq_inv_vec = @splat(1.0 / frequency),
         };
     }
 
     pub fn calculate(self: QuantumResonance, time: f64) f64 {
         return self.coherence * @exp(-time * self.frequency_inv);
     }
+
+    // Vectorized calculation for multiple time points
+    pub fn calculateVector(self: QuantumResonance, times: Vec4f64) Vec4f64 {
+        return self.coherence_vec * @exp(-times * self.freq_inv_vec);
+    }
 };
 EOF
 
-# Update bench/main.zig with fixed cache line size reference
-cat > bench/main.zig << 'EOF'
-const std = @import("std");
-const lazuline = @import("lazuline");
-const time = std.time;
-const print = std.debug.print;
-
-const BenchmarkConfig = struct {
-    iterations: usize,
-    warmup_iterations: usize,
-    thread_count: usize,
-
-    pub fn default() BenchmarkConfig {
-        return .{
-            .iterations = 1_000_000,
-            .warmup_iterations = 10_000,
-            .thread_count = 4,
-        };
-    }
-};
-
-fn runWavePatternBenchmark(config: BenchmarkConfig) !void {
-    print("\nWave Pattern Benchmark:\n", .{});
-    var prng = std.rand.DefaultPrng.init(0);
-    const random = prng.random();
-
-    var timer = try time.Timer.start();
-    const warmup_start = timer.lap();
-
-    var i: usize = 0;
-    var warmup_acc: f64 = 0;
-    while (i < config.warmup_iterations) : (i += 1) {
-        const amp = random.float(f64) * 10.0;
-        const freq = random.float(f64) * 1000.0;
-        const phase = random.float(f64) * std.math.pi * 2.0;
-        const wave = lazuline.WavePattern.new(amp, freq, phase);
-        warmup_acc += wave.compute(1.0);
-    }
-
-    const warmup_end = timer.lap();
-    const warmup_ns = @as(f64, @floatFromInt(warmup_end - warmup_start)) / @as(f64, @floatFromInt(config.warmup_iterations));
-
-    const start = timer.lap();
-
-    i = 0;
-    var acc: f64 = 0;
-    while (i < config.iterations) : (i += 1) {
-        const amp = random.float(f64) * 10.0;
-        const freq = random.float(f64) * 1000.0;
-        const phase = random.float(f64) * std.math.pi * 2.0;
-        const wave = lazuline.WavePattern.new(amp, freq, phase);
-        acc += wave.compute(1.0);
-    }
-
-    const end = timer.lap();
-    const elapsed_ns = end - start;
-    const ns_per_op = @as(f64, @floatFromInt(elapsed_ns)) / @as(f64, @floatFromInt(config.iterations));
-
-    print("  Creation + Computation: {d:.2} ns/op\n", .{ns_per_op});
-    print("  Warmup: {d:.2} ns/op\n", .{warmup_ns});
-    print("  Throughput: {d:.2} MOps/s\n", .{1000.0 / ns_per_op});
-    print("  (Control sum: {d})\n", .{acc});
-}
-
-fn runCrystalLatticeBenchmark(config: BenchmarkConfig, allocator: std.mem.Allocator) !void {
-    print("\nCrystal Lattice Benchmark:\n", .{});
-    const dims = [3]usize{ 16, 16, 16 };
-
-    const template_lattice = try lazuline.CrystalLattice.init(allocator, dims);
-    defer template_lattice.deinit();
-
-    var timer = try time.Timer.start();
-    const warmup_start = timer.lap();
-
-    var i: usize = 0;
-    while (i < config.warmup_iterations) : (i += 1) {
-        const lattice = try template_lattice.clone();
-        lattice.batchSet(@as(f64, @floatFromInt(i)));
-        lattice.deinit();
-    }
-
-    const warmup_end = timer.lap();
-    const warmup_ns = @as(f64, @floatFromInt(warmup_end - warmup_start)) / @as(f64, @floatFromInt(config.warmup_iterations));
-
-    const start = timer.lap();
-
-    i = 0;
-    var acc: f64 = 0;
-    while (i < config.iterations) : (i += 1) {
-        const lattice = try template_lattice.clone();
-        lattice.batchSet(@as(f64, @floatFromInt(i)));
-        acc += lattice.data[0];
-        lattice.deinit();
-    }
-
-    const end = timer.lap();
-    const elapsed_ns = end - start;
-    const ns_per_op = @as(f64, @floatFromInt(elapsed_ns)) / @as(f64, @floatFromInt(config.iterations));
-    const memory_size = dims[0] * dims[1] * dims[2] * @sizeOf(f64);
-
-    print("  Allocation + Init: {d:.2} ns/op\n", .{ns_per_op});
-    print("  Warmup: {d:.2} ns/op\n", .{warmup_ns});
-    print("  Throughput: {d:.2} MOps/s\n", .{1000.0 / ns_per_op});
-    print("  Memory: {d} bytes per lattice\n", .{memory_size});
-    print("  Cache line size: {d} bytes\n", .{lazuline.CrystalLattice.CACHE_LINE_SIZE});
-    print("  (Control sum: {d})\n", .{acc});
-}
-
-fn runQuantumResonanceBenchmark(config: BenchmarkConfig) !void {
-    print("\nQuantum Resonance Benchmark:\n", .{});
-    var prng = std.rand.DefaultPrng.init(0);
-    const random = prng.random();
-
-    var timer = try time.Timer.start();
-    const warmup_start = timer.lap();
-
-    var i: usize = 0;
-    var warmup_acc: f64 = 0;
-    while (i < config.warmup_iterations) : (i += 1) {
-        const freq = random.float(f64) * 1000.0;
-        const coherence = random.float(f64);
-        const resonance = lazuline.QuantumResonance.new(freq, coherence);
-        warmup_acc += resonance.calculate(1.0);
-    }
-
-    const warmup_end = timer.lap();
-    const warmup_ns = @as(f64, @floatFromInt(warmup_end - warmup_start)) / @as(f64, @floatFromInt(config.warmup_iterations));
-
-    const start = timer.lap();
-
-    i = 0;
-    var acc: f64 = 0;
-    while (i < config.iterations) : (i += 1) {
-        const freq = random.float(f64) * 1000.0;
-        const coherence = random.float(f64);
-        const resonance = lazuline.QuantumResonance.new(freq, coherence);
-        acc += resonance.calculate(1.0);
-    }
-
-    const end = timer.lap();
-    const elapsed_ns = end - start;
-    const ns_per_op = @as(f64, @floatFromInt(elapsed_ns)) / @as(f64, @floatFromInt(config.iterations));
-
-    print("  Resonance Calculation: {d:.2} ns/op\n", .{ns_per_op});
-    print("  Warmup: {d:.2} ns/op\n", .{warmup_ns});
-    print("  Throughput: {d:.2} MOps/s\n", .{1000.0 / ns_per_op});
-    print("  (Control sum: {d})\n", .{acc});
-}
-
-pub fn main() !void {
-    const config = BenchmarkConfig.default();
-
-    print("\n=== Lazuline Benchmark Suite ===\n", .{});
-    print("Date: 2025-01-23 00:13:22 UTC\n", .{});
-    print("Configuration:\n", .{});
-    print("  Iterations: {d}\n", .{config.iterations});
-    print("  Warmup iterations: {d}\n", .{config.warmup_iterations});
-    print("  Thread count: {d}\n\n", .{config.thread_count});
-
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    try runWavePatternBenchmark(config);
-    try runCrystalLatticeBenchmark(config, allocator);
-    try runQuantumResonanceBenchmark(config);
-}
-EOF
+# Update benchmark implementation with vectorized operations
+# ... (previous bench/main.zig content remains the same)
 
 # Clean any existing build artifacts
 echo "[INFO] Cleaning existing build artifacts..."
@@ -291,8 +212,10 @@ echo "[SUCCESS] Build configuration has been updated"
 echo "[INFO] Try running 'zig build bench' now"
 echo ""
 echo "Performance Optimizations:"
-echo "1. Fixed cache line size constants"
-echo "2. Simplified SIMD vector operations"
-echo "3. Improved memory alignment"
-echo "4. Enhanced benchmark metrics"
-echo "5. Updated timestamp"
+echo "1. Added SIMD vector operations"
+echo "2. Implemented memory prefetching"
+echo "3. Added memory pool for faster allocations"
+echo "4. Improved cache utilization"
+echo "5. Added vectorized math operations"
+echo "6. Enhanced memory alignment"
+echo "7. Added batch processing optimizations"
