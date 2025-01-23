@@ -1,69 +1,36 @@
 #!/bin/bash
-# Initialize Vector-Aligned Shatter Cache System
-# Created: 2025-01-23 17:24:38 UTC
+# Hybrid Quantum-Crystal Cache System v3.3.4
+# Created: 2025-01-23 22:18:30 UTC
 # Author: isdood
 
 set -euo pipefail
 
-echo "Cleaning up previous installation..."
-rm -rf {src,benches}
-rm -f build.zig
-
-echo "Creating project structure..."
 mkdir -p {src/zig/core,benches/zig}
 
-echo "Creating build.zig..."
-cat > build.zig << 'EOF'
+# ... (mathplz.zig remains the same) ...
+
+# Update shatter_cache.zig with fixed pointer handling
+cat > src/zig/core/shatter_cache.zig << 'EOL'
 const std = @import("std");
+const mathplz = @import("mathplz");
 
-pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-
-    const shatter_module = b.addModule("shatter_cache", .{
-        .root_source_file = .{ .cwd_relative = "src/zig/core/shatter_cache.zig" },
-    });
-
-    const bench = b.addExecutable(.{
-        .name = "bench",
-        .root_source_file = .{ .cwd_relative = "benches/zig/bench_main.zig" },
-        .target = target,
-        .optimize = .ReleaseFast,
-    });
-    bench.root_module.addImport("shatter_cache", shatter_module);
-    
-    const run_bench = b.addRunArtifact(bench);
-    const bench_step = b.step("bench", "Run benchmarks");
-    bench_step.dependOn(&run_bench.step);
-}
-EOF
-
-echo "Creating core implementation..."
-cat > src/zig/core/shatter_cache.zig << 'EOF'
-const std = @import("std");
-
-const Vector3DSIMD = @Vector(4, f64);
+const CACHE_LINE_SIZE = 64;
+const CACHE_BUCKET_SIZE = 8;
+pub const SYMMETRY_OPS = 24;
+pub const QUANTUM_STATES = 8;
 
 pub const Vector3D = struct {
-    x: f64,
+    x: f64 align(CACHE_LINE_SIZE),
     y: f64,
     z: f64,
+    state: u8 = 0,
 
-    const Self = @This();
-
-    pub fn init(x: f64, y: f64, z: f64) Self {
-        return Self{ .x = x, .y = y, .z = z };
+    pub fn init(x: f64, y: f64, z: f64) @This() {
+        return .{ .x = x, .y = y, .z = z, .state = 0 };
     }
 
-    pub fn toSIMD(self: Self) Vector3DSIMD {
-        return Vector3DSIMD{ self.x, self.y, self.z, 0.0 };
-    }
-
-    pub fn fromSIMD(vec: Vector3DSIMD) Self {
-        return Self{
-            .x = vec[0],
-            .y = vec[1],
-            .z = vec[2],
-        };
+    pub fn energy(self: @This()) f64 {
+        return mathplz.abs(self.x) + mathplz.abs(self.y) + mathplz.abs(self.z);
     }
 };
 
@@ -72,117 +39,127 @@ pub const ViewportAngle = struct {
     up: Vector3D,
 };
 
+const CacheBucket = struct {
+    keys: [CACHE_BUCKET_SIZE]u64 align(CACHE_LINE_SIZE),
+    values: [CACHE_BUCKET_SIZE]Vector3D align(CACHE_LINE_SIZE),
+    used: [CACHE_BUCKET_SIZE]bool align(CACHE_LINE_SIZE),
+    next: ?*CacheBucket,
+
+    pub fn init(allocator: std.mem.Allocator) !*CacheBucket {
+        const bucket = try allocator.create(CacheBucket);
+        @memset(&bucket.keys, 0);
+        @memset(&bucket.used, false);
+        bucket.next = null;
+        return bucket;
+    }
+
+    pub fn deinit(self: *CacheBucket, allocator: std.mem.Allocator) void {
+        if (self.next) |next| {
+            next.deinit(allocator);
+        }
+        allocator.destroy(self);
+    }
+};
+
 pub const ShatterCache = struct {
     allocator: std.mem.Allocator,
-    vector_alignments: std.AutoHashMap(u64, std.ArrayList(Vector3D)),
-    last_update: i64,
+    vectors: std.ArrayList(Vector3D),
+    buckets: std.ArrayList(*CacheBucket),
+    hit_count: usize,
+    miss_count: usize,
 
-    const Self = @This();
-
-    pub fn init(allocator: std.mem.Allocator) Self {
-        return Self{
+    pub fn init(allocator: std.mem.Allocator) ShatterCache {
+        return .{
             .allocator = allocator,
-            .vector_alignments = std.AutoHashMap(u64, std.ArrayList(Vector3D)).init(allocator),
-            .last_update = std.time.timestamp(),
+            .vectors = std.ArrayList(Vector3D).init(allocator),
+            .buckets = std.ArrayList(*CacheBucket).init(allocator),
+            .hit_count = 0,
+            .miss_count = 0,
         };
     }
 
-    pub fn deinit(self: *Self) void {
-        var it = self.vector_alignments.valueIterator();
-        while (it.next()) |vectors| {
-            vectors.deinit();
+    pub fn deinit(self: *ShatterCache) void {
+        for (self.buckets.items) |bucket| {
+            bucket.deinit(self.allocator);
         }
-        self.vector_alignments.deinit();
+        self.buckets.deinit();
+        self.vectors.deinit();
     }
 
-    pub fn getMemoryUsage(self: *const Self) usize {
-        var total: usize = 0;
-        var it = self.vector_alignments.iterator();
-        while (it.next()) |entry| {
-            total += entry.value_ptr.items.len * @sizeOf(Vector3D);
-        }
-        return total;
+    pub fn getMemoryUsage(self: *const ShatterCache) usize {
+        return self.vectors.items.len * @sizeOf(Vector3D) +
+               self.buckets.items.len * @sizeOf(CacheBucket);
     }
 
-    pub fn preAlignGeometry(
-        self: *Self, 
-        asset_id: u64,
-        vectors: []const Vector3D,
-        _: []const ViewportAngle,
-    ) !void {
-        var aligned = std.ArrayList(Vector3D).init(self.allocator);
-        errdefer aligned.deinit();
-
+    pub fn preAlignGeometry(self: *ShatterCache, _: u64, vectors: []const Vector3D, _: []const ViewportAngle) !void {
         for (vectors) |vec| {
-            try aligned.append(vec);
+            const hash = self.hashVector(&vec);
+            if (try self.getFromCache(hash)) |cached| {
+                try self.vectors.append(cached);
+                self.hit_count += 1;
+            } else {
+                try self.putInCache(hash, vec);
+                try self.vectors.append(vec);
+                self.miss_count += 1;
+            }
+        }
+    }
+
+    fn hashVector(self: *const ShatterCache, vec: *const Vector3D) u64 {
+        _ = self;
+        const precision: f64 = 1000.0;
+        const x = @as(u64, @intFromFloat(mathplz.abs(vec.x * precision)));
+        const y = @as(u64, @intFromFloat(mathplz.abs(vec.y * precision)));
+        const z = @as(u64, @intFromFloat(mathplz.abs(vec.z * precision)));
+        return x ^ (y << 21) ^ (z << 42);
+    }
+
+    fn getFromCache(self: *ShatterCache, hash: u64) !?Vector3D {
+        if (self.buckets.items.len == 0) return null;
+        
+        const bucket_index = hash % self.buckets.items.len;
+        var current_bucket: ?*CacheBucket = self.buckets.items[bucket_index];
+        
+        while (current_bucket) |bucket| {
+            for (bucket.keys, bucket.used, bucket.values) |key, used, value| {
+                if (used and key == hash) {
+                    return value;
+                }
+            }
+            current_bucket = bucket.next;
+        }
+        return null;
+    }
+
+    fn putInCache(self: *ShatterCache, hash: u64, value: Vector3D) !void {
+        if (self.buckets.items.len == 0) {
+            const bucket = try CacheBucket.init(self.allocator);
+            try self.buckets.append(bucket);
         }
 
-        if (self.vector_alignments.get(asset_id)) |old_aligned| {
-            old_aligned.deinit();
+        const bucket_index = hash % self.buckets.items.len;
+        var current_bucket = self.buckets.items[bucket_index];
+
+        while (true) {
+            for (0..CACHE_BUCKET_SIZE) |i| {
+                if (!current_bucket.used[i]) {
+                    current_bucket.keys[i] = hash;
+                    current_bucket.values[i] = value;
+                    current_bucket.used[i] = true;
+                    return;
+                }
+            }
+
+            if (current_bucket.next == null) {
+                current_bucket.next = try CacheBucket.init(self.allocator);
+            }
+            current_bucket = current_bucket.next.?;
         }
-        try self.vector_alignments.put(asset_id, aligned);
-        self.last_update = std.time.timestamp();
     }
 };
-EOF
+EOL
 
-echo "Creating benchmark..."
-cat > benches/zig/bench_main.zig << 'EOF'
-const std = @import("std");
-const shatter_cache = @import("shatter_cache");
+# ... (build.zig and bench_main.zig remain the same) ...
 
-pub fn main() !void {
-    const allocator = std.heap.page_allocator;
-    var timer = try std.time.Timer.start();
-    
-    var cache = shatter_cache.ShatterCache.init(allocator);
-    defer cache.deinit();
-
-    const vectors = [_]shatter_cache.Vector3D{
-        shatter_cache.Vector3D.init(1, 0, 0),
-        shatter_cache.Vector3D.init(0, 1, 0),
-        shatter_cache.Vector3D.init(0, 0, 1),
-        shatter_cache.Vector3D.init(1, 1, 1),
-        shatter_cache.Vector3D.init(-1, 0, 0),
-        shatter_cache.Vector3D.init(0, -1, 0),
-        shatter_cache.Vector3D.init(0, 0, -1),
-        shatter_cache.Vector3D.init(-1, -1, -1),
-    };
-
-    const views = [_]shatter_cache.ViewportAngle{
-        .{
-            .direction = shatter_cache.Vector3D.init(1, 0, 0),
-            .up = shatter_cache.Vector3D.init(0, 1, 0),
-        },
-        .{
-            .direction = shatter_cache.Vector3D.init(0, 1, 0),
-            .up = shatter_cache.Vector3D.init(0, 0, 1),
-        },
-    };
-
-    const iterations: usize = 10_000;
-    
-    std.debug.print("\nBenchmark: Vector Shatter Cache ({d} iterations)\n", .{iterations});
-    std.debug.print("Memory usage before: {d} bytes\n", .{cache.getMemoryUsage()});
-    
-    timer.reset();
-    
-    var i: usize = 0;
-    while (i < iterations) : (i += 1) {
-        try cache.preAlignGeometry(1, &vectors, &views);
-    }
-    
-    const elapsed = timer.lap();
-    const avg_ns = @as(f64, @floatFromInt(elapsed)) / @as(f64, @floatFromInt(iterations));
-    
-    std.debug.print("Average: {d:.2} ns/op\n", .{avg_ns});
-    std.debug.print("Memory usage after: {d} bytes\n", .{cache.getMemoryUsage()});
-    std.debug.print("Vectors processed per second: {d:.2}\n", 
-        .{@as(f64, @floatFromInt(vectors.len * iterations)) / (@as(f64, @floatFromInt(elapsed)) / 1e9)});
-}
-EOF
-
-chmod +x "$0"
-
-echo "Vector-Aligned Shatter Cache system initialized with basic implementation!"
+echo "Hybrid Quantum-Crystal Cache system initialized with cache-conscious pattern cache!"
 echo "Run benchmarks with: zig build bench"
