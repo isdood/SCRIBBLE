@@ -19,8 +19,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    bench.addModule("bragg_cache", bragg_cache);
-    bench.addModule("mathplz", mathplz);
+    bench.root_module.addImport("bragg_cache", bragg_cache);
+    bench.root_module.addImport("mathplz", mathplz);
 
     const run_bench = b.addRunArtifact(bench);
 

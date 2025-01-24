@@ -1,50 +1,90 @@
 #!/bin/bash
-# Bragg-Enhanced Quantum-Crystal Cache System v1.0.49
-# Created: 2025-01-24 00:45:21
+# Bragg-Enhanced Quantum-Crystal Cache System v1.0.53
+# Created: 2025-01-24 00:52:34
 # Author: isdood
 
 set -euo pipefail
 
-# Update build.zig with correct path syntax
-cat > build.zig << 'EOL'
+# Update bragg_cache.zig with correct abs function
+cat > src/zig/core/bragg_cache.zig << 'EOL'
 const std = @import("std");
 
-pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+pub const CACHE_SIZE: usize = 16;
 
-    const bragg_cache = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = "src/zig/core/bragg_cache.zig" },
-    });
+pub const Vector3D = struct {
+    x: f64,
+    y: f64,
+    z: f64,
+};
 
-    const mathplz = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = "src/zig/core/mathplz.zig" },
-    });
+pub const BraggCache = struct {
+    const Entry = struct {
+        vector: Vector3D,
+        next: ?*Entry,
+    };
 
-    const bench = b.addExecutable(.{
-        .name = "bench_bragg",
-        .root_source_file = .{ .cwd_relative = "benches/zig/bench_bragg.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
+    entries: [CACHE_SIZE]?*Entry,
+    allocator: std.mem.Allocator,
 
-    bench.addModule("bragg_cache", bragg_cache);
-    bench.addModule("mathplz", mathplz);
+    pub fn init(allocator: std.mem.Allocator) !BraggCache {
+        return BraggCache{
+            .entries = .{null} ** CACHE_SIZE,
+            .allocator = allocator,
+        };
+    }
 
-    const run_bench = b.addRunArtifact(bench);
+    pub fn deinit(self: *BraggCache) void {
+        for (self.entries) |maybe_entry| {
+            var current = maybe_entry;
+            while (current) |entry| {
+                const next = entry.next;
+                self.allocator.destroy(entry);
+                current = next;
+            }
+        }
+    }
 
-    const bench_step = b.step("bench", "Run the Bragg cache benchmarks");
-    bench_step.dependOn(&run_bench.step);
+    pub fn processVector(self: *BraggCache, vec: Vector3D) !void {
+        const hash = @as(usize, @intFromFloat(std.math.fabs(vec.x * 73.0))) % CACHE_SIZE;
+        var new_entry = try self.allocator.create(Entry);
+        new_entry.* = .{
+            .vector = vec,
+            .next = self.entries[hash],
+        };
+        self.entries[hash] = new_entry;
+    }
+};
+EOL
 
-    b.default_step.dependOn(bench_step);
+# Create basic bench_bragg.zig
+cat > benches/zig/bench_bragg.zig << 'EOL'
+const std = @import("std");
+const bragg_cache = @import("bragg_cache");
+const mathplz = @import("mathplz");
+
+pub fn main() !void {
+    const stdout = std.io.getStdOut().writer();
+    try stdout.print("Bragg Cache Benchmark Started\n", .{});
+
+    const allocator = std.heap.page_allocator;
+    var cache = try bragg_cache.BraggCache.init(allocator);
+    defer cache.deinit();
+
+    const vec = bragg_cache.Vector3D{ .x = 1.0, .y = 0.0, .z = 0.0 };
+    try cache.processVector(vec);
+
+    try stdout.print("Basic test completed.\n", .{});
 }
 EOL
 
-# Rest of the file setup remains the same
-mkdir -p src/zig/core benches/zig
+# Create basic mathplz.zig
+cat > src/zig/core/mathplz.zig << 'EOL'
+const std = @import("std");
 
-# Previous bench_bragg.zig, bragg_cache.zig, and mathplz.zig content remains unchanged
-# ...
+pub fn abs(x: f64) f64 {
+    return std.math.fabs(x);
+}
+EOL
 
 chmod +x "$0"
 
