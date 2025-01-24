@@ -1,121 +1,220 @@
 #!/bin/bash
-# Created: 2025-01-24 01:32:45
+# Created: 2025-01-24 03:36:25
 # Author: isdood
 
-cat > benches/zig/bench_viz.zig << 'EOL'
+cat > benches/zig/bench_verify.zig << 'EOL'
 const std = @import("std");
 const bragg_cache = @import("bragg_cache");
-const mathplz = @import("mathplz");
 
-const BENCH_ITERATIONS = 100;
-const VECTORS_PER_ITERATION = 100_000;
-const WARMUP_ITERATIONS = 5;
+// Reduced workload for debugging
+const BENCH_ITERATIONS = 10;
+const VECTORS_PER_ITERATION = 1000;
+const WARMUP_ITERATIONS = 2;
+const VALIDATION_FREQUENCY = 2;
 
-const tracy_enabled = @hasDecl(@import("root"), "TRACY_ENABLE");
-const tracy = if (tracy_enabled) @import("tracy") else null;
-
-const Stats = struct {
-    min: f64,
-    max: f64,
-    mean: f64,
-    stddev: f64,
+const BenchmarkError = error{
+    VectorGenerationFailed,
+    WarmupFailed,
+    BenchmarkFailed,
+    ValidationFailed,
+    MemoryLeak,
 };
 
-fn calculateStats(times: []const u64) Stats {
-    var min: f64 = @as(f64, @floatFromInt(times[0]));
-    var max: f64 = min;
-    var sum: f64 = 0;
+fn logError(comptime fmt: []const u8, args: anytype) void {
+    std.debug.print("\nERROR: " ++ fmt ++ "\n", args);
+}
 
-    for (times) |t| {
-        const time = @as(f64, @floatFromInt(t));
-        min = @min(min, time);
-        max = @max(max, time);
-        sum += time;
-    }
-
-    const mean = sum / @as(f64, times.len);
-    var variance_sum: f64 = 0;
-
-    for (times) |t| {
-        const diff = @as(f64, @floatFromInt(t)) - mean;
-        variance_sum += diff * diff;
-    }
-
-    const stddev = @sqrt(variance_sum / @as(f64, times.len));
-
-    return .{
-        .min = min,
-        .max = max,
-        .mean = mean,
-        .stddev = stddev,
-    };
+fn logDebug(comptime fmt: []const u8, args: anytype) void {
+    std.debug.print("DEBUG: " ++ fmt ++ "\n", args);
 }
 
 pub fn main() !void {
-    // ... [Previous allocator and vector setup code remains the same] ...
+    var gpa = std.heap.GeneralPurposeAllocator(.{
+        .safety = true,
+        .never_unmap = true,
+    }){};
+    defer {
+        const check = gpa.deinit();
+        if (check == .leak) {
+            logError("Memory leak detected!", .{});
+        }
+    }
+    const allocator = gpa.allocator();
 
-    // Store all iteration times
-    var times = try allocator.alloc(u64, BENCH_ITERATIONS);
-    defer allocator.free(times);
+    var error_count: usize = 0;
 
-    // Benchmark phase
-    beginZone("Benchmark");
-    for (times) |*time| {
-        beginZone("Iteration");
+    std.debug.print("\nStarting benchmark setup...\n", .{});
 
-        var cache = try bragg_cache.BraggCache.init(allocator);
+    const vectors = allocator.alloc(bragg_cache.Vector3D, VECTORS_PER_ITERATION) catch |err| {
+        logError("Failed to allocate vectors: {any}", .{err});
+        return BenchmarkError.VectorGenerationFailed;
+    };
+    defer allocator.free(vectors);
+
+    var validation_sum: f64 = 0.0;
+    var magnitude_sum: f64 = 0.0;
+    var warmup_magnitude: f64 = 0.0;
+
+    std.debug.print("Generating test vectors...\n", .{});
+
+    for (vectors, 0..) |*vec, i| {
+        const idx = @as(f64, @floatFromInt(i));
+        vec.* = .{
+            .x = @sin(idx * 0.01),
+            .y = @cos(idx * 0.01),
+            .z = @tan(idx * 0.01),
+        };
+
+        if (!vec.isValid()) {
+            logError("Invalid vector at {d}: ({d}, {d}, {d})",
+                .{i, vec.x, vec.y, vec.z});
+            error_count += 1;
+            continue;
+        }
+
+        validation_sum += vec.x + vec.y + vec.z;
+        magnitude_sum += vec.magnitude();
+    }
+
+    if (error_count > 0) {
+        logError("Generated {d} invalid vectors", .{error_count});
+    }
+
+    std.debug.print("\nTesting single vector processing...\n", .{});
+    {
+        var cache = bragg_cache.BraggCache.init(allocator) catch |err| {
+            logError("Cache initialization failed: {any}", .{err});
+            return BenchmarkError.WarmupFailed;
+        };
         defer cache.deinit();
 
-        timer.reset();
-        for (vectors) |vec| {
-            try cache.processVector(vec);
-        }
-        time.* = timer.lap();
+        const test_vec = vectors[0];
+        logDebug("Processing test vector: ({d}, {d}, {d})",
+            .{test_vec.x, test_vec.y, test_vec.z});
 
-        if (tracy_enabled) {
-            tracy.?.plot("Time (ns)", @as(f64, @floatFromInt(time.*)));
-        }
-        endZone();
+        const result = cache.processVector(test_vec) catch |err| {
+            logError("Vector processing failed: {any}", .{err});
+            return BenchmarkError.WarmupFailed;
+        };
+
+        std.debug.print("\nSingle vector test successful\n", .{});
+        std.debug.print("Result: {d}\n", .{result});
     }
-    endZone();
 
-    // Calculate statistics
-    const stats = calculateStats(times);
-    const time_stats = Stats{
-        .min = stats.min / 1_000_000.0, // Convert to ms
-        .max = stats.max / 1_000_000.0,
-        .mean = stats.mean / 1_000_000.0,
-        .stddev = stats.stddev / 1_000_000.0,
-    };
+    std.debug.print("\nStarting warmup phase...\n", .{});
+    {
+        var cache = bragg_cache.BraggCache.init(allocator) catch |err| {
+            logError("Cache initialization failed: {any}", .{err});
+            return BenchmarkError.WarmupFailed;
+        };
+        defer cache.deinit();
 
-    const best_time_ns = stats.min;
-    const time_per_vector_ns = best_time_ns / @as(f64, VECTORS_PER_ITERATION);
-    const vectors_per_second = 1_000_000_000.0 / time_per_vector_ns;
+        std.debug.print("Running {d} warmup iterations...\n", .{WARMUP_ITERATIONS});
 
-    // Print results with statistical analysis
-    const stdout = std.io.getStdOut().writer();
-    try stdout.print("\nBragg Cache Performance Metrics\n", .{});
-    try stdout.print("────────────────────────────────────────────────\n", .{});
-    try stdout.print("Configuration:\n", .{});
-    try stdout.print("  Tracy Profiling:      {s}\n", .{if (tracy_enabled) "Enabled" else "Disabled"});
-    try stdout.print("  Vectors per iteration: {:>12}\n", .{VECTORS_PER_ITERATION});
-    try stdout.print("  Number of iterations: {:>12}\n", .{BENCH_ITERATIONS});
-    try stdout.print("  Warmup iterations:    {:>12}\n", .{WARMUP_ITERATIONS});
-    try stdout.print("\nTiming Statistics (ms):\n", .{});
-    try stdout.print("  Minimum:     {:>12.3}\n", .{time_stats.min});
-    try stdout.print("  Maximum:     {:>12.3}\n", .{time_stats.max});
-    try stdout.print("  Mean:        {:>12.3}\n", .{time_stats.mean});
-    try stdout.print("  Std Dev:     {:>12.3}\n", .{time_stats.stddev});
-    try stdout.print("  Coefficient of Variation: {:>6.2}%\n", .{(time_stats.stddev / time_stats.mean) * 100.0});
-    try stdout.print("\nPerformance (based on best run):\n", .{});
-    try stdout.print("  Time per vector:  {:>12.3} ns\n", .{time_per_vector_ns});
-    try stdout.print("  Throughput:       {:>12.2} M vectors/sec\n\n", .{vectors_per_second / 1_000_000.0});
+        for (0..WARMUP_ITERATIONS) |iter| {
+            logDebug("Warmup iteration {d}", .{iter});
+            error_count = 0;
+
+            for (vectors) |vec| {
+                if (!vec.isValid()) {
+                    error_count += 1;
+                    continue;
+                }
+
+                const result = cache.processVector(vec) catch |err| {
+                    logError("Vector processing failed in warmup: {any}", .{err});
+                    return BenchmarkError.WarmupFailed;
+                };
+                warmup_magnitude += result;
+            }
+
+            if (error_count > 0) {
+                logError("Warmup iteration {d}: {d} invalid vectors",
+                    .{iter, error_count});
+            }
+
+            const stats = cache.getCacheStats();
+            logDebug("Warmup iter {d} stats: stored={d}, hits={d}, misses={d}",
+                .{iter, stats.stored_vectors, stats.hits, stats.misses});
+        }
+
+        std.debug.print("\nWarmup completed successfully\n", .{});
+        std.debug.print("Total warmup magnitude: {d}\n", .{warmup_magnitude});
+    }
+
+    var timer = try std.time.Timer.start();
+    var total_magnitude: f64 = 0.0;
+    var min_time: u64 = std.math.maxInt(u64);
+    var max_time: u64 = 0;
+    var total_time: u64 = 0;
+
+    std.debug.print("\nStarting main benchmark...\n", .{});
+
+    for (0..BENCH_ITERATIONS) |iter| {
+        var cache = bragg_cache.BraggCache.init(allocator) catch |err| {
+            logError("Cache initialization failed: {any}", .{err});
+            return BenchmarkError.BenchmarkFailed;
+        };
+        defer cache.deinit();
+
+        error_count = 0;
+        timer.reset();
+
+        for (vectors) |vec| {
+            if (!vec.isValid()) {
+                error_count += 1;
+                continue;
+            }
+
+            const result = cache.processVector(vec) catch |err| {
+                logError("Vector processing failed: {any}", .{err});
+                return BenchmarkError.BenchmarkFailed;
+            };
+
+            total_magnitude += result;
+        }
+
+        const lap_time = timer.lap();
+
+        if (error_count > 0) {
+            logError("Iteration {d}: {d} invalid vectors",
+                .{iter, error_count});
+        }
+
+        min_time = @min(min_time, lap_time);
+        max_time = @max(max_time, lap_time);
+        total_time += lap_time;
+
+        if (iter % VALIDATION_FREQUENCY == 0) {
+            const stats = cache.getCacheStats();
+            logDebug("Iter {d} stats: stored={d}, hits={d}, misses={d}",
+                .{iter, stats.stored_vectors, stats.hits, stats.misses});
+        }
+    }
+
+    std.debug.print("\nBenchmark completed successfully\n", .{});
+
+    const mean_time = @as(f64, @floatFromInt(total_time)) / @as(f64, BENCH_ITERATIONS);
+    std.debug.print("\nPerformance Results:\n", .{});
+    std.debug.print("  Min time: {d:.3} ms\n",
+        .{@as(f64, @floatFromInt(min_time)) / 1_000_000.0});
+    std.debug.print("  Max time: {d:.3} ms\n",
+        .{@as(f64, @floatFromInt(max_time)) / 1_000_000.0});
+    std.debug.print("  Mean time: {d:.3} ms\n", .{mean_time / 1_000_000.0});
+    std.debug.print("  Total magnitude: {d}\n", .{total_magnitude});
 }
 EOL
 
-chmod +x "$0"
-
-echo "Bragg Cache profiling system initialized with statistical analysis!"
-echo "Run without Tracy: zig build viz"
-echo "Run with Tracy: zig build viz -Dtracy=true"
-echo "Note: Running in ReleaseFast mode for maximum performance"
+echo "Fixed benchmark with:"
+echo "1. Added proper return value handling"
+echo "2. Added magnitude tracking in warmup"
+echo "3. Enhanced progress reporting"
+echo "4. Better error diagnostics"
+echo ""
+echo "Key changes:"
+echo "- Fixed ignored value error"
+echo "- Better warmup validation"
+echo "- More detailed progress tracking"
+echo "- Enhanced error reporting"
+echo ""
+echo "Run: zig build verify"

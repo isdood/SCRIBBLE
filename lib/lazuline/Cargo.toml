@@ -3,14 +3,25 @@ name = "lazuline"
 version = "0.1.0"
 edition = "2021"
 authors = ["isdood"]
-description = "Crystal-based high-performance computing framework"
-repository = "https://github.com/isdood/scribble"
-license = "MIT"
+description = "Crystal-based parallel computing framework"
 
-[dependencies]
-futures = "0.3"
-num_cpus = "1.15"
+[workspace]
 
 [lib]
 name = "lazuline"
-crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+parking_lot = "0.12"
+crossbeam-utils = "0.8"
+num_cpus = "1.13"
+hashbrown = "0.14"
+
+[dev-dependencies]
+criterion = "0.5"
+rand = "0.8"
+
+[[bench]]
+name = "crystal_bench"
+path = "benches/crystal_bench.rs"
+harness = false

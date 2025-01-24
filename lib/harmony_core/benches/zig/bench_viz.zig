@@ -28,7 +28,8 @@ fn calculateStats(times: []const u64) Stats {
         sum += time;
     }
 
-    const mean = sum / @as(f64, times.len);
+    const len = @as(f64, @floatFromInt(times.len));
+    const mean = sum / len;
     var variance_sum: f64 = 0;
 
     for (times) |t| {
@@ -36,7 +37,7 @@ fn calculateStats(times: []const u64) Stats {
         variance_sum += diff * diff;
     }
 
-    const stddev = @sqrt(variance_sum / @as(f64, times.len));
+    const stddev = @sqrt(variance_sum / len);
 
     return .{
         .min = min,
@@ -47,17 +48,49 @@ fn calculateStats(times: []const u64) Stats {
 }
 
 pub fn main() !void {
-    // ... [Previous allocator and vector setup code remains the same] ...
+    // Create allocator
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    if (tracy_enabled) tracy.?.initFrame();
+    defer if (tracy_enabled) tracy.?.endFrame();
+
+    // Pre-generate vectors
+    const vectors = try allocator.alloc(bragg_cache.Vector3D, VECTORS_PER_ITERATION);
+    defer allocator.free(vectors);
+
+    var prng = std.rand.DefaultPrng.init(0x12345678);
+    const random = prng.random();
+
+    for (vectors) |*vec| {
+        vec.* = .{
+            .x = random.float(f64),
+            .y = random.float(f64),
+            .z = random.float(f64),
+        };
+    }
+
+    // Warmup phase with a fresh cache
+    {
+        var cache = try bragg_cache.BraggCache.init(allocator);
+        defer cache.deinit();
+
+        for (0..WARMUP_ITERATIONS) |_| {
+            for (vectors) |vec| {
+                try cache.processVector(vec);
+            }
+        }
+    }
 
     // Store all iteration times
-    var times = try allocator.alloc(u64, BENCH_ITERATIONS);
+    const times = try allocator.alloc(u64, BENCH_ITERATIONS);
     defer allocator.free(times);
 
-    // Benchmark phase
-    beginZone("Benchmark");
-    for (times) |*time| {
-        beginZone("Iteration");
+    var timer = try std.time.Timer.start();
 
+    // Benchmark phase
+    for (0..BENCH_ITERATIONS) |i| {
         var cache = try bragg_cache.BraggCache.init(allocator);
         defer cache.deinit();
 
@@ -65,14 +98,12 @@ pub fn main() !void {
         for (vectors) |vec| {
             try cache.processVector(vec);
         }
-        time.* = timer.lap();
+        times[i] = timer.lap();
 
         if (tracy_enabled) {
-            tracy.?.plot("Time (ns)", @as(f64, @floatFromInt(time.*)));
+            tracy.?.plot("Time (ns)", @as(f64, @floatFromInt(times[i])));
         }
-        endZone();
     }
-    endZone();
 
     // Calculate statistics
     const stats = calculateStats(times);
