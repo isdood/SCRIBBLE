@@ -1,0 +1,279 @@
+cat > ../lazuline/src/lib.zig << 'EOF'
+const std = @import("std");
+const debug = std.debug;
+const assert = std.debug.assert;
+
+pub const WorkFn = *const fn (*anyopaque) void;
+
+pub const Job = struct {
+    context: *anyopaque,
+    work_fn: WorkFn,
+};
+
+const MAX_THREADS = 32;
+const QUEUE_SIZE = 64;
+
+const JobQueue = struct {
+    const Self = @This();
+    
+    buffer: [QUEUE_SIZE]Job,
+    lock: std.Thread.Mutex,
+    slots_used: std.atomic.Value(usize),
+    write_pos: usize,
+    read_pos: usize,
+    
+    fn init() Self {
+        return Self{
+            .buffer = undefined,
+            .lock = std.Thread.Mutex{},
+            .slots_used = std.atomic.Value(usize).init(0),
+            .write_pos = 0,
+            .read_pos = 0,
+        };
+    }
+    
+    fn push(self: *Self, job: Job) bool {
+        if (self.slots_used.load(.acquire) >= QUEUE_SIZE) {
+            debug.print("Queue full (slots_used={})\n", .{self.slots_used.load(.acquire)});
+            return false;
+        }
+        
+        self.lock.lock();
+        defer self.lock.unlock();
+        
+        // Double-check after acquiring lock
+        if (self.slots_used.load(.acquire) >= QUEUE_SIZE) {
+            debug.print("Queue full after lock (slots_used={})\n", .{self.slots_used.load(.acquire)});
+            return false;
+        }
+        
+        self.buffer[self.write_pos] = job;
+        self.write_pos = (self.write_pos + 1) % QUEUE_SIZE;
+        _ = self.slots_used.fetchAdd(1, .release);
+        
+        debug.print("Pushed job (slots_used={})\n", .{self.slots_used.load(.acquire)});
+        return true;
+    }
+    
+    fn pop(self: *Self) ?Job {
+        if (self.slots_used.load(.acquire) == 0) {
+            return null;
+        }
+        
+        self.lock.lock();
+        defer self.lock.unlock();
+        
+        // Double-check after acquiring lock
+        if (self.slots_used.load(.acquire) == 0) {
+            return null;
+        }
+        
+        const job = self.buffer[self.read_pos];
+        self.read_pos = (self.read_pos + 1) % QUEUE_SIZE;
+        _ = self.slots_used.fetchSub(1, .release);
+        
+        debug.print("Popped job (slots_used={})\n", .{self.slots_used.load(.acquire)});
+        return job;
+    }
+    
+    fn size(self: *Self) usize {
+        return self.slots_used.load(.acquire);
+    }
+};
+
+pub const ThreadPool = struct {
+    const Self = @This();
+    
+    allocator: std.mem.Allocator,
+    threads: []std.Thread,
+    queues: []JobQueue,
+    running: std.atomic.Value(bool),
+    active_jobs: std.atomic.Value(usize),
+    
+    pub fn init(allocator: std.mem.Allocator) !Self {
+        const thread_count = @min(
+            try std.Thread.getCpuCount(),
+            MAX_THREADS
+        );
+        
+        debug.print("\nInitializing thread pool with {} threads\n", .{thread_count});
+        
+        const threads = try allocator.alloc(std.Thread, thread_count);
+        const queues = try allocator.alloc(JobQueue, thread_count);
+        
+        // Initialize queues
+        for (queues) |*queue| {
+            queue.* = JobQueue.init();
+        }
+        
+        var pool = Self{
+            .allocator = allocator,
+            .threads = threads,
+            .queues = queues,
+            .running = std.atomic.Value(bool).init(true),
+            .active_jobs = std.atomic.Value(usize).init(0),
+        };
+        
+        // Start worker threads
+        for (0..thread_count) |i| {
+            threads[i] = try std.Thread.spawn(.{}, workerFn, .{ &pool, i });
+            debug.print("Started worker thread {}\n", .{i});
+        }
+        
+        return pool;
+    }
+    
+    fn workerFn(pool: *Self, id: usize) void {
+        const my_queue = &pool.queues[id];
+        var next_steal: usize = (id + 1) % pool.threads.len;
+        var backoff: usize = 1;
+        
+        debug.print("Worker {} started\n", .{id});
+        
+        while (pool.running.load(.acquire)) {
+            var found_work = false;
+            
+            // Try my queue first
+            if (my_queue.pop()) |job| {
+                debug.print("Worker {} processing job from own queue\n", .{id});
+                job.work_fn(job.context);
+                _ = pool.active_jobs.fetchSub(1, .release);
+                found_work = true;
+                backoff = 1;
+                continue;
+            }
+            
+            // Try work stealing
+            var tries: usize = 0;
+            while (tries < pool.threads.len) : ({
+                tries += 1;
+                next_steal = (next_steal + 1) % pool.threads.len;
+            }) {
+                if (next_steal == id) continue;
+                
+                if (pool.queues[next_steal].pop()) |job| {
+                    debug.print("Worker {} stole job from worker {}\n", .{id, next_steal});
+                    job.work_fn(job.context);
+                    _ = pool.active_jobs.fetchSub(1, .release);
+                    found_work = true;
+                    backoff = 1;
+                    break;
+                }
+            }
+            
+            if (!found_work) {
+                if (pool.active_jobs.load(.acquire) == 0) {
+                    backoff = 1;
+                    std.time.sleep(1 * std.time.ns_per_ms);
+                    continue;
+                }
+                
+                const sleep_ns = backoff * std.time.ns_per_ms;
+                std.time.sleep(sleep_ns);
+                backoff = @min(backoff * 2, 32);
+            }
+        }
+        
+        debug.print("Worker {} shutting down\n", .{id});
+    }
+    
+    pub fn deinit(self: *Self) void {
+        debug.print("Shutting down thread pool\n", .{});
+        self.running.store(false, .release);
+        
+        for (self.threads) |thread| {
+            thread.join();
+        }
+        
+        self.allocator.free(self.threads);
+        self.allocator.free(self.queues);
+        debug.print("Thread pool shut down\n", .{});
+    }
+    
+    pub fn schedule(self: *Self, context: anytype, comptime work_fn: fn (*const std.meta.Child(@TypeOf(context))) void) !void {
+        const PtrType = *const std.meta.Child(@TypeOf(context));
+        
+        const Wrapper = struct {
+            fn call(ptr: *anyopaque) void {
+                const typed_ptr = @as(PtrType, @ptrCast(@alignCast(ptr)));
+                work_fn(typed_ptr);
+            }
+        };
+        
+        if (!self.running.load(.acquire)) {
+            debug.print("Thread pool is shutting down\n", .{});
+            return error.ThreadPoolShutdown;
+        }
+        
+        const job = Job{
+            .context = @constCast(context),
+            .work_fn = Wrapper.call,
+        };
+        
+        const current_jobs = self.active_jobs.load(.acquire);
+        var queue_idx = current_jobs % self.threads.len;
+        const start_idx = queue_idx;
+        
+        debug.print("Trying to schedule on worker {}\n", .{queue_idx});
+        
+        while (true) {
+            if (self.queues[queue_idx].push(job)) {
+                _ = self.active_jobs.fetchAdd(1, .release);
+                debug.print("Scheduled job {} on worker {}\n", .{current_jobs + 1, queue_idx});
+                return;
+            }
+            
+            queue_idx = (queue_idx + 1) % self.threads.len;
+            if (queue_idx == start_idx) {
+                debug.print("All queues are full\n", .{});
+                return error.QueuesFull;
+            }
+            
+            debug.print("Trying to schedule on worker {}\n", .{queue_idx});
+        }
+    }
+    
+    pub fn wait(self: *Self) void {
+        while (true) {
+            const remaining = self.active_jobs.load(.acquire);
+            debug.print("Waiting for {} jobs to complete\n", .{remaining});
+            if (remaining == 0) break;
+            std.time.sleep(1 * std.time.ns_per_ms);
+        }
+        debug.print("All jobs completed\n", .{});
+    }
+};
+
+test "ThreadPool basic operation" {
+    debug.print("\nStarting thread pool test\n", .{});
+    var pool = try ThreadPool.init(std.testing.allocator);
+    defer pool.deinit();
+    
+    const Context = struct {
+        value: std.atomic.Value(i32),
+        
+        fn work(self: *const @This()) void {
+            const old = self.value.fetchAdd(1, .acq_rel);
+            debug.print("Incrementing value from {} to {}\n", .{old, old + 1});
+            std.time.sleep(1 * std.time.ns_per_ms);
+        }
+    };
+    
+    var ctx = Context{ .value = std.atomic.Value(i32).init(0) };
+    debug.print("Created context with initial value 0\n", .{});
+    
+    var i: usize = 0;
+    while (i < 10) : (i += 1) {
+        try pool.schedule(&ctx, Context.work);
+        debug.print("Scheduled job {}/10\n", .{i + 1});
+    }
+    
+    debug.print("Waiting for jobs to complete\n", .{});
+    pool.wait();
+    
+    const final_value = ctx.value.load(.acquire);
+    debug.print("Final value: {}\n", .{final_value});
+    try std.testing.expectEqual(@as(i32, 10), final_value);
+    debug.print("Test completed successfully\n", .{});
+}
+EOF

@@ -1,0 +1,63 @@
+cat > ../lazuline/src/lib.zig << 'EOF'
+const std = @import("std");
+const debug = std.debug;
+
+pub const WorkFn = *const fn (*anyopaque) void;
+
+pub const Job = struct {
+    context: *anyopaque,
+    work_fn: WorkFn,
+};
+
+const MAX_THREADS = 32;
+const QUEUE_SIZE = 64;
+
+const JobQueue = struct {
+    const Self = @This();
+    
+    buffer: [QUEUE_SIZE]Job,
+    head: std.atomic.Value(usize),
+    tail: std.atomic.Value(usize),
+    
+    fn init() Self {
+        return Self{
+            .buffer = undefined,
+            .head = std.atomic.Value(usize).init(0),
+            .tail = std.atomic.Value(usize).init(0),
+        };
+    }
+    
+    fn push(self: *Self, job: Job) bool {
+        const head = self.head.load(.acquire);
+        const tail = self.tail.load(.acquire);
+        const next_tail = (tail + 1) % QUEUE_SIZE;
+        
+        if (next_tail == head) {
+            debug.print("Queue full: head={}, tail={}\n", .{head, tail});
+            return false;
+        }
+        
+        self.buffer[tail] = job;
+        self.tail.store(next_tail, .release);
+        debug.print("Pushed job at position {}\n", .{tail});
+        return true;
+    }
+    
+    fn pop(self: *Self) ?Job {
+        const head = self.head.load(.acquire);
+        const tail = self.tail.load(.acquire);
+        
+        if (head == tail) {
+            return null;
+        }
+        
+        const job = self.buffer[head];
+        const next_head = (head + 1) % QUEUE_SIZE;
+        self.head.store(next_head, .release);
+        debug.print("Popped job from position {}\n", .{head});
+        return job;
+    }
+};
+
+pub const ThreadPool = struct {
+    const 

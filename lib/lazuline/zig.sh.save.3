@@ -1,0 +1,115 @@
+cat > ../lazuline/src/lib.zig << 'EOF'
+const std = @import("std");
+const debug = std.debug;
+
+pub const WorkFn = *const fn (*anyopaque) void;
+
+pub const Job = struct {
+    context: *anyopaque,
+    work_fn: WorkFn,
+};
+
+const MAX_THREADS = 32;
+const QUEUE_SIZE = 256;
+
+const JobQueue = struct {
+    const Self = @This();
+    
+    buffer: [QUEUE_SIZE]Job = undefined,
+    head: std.atomic.Value(usize),
+    tail: std.atomic.Value(usize),
+    
+    fn init() Self {
+        return Self{
+            .head = std.atomic.Value(usize).init(0),
+            .tail = std.atomic.Value(usize).init(0),
+        };
+    }
+    
+    fn size(self: *Self) usize {
+        const head = self.head.load(.acquire);
+        const tail = self.tail.load(.acquire);
+        if (tail >= head) {
+            return tail - head;
+        } else {
+            return QUEUE_SIZE - (head - tail);
+        }
+    }
+    
+    fn push(self: *Self, job: Job) bool {
+        const head = self.head.load(.acquire);
+        const tail = self.tail.load(.acquire);
+        const next_tail = (tail + 1) % QUEUE_SIZE;
+        
+        // Queue is full if next_tail would meet head
+        if (next_tail == head) {
+            debug.print("Queue full: head={}, tail={}, next_tail={}\n", .{head, tail, next_tail});
+            return false;
+        }
+        
+        self.buffer[tail] = job;
+        self.tail.store(next_tail, .release);
+        debug.print("Pushed job: head={}, tail={}, size={}\n", .{head, next_tail, self.size()});
+        return true;
+    }
+    
+    fn pop(self: *Self) ?Job {
+        const head = self.head.load(.acquire);
+        const tail = self.tail.load(.acquire);
+        
+        // Queue is empty if head catches up to tail
+        if (head == tail) {
+            return null;
+        }
+        
+        const job = self.buffer[head];
+        const next_head = (head + 1) % QUEUE_SIZE;
+        self.head.store(next_head, .release);
+        debug.print("Popped job: head={}, tail={}, size={}\n", .{next_head, tail, self.size()});
+        return job;
+    }
+};
+
+pub const ThreadPool = struct {
+    const Self = @This();
+    
+    allocator: std.mem.Allocator,
+    threads: []std.Thread,
+    queues: []JobQueue,
+    running: std.atomic.Value(bool),
+    total_jobs: std.atomic.Value(usize),
+    
+    pub fn init(allocator: std.mem.Allocator) !Self {
+        const thread_count = @min(
+            try std.Thread.getCpuCount(),
+            MAX_THREADS
+        );
+        
+        debug.print("\nInitializing thread pool with {} threads\n", .{thread_count});
+        
+        const threads = try allocator.alloc(std.Thread, thread_count);
+        const queues = try allocator.alloc(JobQueue, thread_count);
+        
+        // Initialize queues
+        for (queues) |*queue| {
+            queue.* = JobQueue.init();
+        }
+        
+        var pool = Self{
+            .allocator = allocator,
+            .threads = threads,
+            .queues = queues,
+            .running = std.atomic.Value(bool).init(true),
+            .total_jobs = std.atomic.Value(usize).init(0),
+        };
+        
+        // Start worker threads
+        for (0..thread_count) |i| {
+            threads[i] = try std.Thread.spawn(.{}, workerFn, .{ &pool, i });
+            debug.print("Started worker thread {}\n", .{i});
+        }
+        
+        return pool;
+    }
+    
+    fn workerFn(pool: *Self, id: usize) void {

@@ -1,0 +1,115 @@
+cat > ../lazuline/src/lib.zig << 'EOF'
+const std = @import("std");
+const debug = std.debug;
+const assert = std.debug.assert;
+
+pub const WorkFn = *const fn (*anyopaque) void;
+
+pub const Job = struct {
+    context: *anyopaque,
+    work_fn: WorkFn,
+    id: usize,
+};
+
+const MAX_THREADS = 32;
+const QUEUE_SIZE = 16;
+
+const JobQueue = struct {
+    const Self = @This();
+    
+    buffer: [QUEUE_SIZE]Job,
+    lock: std.Thread.Mutex,
+    slots_used: std.atomic.Value(usize),
+    write_pos: usize,
+    read_pos: usize,
+    id: usize,
+    
+    fn init(id: usize) Self {
+        return Self{
+            .buffer = undefined,
+            .lock = std.Thread.Mutex{},
+            .slots_used = std.atomic.Value(usize).init(0),
+            .write_pos = 0,
+            .read_pos = 0,
+            .id = id,
+        };
+    }
+    
+    fn push(self: *Self, job: Job) bool {
+        const current_slots = self.slots_used.load(.acquire);
+        if (current_slots >= QUEUE_SIZE) {
+            debug.print("Queue {} full (slots_used={})\n", .{self.id, current_slots});
+            return false;
+        }
+        
+        self.lock.lock();
+        defer self.lock.unlock();
+        
+        if (self.slots_used.load(.acquire) >= QUEUE_SIZE) {
+            return false;
+        }
+        
+        self.buffer[self.write_pos] = job;
+        self.write_pos = (self.write_pos + 1) % QUEUE_SIZE;
+        _ = self.slots_used.fetchAdd(1, .release);
+        
+        debug.print("Queue {}: Pushed job {} (slots_used={})\n", 
+            .{self.id, job.id, self.slots_used.load(.acquire)});
+        return true;
+    }
+    
+    fn pop(self: *Self) ?Job {
+        if (self.slots_used.load(.acquire) == 0) {
+            return null;
+        }
+        
+        self.lock.lock();
+        defer self.lock.unlock();
+        
+        if (self.slots_used.load(.acquire) == 0) {
+            return null;
+        }
+        
+        const job = self.buffer[self.read_pos];
+        self.read_pos = (self.read_pos + 1) % QUEUE_SIZE;
+        _ = self.slots_used.fetchSub(1, .release);
+        
+        debug.print("Queue {}: Popped job {} (slots_used={})\n", 
+            .{self.id, job.id, self.slots_used.load(.acquire)});
+        return job;
+    }
+    
+    fn size(self: *Self) usize {
+        return self.slots_used.load(.acquire);
+    }
+};
+
+pub const ThreadPool = struct {
+    const Self = @This();
+    
+    allocator: std.mem.Allocator,
+    threads: []std.Thread,
+    queues: []JobQueue,
+    running: std.atomic.Value(bool),
+    jobs_remaining: std.atomic.Value(usize),
+    jobs_total: std.atomic.Value(usize),
+    next_job_id: std.atomic.Value(usize),
+    
+    pub fn init(allocator: std.mem.Allocator) !Self {
+        const thread_count = @min(
+            try std.Thread.getCpuCount(),
+            MAX_THREADS
+        );
+        
+        debug.print("\nInitializing thread pool with {} threads\n", .{thread_count});
+        
+        const threads = try allocator.alloc(std.Thread, thread_count);
+        const queues = try allocator.alloc(JobQueue, thread_count);
+        
+        for (queues, 0..) |*queue, i| {
+            queue.* = JobQueue.init(i);
+        }
+        
+        var pool = Self{
+            .allocator = allocator,
+            .threads = t

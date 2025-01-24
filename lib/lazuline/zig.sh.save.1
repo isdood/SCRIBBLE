@@ -1,0 +1,37 @@
+cat > ../lazuline/src/lib.zig << 'EOF'
+const std = @import("std");
+const debug = std.debug;
+
+pub const WorkFn = *const fn (*anyopaque) void;
+
+pub const Job = struct {
+    context: *anyopaque,
+    work_fn: WorkFn,
+};
+
+const MAX_THREADS = 32;
+const QUEUE_SIZE = 256;
+
+const JobQueue = struct {
+    const Self = @This();
+    
+    buffer: [QUEUE_SIZE]Job = undefined,
+    head: std.atomic.Value(usize),
+    tail: std.atomic.Value(usize),
+    
+    fn init() Self {
+        return Self{
+            .head = std.atomic.Value(usize).init(0),
+            .tail = std.atomic.Value(usize).init(0),
+        };
+    }
+    
+    fn push(self: *Self, job: Job) bool {
+        const tail = self.tail.load(.SeqCst);
+        const next_tail = (tail + 1) % QUEUE_SIZE;
+        
+        if (next_tail == self.head.load(.SeqCst)) {
+            return false; // Queue full
+        }
+        
+        self.buffer[tail] =
