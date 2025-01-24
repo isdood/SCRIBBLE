@@ -4,15 +4,12 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const mathplz = b.addModule("mathplz", .{
-        .root_source_file = .{ .cwd_relative = "src/zig/core/mathplz.zig" },
+    const bragg_cache = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "src/zig/core/bragg_cache.zig" },
     });
 
-    const bragg_module = b.addModule("bragg_cache", .{
-        .root_source_file = .{ .cwd_relative = "src/zig/core/bragg_cache.zig" },
-        .imports = &.{
-            .{ .name = "mathplz", .module = mathplz },
-        },
+    const mathplz = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = "src/zig/core/mathplz.zig" },
     });
 
     const bench = b.addExecutable(.{
@@ -22,12 +19,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    bench.root_module.addImport("bragg_cache", bragg_module);
-    bench.root_module.addImport("mathplz", mathplz);
-    
+    bench.addModule("bragg_cache", bragg_cache);
+    bench.addModule("mathplz", mathplz);
+
     const run_bench = b.addRunArtifact(bench);
-    run_bench.stdio = .inherit; // Enable terminal control for spinner
-    
-    const bench_step = b.step("bench", "Run Bragg-enhanced cache benchmarks");
+
+    const bench_step = b.step("bench", "Run the Bragg cache benchmarks");
     bench_step.dependOn(&run_bench.step);
+
+    b.default_step.dependOn(bench_step);
 }

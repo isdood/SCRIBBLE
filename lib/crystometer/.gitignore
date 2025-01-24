@@ -1,0 +1,11 @@
+target/
+zig-cache/
+zig-out/
+Cargo.lock
+*.o
+*.so
+*.dylib
+*.dll
+results/
+*~
+.DS_Store

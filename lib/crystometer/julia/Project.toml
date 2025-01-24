@@ -1,0 +1,10 @@
+name = "Crystometer"
+uuid = "f8d0d6b8-6c2d-4b1c-8d5e-9c1b4c1e8d0f"
+authors = ["isdood"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[compat]
+julia = "1.6"
