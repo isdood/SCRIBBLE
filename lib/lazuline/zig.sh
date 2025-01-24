@@ -1,171 +1,196 @@
-#!/bin/bash
-
-echo "[INFO] Starting Lazuline optimization..."
-echo "[INFO] Current time: 2025-01-23 03:37:12 UTC"
-echo "[INFO] User: isdood"
-
-cat > bench/main.zig << 'EOF'
+cat > ../lazuline/src/lib.zig << 'EOF'
 const std = @import("std");
-const lazuline = @import("lazuline");
-const print = std.debug.print;
+const debug = std.debug;
 
-fn verifyResults(scalar_sum: f64, vector_sum: f64) bool {
-    const diff = @abs(scalar_sum - vector_sum);
-    return diff < 1e-10;
-}
+pub const WorkFn = *const fn (*anyopaque) void;
 
-pub fn main() !void {
-    const iterations: usize = 1000000;
-    const warmup_iterations: usize = 100000;
-
-    // Wave Pattern benchmark
-    {
-        const amp = 1.0;
-        const freq = 440.0;
-        const phase = 0.0;
-        var wave = lazuline.WavePattern.new(amp, freq, phase);
-
-        // Warmup with realistic data
-        var warmup_acc: f64 = 0;
-        var i: usize = 0;
-        while (i < warmup_iterations) : (i += 1) {
-            const t = @as(f64, @floatFromInt(i)) * 0.001;
-            warmup_acc += wave.compute(t);
-        }
-
-        // Scalar benchmark
-        const start_scalar = std.time.nanoTimestamp();
-        var acc_scalar: f64 = 0;
-        i = 0;
-        while (i < iterations) : (i += 1) {
-            const t = @as(f64, @floatFromInt(i)) * 0.001;
-            acc_scalar += wave.compute(t);
-        }
-        const end_scalar = std.time.nanoTimestamp();
-        const duration_scalar = @as(f64, @floatFromInt(end_scalar - start_scalar)) / @as(f64, @floatFromInt(iterations));
-
-        // Vector benchmark with aligned data
-        var times: [8]f64 align(64) = undefined;
-        const start_vector = std.time.nanoTimestamp();
-        var acc_vector: f64 = 0;
-        i = 0;
-        while (i < iterations) : (i += 8) {
-            for (0..8) |j| {
-                times[j] = @as(f64, @floatFromInt(i + j)) * 0.001;
-            }
-            const results = wave.computeVectorized(&times);
-            for (results) |result| {
-                acc_vector += result;
-            }
-        }
-        const end_vector = std.time.nanoTimestamp();
-        const duration_vector = @as(f64, @floatFromInt(end_vector - start_vector)) / @as(f64, @floatFromInt(iterations));
-
-        print("Wave Pattern (Scalar): {d:.2} ns/op\n", .{duration_scalar});
-        print("Wave Pattern (Vector): {d:.2} ns/op\n", .{duration_vector});
-        print("Control sums: scalar={d}, vector={d}\n", .{acc_scalar, acc_vector});
-        print("Speedup: {d:.2}x\n", .{duration_scalar / duration_vector});
-        print("Results match: {}\n", .{verifyResults(acc_scalar, acc_vector)});
-    }
-}
-EOF
-
-cat > src/lib.zig << 'EOF'
-const std = @import("std");
-const constants = @import("constants.zig");
-const harmonic = @import("harmonic.zig");
-const math = std.math;
-
-pub const version = "0.1.0";
-
-const VectorType = @Vector(8, f64);
-
-pub const types = struct {
-    pub const WavePattern = struct {
-        amplitude: f64,
-        frequency: f64,
-        phase: f64,
-        omega: f64,
-        harmonic_state: harmonic.HarmonicState,
-        resonance_cache: [32]f64 align(64) = [_]f64{0} ** 32,
-        cache_valid: bool = false,
-
-        pub fn new(amplitude: f64, frequency: f64, phase: f64) @This() {
-            var self = @This(){
-                .amplitude = amplitude,
-                .frequency = frequency,
-                .phase = phase,
-                .omega = 2.0 * math.pi * frequency,
-                .harmonic_state = harmonic.HarmonicState.new(),
-            };
-            self.updateResonanceCache();
-            return self;
-        }
-
-        inline fn updateResonanceCache(self: *@This()) void {
-            if (!self.cache_valid) {
-                var i: usize = 0;
-                while (i < 32) : (i += 1) {
-                    const t = @as(f64, @floatFromInt(i)) * 0.03125;
-                    self.resonance_cache[i] = math.sin(self.omega * t + self.phase);
-                }
-                self.cache_valid = true;
-            }
-        }
-
-        pub inline fn compute(self: *const @This(), time: f64) f64 {
-            var harmonic_state = self.harmonic_state;
-            harmonic_state.apply_field(time * self.frequency);
-
-            const normalized_time = time - @floor(time);
-            const cache_index = @as(usize, @intFromFloat(normalized_time * 32.0));
-            if (cache_index < 32) {
-                const coherence = harmonic_state.get_coherence();
-                return self.amplitude * self.resonance_cache[cache_index] * coherence;
-            }
-
-            const coherence = harmonic_state.get_coherence();
-            return self.amplitude * math.sin(self.omega * time + self.phase) * coherence;
-        }
-
-        pub inline fn computeVectorized(self: *const @This(), times: *const [8]f64) [8]f64 {
-            const time_vec: VectorType = times.*;
-            const freq_vec: VectorType = @splat(@as(f64, self.frequency));
-
-            // Pre-compute normalized times for cache lookup
-            const normalized_vec = time_vec - @floor(time_vec);
-            const cache_indices_f = normalized_vec * @as(VectorType, @splat(32.0));
-
-            // Apply field to harmonic state
-            var harmonic_state = self.harmonic_state;
-            harmonic_state.apply_field_vector(time_vec * freq_vec);
-            const coherence = harmonic_state.get_coherence();
-
-            var result: [8]f64 align(64) = undefined;
-
-            // Process each element using cache when possible
-            inline for (0..8) |i| {
-                const idx = @as(usize, @intFromFloat(cache_indices_f[i]));
-                if (idx < 32) {
-                    result[i] = self.amplitude * self.resonance_cache[idx] * coherence;
-                } else {
-                    const t = time_vec[i];
-                    result[i] = self.amplitude * math.sin(self.omega * t + self.phase) * coherence;
-                }
-            }
-
-            return result;
-        }
-    };
-
-    // ... (rest of the code remains unchanged)
+pub const Job = struct {
+    context: *anyopaque,
+    work_fn: WorkFn,
 };
 
-// Export convenience aliases
-pub const WavePattern = types.WavePattern;
-pub const QuantumResonance = types.QuantumResonance;
-pub const CrystalLattice = types.CrystalLattice;
-EOF
+pub const ThreadPool = struct {
+    allocator: std.mem.Allocator,
+    threads: []std.Thread,
+    mutex: std.Thread.Mutex,
+    jobs: std.ArrayList(Job),
+    shutdown: std.atomic.Value(bool),
+    active_jobs: std.atomic.Value(usize),
+    total_jobs_processed: std.atomic.Value(usize),
+    condition: std.Thread.Condition,
+    thread_count: usize,
+    initialized_threads: std.atomic.Value(usize),
 
-echo "[SUCCESS] Moved result verification to benchmark code"
-echo "[INFO] Try running 'zig build bench' now"
+    const Self = @This();
+    
+    pub fn init(allocator: std.mem.Allocator) !Self {
+        const thread_count = try std.Thread.getCpuCount();
+        debug.print("\nThread Pool: Initializing with {d} threads\n", .{thread_count});
+        
+        const threads = try allocator.alloc(std.Thread, thread_count);
+        errdefer allocator.free(threads);
+        
+        var pool = Self{
+            .allocator = allocator,
+            .threads = threads,
+            .mutex = .{},
+            .jobs = std.ArrayList(Job).init(allocator),
+            .shutdown = std.atomic.Value(bool).init(false),
+            .active_jobs = std.atomic.Value(usize).init(0),
+            .total_jobs_processed = std.atomic.Value(usize).init(0),
+            .condition = .{},
+            .thread_count = thread_count,
+            .initialized_threads = std.atomic.Value(usize).init(0),
+        };
+
+        // Create all threads before returning
+        var i: usize = 0;
+        while (i < thread_count) : (i += 1) {
+            threads[i] = try std.Thread.spawn(.{}, worker, .{&pool});
+            _ = pool.initialized_threads.fetchAdd(1, .release);
+            debug.print("Thread Pool: Started worker thread {d}\n", .{i});
+        }
+
+        // Wait for all threads to start
+        var retry: usize = 0;
+        while (pool.initialized_threads.load(.acquire) < thread_count) {
+            std.time.sleep(1 * std.time.ns_per_ms);
+            retry += 1;
+            if (retry > 1000) {
+                return error.ThreadInitTimeout;
+            }
+        }
+
+        debug.print("Thread Pool: All threads initialized\n", .{});
+        return pool;
+    }
+
+    pub fn deinit(self: *Self) void {
+        debug.print("\nThread Pool: Initiating shutdown\n", .{});
+        
+        self.shutdown.store(true, .release);
+        self.mutex.lock();
+        self.condition.broadcast();
+        self.mutex.unlock();
+        
+        const init_threads = self.initialized_threads.load(.acquire);
+        for (self.threads[0..init_threads], 0..) |thread, i| {
+            debug.print("Thread Pool: Joining thread {d}\n", .{i});
+            thread.join();
+        }
+        
+        const remaining = self.jobs.items.len;
+        const completed = self.total_jobs_processed.load(.acquire);
+        debug.print("Thread Pool: Shutdown complete. Processed {d} jobs, {d} remaining\n", 
+            .{completed, remaining});
+        
+        self.jobs.deinit();
+        self.allocator.free(self.threads);
+    }
+
+    fn worker(pool: *Self) void {
+        const thread_num = pool.initialized_threads.load(.monotonic);
+        debug.print("Thread Pool[{d}]: Worker ready\n", .{thread_num});
+        
+        while (!pool.shutdown.load(.acquire)) {
+            // Try to get a job
+            pool.mutex.lock();
+            
+            // Wait for work while holding the mutex
+            while (!pool.shutdown.load(.acquire) and pool.jobs.items.len == 0) {
+                debug.print("Thread Pool[{d}]: Waiting for work\n", .{thread_num});
+                pool.condition.wait(&pool.mutex);
+            }
+            
+            // Check for shutdown after wakeup
+            if (pool.shutdown.load(.acquire)) {
+                pool.mutex.unlock();
+                break;
+            }
+            
+            // Get a job if available
+            const job: ?Job = if (pool.jobs.items.len > 0) blk: {
+                _ = pool.active_jobs.fetchAdd(1, .release);
+                debug.print("Thread Pool[{d}]: Got job ({d} in queue)\n", 
+                    .{thread_num, pool.jobs.items.len - 1});
+                break :blk pool.jobs.orderedRemove(0);
+            } else null;
+            
+            pool.mutex.unlock();
+            
+            // Process job if we got one
+            if (job) |j| {
+                debug.print("Thread Pool[{d}]: Executing job\n", .{thread_num});
+                j.work_fn(j.context);
+                _ = pool.total_jobs_processed.fetchAdd(1, .release);
+                _ = pool.active_jobs.fetchSub(1, .release);
+                debug.print("Thread Pool[{d}]: Job completed\n", .{thread_num});
+            }
+        }
+        
+        debug.print("Thread Pool[{d}]: Shutting down\n", .{thread_num});
+    }
+
+    pub fn schedule(self: *Self, context: anytype, comptime work_fn: fn (*const std.meta.Child(@TypeOf(context))) void) !void {
+        const PtrType = *const std.meta.Child(@TypeOf(context));
+        
+        // Create work function wrapper
+        const WorkerFn = struct {
+            fn call(ptr: *anyopaque) void {
+                const typed_ptr = @as(PtrType, @ptrCast(@alignCast(ptr)));
+                work_fn(typed_ptr);
+            }
+        };
+
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        
+        if (self.shutdown.load(.acquire)) {
+            return error.ThreadPoolShutdown;
+        }
+
+        try self.jobs.append(Job{
+            .context = @constCast(context),
+            .work_fn = WorkerFn.call,
+        });
+        
+        debug.print("Thread Pool: Scheduled job (queue: {d})\n", .{self.jobs.items.len});
+        self.condition.signal();
+    }
+
+    pub fn wait(self: *Self) void {
+        debug.print("\nThread Pool: Waiting for completion\n", .{});
+        var stall_count: usize = 0;
+        
+        while (true) {
+            const jobs_len = blk: {
+                self.mutex.lock();
+                defer self.mutex.unlock();
+                break :blk self.jobs.items.len;
+            };
+            
+            const active = self.active_jobs.load(.acquire);
+            const completed = self.total_jobs_processed.load(.acquire);
+            
+            if (jobs_len == 0 and active == 0) {
+                debug.print("Thread Pool: All jobs completed ({d} total)\n", .{completed});
+                break;
+            }
+            
+            stall_count += 1;
+            if (stall_count > 50) {
+                debug.print("Thread Pool: Possible stall, waking workers (jobs: {d}, active: {d})\n", 
+                    .{jobs_len, active});
+                self.mutex.lock();
+                self.condition.broadcast();
+                self.mutex.unlock();
+                stall_count = 0;
+            }
+            
+            debug.print("Thread Pool: Queue: {d}, Active: {d}, Completed: {d}, Stall: {d}\n", 
+                .{jobs_len, active, completed, stall_count});
+            std.time.sleep(10 * std.time.ns_per_ms);
+        }
+    }
+};
+EOF

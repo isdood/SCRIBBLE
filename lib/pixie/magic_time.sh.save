@@ -1,0 +1,27 @@
+cat > src/zig/core/crystal_dance.zig << 'EOF'
+const std = @import("std");
+const math = @import("crystal_math");
+const ThreadPool = @import("lazuline").ThreadPool;
+
+pub const DanceError = error{
+    ThreadPoolError,
+    AllocationError,
+};
+
+pub const DancePattern = enum {
+    Spiral,
+    Waltz,
+    Flutter,
+    Sparkle,
+    Dream,
+};
+
+pub const CrystalDance = struct {
+    allocator: std.mem.Allocator,
+    enchanted_lattice: [][]f64,
+    sparkle_factor: f64,
+    current_pattern: DancePattern,
+    size: usize,
+    thread_pool: ThreadPool,
+    contexts: std.ArrayList(WorkContext),
+    dream_contexts: std.ArrayList(Drea
