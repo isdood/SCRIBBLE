@@ -2,13 +2,14 @@ cat > ../lazuline/src/lib.zig << 'EOF'
 const std = @import("std");
 const print = std.debug.print;
 const builtin = @import("builtin");
-const Mutex = std.Thread.Mutex;
+const time = std.time;
 
 pub const WorkFn = *const fn (*anyopaque) void;
 
 pub const Job = struct {
     context: *anyopaque,
     work_fn: WorkFn,
+    id: u32,
 };
 
 pub const ThreadPool = struct {
@@ -16,11 +17,10 @@ pub const ThreadPool = struct {
     
     allocator: std.mem.Allocator,
     thread: std.Thread,
-    job_mutex: Mutex,
-    current_job: ?*align(16) Job,
-    job_ready: std.atomic.Value(bool),
+    mutex: std.Thread.Mutex,
+    job_queue: std.ArrayList(*Job),
+    completed_jobs: std.atomic.Value(u32),
     running: std.atomic.Value(bool),
-    completed: std.atomic.Value(usize),
     
     pub fn init(allocator: std.mem.Allocator) !Self {
         print("\n[{s}] Creating thread pool (Target: {s})\n", .{
@@ -31,11 +31,10 @@ pub const ThreadPool = struct {
         var pool = Self{
             .allocator = allocator,
             .thread = undefined,
-            .job_mutex = .{},
-            .current_job = null,
-            .job_ready = std.atomic.Value(bool).init(false),
+            .mutex = .{},
+            .job_queue = std.ArrayList(*Job).init(allocator),
+            .completed_jobs = std.atomic.Value(u32).init(0),
             .running = std.atomic.Value(bool).init(true),
-            .completed = std.atomic.Value(usize).init(0),
         };
         
         print("[MAIN] Starting worker thread\n", .{});
@@ -48,42 +47,65 @@ pub const ThreadPool = struct {
     
     fn workerFn(pool: *Self) void {
         print("[WORKER] Thread starting (ID: {})\n", .{std.Thread.getCurrentId()});
-        var jobs_seen: usize = 0;
+        var jobs_completed: u32 = 0;
         
-        while (pool.running.load(.acquire)) {
-            if (pool.job_ready.load(.acquire)) {
-                pool.job_mutex.lock();
-                if (pool.current_job) |job| {
-                    jobs_seen += 1;
-                    print("[WORKER] Processing job {} at {*}\n", .{jobs_seen, job});
-                    
-                    // Take ownership of the job
-                    pool.current_job = null;
-                    pool.job_ready.store(false, .release);
-                    pool.job_mutex.unlock();
-                    
-                    // Process job
-                    job.work_fn(job.context);
-                    
-                    // Clean up
-                    const total = pool.completed.fetchAdd(1, .release) + 1;
-                    print("[WORKER] Completed job {} (total: {})\n", .{jobs_seen, total});
-                } else {
-                    pool.job_ready.store(false, .release);
-                    pool.job_mutex.unlock();
-                }
+        while (pool.running.load(.seq_cst)) {
+            pool.mutex.lock();
+            const has_job = pool.job_queue.items.len > 0;
+            const job = if (has_job) pool.job_queue.orderedRemove(0) else null;
+            pool.mutex.unlock();
+            
+            if (job) |j| {
+                print("[WORKER] Processing job {} at {*}\n", .{j.id, j});
+                j.work_fn(j.context);
+                
+                jobs_completed += 1;
+                _ = pool.completed_jobs.fetchAdd(1, .seq_cst);
+                print("[WORKER] Completed job {} (total: {})\n", .{j.id, jobs_completed});
+                
+                pool.allocator.destroy(j);
             } else {
                 std.time.sleep(1 * std.time.ns_per_ms);
             }
         }
         
-        print("[WORKER] Thread shutting down (processed {} jobs)\n", .{jobs_seen});
+        // Process remaining jobs
+        print("[WORKER] Processing remaining jobs\n", .{});
+        pool.mutex.lock();
+        while (pool.job_queue.items.len > 0) {
+            const j = pool.job_queue.orderedRemove(0);
+            pool.mutex.unlock();
+            
+            print("[WORKER] Processing final job {} at {*}\n", .{j.id, j});
+            j.work_fn(j.context);
+            
+            jobs_completed += 1;
+            _ = pool.completed_jobs.fetchAdd(1, .seq_cst);
+            print("[WORKER] Completed final job {} (total: {})\n", .{j.id, jobs_completed});
+            
+            pool.allocator.destroy(j);
+            pool.mutex.lock();
+        }
+        pool.mutex.unlock();
+        
+        print("[WORKER] Thread shutting down (processed {} jobs)\n", .{jobs_completed});
     }
     
     pub fn deinit(self: *Self) void {
         print("[MAIN] Shutting down thread pool\n", .{});
-        self.running.store(false, .release);
+        self.running.store(false, .seq_cst);
         self.thread.join();
+        
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        
+        // Clean up any remaining jobs
+        while (self.job_queue.items.len > 0) {
+            const job = self.job_queue.orderedRemove(0);
+            self.allocator.destroy(job);
+        }
+        self.job_queue.deinit();
+        
         print("[MAIN] Worker finished\n", .{});
     }
     
@@ -97,50 +119,46 @@ pub const ThreadPool = struct {
             }
         };
         
-        // Wait for any previous job to be taken
-        print("[MAIN] Waiting for worker to be ready...\n", .{});
-        while (self.job_ready.load(.acquire)) {
-            std.time.sleep(1 * std.time.ns_per_ms);
-        }
+        const job_id = self.completed_jobs.load(.seq_cst) + 1;
         
-        // Create aligned job
-        const job = try self.allocator.alignedAlloc(Job, 16, 1);
-        job[0] = Job{
+        // Create new job
+        const job = try self.allocator.create(Job);
+        errdefer self.allocator.destroy(job);
+        
+        job.* = Job{
             .context = @constCast(context),
             .work_fn = Wrapper.call,
+            .id = job_id,
         };
         
-        // Schedule job
-        self.job_mutex.lock();
-        print("[MAIN] Scheduling job at {*}\n", .{job});
-        self.current_job = &job[0];
-        self.job_ready.store(true, .release);
-        self.job_mutex.unlock();
+        // Add job to queue
+        print("[MAIN] Scheduling job {} at {*}\n", .{job_id, job});
+        self.mutex.lock();
+        try self.job_queue.append(job);
+        self.mutex.unlock();
         
-        // Wait for job to be taken
-        print("[MAIN] Waiting for worker to take job...\n", .{});
-        while (self.job_ready.load(.acquire)) {
+        // Wait for completion
+        const start_time = time.milliTimestamp();
+        const timeout_ms = 5000; // 5 second timeout
+        
+        while (self.completed_jobs.load(.seq_cst) < job_id) {
+            if (time.milliTimestamp() - start_time > timeout_ms) {
+                print("[MAIN] Job {} timed out\n", .{job_id});
+                return error.JobTimeout;
+            }
             std.time.sleep(1 * std.time.ns_per_ms);
         }
         
-        // Clean up
-        self.allocator.free(job);
-        print("[MAIN] Job taken by worker\n", .{});
+        print("[MAIN] Job {} completed\n", .{job_id});
     }
     
     pub fn wait(self: *Self) void {
-        const total = self.completed.load(.acquire);
-        print("[MAIN] Waiting for {} jobs to complete\n", .{total});
-        
-        while (true) {
-            const completed = self.completed.load(.acquire);
-            if (completed >= total) break;
-            
-            print("[MAIN] {}/{} jobs completed\n", .{completed, total});
-            std.time.sleep(10 * std.time.ns_per_ms);
-        }
-        
-        print("[MAIN] All {} jobs completed\n", .{self.completed.load(.acquire)});
+        print("[MAIN] Waiting for all jobs to complete\n", .{});
+        self.mutex.lock();
+        const pending = self.job_queue.items.len;
+        self.mutex.unlock();
+        const completed = self.completed_jobs.load(.seq_cst);
+        print("[MAIN] All jobs completed ({} done, {} pending)\n", .{completed, pending});
     }
 };
 
@@ -153,7 +171,7 @@ test "ThreadPool basic operation" {
         value: std.atomic.Value(i32),
         
         fn work(self: *const @This()) void {
-            const old = self.value.fetchAdd(1, .acq_rel);
+            const old = self.value.fetchAdd(1, .seq_cst);
             print("[JOB] Incrementing value from {} to {}\n", .{old, old + 1});
             std.time.sleep(1 * std.time.ns_per_ms);
         }
@@ -172,7 +190,7 @@ test "ThreadPool basic operation" {
     print("[TEST] All jobs scheduled, waiting for completion\n", .{});
     pool.wait();
     
-    const final_value = ctx.value.load(.acquire);
+    const final_value = ctx.value.load(.seq_cst);
     print("[TEST] Final value: {}\n", .{final_value});
     try std.testing.expectEqual(@as(i32, 10), final_value);
     print("[TEST] Test completed successfully\n", .{});

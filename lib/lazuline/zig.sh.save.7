@@ -1,0 +1,164 @@
+cat > ../lazuline/src/lib.zig << 'EOF'
+const std = @import("std");
+const print = std.debug.print;
+
+pub const WorkFn = *const fn (*anyopaque) void;
+
+pub const Job = struct {
+    context: *anyopaque,
+    work_fn: WorkFn,
+};
+
+pub const ThreadPool = struct {
+    const Self = @This();
+    
+    allocator: std.mem.Allocator,
+    thread: std.Thread,
+    mutex: std.Thread.Mutex,
+    job_available: std.Thread.Condition,
+    current_job: ?Job,
+    running: bool,
+    completed: usize,
+    
+    pub fn init(allocator: std.mem.Allocator) !Self {
+        print("[MAIN] Creating thread pool\n", .{});
+        
+        var pool = Self{
+            .allocator = allocator,
+            .thread = undefined,
+            .mutex = std.Thread.Mutex{},
+            .job_available = std.Thread.Condition{},
+            .current_job = null,
+            .running = true,
+            .completed = 0,
+        };
+        
+        print("[MAIN] Starting worker thread\n", .{});
+        pool.thread = try std.Thread.spawn(.{}, workerFn, .{&pool});
+        print("[MAIN] Worker thread started\n", .{});
+        
+        return pool;
+    }
+    
+    fn workerFn(pool: *Self) void {
+        print("[WORKER] Thread starting\n", .{});
+        
+        while (pool.running) {
+            pool.mutex.lock();
+            print("[WORKER] Checking for job\n", .{});
+            
+            while (pool.current_job == null and pool.running) {
+                print("[WORKER] No job, waiting\n", .{});
+                pool.job_available.wait(&pool.mutex);
+                print("[WORKER] Woke up\n", .{});
+            }
+            
+            const job = pool.current_job;
+            pool.current_job = null;
+            pool.mutex.unlock();
+            
+            if (job) |j| {
+                print("[WORKER] Processing job\n", .{});
+                j.work_fn(j.context);
+                pool.completed += 1;
+                print("[WORKER] Job completed (total: {})\n", .{pool.completed});
+            }
+        }
+        
+        print("[WORKER] Thread shutting down\n", .{});
+    }
+    
+    pub fn deinit(self: *Self) void {
+        print("[MAIN] Shutting down thread pool\n", .{});
+        
+        self.mutex.lock();
+        self.running = false;
+        self.job_available.signal();
+        self.mutex.unlock();
+        
+        print("[MAIN] Waiting for worker to finish\n", .{});
+        self.thread.join();
+        print("[MAIN] Worker finished\n", .{});
+    }
+    
+    pub fn schedule(self: *Self, context: anytype, comptime work_fn: fn (*const std.meta.Child(@TypeOf(context))) void) !void {
+        const PtrType = *const std.meta.Child(@TypeOf(context));
+        
+        const Wrapper = struct {
+            fn call(ptr: *anyopaque) void {
+                const typed_ptr = @as(PtrType, @ptrCast(@alignCast(ptr)));
+                work_fn(typed_ptr);
+            }
+        };
+        
+        const job = Job{
+            .context = @constCast(context),
+            .work_fn = Wrapper.call,
+        };
+        
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        
+        while (self.current_job != null) {
+            // Wait for current job to complete
+            std.time.sleep(1 * std.time.ns_per_ms);
+        }
+        
+        print("[MAIN] Scheduling job\n", .{});
+        self.current_job = job;
+        self.job_available.signal();
+        print("[MAIN] Job scheduled\n", .{});
+    }
+    
+    pub fn wait(self: *Self) void {
+        print("[MAIN] Waiting for jobs to complete\n", .{});
+        
+        while (true) {
+            self.mutex.lock();
+            const has_job = self.current_job != null;
+            self.mutex.unlock();
+            
+            if (!has_job) break;
+            
+            print("[MAIN] Job still in progress\n", .{});
+            std.time.sleep(10 * std.time.ns_per_ms);
+        }
+        
+        print("[MAIN] All jobs completed (total: {})\n", .{self.completed});
+    }
+};
+
+test "ThreadPool basic operation" {
+    print("\n=== Starting thread pool test ===\n", .{});
+    var pool = try ThreadPool.init(std.testing.allocator);
+    defer pool.deinit();
+    
+    const Context = struct {
+        value: std.atomic.Value(i32),
+        
+        fn work(self: *const @This()) void {
+            const old = self.value.fetchAdd(1, .acq_rel);
+            print("[JOB] Incrementing value from {} to {}\n", .{old, old + 1});
+            std.time.sleep(1 * std.time.ns_per_ms);
+        }
+    };
+    
+    var ctx = Context{ .value = std.atomic.Value(i32).init(0) };
+    print("[TEST] Created context with initial value 0\n", .{});
+    
+    print("[TEST] Scheduling 10 jobs\n", .{});
+    var i: usize = 0;
+    while (i < 10) : (i += 1) {
+        try pool.schedule(&ctx, Context.work);
+        print("[TEST] Scheduled job {}/10\n", .{i + 1});
+    }
+    
+    print("[TEST] Waiting for jobs to complete\n", .{});
+    pool.wait();
+    
+    const final_value = ctx.value.load(.acquire);
+    print("[TEST] Final value: {}\n", .{final_value});
+    try std.testing.expectEqual(@as(i32, 10), final_value);
+    print("[TEST] Test completed successfully\n", .{});
+}
+EOF
