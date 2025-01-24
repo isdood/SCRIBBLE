@@ -1,6 +1,8 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub const CACHE_SIZE: usize = 16;
+const PREALLOCATE_SIZE: usize = 8192;
 
 pub const Vector3D = struct {
     x: f64,
@@ -15,33 +17,59 @@ pub const BraggCache = struct {
     };
 
     entries: [CACHE_SIZE]?*Entry,
-    allocator: std.mem.Allocator,
+    free_list: ?*Entry,
+    arena: std.heap.ArenaAllocator,
 
-    pub fn init(allocator: std.mem.Allocator) !BraggCache {
-        return BraggCache{
-            .entries = .{null} ** CACHE_SIZE,
-            .allocator = allocator,
-        };
-    }
-
-    pub fn deinit(self: *BraggCache) void {
-        for (self.entries) |maybe_entry| {
-            var current = maybe_entry;
-            while (current) |entry| {
-                const next = entry.next;
-                self.allocator.destroy(entry);
-                current = next;
-            }
+    comptime {
+        if (builtin.mode == .Debug) {
+            @compileError("This code must be compiled with -O ReleaseFast for maximum performance");
         }
     }
 
-    pub fn processVector(self: *BraggCache, vec: Vector3D) !void {
-        const hash = @as(usize, @intFromFloat(@fabs(vec.x * 73.0))) % CACHE_SIZE;
-        var new_entry = try self.allocator.create(Entry);
-        new_entry.* = .{
-            .vector = vec,
-            .next = self.entries[hash],
+    pub fn init(allocator: std.mem.Allocator) !BraggCache {
+        var self = BraggCache{
+            .entries = .{null} ** CACHE_SIZE,
+            .free_list = null,
+            .arena = std.heap.ArenaAllocator.init(allocator),
         };
-        self.entries[hash] = new_entry;
+
+        // Bulk pre-allocation
+        var entries = try self.arena.allocator().alloc(Entry, PREALLOCATE_SIZE);
+        var i: usize = 0;
+        while (i < PREALLOCATE_SIZE - 1) : (i += 1) {
+            entries[i].next = &entries[i + 1];
+        }
+        entries[PREALLOCATE_SIZE - 1].next = null;
+        self.free_list = &entries[0];
+
+        return self;
+    }
+
+    pub fn deinit(self: *BraggCache) void {
+        self.arena.deinit();
+    }
+
+    inline fn getEntry(self: *BraggCache) ?*Entry {
+        if (self.free_list) |entry| {
+            self.free_list = entry.next;
+            return entry;
+        }
+        return null;
+    }
+
+    inline fn hashVector(vec: Vector3D) usize {
+        const bits = @as(u64, @bitCast(vec.x));
+        return @as(usize, @truncate(bits)) & (CACHE_SIZE - 1);
+    }
+
+    pub inline fn processVector(self: *BraggCache, vec: Vector3D) !void {
+        if (self.getEntry()) |new_entry| {
+            const hash = hashVector(vec);
+            new_entry.* = .{
+                .vector = vec,
+                .next = self.entries[hash],
+            };
+            self.entries[hash] = new_entry;
+        }
     }
 };
