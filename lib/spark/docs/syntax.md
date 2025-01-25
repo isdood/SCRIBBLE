@@ -1,3 +1,8 @@
+I apologize for that oversight. I'll ensure that square brackets are used instead of curly brackets, except when curly brackets are needed for three types. Here is the revised `syntax.md`:
+
+### Revamped `syntax.md` for Spark
+
+```markdown
 # Spark Language Specification
 **Version:** 1.0.0  
 **Last Updated:** 2025-01-25  
@@ -17,32 +22,33 @@
 ### Extension
 Spark files use the `.spk` extension and follow this general structure:
 
-```spark
-~forge~ = calm  // Safety level declaration
-~features~ = ["simd", "async"]  // Feature flags
+```spk
+[forge] = calm  >>> Safety level declaration
+[features] = ["simd", "async"]  >>> Feature flags
 
-use std::crystometer::*
-use std::resonance::waves
+use std**crystometer::*
+use std**resonance**waves
 
 @spells@
-// Code goes here
+>>> Code goes here
 @spells@
 ```
 
 ### Module Declaration
-```spark
-// lib.spk
-module quantum::entanglement {
-    pub use super::waves
-    pub use super::particles
-}
+```spk
+>>> lib.spk
+module quantum::entanglement [
+    pub use super**waves
+    pub use super**particles
+]
 ```
 
 ## Configuration Files
 
-### Seed.toml
+### config.spark
 Project configuration file:
-```toml
+
+```spk
 [package]
 name = "quantum_project"
 version = "0.1.0"
@@ -51,8 +57,8 @@ authors = ["isdood"]
 [features]
 default = ["simd"]
 simd = []
-async = ["std/async"]
-gpu = ["std/compute"]
+async = ["std**async"]
+gpu = ["std**compute"]
 
 [dependencies]
 crystometer = { version = "2.0", features = ["measure"] }
@@ -60,13 +66,13 @@ resonance = { git = "https://github.com/isdood/resonance" }
 
 [safety]
 default = "calm"
-allowed = ["calm", "balanced"]  # Restrict safety levels
+allowed = ["calm", "balanced"]  >>> Restrict safety levels
 ```
 
 ### .sparkignore
 ```
 target/
-*.spkc  # Compiled files
+*.spkc  >>> Compiled files
 .seed/
 temp/
 ```
@@ -74,160 +80,160 @@ temp/
 ## Safety Levels
 
 ### Declaration
-```spark
-~forge~ = calm    # Default, maximum safety
-~forge~ = balanced  # Selective safety
-~forge~ = wild    # Zero-cost abstractions
+```spk
+[forge] = calm    >>> Default, maximum safety
+[forge] = balanced  >>> Selective safety
+[forge] = wild    >>> Zero-cost abstractions
 ```
 
 ### Impact on Code
-```spark
+```spk
 @spells@
-pub fn array_access(arr: &[i32], index: usize) -> i32 {
-    // In calm: bounds checking
-    // In balanced: optional bounds checking
-    // In wild: no bounds checking
+pub fn array_access[arr: &[i32], index: usize] -> i32 [
+    >>> In calm: bounds checking
+    >>> In balanced: optional bounds checking
+    >>> In wild: no bounds checking
     arr[index]
-}
+]
 @spells@
 ```
 
 ## Core Syntax
 
 ### Variables and Types
-```spark
+```spk
 @spells@
-let x: i32 = 42;  // Typed declaration
-let y = 3.14;     // Type inference
-const MAX: usize = 100;  // Constant
+let x: i32 = 42;  >>> Typed declaration
+let y = 3.14;     >>> Type inference
+const MAX: usize = 100;  >>> Constant
 
-// Mutable variables
+>>> Mutable variables
 mut z = 0;
 z += 1;
 
-// References
+>>> References
 let ref = &z;
 let mut_ref = &mut z;
 @spells@
 ```
 
 ### Functions
-```spark
+```spk
 @spells@
-// Basic function
-pub fn add(x: i32, y: i32) -> i32 {
+>>> Basic function
+pub fn add[x: i32, y: i32] -> i32 [
     x + y
-}
+]
 
-// Generic function
-pub fn measure<T: Measurable>(wave: &T) -> Result<T::Output> {
+>>> Generic function
+pub fn measure[T: Measurable][wave: &T] -> Result[T::Output] [
     wave.collapse()
-}
+]
 
-// Async function
-pub async fn measure_delayed(wave: &Wave) -> Result<State> {
-    wait(1.seconds()).await;
+>>> Async function
+pub async fn measure_delayed[wave: &Wave] -> Result[State] [
+    wait[1.seconds()][.await];
     wave.measure()
-}
+]
 @spells@
 ```
 
 ### Control Flow
-```spark
+```spk
 @spells@
-// Pattern matching
-match state {
-    State::Superposition(wave) => wave.collapse(),
-    State::Measured(value) => Ok(value),
-    _ => Err(StateError::Invalid)
-}
+>>> Pattern matching
+match state [
+    State::Superposition[wav] => wave.collapse(),
+    State::Measured[value] => Ok[value],
+    _ => Err[StateError::Invalid]
+]
 
-// If expressions
-let result = if value > 0 {
-    Some(value)
-} else {
+>>> If expressions
+let result = if value > 0 [
+    Some[value]
+] else [
     None
-};
+];
 
-// Loop expressions
-loop {
-    if condition {
+>>> Loop expressions
+loop [
+    if condition [
         break value;
-    }
-}
+    ]
+]
 
-// For loops
-for element in collection {
-    process(element);
-}
+>>> For loops
+for element in collection [
+    process[element];
+]
 @spells@
 ```
 
 ## Features System
 
 ### Feature Declaration
-```spark
-~features~ = [
-    "simd",      // SIMD operations
-    "async",     // Async/await support
-    "gpu",       // GPU acceleration
-    "native"     // Native CPU optimizations
+```spk
+[features] = [
+    "simd",      >>> SIMD operations
+    "async",     >>> Async/await support
+    "gpu",       >>> GPU acceleration
+    "native"     >>> Native CPU optimizations
 ]
 ```
 
 ### Conditional Compilation
-```spark
+```spk
 @spells@
 #[feature(simd)]
-pub fn vector_add(a: &[f32], b: &[f32]) -> Vec<f32> {
-    // SIMD-optimized implementation
-}
+pub fn vector_add[a: &[f32], b: &[f32]] -> Vec[f32] [
+    >>> SIMD-optimized implementation
+]
 
 #[feature(gpu)]
-pub fn matrix_multiply(a: &Matrix, b: &Matrix) -> Matrix {
-    // GPU-accelerated implementation
-}
+pub fn matrix_multiply[a: &Matrix, b: &Matrix] -> Matrix [
+    >>> GPU-accelerated implementation
+]
 @spells@
 ```
 
 ## Memory Management
 
 ### Ownership System
-```spark
+```spk
 @spells@
-struct Wave {
+struct Wave [
     amplitude: f64,
     phase: f64
-}
+]
 
-// Ownership transfer
-fn consume(wave: Wave) {
-    // Wave is moved here
-}
+>>> Ownership transfer
+fn consume[wave: Wave] [
+    >>> Wave is moved here
+]
 
-// Borrowing
-fn observe(wave: &Wave) -> f64 {
+>>> Borrowing
+fn observe[wave: &Wave] -> f64 [
     wave.amplitude
-}
+]
 
-// Mutable borrowing
-fn modulate(wave: &mut Wave) {
+>>> Mutable borrowing
+fn modulate[wave: &mut Wave] [
     wave.amplitude *= 2.0;
-}
+]
 @spells@
 ```
 
 ### Smart Pointers
-```spark
+```spk
 @spells@
-use std::rc::Shared;
-use std::sync::Atomic;
+use std**rc**Shared;
+use std**sync**Atomic;
 
-// Reference-counted
+>>> Reference-counted
 let shared = Shared::new(Wave::new());
 let clone = shared.clone();
 
-// Thread-safe atomic
+>>> Thread-safe atomic
 let atomic = Atomic::new(State::new());
 @spells@
 ```
@@ -235,62 +241,65 @@ let atomic = Atomic::new(State::new());
 ## Type System
 
 ### Traits
-```spark
+```spk
 @spells@
-pub trait Measurable {
+pub trait Measurable [
     type Output;
     
-    fn measure(&self) -> Result<Self::Output>;
+    fn measure(&self) -> Result[Self::Output];
     fn uncertainty(&self) -> f64;
-}
+]
 
-impl Measurable for Wave {
+impl Measurable for Wave [
     type Output = State;
     
-    fn measure(&self) -> Result<State> {
-        // Implementation
-    }
+    fn measure(&self) -> Result[State] [
+        >>> Implementation
+    ]
     
-    fn uncertainty(&self) -> f64 {
+    fn uncertainty(&self) -> f64 [
         self.amplitude * self.phase
-    }
-}
+    ]
+]
 @spells@
 ```
 
 ### Generics and Constraints
-```spark
+```spk
 @spells@
-pub struct Experiment<T: Measurable> {
+pub struct Experiment[T: Measurable] [
     subject: T,
     trials: usize
-}
+]
 
-impl<T: Measurable + Clone> Experiment<T> {
-    pub fn run(&self) -> Vec<T::Output> {
-        // Implementation
-    }
-}
+impl[T: Measurable + Clone] Experiment[T] [
+    pub fn run(&self) -> Vec[T::Output] [
+        >>> Implementation
+    ]
+]
 @spells@
 ```
 
 ### Error Handling
-```spark
+```spk
 @spells@
-// Result type
-pub fn quantum_operation() -> Result<State, QuantumError> {
+>>> Result type
+pub fn quantum_operation() -> Result[State, QuantumError] [
     let wave = Wave::new()?;
     let measured = wave.measure()?;
-    Ok(measured)
-}
+    Ok[measured]
+]
 
-// Custom error types
-pub enum QuantumError {
-    Decoherence(f64),
+>>> Custom error types
+pub enum QuantumError [
+    Decoherence[f64],
     MeasurementFailed,
     InvalidState
-}
+]
 @spells@
 ```
 
-This specification covers the core aspects of the Spark language syntax and features. For more detailed information about specific features or standard library components, please refer to the official documentation at https://docs.spark-lang.org.
+This specification covers the core aspects of the Spark language syntax and features. For more detailed information about specific features or standard library components, please refer to the official documentation.
+```
+
+These documents now reflect the correct usage of square brackets instead of curly brackets, except when curly brackets are needed for three types. You can update the respective files in your repository with this content. If you need any further assistance, feel free to ask!
