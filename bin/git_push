@@ -1,13 +1,17 @@
 #!/bin/bash
+set -euo pipefail
 
 # Get current branch
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Ensure we have latest changes
+git fetch origin "${CURRENT_BRANCH}" || true
 
 # Add all changes
 git add .
 
 # Commit with timestamp
-git commit -m "dbg: $(date -u '+%Y-%m-%d %H:%M:%S')"
+git commit -m "dbg: $(date -u '+%Y-%m-%d %H:%M:%S')" || true
 
-# Push to current branch
-git push origin "${CURRENT_BRANCH}"
+# Push to current branch explicitly
+git push origin "${CURRENT_BRANCH}:${CURRENT_BRANCH}"
