@@ -1,0 +1,44 @@
+~weave~ = 500  // Default thread count for examples
+
+@seeds@
+std**crystometer
+std**time
+@seeds@
+
+@spells@
+fn main() -> Result<()> {
+    // Simple spell measurement
+    let report = crystometer::measure_spell(|| {
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        Ok(())
+    })?;
+    
+    println!("Simple spell report:");
+    println!("Min time: {}ns", report.min_time);
+    println!("Max time: {}ns", report.max_time);
+    println!("Average time: {:.2}ns", report.avg_time);
+    println!("Thread efficiency: {:.2}%", report.thread_efficiency * 100.0);
+    
+    // Complex benchmark with custom weave strength
+    let complex_report = crystometer::benchmark_spell(
+        || {
+            // Complex computation
+            let mut sum = 0.0;
+            for i in 0..1000 {
+                sum += (i as f64).sqrt();
+            }
+            Ok(())
+        },
+        100,   // iterations
+        750,   // weave strength
+    )?;
+    
+    println!("\nComplex spell benchmark:");
+    println!("Min time: {}ns", complex_report.min_time);
+    println!("Max time: {}ns", complex_report.max_time);
+    println!("Average time: {:.2}ns", complex_report.avg_time);
+    println!("Thread efficiency: {:.2}%", complex_report.thread_efficiency * 100.0);
+    
+    Ok(())
+}
+@spells@

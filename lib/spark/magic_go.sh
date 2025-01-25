@@ -1,170 +1,197 @@
 #!/usr/bin/env bash
-# magic_go.sh - Spark Language Implementation
+# magic_regex_fix.sh - Fix regex patterns for ** handling
 # Author: isdood
-# Created: 2025-01-25 13:28:54
+# Created: 2025-01-25 14:38:12
 
 set -euo pipefail
 
-# Project-relative paths
-SPARK_ROOT="$(pwd)"
-SPARK_BIN="$SPARK_ROOT/bin"
-SPARK_CORE="$SPARK_ROOT/core"
-SPARK_TOOLS="$SPARK_ROOT/tools"
-SPARK_STD="$SPARK_ROOT/std"
-
-# User-specific paths
-USER_SPARK_HOME="$HOME/.spark"
-USER_SPARK_GARDEN="$USER_SPARK_HOME/garden"
-USER_SPARK_CACHE="$USER_SPARK_HOME/cache"
-
-# Colors for whimsical output
-MAGIC_PURPLE='\033[0;35m'
-MAGIC_GREEN='\033[0;32m'
-NC='\033[0m'
+SPARK_PURPLE='\033[0;35m'
+SPARK_RESET='\033[0m'
 
 echo_magic() {
-    echo -e "${MAGIC_PURPLE}âœ¨ $1${NC}"
+    echo -e "${SPARK_PURPLE}âœ¨ $1${SPARK_RESET}"
 }
 
-setup_project_structure() {
-    echo_magic "Creating Spark project structure..."
-    
-    # Create project directories
-    mkdir -p "$SPARK_BIN" "$SPARK_CORE" "$SPARK_TOOLS" "$SPARK_STD"
-    
-    # Create standard library modules
-    mkdir -p "$SPARK_STD/math" "$SPARK_STD/string" "$SPARK_STD/io"
-    
-    # Create user directories
-    mkdir -p "$USER_SPARK_GARDEN" "$USER_SPARK_CACHE"
-}
+SPARK_ROOT="$(pwd)"
+SPARK_BIN="$SPARK_ROOT/bin"
 
-create_seed_fish() {
-    cat > "$SPARK_BIN/seed.fish" << 'EOF'
+fix_seed_fish() {
+    cat > "$SPARK_BIN/seed.fish" << EOF
+#!/usr/bin/env fish
+
+# Core Spark configuration
+set -g SPARK_ROOT "$SPARK_ROOT"
+set -g SPARK_PATH_SEP '**'
+
+# Display configuration
+set -g spark_purple '\033[0;35m'
+set -g spark_reset '\033[0m'
+
+function __spark_echo
+    echo -e "\$spark_purpleâœ¨ \$argv\$spark_reset"
+end
+
+# Core path handling system
+function __normalize_path
+    # Convert any path to use Spark separators for display
+    echo \$argv[1] | string replace -a '/' \$SPARK_PATH_SEP
+end
+
+function __to_fs_path
+    # Convert any path to filesystem format
+    echo \$argv[1] | string replace -a \$SPARK_PATH_SEP '/'
+end
+
+function __is_std_package
+    # Use exact pattern matching instead of regex
+    string match -q "std\$SPARK_PATH_SEP*" (__normalize_path \$argv[1])
+end
+
+function __get_std_name
+    # Use string replace with escaped pattern
+    string replace "std\$SPARK_PATH_SEP" "" (__normalize_path \$argv[1])
+end
+
+function __display_path
+    __normalize_path \$argv[1]
+end
+
 function seed
-    if test (count $argv) -lt 2
-        echo "Usage: seed [plant|unplant] package**name"
+    if test (count \$argv) -lt 1
+        echo "Usage: seed [plant|unplant|garden] [package\$SPARK_PATH_SEP"name"]"
         return 1
     end
 
-    set -l action $argv[1]
-    set -l package $argv[2]
-    set -l package_clean (string replace --all '**' '/' $package)
-    set -l package_path "$HOME/.spark/garden/$package_clean"
+    set -l action \$argv[1]
+    set -l garden_path "\$HOME/.spark/garden"
     
-    switch $action
-        case "plant"
-            echo "ðŸŒ Planting $package..."
-            if string match -q "std*" $package
-                set -l std_name (string replace "std**" "" $package)
-                set -l std_path "$SPARK_ROOT/std/$std_name"
-                mkdir -p (dirname $package_path)
-                ln -sf $std_path $package_path
+    switch \$action
+        case "garden"
+            __spark_echo "Your Magical Garden âœ¨"
+            
+            if test -d "\$garden_path"
+                for pkg in (find "\$garden_path" -mindepth 1 -maxdepth 3 -type d ! -name ".*" ! -type l 2>/dev/null | sort)
+                    set -l rel_path (string replace -r "^\$garden_path/" "" "\$pkg")
+                    test -n "\$rel_path"; and __spark_echo (__display_path "\$rel_path")
+                end
+                
+                for pkg in (find "\$garden_path" -mindepth 1 -maxdepth 3 -type l 2>/dev/null | sort)
+                    set -l rel_path (string replace -r "^\$garden_path/" "" "\$pkg")
+                    test -n "\$rel_path"; and __spark_echo (__display_path "\$rel_path") "(linked)"
+                end
             else
-                mkdir -p $package_path
+                __spark_echo "Your garden is empty! Plant some packages with: seed plant package\$SPARK_PATH_SEP"name""
             end
+
+        case "plant"
+            if test (count \$argv) -lt 2
+                echo "Usage: seed plant package\$SPARK_PATH_SEP"name""
+                return 1
+            end
+            
+            set -l spark_path (__normalize_path \$argv[2])
+            set -l fs_path (__to_fs_path \$spark_path)
+            set -l target_path "\$garden_path/\$fs_path"
+            
+            __spark_echo "Planting \$spark_path..."
+            
+            if __is_std_package \$spark_path
+                set -l std_name (__get_std_name \$spark_path)
+                set -l std_path "\$SPARK_ROOT/std/\$std_name"
+                
+                if test -d "\$std_path"
+                    mkdir -p (dirname "\$target_path")
+                    if ln -sf "\$std_path" "\$target_path"
+                        __spark_echo "Standard package \$spark_path planted successfully!"
+                    else
+                        __spark_echo "Failed to plant standard package \$spark_path"
+                        return 1
+                    end
+                else
+                    __spark_echo "Standard package \$spark_path not found in std library!"
+                    echo "Available std modules:"
+                    for module in (find "\$SPARK_ROOT/std" -mindepth 1 -maxdepth 1 -type d ! -name ".*" 2>/dev/null)
+                        echo "  - std\$SPARK_PATH_SEP"(basename \$module)
+                    end
+                    return 1
+                end
+            else
+                if mkdir -p "\$target_path"
+                    __spark_echo "External package \$spark_path planted successfully!"
+                else
+                    __spark_echo "Failed to plant external package \$spark_path"
+                    return 1
+                end
+            end
+
         case "unplant"
-            echo "ðŸ¥ Unplanting $package..."
-            rm -rf $package_path
+            if test (count \$argv) -lt 2
+                echo "Usage: seed unplant package\$SPARK_PATH_SEP"name""
+                return 1
+            end
+            
+            set -l spark_path (__normalize_path \$argv[2])
+            set -l fs_path (__to_fs_path \$spark_path)
+            set -l target_path "\$garden_path/\$fs_path"
+            
+            if test -e "\$target_path"; or test -L "\$target_path"
+                __spark_echo "Unplanting \$spark_path..."
+                if rm -rf "\$target_path"
+                    __spark_echo "Package \$spark_path unplanted successfully!"
+                else
+                    __spark_echo "Failed to unplant \$spark_path"
+                    return 1
+                end
+            else
+                __spark_echo "Package \$spark_path not found in garden!"
+                return 1
+            end
+
         case '*'
-            echo "ðŸŒ Unknown magical command: $action"
+            __spark_echo "Unknown magical command: \$action"
+            echo "Available commands: plant, unplant, garden"
             return 1
     end
 end
+
+complete -c seed -f -n "__fish_use_subcommand" -a "plant" -d "Plant a new package"
+complete -c seed -f -n "__fish_use_subcommand" -a "unplant" -d "Remove a package"
+complete -c seed -f -n "__fish_use_subcommand" -a "garden" -d "Display installed packages"
 EOF
+
+    chmod +x "$SPARK_BIN/seed.fish"
 }
 
-create_forge_fish() {
-    cat > "$SPARK_BIN/forge.fish" << 'EOF'
-function forge
-    if test (count $argv) -lt 1
-        echo "Usage: forge [brew|enchant|test] [project_directory]"
-        return 1
-    end
+setup_std_lib() {
+    echo_magic "Setting up standard library..."
+    mkdir -p "$SPARK_ROOT/std/"{math,string,io,crystometer}
+    
+    cat > "$SPARK_ROOT/std/math/mod.spk" << 'EOF'
+~weave~ = 500
 
-    set -l action $argv[1]
-    set -l project_dir "."
-    test (count $argv) -gt 1; and set project_dir $argv[2]
-    set -l launch_file "$project_dir/launch.spk"
-    
-    if not test -f $launch_file
-        echo "âŒ No launch.spk found in $project_dir"
-        return 1
-    end
-    
-    switch $action
-        case "brew"
-            echo "ðŸ” Brewing project..."
-            eval "$SPARK_CORE/compiler/forge build $launch_file"
-        case "enchant"
-            echo "âœ¨ Enchanting project..."
-            eval "$SPARK_CORE/runtime/spark run $launch_file"
-        case "test"
-            echo "ðŸŽ Testing spells..."
-            eval "$SPARK_CORE/test/runner $launch_file"
-        case '*'
-            echo "Unknown forge command: $action"
-            return 1
-    end
-end
+@spells@
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+pub fn multiply(a: i32, b: i32) -> i32 {
+    a * b
+}
+@spells@
 EOF
+    echo_magic "Standard library setup complete!"
 }
 
-create_example_launch_spk() {
-    mkdir -p "$SPARK_ROOT/examples/basic"
-    cat > "$SPARK_ROOT/examples/basic/launch.spk" << 'EOF'
-@launch@
-name: "spark_example"
-version: "0.1.0"
-
-@ingredients@
-std**math
-std**string
-@ingredients@
-
-@brew@
-target: "sparkle"
-safety: "careful"
-optimization: "quick"
-@brew@
-EOF
+cleanup_garden() {
+    echo_magic "Cleaning up garden..."
+    rm -rf "$HOME/.spark/garden"
+    mkdir -p "$HOME/.spark/garden"
 }
 
-setup_fish_integration() {
-    mkdir -p "$HOME/.config/fish/conf.d"
-    
-    cat > "$HOME/.config/fish/conf.d/spark.fish" << EOF
-# Spark Fish Shell Integration
-set -gx SPARK_ROOT "$SPARK_ROOT"
-set -gx SPARK_BIN "$SPARK_BIN"
+# Apply all fixes
+cleanup_garden
+setup_std_lib
+fix_seed_fish
 
-# Source the Spark fish functions
-source "$SPARK_BIN/seed.fish"
-source "$SPARK_BIN/forge.fish"
-
-# Define universal variables
-set -U spark_installed true
-
-# Spark aliases
-alias spk 'forge enchant'
-alias spkb 'forge brew'
-alias spkt 'forge test'
-EOF
-}
-
-# Main implementation
-main() {
-    echo_magic "ðŸŒ Setting up Spark in $SPARK_ROOT"
-    
-    setup_project_structure
-    create_seed_fish
-    create_forge_fish
-    create_example_launch_spk
-    setup_fish_integration
-    
-    echo_magic "Setup complete! ðŸŽ"
-    echo_magic "Restart your shell or run: source ~/.config/fish/conf.d/spark.fish"
-    echo_magic "Try: seed plant std**math"
-}
-
-main "$@"
+echo_magic "Regex patterns fixed! âœ¨"
+echo_magic "Try: seed plant std**math"

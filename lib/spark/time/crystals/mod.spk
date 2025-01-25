@@ -1,0 +1,11 @@
+~weave~ = 750  // High thread count for time crystal operations
+
+@spells@
+pub fn create_crystal(duration: Duration) -> TimeCrystal {
+    TimeCrystal::new(duration)
+}
+
+pub fn measure_resonance(crystal: &TimeCrystal) -> u64 {
+    crystal.measure_vibrations()
+}
+@spells@
