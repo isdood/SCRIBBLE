@@ -1,0 +1,29 @@
+garden "SparkStd" [
+    >>> Core crystalline patterns
+    crystal "std**crystal" [
+        version: "1.0.0"
+        facets: ["lattice", "symmetry", "resonance"]
+        stability: 0.92
+    ]
+    
+    >>> Mathematical patterns
+    crystal "std**math" [
+        version: "1.0.0"
+        facets: ["algebra", "geometry", "calculus"]
+        stability: 0.95
+    ]
+    
+    >>> Enchantment patterns
+    crystal "std**enchant" [
+        version: "1.0.0"
+        facets: ["weave", "attune", "channel"]
+        stability: 0.88
+    ]
+    
+    >>> Natural patterns
+    crystal "std**nature" [
+        version: "1.0.0"
+        facets: ["web", "harmony", "balance"]
+        stability: 0.95
+    ]
+]

@@ -1,0 +1,17 @@
+#!/bin/sh
+shell_type=$(basename "$SHELL")
+if [ "$shell_type" = "fish" ]; then
+    # For fish shell, escape the arguments
+    args=""
+    for arg in "$@"; do
+        # Preserve ** exactly by using single quotes
+        case "$arg" in
+            *\*\**) args="$args '$arg'";;
+            *) args="$args $arg";;
+        esac
+    done
+    eval "$(dirname "$0")/sparkwrap $args"
+else
+    # For other shells, pass arguments directly
+    exec "$(dirname "$0")/sparkwrap" "$@"
+fi

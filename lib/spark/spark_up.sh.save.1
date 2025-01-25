@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# spark_up.sh - Spark Language Setup Script
+# Created: 2025-01-25 10:24:53 UTC
+# Author: isdood
+
+# ... (previous content remains the same until the seed.zig creation) ...
+
+cat > "tools/seed/seed.zig" << 'ZIGCODE'
+const std = @import("std");
+const fs = std.fs;
+const process = std.process;
+const print = std.debug.print;
+
+const Purple = "\x1b[0;35m";
+const Reset = "\x1b[0m";
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    defer _ = gpa.deinit();
+
+    var args = try process.argsWithAllocator(allocator);
+    defer args.deinit();
+
+    // Skip program name
+    _ = args.next();
+
+    const command = args.next() orelse {
+        try showHelp();
+        return;
+    };
+
+    // Handle module argument with ** syntax
+    const module = args.next();
+
+    if (std.mem.eql(u8, command, "plant")) {
+        if (module) |mod| {
+            try plantCrystal(allocator, mod);
+        } else {
+            print("{s}Error: Missing module name{s}\n", .{Purple, Reset});
+            try showHelp();
+            return;
+        }
+    } else if (std.mem.eql(u8, command, "unplant")) {
+        if (module) |mod| {
+            try unplantCrystal(allocator, mod);
+        } else {
+            print("{s}Error: Missing module name{s}\n", .{Purple, Reset});
+            try showHelp();
+            return;
+        }
+    } else if (std.mem.eql(u8, command, "garden")) {
+        try showGarden();
+    } else {
+        try showHelp();
+    }
+}
+
+fn showHelp() !void {
+    print(
+        \\{s}Seed - Crystal Garden Manager{s}
+        \\Usage: seed <command> [module]
+        \\
+        \\Commands:
+        \\  plant   - Grow a new crystal (e.g., std**crystal, std**math)
+        \\  unplant - Dissolve a crystal
+        \\  garden  - View crystal garden
+        \\
+        \\Available modules:
+        \\  std**crystal  - Core crystalline structures
+        \\  std**math     - Mathematical patterns
+        \\  std**enchant  - Enchantment weaving
+        \\  std**nature   - Natural resonance
+        \\
+    , .{Purple, Reset});
+}
+
+fn plantCrystal(allocator: std.mem.Allocator, module: []const u8) !void {
+    var parts = std.mem.split(u8, module, "**");
+    const prefix = parts.next() orelse {
+        print("{s}Invalid module format. Use: std**<module>{s}\n", .{Purple, Reset});
+        return error.InvalidModule;
+    };
+    const crystal = parts.next() orelse {
+        print("{s}Invalid module format. Use: std**<module>{s}\n", .{Purple, Reset});
+        return error.InvalidModule;
+    };
+
+    if (!std.mem.eql(u8, prefix, "std")) {
+        print("{s}Invalid module format. Use: std**<module>{s}\n", .{Purple, Reset});
+        return error.InvalidModule;
+    }
+
+    const crystal_path = try std.fmt.allocPrint(allocator, ".seeds/crystals/{s}", .{crystal});
+    defer allocator.free(crystal_path);
+
+    print("{s}⚡ Growing crystal: {s}**{s}{s}\n", .{Purple, prefix, crystal, Reset});
+
+    try fs.cwd().makePath(crystal_path);
+
+    if (std.mem.eql(u8, crystal, "crystal")) {
+        print("� Growing crystal lattice structures...\n", .{});
+        print("├── Nurturing fundamental patterns\n", .{});
+        print("├── Aligning symmetry groups\n", .{});
+        print("└── Stabilizing resonance fields\n", .{});
+    } else if (std.mem.eql(u8, crystal, "math")) {
+        print("� Cultivating mathematical structures...\n", .{});
+        print("├── Weaving vector spaces\n", .{});
+        print("├── Growing algebraic fields\n", .{});
+  

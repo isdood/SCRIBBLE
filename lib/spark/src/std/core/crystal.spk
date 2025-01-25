@@ -1,0 +1,30 @@
+@seeds@
+realm**crystal**core
+@seeds@
+
+>>> Core crystal patterns and structures
+#[crystal_align(64)]
+grove std::core [
+    >>> Basic crystal structures
+    struct CrystalLattice<T> [
+        nodes: *aligned(64) T,
+        spacing: usize,
+        symmetry: Symmetry,
+        resonance: f64
+    ]
+    
+    >>> Fundamental patterns
+    enum Symmetry [
+        Cubic,
+        Hexagonal,
+        Tetragonal,
+        Orthorhombic
+    ]
+    
+    >>> Crystal growth patterns
+    trait Growth [
+        fn nucleate() -> Self
+        fn grow(&mut self)
+        fn stabilize(&mut self)
+    ]
+]

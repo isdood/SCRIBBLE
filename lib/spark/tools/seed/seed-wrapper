@@ -1,0 +1,6 @@
+#!/bin/sh
+if [ "$1" = "plant" ] || [ "$1" = "unplant" ]; then
+    "$(dirname "$0")/zig-out/bin/seed" "$1" '"$2"'
+else
+    "$(dirname "$0")/zig-out/bin/seed" "$@"
+fi

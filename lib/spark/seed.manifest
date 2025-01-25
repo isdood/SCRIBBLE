@@ -1,0 +1,6 @@
+name: spark-project
+version: 0.1.0
+author: isdood
+dependencies:
+  - core: ^1.0.0
+  - shattercache: ^0.1.0
