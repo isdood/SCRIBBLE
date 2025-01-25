@@ -5,6 +5,10 @@ garden:
   tender: "isdood"
 
 modules:
+  - name: "std__math"
+    version: "1.0.0"
+    description: "Module std__math"
+    path: "std__math"
   - name: "std**math"
     version: "1.0.0"
     description: "Mathematical operations with moonlit precision"
