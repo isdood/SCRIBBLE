@@ -1,7 +1,7 @@
 module Scribble
   module Sparkle
     VERSION = "1.0.0"
-    CREATED = "2025-01-25 02:51:59"
+    CREATED = "2025-01-25 02:53:12"
     TENDER  = "isdood"
 
     def self.root_path

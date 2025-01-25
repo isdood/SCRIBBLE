@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Get current branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Add all changes
+git add .
+
+# Commit with timestamp
+git commit -m "dbg: $(date -u '+%Y-%m-%d %H:%M:%S')"
+
+# Push to current branch
+git push origin "${CURRENT_BRANCH}"
