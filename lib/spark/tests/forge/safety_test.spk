@@ -1,7 +1,0 @@
-~forge~ = calm
-
-@spells@
-pub fn test_function() -> i32 {
-    42
-}
-@spells@
