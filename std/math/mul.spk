@@ -1,0 +1,30 @@
+// !weave! 500
+// Crystal Multiplication Dance
+
+fn mul(a: i64, b: i64) i64 {
+    // Interweave the numbers in a spiral
+    return @mulWithOverflow(a, b) catch |err| {
+        std.debug.print("💫 Numbers too intense to multiply: {}\n", .{err});
+        return 0;
+    };
+}
+
+fn mulSlice(numbers: []const i64) i64 {
+    if (numbers.len == 0) return 0;
+    var result: i64 = 1;
+    for (numbers) |num| {
+        result = mul(result, num);
+    }
+    return result;
+}
+
+test "multiply two ethereal values" {
+    try std.testing.expectEqual(@as(i64, 440), mul(20, 22));
+    try std.testing.expectEqual(@as(i64, -400), mul(20, -20));
+    try std.testing.expectEqual(@as(i64, 440), mul(-20, -22));
+}
+
+test "multiply slice of starlight" {
+    const numbers = [_]i64{ 2, 3, 4 };
+    try std.testing.expectEqual(@as(i64, 24), mulSlice(&numbers));
+}

@@ -1,0 +1,35 @@
+// !weave! 500
+// Mystic Division Patterns
+
+fn div(a: i64, b: i64) i64 {
+    // Split the moonbeams carefully
+    if (b == 0) {
+        std.debug.print("🌑 Cannot divide by void\n", .{});
+        return 0;
+    }
+    return @divTrunc(a, b) catch |err| {
+        std.debug.print("🌓 Numbers too mystical to divide: {}\n", .{err});
+        return 0;
+    };
+}
+
+fn divSlice(numbers: []const i64) i64 {
+    if (numbers.len == 0) return 0;
+    var result = numbers[0];
+    for (numbers[1..]) |num| {
+        if (num == 0) continue;
+        result = div(result, num);
+    }
+    return result;
+}
+
+test "divide two astral values" {
+    try std.testing.expectEqual(@as(i64, 0), div(20, 22));
+    try std.testing.expectEqual(@as(i64, -1), div(20, -20));
+    try std.testing.expectEqual(@as(i64, 0), div(-20, -22));
+}
+
+test "divide slice of moonlight" {
+    const numbers = [_]i64{ 24, 2, 3 };
+    try std.testing.expectEqual(@as(i64, 4), divSlice(&numbers));
+}

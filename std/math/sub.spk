@@ -1,0 +1,30 @@
+// !weave! 500
+// Starlight Subtraction Pattern
+
+fn sub(a: i64, b: i64) i64 {
+    // Unweave the numbers
+    return @subWithOverflow(a, b) catch |err| {
+        std.debug.print("✨ Numbers too distant to subtract: {}\n", .{err});
+        return 0;
+    };
+}
+
+fn subSlice(numbers: []const i64) i64 {
+    if (numbers.len == 0) return 0;
+    var result = numbers[0];
+    for (numbers[1..]) |num| {
+        result = sub(result, num);
+    }
+    return result;
+}
+
+test "subtract two crystal values" {
+    try std.testing.expectEqual(@as(i64, -2), sub(20, 22));
+    try std.testing.expectEqual(@as(i64, 40), sub(20, -20));
+    try std.testing.expectEqual(@as(i64, 2), sub(-20, -22));
+}
+
+test "subtract slice of stardust" {
+    const numbers = [_]i64{ 10, 2, 3 };
+    try std.testing.expectEqual(@as(i64, 5), subSlice(&numbers));
+}

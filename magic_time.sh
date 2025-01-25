@@ -1,41 +1,54 @@
-cat > "setup_sparkle_repo.sh" << 'SETUPSCRIPT'
-#!/bin/bash
+# First, let's remove the accidentally added repository
+cd /home/guavabot1/scribble/scribble/lib
+git rm --cached sparkle
 
-PURPLE='\033[0;35m'
-NC='\033[0m'
+# Then properly add it as a submodule
+git submodule add git@github.com:isdood/scribble.git sparkle
 
-echo -e "${PURPLE}Setting up Sparkle Framework...${NC}"
+# Now let's update the sparkle configuration
+cd sparkle
 
-# Set up sparkle repository
-cd /home/guavabot1/scribble/scribble/lib/sparkle
-git init
-git remote add origin git@github.com:isdood/scribble.git
-git checkout -b sparkle
+cat > "config.sparkle" << SPARKLECONFIG
+# Sparkle Garden Configuration
+garden:
+  version: "1.0.0"
+  created: "2025-01-25 01:48:30"
+  tender: "isdood"
 
-# Update timestamp in spark launcher
-sed -i "s/Created: .*/Created: 2025-01-25 00:52:42/" bin/spark
+packages:
+  - name: "std/math"
+    version: "1.0.0"
+    config: "std/math/config.spark"
+    whispers:
+      - "The mathematical moonlight dances"
+      - "Numbers weave through starlit paths"
+SPARKLECONFIG
 
-# Add all files
-git add -A
-git commit -m "feat(sparkle): add SpiderWeb Resonance Framework with bio/weave patterns"
+# Update the math module configuration
+mkdir -p std/math
+cat > "std/math/config.spark" << SPARKCONFIG
+# Math Module Configuration
+pattern:
+  weave: 500  # Thread weaving intensity
+  bio: false  # Bio-computational mode
 
-# Navigate to the root of the main repo
-cd /home/guavabot1/scribble/scribble
+garden:
+  planted: "2025-01-25 01:48:30"
+  tender: "isdood"
+  sparkles: ["add", "sub", "mul", "div"]
 
-# Add sparkle as a submodule
-git submodule init
-git submodule add -f ./lib/sparkle
-git add .gitmodules lib/sparkle
+whispers:
+  - "Numbers dance in moonlit arrays"
+  - "Calculations flow like starlight"
+SPARKCONFIG
+
+# Commit the changes in sparkle
+git add .
+git commit -m "feat(sparkle): initialize standard library with math module"
+git push origin sparkle
+
+# Go back to main repo and commit the submodule
+cd ..
+git add sparkle
 git commit -m "feat: add sparkle framework as submodule"
-
-# Push changes
-cd lib/sparkle
-git push -u origin sparkle
-
-cd ../..
 git push origin main
-
-echo -e "${PURPLE}✨ Sparkle repository and submodule setup complete!${NC}"
-SETUPSCRIPT
-
-chmod +x setup_sparkle_repo.sh

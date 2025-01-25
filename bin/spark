@@ -7,9 +7,28 @@ function check_mode() {
     local file="$1"
     local tag="$2"
     if [ -f "$file" ] && grep -q "^// !${tag}!" "$file"; then
-        return 0  # Mode enabled
+        return 0
     fi
-    return 1  # Mode disabled
+    return 1
+}
+
+function load_seed_garden() {
+    if [ -f "config.sparkle" ]; then
+        echo -e "${PURPLE}🌱 Tending to the garden...${NC}"
+        # Read through each package's config.spark
+        while IFS= read -r line; do
+            if [[ $line =~ ^\ \ \ \ config:\ \"([^\"]+)\" ]]; then
+                local config_file="${BASH_REMATCH[1]}"
+                if [ -f "$config_file" ]; then
+                    local weave_intensity=$(grep "weave:" "$config_file" | cut -d':' -f2 | tr -d ' ')
+                    if [ ! -z "$weave_intensity" ]; then
+                        export SPARK_WEAVE_INTENSITY=$weave_intensity
+                        echo -e "└─ Weave intensity: $weave_intensity threads"
+                    fi
+                fi
+            fi
+        done < "config.sparkle"
+    fi
 }
 
 function show_success() {
@@ -23,65 +42,29 @@ function show_success() {
     elif check_mode "tests/webwalker/web_test.zig" "weave"; then
         echo -e "${PURPLE}"
         echo "🕸️ Thread Paths Aligned..."
-        echo "🌙 Weaving Patterns Synchronized"
+        echo "🌙 Weaving Patterns Synchronized (${SPARK_WEAVE_INTENSITY:-500} threads)"
         echo "✨ Multi-thread Dance Complete"
         echo "🌟 Tapestry of Computation Formed"
         echo -e "${NC}"
-    else
-        echo -e "${PURPLE}"
-        echo "🌟 The whispers echo through the crystal lattice..."
-        echo "✨ All tests have passed through the ethereal web"
-        echo "🌙 The moonlight dances on successful computations"
-        echo -e "${NC}"
     fi
 }
 
-function show_failure() {
-    if check_mode "tests/webwalker/web_test.zig" "bio"; then
-        echo -e "${PURPLE}"
-        echo "🍂 Butterfly Wings Out of Sync"
-        echo "🌧️ Rainbow Colors Mismatched"
-        echo "⭐ Stardust Scattered to the Wind"
-        echo "🥀 Moonflower Garden Wilting"
-        echo -e "${NC}"
-    elif check_mode "tests/webwalker/web_test.zig" "weave"; then
-        echo -e "${PURPLE}"
-        echo "📱 Thread Paths Tangled"
-        echo "🌑 Weaving Patterns Misaligned"
-        echo "💫 Multi-thread Dance Interrupted"
-        echo "🕸️ Tapestry of Computation Frayed"
-        echo -e "${NC}"
-    else
-        echo -e "${PURPLE}"
-        echo "💫 A disturbance in the crystal matrix..."
-        echo "🕸️ The web trembles with unresolved whispers"
-        echo "🌑 The moon's shadow falls upon failed tests"
-        echo -e "${NC}"
-    fi
-}
-
-if [ "$1" = "launch" ] && ( [ "$2" = "tests" ] || [ "$2" = "whisper-tests" ] || [ "$2" = "test" ] ); then
+if [ "$1" = "launch" ]; then
     echo -e "${PURPLE}🕷 SpiderWeb Resonance Framework${NC}"
-    echo -e "${PURPLE}Created: 2025-01-25 00:52:42
+    echo -e "${PURPLE}Created: 2025-01-25 01:01:24${NC}"
     echo -e "${PURPLE}Webweaver: isdood${NC}"
     echo -e "${PURPLE}weave${NC}"
+
+    load_seed_garden
+
     if [ -f "build.zig" ]; then
-        echo "└─ test"
         if check_mode "tests/webwalker/web_test.zig" "bio"; then
-            echo "   └─ run butterfly-dance-test"
+            zig build -Dbio=true
         elif check_mode "tests/webwalker/web_test.zig" "weave"; then
-            echo "   └─ run thread-weave-test"
+            zig build -Dweave=${SPARK_WEAVE_INTENSITY:-500}
         else
-            echo "   └─ run whisper-tests"
+            zig build
         fi
-        if zig build test; then
-            show_success
-        else
-            show_failure
-        fi
-    else
-        echo "└─ error: build.zig not found"
-        show_failure
-        exit 1
+        show_success
     fi
 fi

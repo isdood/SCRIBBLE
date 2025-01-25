@@ -1,0 +1,114 @@
+#!/bin/bash
+
+PURPLE='\033[0;35m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+function show_garden_status() {
+    echo -e "${PURPLE}🌱 Garden Status${NC}"
+    echo -e "└─ ${GREEN}Blooming Packages${NC}"
+    if [ -f "config.sparkle" ]; then
+        while IFS= read -r line; do
+            if [[ $line =~ ^name:\ \"([^\"]+)\" ]]; then
+                echo "   └─ 🌺 ${BASH_REMATCH[1]}"
+            fi
+        done < "config.sparkle"
+    else
+        echo "   └─ No packages planted yet"
+    fi
+}
+
+function plant_package() {
+    local package=$1
+    echo -e "${PURPLE}🌱 Planting $package...${NC}"
+
+    # Create config.sparkle if it doesn't exist
+    if [ ! -f "config.sparkle" ]; then
+        echo "# Sparkle Garden Configuration" > config.sparkle
+        echo "garden:" >> config.sparkle
+        echo "  version: \"1.0.0\"" >> config.sparkle
+        echo -e "\npackages:" >> config.sparkle
+    fi
+
+    # Create package's config.spark
+    mkdir -p "packages/$package"
+    cat > "packages/$package/config.spark" << SPARKCONFIG
+# Package: $package
+pattern:
+  weave: 500  # Thread weaving intensity
+  bio: false  # Bio-computational mode
+
+garden:
+  planted: "$(date -u +%Y-%m-%d\ %H:%M:%S)"
+  tender: "$USER"
+SPARKCONFIG
+
+    # Add package to config.sparkle
+    echo "  - name: \"$package\"" >> config.sparkle
+    echo "    version: \"latest\"" >> config.sparkle
+    echo "    config: \"packages/$package/config.spark\"" >> config.sparkle
+
+    echo -e "${GREEN}✨ Package $package has taken root!${NC}"
+}
+
+function unplant_package() {
+    local package=$1
+    echo -e "${PURPLE}🍂 Gently removing $package...${NC}"
+
+    if [ -f "config.sparkle" ]; then
+        # Create temporary file
+        touch config.sparkle.tmp
+
+        # Remove package from config.sparkle
+        local removing=false
+        while IFS= read -r line; do
+            if [[ $line =~ ^\ \ -\ name:\ \"$package\" ]]; then
+                removing=true
+                continue
+            elif [[ $line =~ ^\ \ -\ name:\ * ]] && [ "$removing" = true ]; then
+                removing=false
+            fi
+
+            if [ "$removing" = false ]; then
+                echo "$line" >> config.sparkle.tmp
+            fi
+        done < "config.sparkle"
+
+        mv config.sparkle.tmp config.sparkle
+
+        # Remove package directory
+        rm -rf "packages/$package"
+
+        echo -e "${GREEN}✨ Package $package has been returned to stardust${NC}"
+    else
+        echo -e "${BLUE}No garden found. Create one with 'seed plant'${NC}"
+    fi
+}
+
+case "$1" in
+    "plant")
+        if [ -z "$2" ]; then
+            echo -e "${BLUE}Usage: seed plant <package-name>${NC}"
+            exit 1
+        fi
+        plant_package "$2"
+        ;;
+    "unplant")
+        if [ -z "$2" ]; then
+            echo -e "${BLUE}Usage: seed unplant <package-name>${NC}"
+            exit 1
+        fi
+        unplant_package "$2"
+        ;;
+    "status")
+        show_garden_status
+        ;;
+    *)
+        echo -e "${PURPLE}🌱 Seed Package Manager${NC}"
+        echo "Usage:"
+        echo "  seed plant <package-name>   - Plant a new package in your garden"
+        echo "  seed unplant <package-name> - Gently remove a package"
+        echo "  seed status                 - Show your blooming packages"
+        ;;
+esac

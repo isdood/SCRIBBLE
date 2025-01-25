@@ -1,0 +1,29 @@
+// !weave! 500
+// Moonlight Addition Pattern
+
+fn add(a: i64, b: i64) i64 {
+    // Weave the numbers together
+    return @addWithOverflow(a, b) catch |err| {
+        std.debug.print("🌙 Numbers too bright to add: {}\n", .{err});
+        return 0;
+    };
+}
+
+fn addSlice(numbers: []const i64) i64 {
+    var sum: i64 = 0;
+    for (numbers) |num| {
+        sum = add(sum, num);
+    }
+    return sum;
+}
+
+test "add two stardust numbers" {
+    try std.testing.expectEqual(@as(i64, 42), add(20, 22));
+    try std.testing.expectEqual(@as(i64, 0), add(-20, 20));
+    try std.testing.expectEqual(@as(i64, -42), add(-20, -22));
+}
+
+test "add slice of moonbeams" {
+    const numbers = [_]i64{ 1, 2, 3, 4, 5 };
+    try std.testing.expectEqual(@as(i64, 15), addSlice(&numbers));
+}
