@@ -1,23 +1,11 @@
 # Sparkle Garden Configuration
 garden:
   version: "1.0.0"
-  created: "2025-01-25 01:52:58"
+  created: "2025-01-25 02:40:26"
   tender: "isdood"
 
 modules:
   - name: "std__math"
     version: "1.0.0"
-    description: "Module std__math"
-    path: "std__math"
-  - name: "std**math"
-    version: "1.0.0"
     description: "Mathematical operations with moonlit precision"
     path: "std/math"
-
-packages:
-  - name: "std**math"
-    version: "1.0.0"
-    config: "std/math/config.spark"
-    whispers:
-      - "The mathematical moonlight dances"
-      - "Numbers weave through starlit paths"
