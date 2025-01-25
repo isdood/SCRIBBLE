@@ -25,26 +25,37 @@ get_git_root() {
     git rev-parse --show-toplevel
 }
 
-# Function to fix git push command
-fix_git_push() {
-    echo -e "\n${BLUE}🔧 Setting up Git push command...${NC}"
+# Function to ensure git configuration is correct
+setup_git_config() {
+    echo -e "\n${BLUE}🔧 Setting up Git configuration...${NC}"
+
+    # Get the git root directory
     local git_root=$(get_git_root)
 
-    # Create or update git_push script
+    # Update git config for the repository
+    git config push.default current
+    git config pull.rebase true
+
+    # Create git_push script in the repository root
+    mkdir -p "${git_root}/bin"
     cat > "${git_root}/bin/git_push" << 'GITPUSH'
 #!/bin/bash
+set -euo pipefail
 
 # Get current branch
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Ensure we have latest changes
+git fetch origin "${CURRENT_BRANCH}" || true
 
 # Add all changes
 git add .
 
 # Commit with timestamp
-git commit -m "dbg: $(date -u '+%Y-%m-%d %H:%M:%S')"
+git commit -m "dbg: $(date -u '+%Y-%m-%d %H:%M:%S')" || true
 
-# Push to current branch
-git push origin "${CURRENT_BRANCH}"
+# Push to current branch explicitly
+git push origin "${CURRENT_BRANCH}:${CURRENT_BRANCH}"
 GITPUSH
 
     chmod +x "${git_root}/bin/git_push"
@@ -54,10 +65,10 @@ GITPUSH
 setup_git_branch() {
     echo -e "\n${BLUE}🔄 Setting up Git branch...${NC}"
 
-    # Fetch all branches
+    # Ensure we have the latest changes
     git fetch origin
 
-    # Create or switch to sparkle branch
+    # Switch to or create sparkle branch
     if git rev-parse --verify sparkle >/dev/null 2>&1; then
         echo "Switching to existing sparkle branch..."
         git checkout sparkle
@@ -65,10 +76,24 @@ setup_git_branch() {
     else
         echo "Creating new sparkle branch..."
         git checkout -b sparkle
+        git push -u origin sparkle || true
     fi
 }
 
-# Function to create necessary module files
+# Function to push changes safely
+safe_push() {
+    echo -e "\n${BLUE}🚀 Pushing changes...${NC}"
+    local branch=$(git rev-parse --abbrev-ref HEAD)
+
+    # Ensure branch exists on remote
+    git push origin "${branch}:${branch}" || {
+        echo -e "${RED}Failed to push directly. Attempting to fix...${NC}"
+        git fetch origin
+        git push -u origin "${branch}"
+    }
+}
+
+# Function to create necessary files
 create_module_files() {
     echo -e "\n${BLUE}📝 Creating module files...${NC}"
     local git_root=$(get_git_root)
@@ -78,7 +103,7 @@ create_module_files() {
 module Scribble
   module Sparkle
     VERSION = "1.0.0"
-    CREATED = "2025-01-25 02:53:12"
+    CREATED = "2025-01-25 02:55:14"
     TENDER  = "isdood"
 
     def self.root_path
@@ -111,58 +136,29 @@ modules:
       - build_system
       - pattern_matching
 MODULES
-
-    # Ensure bin directory exists
-    mkdir -p "${git_root}/bin"
 }
 
-# Function to stage and commit changes
+# Function to commit changes
 commit_changes() {
     echo -e "\n${BLUE}📦 Committing changes...${NC}"
     local git_root=$(get_git_root)
 
-    git add mod.cr
-    git add "${git_root}/config/modules.yml"
-    git add "${git_root}/bin/git_push"
+    # Stage changes
+    git add mod.cr || true
+    git add "${git_root}/config/modules.yml" || true
+    git add "${git_root}/bin/git_push" || true
 
+    # Commit
     git commit -m "feat: integrate sparkle module with scribble framework
 
 - Add Crystal module definition
 - Configure module in Scribble framework
 - Set up proper module structure
+- Fix git push handling
 - Update module configuration
-- Fix git push command
 
-Created: 2025-01-25 02:53:12
-Author: isdood"
-}
-
-# Function to attempt pushing changes
-push_changes() {
-    echo -e "\n${BLUE}🚀 Pushing changes...${NC}"
-
-    # First try to push
-    if git push origin sparkle 2>/dev/null; then
-        echo -e "${GREEN}✨ Changes pushed successfully!${NC}"
-    else
-        echo -e "${BLUE}⚠️  Need to integrate with main first...${NC}"
-
-        # Fetch latest main
-        git fetch origin main
-
-        # Try to rebase on main
-        if git rebase origin/main; then
-            echo "Rebased on main, pushing changes..."
-            git push origin sparkle --force-with-lease
-        else
-            echo -e "${RED}⚠️  Rebase conflicts detected. Please resolve manually:${NC}"
-            echo "1. Resolve the conflicts in the files"
-            echo "2. git add . "
-            echo "3. git rebase --continue"
-            echo "4. git push origin sparkle --force-with-lease"
-            exit 1
-        fi
-    fi
+Created: 2025-01-25 02:55:14
+Author: isdood" || true
 }
 
 # Main execution
@@ -172,27 +168,26 @@ main() {
     # Verify we're in the right directory
     check_sparkle_dir
 
+    # Setup git configuration
+    setup_git_config
+
     # Setup git branch
     setup_git_branch
 
     # Create module files
     create_module_files
 
-    # Fix git push command
-    fix_git_push
-
     # Commit changes
     commit_changes
 
-    # Push changes
-    push_changes
+    # Push changes safely
+    safe_push
 
     echo -e "\n${GREEN}✨ Integration completed successfully!${NC}"
     echo -e "${BLUE}Next steps:${NC}"
     echo "1. Visit: https://github.com/isdood/scribble/pull/new/sparkle"
     echo "2. Create a pull request to merge the sparkle branch into main"
     echo "3. Add reviewers and wait for approval"
-    echo -e "\n${PURPLE}Note: The git_push command has been updated to work with the current branch${NC}"
 }
 
 # Run the script
