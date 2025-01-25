@@ -2,13 +2,12 @@
 
 # Sparkle - Spark Runtime Terminal v0.1
 # Author: isdood
-# Created: 2025-01-25 23:14:50 UTC
+# Created: 2025-01-25 23:27:37 UTC
 # Repository: isdood/scribble
 
 set -e
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PKG_DIR="$SCRIPT_DIR/forge/julia/SparkJL"
 
 # Generate a temporary directory for our sandbox
 SANDBOX_DIR=$(mktemp -d)
@@ -22,61 +21,85 @@ version = "0.1.0"
 
 [deps]
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 EOF
+
+# Install required packages
+julia --project="$SANDBOX_DIR" -e '
+    using Pkg
+    Pkg.instantiate()
+    Pkg.add(["UnicodePlots", "Statistics"])
+'
 
 # Create the Julia initialization script
 cat > "$SANDBOX_DIR/init.jl" << 'JULIA_EOF'
 using REPL
 using REPL.LineEdit
+using UnicodePlots
+using Statistics
 
-# Create Sparkle module to contain our REPL functionality
+# Create Sparkle module
 module Sparkle
-export crystal, wave, weave, optimize
+export crystal, wave, weave, optimize, visualize
 
 using REPL
 using REPL.LineEdit
+using UnicodePlots
+using Statistics
 
-# Sparkle commands implementation
+# Sparkle types
 struct Crystal
-    dimensions::Tuple{Int,Int,Int}
-    spacing::Float64
+    dimensions
+    spacing
+    data
 end
 
 struct Wave
-    data::Vector{Float64}
-    frequency::Float64
+    data
+    frequency
 end
 
 struct Pattern
-    name::String
-    transform::Function
+    name
+    transform
 end
 
 # Global state
 const patterns = Dict{String,Pattern}()
 mutable struct SparkleState
-    current_crystal::Union{Crystal,Nothing}
-    current_wave::Union{Wave,Nothing}
-    patterns::Dict{String,Pattern}
+    current_crystal
+    current_wave
+    patterns
 end
 
 const GLOBAL_STATE = SparkleState(nothing, nothing, patterns)
 
 # Command implementations
-function crystal(dims::Tuple{Int,Int,Int}=(32,32,32), spacing::Float64=1.0)
-    GLOBAL_STATE.current_crystal = Crystal(dims, spacing)
+function crystal(dims=(32,32,32), spacing=1.0)
+    data = zeros(dims...)
+    center = dims .÷ 2
+    for i in 1:dims[1], j in 1:dims[2], k in 1:dims[3]
+        r = sqrt(((i-center[1])/dims[1])^2 + ((j-center[2])/dims[2])^2 + ((k-center[3])/dims[3])^2)
+        data[i,j,k] = exp(-r^2 * 5)
+    end
+
+    GLOBAL_STATE.current_crystal = Crystal(dims, spacing, data)
     println("Created crystal structure with dimensions $(dims) and spacing $(spacing)")
+    visualize()
     return GLOBAL_STATE.current_crystal
 end
 
-function wave(n::Int=100)
-    data = randn(n)
+function wave(n=100)
+    x = range(0, 4π, length=n)
+    data = sin.(x) .+ 0.5 .* cos.(2x) .+ 0.2 .* randn(n)
     GLOBAL_STATE.current_wave = Wave(data, 1.0)
     println("Created wave pattern with $(n) points")
+    visualize()
     return GLOBAL_STATE.current_wave
 end
 
-function weave(pattern::String="default")
+function weave(pattern="default")
     if isnothing(GLOBAL_STATE.current_wave)
         println("Error: No wave pattern to weave. Create one first with 'wave'")
         return nothing
@@ -87,8 +110,26 @@ function weave(pattern::String="default")
     end
     println("Applied $(pattern) weave pattern to wave")
     result = patterns[pattern].transform(GLOBAL_STATE.current_wave)
+    GLOBAL_STATE.current_wave = result
     println("Pattern applied successfully")
+    visualize()
     return result
+end
+
+function visualize()
+    if !isnothing(GLOBAL_STATE.current_crystal)
+        crystal = GLOBAL_STATE.current_crystal
+        middle_slice = crystal.data[:,:,crystal.dimensions[3]÷2]
+        println("\nCrystal Visualization (middle slice):")
+        display(heatmap(middle_slice, colormap=:ink))
+    end
+
+    if !isnothing(GLOBAL_STATE.current_wave)
+        wave = GLOBAL_STATE.current_wave
+        n = length(wave.data)
+        println("\nWave Visualization:")
+        display(lineplot(1:n, wave.data, title="Wave Pattern", name="amplitude"))
+    end
 end
 
 function optimize()
@@ -102,6 +143,7 @@ function optimize()
         println("• Crystal optimization:")
         println("  - Dimensions: $(GLOBAL_STATE.current_crystal.dimensions)")
         println("  - Spacing: $(GLOBAL_STATE.current_crystal.spacing)")
+        println("  - Mean density: $(mean(GLOBAL_STATE.current_crystal.data))")
         println("  ✓ Crystal optimization complete")
     end
 
@@ -109,9 +151,11 @@ function optimize()
         println("• Wave optimization:")
         println("  - Points: $(length(GLOBAL_STATE.current_wave.data))")
         println("  - Frequency: $(GLOBAL_STATE.current_wave.frequency)")
+        println("  - Amplitude range: [$(minimum(GLOBAL_STATE.current_wave.data)), $(maximum(GLOBAL_STATE.current_wave.data))]")
         println("  ✓ Wave optimization complete")
     end
 
+    visualize()
     return (crystal=GLOBAL_STATE.current_crystal, wave=GLOBAL_STATE.current_wave)
 end
 
@@ -119,11 +163,17 @@ end
 patterns["default"] = Pattern("Default", w -> w)
 patterns["invert"] = Pattern("Invert", w -> Wave(-w.data, w.frequency))
 patterns["double"] = Pattern("Double", w -> Wave(w.data .* 2, w.frequency))
+patterns["smooth"] = Pattern("Smooth", w -> begin
+    data = copy(w.data)
+    for i in 2:length(data)-1
+        data[i] = mean(w.data[i-1:i+1])
+    end
+    Wave(data, w.frequency)
+end)
 
-# Process sparkle commands
-function process_sparkle(s::LineEdit.MIState)
+function process_sparkle(s)
     buf = LineEdit.buffer(s)
-    input = String(take!(copy(buf))::Vector{UInt8})
+    input = String(take!(copy(buf)))
 
     if input == "?" || input == "help"
         println("""
@@ -138,6 +188,7 @@ function process_sparkle(s::LineEdit.MIState)
                                          pattern: String (default: "default")
                                          Available patterns: $(join(keys(patterns), ", "))
         optimize                       - Optimize current structure
+        visualize                      - Show current structures
         exit/quit                      - Exit Sparkle mode
         """)
     elseif input == "exit" || input == "quit"
@@ -146,12 +197,9 @@ function process_sparkle(s::LineEdit.MIState)
     else
         try
             expr = Meta.parse(input)
-            # Check if it's just a bare symbol (command name)
             if expr isa Symbol
-                # Convert symbol to function call
                 expr = Expr(:call, expr)
             end
-            # Evaluate in Sparkle module context
             result = Base.eval(Sparkle, expr)
             if result !== nothing
                 if result isa NamedTuple  # For optimize results
@@ -173,14 +221,12 @@ function init()
     repl = Base.active_repl
     terminal = repl.t
 
-    # Create the sparkle prompt
     sparkle = LineEdit.Prompt("sparkle> ";
         prompt_prefix = "\e[35m",
         prompt_suffix = "\e[0m",
         on_enter = REPL.return_callback)
 
-    # Set up command processing with proper typing
-    sparkle.on_done = (s::LineEdit.MIState, buf::IOBuffer, ok::Bool) -> begin
+    sparkle.on_done = (s, buf, ok) -> begin
         if !ok
             LineEdit.transition(s, repl.interface.modes[1])
             return nothing
@@ -191,13 +237,9 @@ function init()
         return nothing
     end
 
-    # Add sparkle mode to REPL
     push!(repl.interface.modes, sparkle)
-
-    # Get main mode
     main_mode = repl.interface.modes[1]
 
-    # Add * key binding to main mode
     main_mode.keymap_dict = LineEdit.keymap_merge(
         main_mode.keymap_dict,
         Dict{Any,Any}(
@@ -221,7 +263,7 @@ end # module Sparkle
 # Initialize when REPL is ready
 atreplinit() do repl
     @async begin
-        sleep(0.1) # Wait for REPL to be fully initialized
+        sleep(0.1)
         try
             Sparkle.init()
             println("\n✨ Welcome to Sparkle - Spark Runtime Terminal ✨")
