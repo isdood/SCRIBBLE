@@ -1,0 +1,71 @@
+!ingredients!
+sparkle**core**[
+    memory,
+    threading,
+    crystallize
+]
+
+sparkle**forge**[
+    compiler,
+    linker,
+    optimizer
+]
+
+sparkle**seed**[
+    registry,
+    resolver,
+    cache
+]
+
+sparkle**shimmer**[
+    translators,
+    bridges,
+    runtime
+]
+!ingredients!
+
+project Crystal [
+    name: "sparkle"
+    version: "0.1.0"
+    authors: ["isdood"]
+    created: "2025-01-24 23:32:00"
+
+    => Shimmer integration
+    shimmer: [
+        enabled: true,
+        languages: ["rust", "zig", "julia"],
+        safety_level: @controlled,
+        runtime: [
+            gc_enabled: true,
+            thread_safe: true
+        ]
+    ]
+
+    => Other configurations remain the same...
+
+    => Safety and performance configuration
+    safety: [
+        default: @safe,
+        memory: @controlled,
+        threading: @protected
+    ]
+
+    performance: [
+        optimization: @aggressive,
+        cache_strategy: @smart
+    ]
+]
+    => Test configuration
+    test: [
+        framework: "sparkle",
+        parallel: true,
+        timeout: "5m",
+        retry: [
+            attempts: 3,
+            backoff: "1s"
+        ],
+        coverage: [
+            enabled: true,
+            minimum: 80
+        ]
+    ]

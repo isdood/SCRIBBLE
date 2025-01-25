@@ -1,0 +1,105 @@
+#!/bin/bash
+
+PURPLE='\033[0;35m'
+NC='\033[0m'
+
+echo -e "${PURPLE}Step-by-Step Creation Process${NC}"
+
+# Create bin directory and spark launcher with CURRENT timestamp
+echo -e "${PURPLE}Creating spark launcher${NC}"
+mkdir -p bin
+cat > "bin/spark" << 'SPARKLAUNCHER'
+#!/bin/bash
+
+PURPLE='\033[0;35m'
+NC='\033[0m'
+
+function check_mode() {
+    local file="$1"
+    local tag="$2"
+    if [ -f "$file" ] && grep -q "^// !${tag}!" "$file"; then
+        return 0  # Mode enabled
+    fi
+    return 1  # Mode disabled
+}
+
+function show_success() {
+    if check_mode "tests/webwalker/web_test.zig" "bio"; then
+        echo -e "${PURPLE}"
+        echo "🦋 Butterfly Wings Synchronized..."
+        echo "🌈 Rainbow Patterns Harmonized"
+        echo "✨ Stardust Resonance Achieved"
+        echo "🌱 Moonflower Garden Blooming"
+        echo -e "${NC}"
+    elif check_mode "tests/webwalker/web_test.zig" "weave"; then
+        echo -e "${PURPLE}"
+        echo "🕸️ Thread Paths Aligned..."
+        echo "🌙 Weaving Patterns Synchronized"
+        echo "✨ Multi-thread Dance Complete"
+        echo "🌟 Tapestry of Computation Formed"
+        echo -e "${NC}"
+    else
+        echo -e "${PURPLE}"
+        echo "🌟 The whispers echo through the crystal lattice..."
+        echo "✨ All tests have passed through the ethereal web"
+        echo "🌙 The moonlight dances on successful computations"
+        echo -e "${NC}"
+    fi
+}
+
+function show_failure() {
+    if check_mode "tests/webwalker/web_test.zig" "bio"; then
+        echo -e "${PURPLE}"
+        echo "🍂 Butterfly Wings Out of Sync"
+        echo "🌧️ Rainbow Colors Mismatched"
+        echo "⭐ Stardust Scattered to the Wind"
+        echo "🥀 Moonflower Garden Wilting"
+        echo -e "${NC}"
+    elif check_mode "tests/webwalker/web_test.zig" "weave"; then
+        echo -e "${PURPLE}"
+        echo "📱 Thread Paths Tangled"
+        echo "🌑 Weaving Patterns Misaligned"
+        echo "💫 Multi-thread Dance Interrupted"
+        echo "🕸️ Tapestry of Computation Frayed"
+        echo -e "${NC}"
+    else
+        echo -e "${PURPLE}"
+        echo "💫 A disturbance in the crystal matrix..."
+        echo "🕸️ The web trembles with unresolved whispers"
+        echo "🌑 The moon's shadow falls upon failed tests"
+        echo -e "${NC}"
+    fi
+}
+
+if [ "$1" = "launch" ] && ( [ "$2" = "tests" ] || [ "$2" = "whisper-tests" ] || [ "$2" = "test" ] ); then
+    echo -e "${PURPLE}🕷 SpiderWeb Resonance Framework${NC}"
+    echo -e "${PURPLE}Created: 2025-01-25 00:46:37${NC}"
+    echo -e "${PURPLE}Webweaver: isdood${NC}"
+    echo -e "${PURPLE}weave${NC}"
+    if [ -f "build.zig" ]; then
+        echo "└─ test"
+        if check_mode "tests/webwalker/web_test.zig" "bio"; then
+            echo "   └─ run butterfly-dance-test"
+        elif check_mode "tests/webwalker/web_test.zig" "weave"; then
+            echo "   └─ run thread-weave-test"
+        else
+            echo "   └─ run whisper-tests"
+        fi
+        if zig build test; then
+            show_success
+        else
+            show_failure
+        fi
+    else
+        echo "└─ error: build.zig not found"
+        show_failure
+        exit 1
+    fi
+fi
+SPARKLAUNCHER
+
+chmod +x "bin/spark"
+
+echo -e "${PURPLE}Process complete! Run:${NC}"
+echo "source ./setup.sh"
+echo "spark launch tests"

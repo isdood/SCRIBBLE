@@ -1,0 +1,41 @@
+=> Example of language interop using Shimmer
+!ingredients!
+sparkle**shimmer**[runtime, bridges]
+sparkle**core**[crystal]
+!ingredients!
+
+@safe fn main() -> Result<(), Error> [
+    => Initialize Shimmer runtime
+    let mut runtime = Runtime::new()
+
+    => Register language bridges
+    runtime.register_bridge("rust", FFIBridge::new("spark", "rust"))
+    runtime.register_bridge("zig", FFIBridge::new("spark", "zig"))
+    runtime.register_bridge("julia", FFIBridge::new("spark", "julia"))
+
+    => Create a crystal in Spark
+    let crystal = Crystal::new(12)
+
+    => Call Rust function
+    let rust_result = runtime.call(
+        "rust",
+        "optimize_crystal",
+        vec![crystal.into_value()]
+    )?
+
+    => Call Zig function
+    let zig_result = runtime.call(
+        "zig",
+        "transform_crystal",
+        vec![rust_result]
+    )?
+
+    => Call Julia function
+    let final_result = runtime.call(
+        "julia",
+        "analyze_crystal",
+        vec![zig_result]
+    )?
+
+    Ok(())
+]

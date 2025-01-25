@@ -1,0 +1,11 @@
+/target
+/build
+**/*.spk.cache
+**/*.o
+**/*.a
+.sparkle
+.forge
+.seed
+.shimmer
+zig-cache/
+zig-out/

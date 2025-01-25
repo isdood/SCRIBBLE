@@ -1,0 +1,19 @@
+=> Test configuration for Spark
+!ingredients!
+sparkle**core**[test]
+sparkle**forge**[builder]
+!ingredients!
+
+@test fn main() -> Result<(), Error> [
+    => Configure test environment
+    let config = TestConfig [
+        test_dirs: ["tests/spark", "tests/integration"],
+        timeout: Duration::from_secs(300),
+        parallel: true,
+        safety_checks: @strict,
+        created: "2025-01-24 23:35:43"
+    ]
+
+    => Run tests
+    test.run_with_config(config)
+]

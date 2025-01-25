@@ -1,0 +1,16 @@
+!ingredients!
+sparkle**core**[crystal, types]
+!ingredients!
+
+@safe fn main() -> Result<(), Error> [
+    => Create a new crystal structure
+    let crystal = Crystal::new(12)
+
+    => Modify its structure
+    crystal.structure = CrystalStructure.Hexagonal
+
+    => Perform operations
+    crystal.crystallize()?
+
+    Ok(())
+]

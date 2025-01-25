@@ -1,0 +1,23 @@
+!ingredients!
+sparkle**forge**[integration, rules]
+sparkle**core**[crystal]
+!ingredients!
+
+@safe fn main() -> Result<(), Error> [
+    => Initialize build context
+    let mut context = BuildContext::new(
+        source: "src",
+        target: "native"
+    )
+
+    => Add optimization rules
+    context.add_rule(Rule::optimize_memory())
+
+    => Create compiler
+    let mut compiler = SparkCompiler::new(context)
+
+    => Compile project
+    compiler.compile()?
+
+    Ok(())
+]
