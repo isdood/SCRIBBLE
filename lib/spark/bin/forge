@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SPARK_ROOT="$(dirname $(dirname $(realpath $0)))"
+
+forge_action() {
+    local action=$1
+    local project_dir="${2:-.}"
+    local launch_file="$project_dir/launch.spk"
+    
+    [ ! -f "$launch_file" ] && echo "‚ùå No launch.spk found in $project_dir" && exit 1
+    
+    case "$action" in
+        "brew")
+            echo "üî Brewing project..."
+            "$SPARK_ROOT/core/compiler/forge" build "$launch_file"
+            ;;
+        "enchant")
+            echo "‚ú® Enchanting project..."
+            "$SPARK_ROOT/core/runtime/spark" run "$launch_file"
+            ;;
+        "test")
+            echo "üé Testing spells..."
+            "$SPARK_ROOT/core/test/runner" "$launch_file"
+            ;;
+        *)
+            echo "Unknown forge command: $action"
+            exit 1
+            ;;
+    esac
+}
+
+[ $# -lt 1 ] && echo "Usage: forge [brew|enchant|test] [project_directory]" && exit 1
+forge_action "$@"

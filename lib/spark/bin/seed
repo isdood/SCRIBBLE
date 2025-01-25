@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SPARK_ROOT="$(dirname $(dirname $(realpath $0)))"
+USER_SPARK_HOME="$HOME/.spark"
+USER_SPARK_GARDEN="$USER_SPARK_HOME/garden"
+
+handle_package() {
+    local action=$1
+    local package=$2
+    local package_path="$USER_SPARK_GARDEN/${package//\*\*/\/}"
+    
+    case "$action" in
+        "plant")
+            echo "ðŸŒ Planting $package..."
+            if [[ $package == std** ]]; then
+                # Link standard library packages
+                local std_path="$SPARK_ROOT/std/${package#std\*\*}"
+                ln -sf "$std_path" "$package_path"
+            else
+                # Clone or download external packages
+                mkdir -p "$package_path"
+                # Package download logic here
+            fi
+            ;;
+        "unplant")
+            echo "ðŸ¥ Unplanting $package..."
+            rm -rf "$package_path"
+            ;;
+        *)
+            echo "ðŸŒ Unknown magical command: $action"
+            exit 1
+            ;;
+    esac
+}
+
+[ $# -lt 2 ] && echo "Usage: seed [plant|unplant] package**name" && exit 1
+handle_package "$@"
