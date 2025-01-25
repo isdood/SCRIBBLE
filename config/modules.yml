@@ -1,0 +1,11 @@
+modules:
+  sparkle:
+    path: lib/sparkle
+    version: 1.0.0
+    dependencies:
+      - core
+      - std
+    features:
+      - package_management
+      - build_system
+      - pattern_matching
