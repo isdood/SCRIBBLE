@@ -25,75 +25,21 @@ get_git_root() {
     git rev-parse --show-toplevel
 }
 
-# Function to ensure git configuration is correct
-setup_git_config() {
-    echo -e "\n${BLUE}🔧 Setting up Git configuration...${NC}"
-
-    # Get the git root directory
-    local git_root=$(get_git_root)
-
-    # Update git config for the repository
-    git config push.default current
-    git config pull.rebase true
-
-    # Create git_push script in the repository root
-    mkdir -p "${git_root}/bin"
-    cat > "${git_root}/bin/git_push" << 'GITPUSH'
-#!/bin/bash
-set -euo pipefail
-
-# Get current branch
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-# Ensure we have latest changes
-git fetch origin "${CURRENT_BRANCH}" || true
-
-# Add all changes
-git add .
-
-# Commit with timestamp
-git commit -m "dbg: $(date -u '+%Y-%m-%d %H:%M:%S')" || true
-
-# Push to current branch explicitly
-git push origin "${CURRENT_BRANCH}:${CURRENT_BRANCH}"
-GITPUSH
-
-    chmod +x "${git_root}/bin/git_push"
-}
-
 # Function to ensure we're on the sparkle branch
 setup_git_branch() {
     echo -e "\n${BLUE}🔄 Setting up Git branch...${NC}"
 
-    # Ensure we have the latest changes
-    git fetch origin
-
-    # Switch to or create sparkle branch
+    # Create or switch to sparkle branch
     if git rev-parse --verify sparkle >/dev/null 2>&1; then
         echo "Switching to existing sparkle branch..."
         git checkout sparkle
-        git pull origin sparkle || true
     else
         echo "Creating new sparkle branch..."
         git checkout -b sparkle
-        git push -u origin sparkle || true
     fi
 }
 
-# Function to push changes safely
-safe_push() {
-    echo -e "\n${BLUE}🚀 Pushing changes...${NC}"
-    local branch=$(git rev-parse --abbrev-ref HEAD)
-
-    # Ensure branch exists on remote
-    git push origin "${branch}:${branch}" || {
-        echo -e "${RED}Failed to push directly. Attempting to fix...${NC}"
-        git fetch origin
-        git push -u origin "${branch}"
-    }
-}
-
-# Function to create necessary files
+# Function to create necessary module files
 create_module_files() {
     echo -e "\n${BLUE}📝 Creating module files...${NC}"
     local git_root=$(get_git_root)
@@ -103,7 +49,7 @@ create_module_files() {
 module Scribble
   module Sparkle
     VERSION = "1.0.0"
-    CREATED = "2025-01-25 02:55:14"
+    CREATED = "2025-01-25 02:59:24"
     TENDER  = "isdood"
 
     def self.root_path
@@ -138,27 +84,30 @@ modules:
 MODULES
 }
 
-# Function to commit changes
+# Function to stage and commit changes
 commit_changes() {
     echo -e "\n${BLUE}📦 Committing changes...${NC}"
     local git_root=$(get_git_root)
 
-    # Stage changes
-    git add mod.cr || true
-    git add "${git_root}/config/modules.yml" || true
-    git add "${git_root}/bin/git_push" || true
+    # Stage all changes
+    git add .
 
-    # Commit
     git commit -m "feat: integrate sparkle module with scribble framework
 
 - Add Crystal module definition
 - Configure module in Scribble framework
 - Set up proper module structure
-- Fix git push handling
 - Update module configuration
 
-Created: 2025-01-25 02:55:14
+Created: 2025-01-25 02:59:24
 Author: isdood" || true
+}
+
+# Function to push changes
+push_changes() {
+    echo -e "\n${BLUE}🚀 Pushing changes...${NC}"
+    local BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    git push origin "${BRANCH}"
 }
 
 # Main execution
@@ -167,9 +116,6 @@ main() {
 
     # Verify we're in the right directory
     check_sparkle_dir
-
-    # Setup git configuration
-    setup_git_config
 
     # Setup git branch
     setup_git_branch
@@ -180,14 +126,15 @@ main() {
     # Commit changes
     commit_changes
 
-    # Push changes safely
-    safe_push
+    # Push changes
+    push_changes
 
     echo -e "\n${GREEN}✨ Integration completed successfully!${NC}"
     echo -e "${BLUE}Next steps:${NC}"
     echo "1. Visit: https://github.com/isdood/scribble/pull/new/sparkle"
     echo "2. Create a pull request to merge the sparkle branch into main"
     echo "3. Add reviewers and wait for approval"
+    echo -e "\n${PURPLE}Note: Use your fish function git_push to push future changes${NC}"
 }
 
 # Run the script
