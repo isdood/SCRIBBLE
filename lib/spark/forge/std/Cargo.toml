@@ -1,0 +1,13 @@
+[package]
+name = "spark-std"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "0.2"
+num_cpus = "1.15"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+raw-cpuid = "10.6"
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
