@@ -1,118 +1,162 @@
-cat > "sparkle_demo.sh" << 'SPARKLEDEMO'
 #!/bin/bash
 
 # Set strict error handling
 set -euo pipefail
 IFS=$'\n\t'
 
-echo "📝 Creating seed package manager..."
-
-mkdir -p bin
-
-# Create the main seed script
-cat > "bin/seed" << 'SEED_SCRIPT'
-#!/bin/bash
-
 PURPLE='\033[0;35m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+RED='\033[0;31m'
 NC='\033[0m'
 
-function show_garden_status() {
-    echo -e "${PURPLE}🌱 Garden Status${NC}"
-    echo -e "└─ ${GREEN}Blooming Packages${NC}"
+echo -e "${PURPLE}🌟 Sparkle Git Integration Setup${NC}"
 
-    if [ -f "config.sparkle" ]; then
-        local in_modules=false
-        while IFS= read -r line; do
-            if [[ $line == *"modules:"* ]]; then
-                in_modules=true
-                continue
-            elif [[ $line == *"packages:"* ]]; then
-                in_modules=false
-                continue
-            fi
-
-            if [ "$in_modules" = true ] && [[ $line =~ ^\ \ -\ name:\ \"([^\"]+)\" ]]; then
-                local module_name="${BASH_REMATCH[1]}"
-                local module_path="$module_name"
-                local module_status="✨ Active"
-
-                if [ -d "$module_path" ]; then
-                    echo "   └─ 🌺 ${module_name} (${module_status})"
-                fi
-            fi
-        done < "config.sparkle"
-    else
-        echo "   └─ No packages planted yet"
+# Function to check if we're in the sparkle directory
+check_sparkle_dir() {
+    if [[ ! "$PWD" =~ /sparkle$ ]]; then
+        echo -e "${RED}Error: Must be run from the sparkle directory${NC}"
+        exit 1
     fi
 }
 
-function plant_package() {
-    local package=$1
-    echo -e "${PURPLE}🌱 Planting $package...${NC}"
-    mkdir -p "$package"
-    echo -e "${GREEN}✨ Package $package has taken root!${NC}"
+# Function to get git root directory
+get_git_root() {
+    git rev-parse --show-toplevel
 }
 
-function unplant_package() {
-    local package=$1
-    echo -e "${PURPLE}🍂 Gently removing $package...${NC}"
-    rm -rf "$package"
-    echo -e "${GREEN}✨ Package $package has been returned to stardust${NC}"
+# Function to ensure we're on the sparkle branch
+setup_git_branch() {
+    echo -e "\n${BLUE}🔄 Setting up Git branch...${NC}"
+
+    # Create or switch to sparkle branch
+    if git rev-parse --verify sparkle >/dev/null 2>&1; then
+        echo "Switching to existing sparkle branch..."
+        git checkout sparkle
+    else
+        echo "Creating new sparkle branch..."
+        git checkout -b sparkle
+    fi
 }
 
-case "$1" in
-    "plant")
-        if [ -z "${2:-}" ]; then
-            echo -e "${BLUE}Usage: ./bin/seed plant std**math${NC}"
-            exit 1
-        fi
-        plant_package "$2"
-        ;;
-    "unplant")
-        if [ -z "${2:-}" ]; then
-            echo -e "${BLUE}Usage: ./bin/seed unplant std**math${NC}"
-            exit 1
-        fi
-        unplant_package "$2"
-        ;;
-    "status")
-        show_garden_status
-        ;;
-    *)
-        echo -e "${PURPLE}🌱 Seed Package Manager${NC}"
-        echo "Usage:"
-        echo "  ./bin/seed plant std**math     - Plant a new package"
-        echo "  ./bin/seed unplant std**math   - Remove a package"
-        echo "  ./bin/seed status              - Show package status"
-        ;;
-esac
-SEED_SCRIPT
+# Function to create necessary module files
+create_module_files() {
+    echo -e "\n${BLUE}📝 Creating module files...${NC}"
+    local git_root=$(get_git_root)
 
-chmod +x bin/seed
+    # Create Crystal module definition
+    cat > "mod.cr" << 'MOD'
+module Scribble
+  module Sparkle
+    VERSION = "1.0.0"
+    CREATED = "2025-01-25 02:51:59"
+    TENDER  = "isdood"
 
-# Create example configuration
-echo "📝 Creating example configuration..."
-cat > "config.sparkle" << 'CONFIG'
-# Sparkle Garden Configuration
-garden:
-  version: "1.0.0"
-  created: "2025-01-25 02:44:36"
-  tender: "isdood"
+    def self.root_path
+      File.dirname(__FILE__)
+    end
 
+    def self.pattern_path
+      File.join(root_path, "patterns")
+    end
+
+    def self.config_path
+      File.join(root_path, "config.sparkle")
+    end
+  end
+end
+MOD
+
+    # Create module configuration
+    mkdir -p "${git_root}/config"
+    cat > "${git_root}/config/modules.yml" << 'MODULES'
 modules:
-  - name: "std**math"
-    version: "1.0.0"
-    description: "Mathematical operations with moonlit precision"
-    path: "std**math"
-CONFIG
+  sparkle:
+    path: lib/sparkle
+    version: 1.0.0
+    dependencies:
+      - core
+      - std
+    features:
+      - package_management
+      - build_system
+      - pattern_matching
+MODULES
+}
 
-echo -e "\n✨ Demo script created successfully!"
-echo -e "Try running:"
-echo -e "  ./bin/seed status"
-echo -e "  ./bin/seed plant std**math"
-echo -e "  ./bin/seed unplant std**math"
-SPARKLEDEMO
+# Function to stage and commit changes
+commit_changes() {
+    echo -e "\n${BLUE}📦 Committing changes...${NC}"
+    local git_root=$(get_git_root)
 
-chmod +x sparkle_demo.sh
+    git add mod.cr
+    git add "${git_root}/config/modules.yml"
+
+    git commit -m "feat: integrate sparkle module with scribble framework
+
+- Add Crystal module definition
+- Configure module in Scribble framework
+- Set up proper module structure
+- Update module configuration
+
+Created: 2025-01-25 02:51:59
+Author: isdood"
+}
+
+# Function to attempt pushing changes
+push_changes() {
+    echo -e "\n${BLUE}🚀 Pushing changes...${NC}"
+
+    # First try to push
+    if git push origin sparkle 2>/dev/null; then
+        echo -e "${GREEN}✨ Changes pushed successfully!${NC}"
+    else
+        echo -e "${BLUE}⚠️  Need to integrate with main first...${NC}"
+
+        # Fetch latest main
+        git fetch origin main
+
+        # Try to rebase on main
+        if git rebase origin/main; then
+            echo "Rebased on main, pushing changes..."
+            git push origin sparkle --force-with-lease
+        else
+            echo -e "${RED}⚠️  Rebase conflicts detected. Please resolve manually:${NC}"
+            echo "1. Resolve the conflicts in the files"
+            echo "2. git add . "
+            echo "3. git rebase --continue"
+            echo "4. git push origin sparkle --force-with-lease"
+            exit 1
+        fi
+    fi
+}
+
+# Main execution
+main() {
+    echo -e "${BLUE}🔍 Starting Sparkle module integration...${NC}"
+
+    # Verify we're in the right directory
+    check_sparkle_dir
+
+    # Setup git branch
+    setup_git_branch
+
+    # Create module files
+    create_module_files
+
+    # Commit changes
+    commit_changes
+
+    # Push changes
+    push_changes
+
+    echo -e "\n${GREEN}✨ Integration completed successfully!${NC}"
+    echo -e "${BLUE}Next steps:${NC}"
+    echo "1. Visit: https://github.com/isdood/scribble/pull/new/sparkle"
+    echo "2. Create a pull request to merge the sparkle branch into main"
+    echo "3. Add reviewers and wait for approval"
+}
+
+# Run the script
+main
+
