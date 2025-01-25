@@ -1,0 +1,13 @@
+[package]
+name = "forge"
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
+description = "Spark language forge compiler"
+
+[[bin]]
+name = "forge"
+path = "src/main.rs"
+
+[dependencies]
+colored = "2.0"

@@ -1,0 +1,14 @@
+# Forge Compiler Documentation
+**Version:** 0.3.0  
+**Author:** isdood  
+**Last Updated:** 2025-01-25 15:25:28
+
+## Overview
+Forge is the official compiler for the Spark programming language, designed to provide multi-stage compilation with safety-level awareness and advanced optimization capabilities.
+
+## Core Features
+
+### 1. Safety-Level Compilation
+```bash
+# Compile with different safety levels
+forge compile src

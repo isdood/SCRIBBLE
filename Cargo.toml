@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "lib/mathplz/lib/rust"
-]
+, "lib/spark/forge"]
 
 [profile.release]
 lto = "fat"

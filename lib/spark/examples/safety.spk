@@ -1,0 +1,20 @@
+~forge~ = calm  // File-level safety setting
+
+@spells@
+// Function with default (file-level) safety
+pub fn safe_operation(x: i32) -> i32 {
+    x + 1
+}
+
+// Function with minimal safety
+~forge~ = wild
+pub fn unsafe_operation(ptr: *mut i32) -> i32 {
+    unsafe { *ptr }
+}
+
+// Function with balanced safety
+~forge~ = balanced
+pub fn mixed_safety(x: Option<i32>) -> i32 {
+    x.unwrap_or(0)
+}
+@spells@
