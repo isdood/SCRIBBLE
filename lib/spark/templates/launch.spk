@@ -1,0 +1,18 @@
+~forge~ = calm  # Safety level
+
+~features~ = [
+    "simd",
+    "async"
+]
+
+@seeds@
+std**math
+std**io
+@seeds@
+
+@spells@
+pfn main[] -> i32 [
+    println["Hello from Spark!"];
+    0
+]
+@spells@

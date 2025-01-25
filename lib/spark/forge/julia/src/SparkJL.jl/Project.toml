@@ -1,0 +1,16 @@
+name = "SparkJL"
+uuid = "d7891abc-4510-51ab-9240-a78b42f11234"
+authors = ["isdood <isdood@users.noreply.github.com>"]
+version = "0.2.0"
+
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+SIMD = "fdea26ae-647d-5447-a871-4b548cad5224"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[compat]
+julia = "1.9"
+CUDA = "5.0"
+DataStructures = "0.18"
+SIMD = "3.4"

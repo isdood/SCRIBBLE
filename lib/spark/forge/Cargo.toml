@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [
+    "std",
+    "safety"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
+repository = "https://github.com/isdood/scribble"
+
+[workspace.dependencies]
+thiserror = "2.0.11"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.137"
+criterion = "0.5"

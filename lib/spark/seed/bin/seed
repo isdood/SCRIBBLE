@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+PURPLE='\033[0;35m'
+NC='\033[0m'
+
+case "$1" in
+    "plant")
+        echo -e "${PURPLE}🌱 Planting seed: $2${NC}"
+        # TODO: Implement package installation
+        ;;
+    "unplant")
+        echo -e "${PURPLE}🗑️  Removing seed: $2${NC}"
+        # TODO: Implement package removal
+        ;;
+    "garden")
+        echo -e "${PURPLE}🪴 Your seed garden:${NC}"
+        # TODO: Implement package listing
+        ;;
+    *)
+        echo -e "${PURPLE}Usage: seed [plant|unplant|garden] [package]${NC}"
+        ;;
+esac

@@ -47,6 +47,12 @@ pub type ShimmerResult<T> = Result<T, ShimmerError>;
 #[derive(Clone, Copy)]
 struct RawPtr(*mut c_void);
 
+impl RawPtr {
+    fn is_null(self) -> bool {
+        self.0.is_null()
+    }
+}
+
 impl fmt::Debug for RawPtr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:p}", self.0)
@@ -54,8 +60,23 @@ impl fmt::Debug for RawPtr {
 }
 
 /// Wrapper for dynamic data
-#[derive(Clone)]
 struct DynamicData(Box<dyn Any + Send + Sync>);
+
+impl DynamicData {
+    fn new<T: Any + Send + Sync>(value: T) -> Self {
+        Self(Box::new(value))
+    }
+
+    fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        self.0.downcast_ref()
+    }
+}
+
+impl Clone for DynamicData {
+    fn clone(&self) -> Self {
+        Self(Box::new(()))
+    }
+}
 
 impl fmt::Debug for DynamicData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -72,6 +93,13 @@ pub struct ShimmerContext {
     data: DynamicData,
 }
 
+impl ShimmerContext {
+    /// Get the context data if it matches the expected type
+    pub fn get_data<T: Any>(&self) -> Option<&T> {
+        self.data.downcast_ref()
+    }
+}
+
 unsafe impl Send for ShimmerContext {}
 unsafe impl Sync for ShimmerContext {}
 
@@ -84,6 +112,18 @@ pub struct ShimmerFn<T> {
     ctx: Arc<ShimmerContext>,
     /// Function type
     _phantom: PhantomData<T>,
+}
+
+impl<T> ShimmerFn<T> {
+    /// Check if the function pointer is valid
+    pub fn is_valid(&self) -> bool {
+        !self.ptr.is_null()
+    }
+
+    /// Get the associated context
+    pub fn context(&self) -> &ShimmerContext {
+        &self.ctx
+    }
 }
 
 unsafe impl<T> Send for ShimmerFn<T> {}
@@ -102,9 +142,14 @@ impl Shimmer {
         Self {
             context: Arc::new(ShimmerContext {
                 lib: Arc::new(RawPtr(std::ptr::null_mut())),
-                data: DynamicData(Box::new(())),
+                data: DynamicData::new(()),
             }),
         }
+    }
+
+    /// Get the current context data if it matches the expected type
+    pub fn get_data<T: Any>(&self) -> Option<&T> {
+        self.context.get_data()
     }
 
     /// Loads a dynamic library
@@ -123,7 +168,7 @@ impl Shimmer {
 
         self.context = Arc::new(ShimmerContext {
             lib: Arc::new(RawPtr(lib)),
-            data: DynamicData(Box::new(())),
+            data: DynamicData::new(()),
         });
 
         Ok(())
