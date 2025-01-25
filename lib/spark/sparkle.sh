@@ -2,7 +2,7 @@
 
 # Sparkle - Spark Runtime Terminal v0.1
 # Author: isdood
-# Created: 2025-01-25 23:08:12 UTC
+# Created: 2025-01-25 23:14:50 UTC
 # Repository: isdood/scribble
 
 set -e
@@ -31,6 +31,7 @@ using REPL.LineEdit
 
 # Create Sparkle module to contain our REPL functionality
 module Sparkle
+export crystal, wave, weave, optimize
 
 using REPL
 using REPL.LineEdit
@@ -59,24 +60,24 @@ mutable struct SparkleState
     patterns::Dict{String,Pattern}
 end
 
-const state = SparkleState(nothing, nothing, patterns)
+const GLOBAL_STATE = SparkleState(nothing, nothing, patterns)
 
 # Command implementations
 function crystal(dims::Tuple{Int,Int,Int}=(32,32,32), spacing::Float64=1.0)
-    state.current_crystal = Crystal(dims, spacing)
+    GLOBAL_STATE.current_crystal = Crystal(dims, spacing)
     println("Created crystal structure with dimensions $(dims) and spacing $(spacing)")
-    return state.current_crystal
+    return GLOBAL_STATE.current_crystal
 end
 
 function wave(n::Int=100)
     data = randn(n)
-    state.current_wave = Wave(data, 1.0)
+    GLOBAL_STATE.current_wave = Wave(data, 1.0)
     println("Created wave pattern with $(n) points")
-    return state.current_wave
+    return GLOBAL_STATE.current_wave
 end
 
 function weave(pattern::String="default")
-    if isnothing(state.current_wave)
+    if isnothing(GLOBAL_STATE.current_wave)
         println("Error: No wave pattern to weave. Create one first with 'wave'")
         return nothing
     end
@@ -85,21 +86,33 @@ function weave(pattern::String="default")
         return nothing
     end
     println("Applied $(pattern) weave pattern to wave")
-    patterns[pattern].transform(state.current_wave)
+    result = patterns[pattern].transform(GLOBAL_STATE.current_wave)
+    println("Pattern applied successfully")
+    return result
 end
 
 function optimize()
-    if isnothing(state.current_crystal) && isnothing(state.current_wave)
+    if isnothing(GLOBAL_STATE.current_crystal) && isnothing(GLOBAL_STATE.current_wave)
         println("Error: Nothing to optimize. Create a crystal or wave first")
         return nothing
     end
-    println("Optimizing current structure...")
-    if !isnothing(state.current_crystal)
-        println("Crystal optimization complete")
+    println("\nOptimizing current structure...")
+
+    if !isnothing(GLOBAL_STATE.current_crystal)
+        println("• Crystal optimization:")
+        println("  - Dimensions: $(GLOBAL_STATE.current_crystal.dimensions)")
+        println("  - Spacing: $(GLOBAL_STATE.current_crystal.spacing)")
+        println("  ✓ Crystal optimization complete")
     end
-    if !isnothing(state.current_wave)
-        println("Wave optimization complete")
+
+    if !isnothing(GLOBAL_STATE.current_wave)
+        println("• Wave optimization:")
+        println("  - Points: $(length(GLOBAL_STATE.current_wave.data))")
+        println("  - Frequency: $(GLOBAL_STATE.current_wave.frequency)")
+        println("  ✓ Wave optimization complete")
     end
+
+    return (crystal=GLOBAL_STATE.current_crystal, wave=GLOBAL_STATE.current_wave)
 end
 
 # Register default patterns
@@ -133,8 +146,20 @@ function process_sparkle(s::LineEdit.MIState)
     else
         try
             expr = Meta.parse(input)
-            result = Core.eval(Sparkle, expr)
-            println(result)
+            # Check if it's just a bare symbol (command name)
+            if expr isa Symbol
+                # Convert symbol to function call
+                expr = Expr(:call, expr)
+            end
+            # Evaluate in Sparkle module context
+            result = Base.eval(Sparkle, expr)
+            if result !== nothing
+                if result isa NamedTuple  # For optimize results
+                    # Results already printed in function
+                elseif result isa Union{Crystal,Wave}  # For crystal/wave results
+                    # Already printed in the function
+                end
+            end
         catch e
             printstyled("Error: ", bold=true, color=:red)
             println(e)
