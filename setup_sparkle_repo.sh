@@ -1,4 +1,3 @@
-cat > "setup_sparkle_repo.sh" << 'SETUPSCRIPT'
 #!/bin/bash
 
 # Set up sparkle repository
@@ -22,6 +21,3 @@ cd ..
 git push origin master
 
 echo "✨ Sparkle repository and submodule setup complete!"
-SETUPSCRIPT
-
-chmod +x setup_sparkle_repo.sh
