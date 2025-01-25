@@ -1,0 +1,125 @@
+#!/bin/bash
+
+PURPLE='\033[0;35m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+function show_garden_status() {
+    echo -e "${PURPLE}🌱 Garden Status${NC}"
+    echo -e "└─ ${GREEN}Blooming Packages${NC}"
+
+    if [ -f "config.sparkle" ]; then
+        local in_modules=false
+        while IFS= read -r line; do
+            if [[ $line == *"modules:"* ]]; then
+                in_modules=true
+                continue
+            elif [[ $line == *"packages:"* ]]; then
+                in_modules=false
+                continue
+            fi
+
+            if [ "$in_modules" = true ] && [[ $line =~ ^\ \ -\ name:\ \"([^\"]+)\" ]]; then
+                local module_name="${BASH_REMATCH[1]}"
+                local module_path=$(echo "$module_name" | sed 's/\*\*/\//g')
+                local module_status="✨ Active"
+
+                if [ -d "$module_path" ]; then
+                    echo "   └─ 🌺 ${module_name} (${module_status})"
+                fi
+            fi
+        done < "config.sparkle"
+    else
+        echo "   └─ No packages planted yet"
+    fi
+}
+
+function plant_package() {
+    local package=$1
+    echo -e "${PURPLE}🌱 Planting $package...${NC}"
+    local package_path=$(echo "$package" | sed 's/\*\*/\//g')
+
+    if [ ! -f "config.sparkle" ]; then
+        cat > "config.sparkle" << CONF
+# Sparkle Garden Configuration
+garden:
+  version: "1.0.0"
+  created: "2025-01-25 02:04:26"
+  tender: "isdood"
+
+modules:
+  - name: "std**math"
+    version: "1.0.0"
+    description: "Mathematical operations with moonlit precision"
+    path: "std/math"
+
+packages:
+CONF
+    fi
+
+    mkdir -p "$package_path"
+
+    cat > "$package_path/config.spark" << SPARKCONFIG
+# Package: $package
+pattern:
+  weave: 500  # Thread weaving intensity
+  bio: false  # Bio-computational mode
+
+garden:
+  planted: "2025-01-25 02:04:26"
+  tender: "isdood"
+  sparkles: ["add", "sub", "mul", "div"]
+
+whispers:
+  - "Numbers dance in moonlit arrays"
+  - "Calculations flow like starlight"
+SPARKCONFIG
+
+    if ! grep -q "name: \"$package\"" "config.sparkle"; then
+        sed -i "/modules:/a \ \ - name: \"$package\"\n    version: \"1.0.0\"\n    description: \"Module $package\"\n    path: \"$package_path\"" "config.sparkle"
+    fi
+
+    echo -e "${GREEN}✨ Package $package has taken root!${NC}"
+}
+
+function unplant_package() {
+    local package=$1
+    local package_path=$(echo "$package" | sed 's/\*\*/\//g')
+    echo -e "${PURPLE}🍂 Gently removing $package...${NC}"
+
+    if [ -f "config.sparkle" ]; then
+        sed -i "/name: \"$package\"/,+3d" "config.sparkle"
+        rm -rf "$package_path"
+        echo -e "${GREEN}✨ Package $package has been returned to stardust${NC}"
+    else
+        echo -e "${BLUE}No garden found. Create one with 'seed plant'${NC}"
+    fi
+}
+
+case "$1" in
+    "plant")
+        if [ -z "$2" ]; then
+            echo -e "${BLUE}Usage: ./bin/seed plant std**math${NC}"
+            exit 1
+        fi
+        plant_package "$2"
+        ;;
+    "unplant")
+        if [ -z "$2" ]; then
+            echo -e "${BLUE}Usage: ./bin/seed unplant std**math${NC}"
+            exit 1
+        fi
+        unplant_package "$2"
+        ;;
+    "status")
+        show_garden_status
+        ;;
+    *)
+        echo -e "${PURPLE}🌱 Seed Package Manager${NC}"
+        echo "Usage:"
+        echo "  ./bin/seed plant std**math     - Plant a new package in your garden"
+        echo "  ./bin/seed unplant std**math   - Gently remove a package"
+        echo "  ./bin/seed status              - Show your blooming packages"
+        ;;
+esac
