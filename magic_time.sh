@@ -25,14 +25,43 @@ get_git_root() {
     git rev-parse --show-toplevel
 }
 
+# Function to fix git push command
+fix_git_push() {
+    echo -e "\n${BLUE}🔧 Setting up Git push command...${NC}"
+    local git_root=$(get_git_root)
+
+    # Create or update git_push script
+    cat > "${git_root}/bin/git_push" << 'GITPUSH'
+#!/bin/bash
+
+# Get current branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Add all changes
+git add .
+
+# Commit with timestamp
+git commit -m "dbg: $(date -u '+%Y-%m-%d %H:%M:%S')"
+
+# Push to current branch
+git push origin "${CURRENT_BRANCH}"
+GITPUSH
+
+    chmod +x "${git_root}/bin/git_push"
+}
+
 # Function to ensure we're on the sparkle branch
 setup_git_branch() {
     echo -e "\n${BLUE}🔄 Setting up Git branch...${NC}"
+
+    # Fetch all branches
+    git fetch origin
 
     # Create or switch to sparkle branch
     if git rev-parse --verify sparkle >/dev/null 2>&1; then
         echo "Switching to existing sparkle branch..."
         git checkout sparkle
+        git pull origin sparkle || true
     else
         echo "Creating new sparkle branch..."
         git checkout -b sparkle
@@ -49,7 +78,7 @@ create_module_files() {
 module Scribble
   module Sparkle
     VERSION = "1.0.0"
-    CREATED = "2025-01-25 02:51:59"
+    CREATED = "2025-01-25 02:53:12"
     TENDER  = "isdood"
 
     def self.root_path
@@ -82,6 +111,9 @@ modules:
       - build_system
       - pattern_matching
 MODULES
+
+    # Ensure bin directory exists
+    mkdir -p "${git_root}/bin"
 }
 
 # Function to stage and commit changes
@@ -91,6 +123,7 @@ commit_changes() {
 
     git add mod.cr
     git add "${git_root}/config/modules.yml"
+    git add "${git_root}/bin/git_push"
 
     git commit -m "feat: integrate sparkle module with scribble framework
 
@@ -98,8 +131,9 @@ commit_changes() {
 - Configure module in Scribble framework
 - Set up proper module structure
 - Update module configuration
+- Fix git push command
 
-Created: 2025-01-25 02:51:59
+Created: 2025-01-25 02:53:12
 Author: isdood"
 }
 
@@ -144,6 +178,9 @@ main() {
     # Create module files
     create_module_files
 
+    # Fix git push command
+    fix_git_push
+
     # Commit changes
     commit_changes
 
@@ -155,6 +192,7 @@ main() {
     echo "1. Visit: https://github.com/isdood/scribble/pull/new/sparkle"
     echo "2. Create a pull request to merge the sparkle branch into main"
     echo "3. Add reviewers and wait for approval"
+    echo -e "\n${PURPLE}Note: The git_push command has been updated to work with the current branch${NC}"
 }
 
 # Run the script
