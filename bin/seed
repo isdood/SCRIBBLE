@@ -8,10 +8,27 @@ NC='\033[0m'
 function show_garden_status() {
     echo -e "${PURPLE}🌱 Garden Status${NC}"
     echo -e "└─ ${GREEN}Blooming Packages${NC}"
+
     if [ -f "config.sparkle" ]; then
+        local in_modules=false
         while IFS= read -r line; do
-            if [[ $line =~ ^name:\ \"([^\"]+)\" ]]; then
-                echo "   └─ 🌺 ${BASH_REMATCH[1]}"
+            if [[ $line == *"modules:"* ]]; then
+                in_modules=true
+                continue
+            elif [[ $line == *"packages:"* ]]; then
+                in_modules=false
+                continue
+            fi
+
+            if [ "$in_modules" = true ] && [[ $line =~ ^\ \ -\ name:\ \"([^\"]+)\" ]]; then
+                local module_name="${BASH_REMATCH[1]}"
+                local module_path=$(echo "$module_name" | sed 's/\*\*/\//g')
+                local module_status="✨ Active"
+
+                # Check if module is actually installed
+                if [ -d "$module_path" ]; then
+                    echo "   └─ 🌺 ${module_name} (${module_status})"
+                fi
             fi
         done < "config.sparkle"
     else
@@ -21,64 +38,67 @@ function show_garden_status() {
 
 function plant_package() {
     local package=$1
+    local package_path=$(echo "$package" | sed 's/\*\*/\//g')
     echo -e "${PURPLE}🌱 Planting $package...${NC}"
 
     # Create config.sparkle if it doesn't exist
     if [ ! -f "config.sparkle" ]; then
-        echo "# Sparkle Garden Configuration" > config.sparkle
-        echo "garden:" >> config.sparkle
-        echo "  version: \"1.0.0\"" >> config.sparkle
-        echo -e "\npackages:" >> config.sparkle
+        cat > "config.sparkle" << CONF
+# Sparkle Garden Configuration
+garden:
+  version: "1.0.0"
+  created: "2025-01-25 01:52:58"
+  tender: "isdood"
+
+modules:
+  - name: "std**math"
+    version: "1.0.0"
+    description: "Mathematical operations with moonlit precision"
+    path: "std/math"
+
+packages:
+CONF
     fi
 
-    # Create package's config.spark
-    mkdir -p "packages/$package"
-    cat > "packages/$package/config.spark" << SPARKCONFIG
+    # Create package directory structure if it doesn't exist
+    mkdir -p "$package_path"
+
+    # Create or update package's config.spark
+    cat > "$package_path/config.spark" << SPARKCONFIG
 # Package: $package
 pattern:
   weave: 500  # Thread weaving intensity
   bio: false  # Bio-computational mode
 
 garden:
-  planted: "$(date -u +%Y-%m-%d\ %H:%M:%S)"
-  tender: "$USER"
+  planted: "2025-01-25 01:52:58"
+  tender: "isdood"
+  sparkles: ["add", "sub", "mul", "div"]
+
+whispers:
+  - "Numbers dance in moonlit arrays"
+  - "Calculations flow like starlight"
 SPARKCONFIG
 
-    # Add package to config.sparkle
-    echo "  - name: \"$package\"" >> config.sparkle
-    echo "    version: \"latest\"" >> config.sparkle
-    echo "    config: \"packages/$package/config.spark\"" >> config.sparkle
+    # Add to modules if not already present
+    if ! grep -q "name: \"$package\"" "config.sparkle"; then
+        sed -i "/modules:/a \ \ - name: \"$package\"\n    version: \"1.0.0\"\n    description: \"Module $package\"\n    path: \"$package_path\"" "config.sparkle"
+    fi
 
     echo -e "${GREEN}✨ Package $package has taken root!${NC}"
 }
 
 function unplant_package() {
     local package=$1
+    local package_path=$(echo "$package" | sed 's/\*\*/\//g')
     echo -e "${PURPLE}🍂 Gently removing $package...${NC}"
 
     if [ -f "config.sparkle" ]; then
-        # Create temporary file
-        touch config.sparkle.tmp
-
-        # Remove package from config.sparkle
-        local removing=false
-        while IFS= read -r line; do
-            if [[ $line =~ ^\ \ -\ name:\ \"$package\" ]]; then
-                removing=true
-                continue
-            elif [[ $line =~ ^\ \ -\ name:\ * ]] && [ "$removing" = true ]; then
-                removing=false
-            fi
-
-            if [ "$removing" = false ]; then
-                echo "$line" >> config.sparkle.tmp
-            fi
-        done < "config.sparkle"
-
-        mv config.sparkle.tmp config.sparkle
+        # Remove from modules section
+        sed -i "/name: \"$package\"/,+3d" "config.sparkle"
 
         # Remove package directory
-        rm -rf "packages/$package"
+        rm -rf "$package_path"
 
         echo -e "${GREEN}✨ Package $package has been returned to stardust${NC}"
     else
