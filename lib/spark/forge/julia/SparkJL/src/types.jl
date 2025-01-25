@@ -1,7 +1,3 @@
-"""
-Base types for SparkJL
-"""
-
 struct WeavePattern
     factor::UInt16
     zx_ratio::Float64
@@ -15,3 +11,16 @@ struct WeavePattern
 end
 
 @enum BasePair ZX QW
+
+mutable struct Wave
+    data::Vector{Float64}
+    is_optimized::Bool
+    simd_enabled::Bool
+end
+
+Wave(data::Vector{Float64}) = Wave(data, false, false)
+
+struct Crystal
+    dimensions::NTuple{3,Int}
+    spacing::Float64
+end

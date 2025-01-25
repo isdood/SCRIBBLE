@@ -1,7 +1,3 @@
-"""
-Thread distribution functionality
-"""
-
 function distribute_threads(pattern::WeavePattern)
     n_threads = Threads.nthreads()
     pairs = Vector{BasePair}(undef, n_threads)

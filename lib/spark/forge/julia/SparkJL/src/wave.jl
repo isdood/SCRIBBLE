@@ -1,16 +1,3 @@
-"""
-Wave implementation
-"""
-
-mutable struct Wave
-    data::Vector{Float64}
-    is_optimized::Bool
-    simd_enabled::Bool
-    gpu_enabled::Bool
-end
-
-Wave(data::Vector{Float64}) = Wave(data, false, false, false)
-
 function weave!(wave::Wave, pattern::WeavePattern)
     pairs = distribute_threads(pattern)
     n_threads = length(pairs)
@@ -27,13 +14,6 @@ function weave!(wave::Wave, pattern::WeavePattern)
     end
 
     wave.is_optimized = true
+    wave.simd_enabled = true
     wave
-end
-
-function optimize_chunk!(wave::Wave, range::UnitRange, pair::BasePair)
-    if pair == ZX
-        optimize_compute!(wave, range)
-    else
-        optimize_memory!(wave, range)
-    end
 end
