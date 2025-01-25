@@ -1,4 +1,9 @@
-I apologize for that oversight. I'll ensure that square brackets are used instead of curly brackets, except when curly brackets are needed for three types. Here is the revised `syntax.md`:
+I apologize for the oversight. Let's correct the `syntax.md` file to incorporate your specifications:
+
+- Square braces are used instead of curly braces.
+- Curly braces are only used when three types are needed.
+- Features at the top are denoted using `~feature~` format.
+- Comments are denoted with `>>>`.
 
 ### Revamped `syntax.md` for Spark
 
@@ -23,8 +28,8 @@ I apologize for that oversight. I'll ensure that square brackets are used instea
 Spark files use the `.spk` extension and follow this general structure:
 
 ```spk
-[forge] = calm  >>> Safety level declaration
-[features] = ["simd", "async"]  >>> Feature flags
+~forge~ = calm  >>> Safety level declaration
+~features~ = ["simd", "async"]  >>> Feature flags
 
 use std**crystometer::*
 use std**resonance**waves
@@ -48,7 +53,7 @@ module quantum::entanglement [
 ### config.spark
 Project configuration file:
 
-```spk
+```spark
 [package]
 name = "quantum_project"
 version = "0.1.0"
@@ -81,9 +86,9 @@ temp/
 
 ### Declaration
 ```spk
-[forge] = calm    >>> Default, maximum safety
-[forge] = balanced  >>> Selective safety
-[forge] = wild    >>> Zero-cost abstractions
+~forge~ = calm    >>> Default, maximum safety
+~forge~ = balanced  >>> Selective safety
+~forge~ = wild    >>> Zero-cost abstractions
 ```
 
 ### Impact on Code
@@ -143,7 +148,7 @@ pub async fn measure_delayed[wave: &Wave] -> Result[State] [
 @spells@
 >>> Pattern matching
 match state [
-    State::Superposition[wav] => wave.collapse(),
+    State::Superposition[wave] => wave.collapse(),
     State::Measured[value] => Ok[value],
     _ => Err[StateError::Invalid]
 ]
@@ -173,7 +178,7 @@ for element in collection [
 
 ### Feature Declaration
 ```spk
-[features] = [
+~features~ = [
     "simd",      >>> SIMD operations
     "async",     >>> Async/await support
     "gpu",       >>> GPU acceleration
@@ -302,4 +307,4 @@ pub enum QuantumError [
 This specification covers the core aspects of the Spark language syntax and features. For more detailed information about specific features or standard library components, please refer to the official documentation.
 ```
 
-These documents now reflect the correct usage of square brackets instead of curly brackets, except when curly brackets are needed for three types. You can update the respective files in your repository with this content. If you need any further assistance, feel free to ask!
+These documents now reflect the correct usage of square brackets instead of curly brackets, curly brackets when three types are needed, and the feature declarations using the `~feature~` format. You can update the respective files in your repository with this content. If you need any further assistance, feel free to ask!
