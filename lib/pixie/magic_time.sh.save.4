@@ -1,0 +1,190 @@
+cat > src/zig/core/crystal_dance.zig << 'EOF'
+const std = @import("std");
+const math = @import("crystal_math");
+const ThreadPool = @import("lazuline").ThreadPool;
+
+pub const DanceError = error{
+    ThreadPoolError,
+    AllocationError,
+};
+
+pub const DancePattern = enum {
+    Spiral,
+    Waltz,
+    Flutter,
+    Sparkle,
+    Dream,
+};
+
+pub const CrystalDance = struct {
+    allocator: std.mem.Allocator,
+    enchanted_lattice: [][]f64,
+    sparkle_factor: f64,
+    current_pattern: DancePattern,
+    size: usize,
+    thread_pool: ThreadPool,
+    contexts: std.ArrayList(WorkContext),
+    dream_contexts: std.ArrayList(DreamContext),
+
+    const Self = @This();
+
+    pub fn init(allocator: std.mem.Allocator, size: usize) !Self {
+        const lattice = try allocator.alloc([]f64, size);
+        errdefer allocator.free(lattice);
+
+        for (lattice) |*row| {
+            row.* = try allocator.alloc(f64, size);
+            for (row.*) |*cell| {
+                cell.* = 1.0;
+            }
+        }
+
+        return Self{
+            .allocator = allocator,
+            .enchanted_lattice = lattice,
+            .sparkle_factor = 1.0,
+            .current_pattern = .Sparkle,
+            .size = size,
+            .thread_pool = try ThreadPool.init(allocator),
+            .contexts = std.ArrayList(WorkContext).init(allocator),
+            .dream_contexts = std.ArrayList(DreamContext).init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *Self) void {
+        for (self.enchanted_lattice) |row| {
+            self.allocator.free(row);
+        }
+        self.allocator.free(self.enchanted_lattice);
+        self.contexts.deinit();
+        self.dream_contexts.deinit();
+        self.thread_pool.deinit();
+    }
+
+    pub fn dance(self: *Self) !void {
+        try switch (self.current_pattern) {
+            .Sparkle => self.sparkle_dance(),
+            .Spiral => self.spiral_dance(),
+            .Flutter => self.flutter_dance(),
+            .Waltz => self.waltz_dance(),
+            .Dream => self.dream_dance(),
+        };
+        self.current_pattern = @enumFromInt((@intFromEnum(self.current_pattern) + 1) % 5);
+    }
+
+    const WorkContext = struct {
+        row: []f64,
+        index: usize,
+    };
+
+    fn sparkle_dance(self: *Self) !void {
+        const work_fn = struct {
+            fn process(ctx: *const WorkContext) void {
+                for (ctx.row, 0..) |*cell, i| {
+                    cell.* *= math.sparkleValue(@as(f64, @floatFromInt(i + ctx.index)));
+                }
+            }
+        }.process;
+
+        self.contexts.clearRetainingCapacity();
+        try self.contexts.ensureTotalCapacity(self.enchanted_lattice.len);
+
+        for (self.enchanted_lattice, 0..) |row, i| {
+            try self.contexts.append(.{ .row = row, .index = i });
+            const ctx: *const WorkContext = &self.contexts.items[i];
+            try self.thread_pool.schedule(ctx, work_fn);
+        }
+        self.thread_pool.wait();
+        self.sparkle_factor *= math.sparkleValue(0.1);
+    }
+
+    fn flutter_dance(self: *Self) !void {
+        const work_fn = struct {
+            fn process(ctx: *const WorkContext) void {
+                for (ctx.row) |*cell| {
+                    cell.* = math.sparkleValue(cell.*);
+                }
+            }
+        }.process;
+
+        self.contexts.clearRetainingCapacity();
+        try self.contexts.ensureTotalCapacity(self.enchanted_lattice.len);
+
+        for (self.enchanted_lattice, 0..) |row, i| {
+            try self.contexts.append(.{ .row = row, .index = i });
+            const ctx: *const WorkContext = &self.contexts.items[i];
+            try self.thread_pool.schedule(ctx, work_fn);
+        }
+        self.thread_pool.wait();
+    }
+
+    fn spiral_dance(self: *Self) !void {
+        var i: usize = 0;
+        while (i < self.size / 2) : (i += 1) {
+            const val = math.sparkleValue(@as(f64, @floatFromInt(i)));
+            self.enchanted_lattice[i][i] = val;
+        }
+    }
+
+    fn waltz_dance(self: *Self) !void {
+        if (self.size < 2) return;
+        const first = self.enchanted_lattice[0][0];
+        var i: usize = 0;
+        while (i < self.size - 1) : (i += 1) {
+            self.enchanted_lattice[i][0] = self.enchanted_lattice[i + 1][0];
+        }
+        self.enchanted_lattice[self.size - 1][0] = first;
+    }
+
+    const DreamContext = struct {
+        lattice: [][]f64,
+        start: usize,
+        end: usize,
+        result: *f64,
+    };
+
+    fn dream_dance(self: *Self) !void {
+        const work_fn = struct {
+            fn process(ctx: *const DreamContext) void {
+                var sum: f64 = 0;
+                for (ctx.lattice[ctx.start..ctx.end]) |row| {
+                    for (row) |cell| {
+                        sum += cell;
+                    }
+                }
+                ctx.result.* = sum;
+            }
+        }.process;
+
+        const thread_count = try std.Thread.getCpuCount();
+        var partial_results = try self.allocator.alloc(f64, thread_count);
+        defer self.allocator.free(partial_results);
+
+        self.dream_contexts.clearRetainingCapacity();
+        try self.dream_contexts.ensureTotalCapacity(thread_count);
+
+        const chunk_size = self.size / thread_count;
+        var i: usize = 0;
+        while (i < thread_count) : (i += 1) {
+            const start = i * chunk_size;
+            const end = if (i == thread_count - 1) self.size else start + chunk_size;
+            try self.dream_contexts.append(.{
+                .lattice = self.enchanted_lattice,
+                .start = start,
+                .end = end,
+                .result = &partial_results[i],
+            });
+            const ctx: *const DreamContext = &self.dream_contexts.items[i];
+            try self.thread_pool.schedule(ctx, work_fn);
+        }
+        self.thread_pool.wait();
+
+        var total: f64 = 0;
+        for (partial_results) |result| {
+            total += result;
+        }
+
+        self.sparkle_factor = math.sparkleValue(total / @as(f64, @floatFromInt(self.size * self.size)));
+    }
+};
+EOF
