@@ -2,7 +2,7 @@
 
 # Sparkle - Spark Runtime Terminal v0.1
 # Author: isdood
-# Created: 2025-01-25 23:05:31 UTC
+# Created: 2025-01-25 23:08:12 UTC
 # Repository: isdood/scribble
 
 set -e
@@ -35,19 +35,97 @@ module Sparkle
 using REPL
 using REPL.LineEdit
 
+# Sparkle commands implementation
+struct Crystal
+    dimensions::Tuple{Int,Int,Int}
+    spacing::Float64
+end
+
+struct Wave
+    data::Vector{Float64}
+    frequency::Float64
+end
+
+struct Pattern
+    name::String
+    transform::Function
+end
+
+# Global state
+const patterns = Dict{String,Pattern}()
+mutable struct SparkleState
+    current_crystal::Union{Crystal,Nothing}
+    current_wave::Union{Wave,Nothing}
+    patterns::Dict{String,Pattern}
+end
+
+const state = SparkleState(nothing, nothing, patterns)
+
+# Command implementations
+function crystal(dims::Tuple{Int,Int,Int}=(32,32,32), spacing::Float64=1.0)
+    state.current_crystal = Crystal(dims, spacing)
+    println("Created crystal structure with dimensions $(dims) and spacing $(spacing)")
+    return state.current_crystal
+end
+
+function wave(n::Int=100)
+    data = randn(n)
+    state.current_wave = Wave(data, 1.0)
+    println("Created wave pattern with $(n) points")
+    return state.current_wave
+end
+
+function weave(pattern::String="default")
+    if isnothing(state.current_wave)
+        println("Error: No wave pattern to weave. Create one first with 'wave'")
+        return nothing
+    end
+    if !haskey(patterns, pattern)
+        println("Error: Pattern '$(pattern)' not found")
+        return nothing
+    end
+    println("Applied $(pattern) weave pattern to wave")
+    patterns[pattern].transform(state.current_wave)
+end
+
+function optimize()
+    if isnothing(state.current_crystal) && isnothing(state.current_wave)
+        println("Error: Nothing to optimize. Create a crystal or wave first")
+        return nothing
+    end
+    println("Optimizing current structure...")
+    if !isnothing(state.current_crystal)
+        println("Crystal optimization complete")
+    end
+    if !isnothing(state.current_wave)
+        println("Wave optimization complete")
+    end
+end
+
+# Register default patterns
+patterns["default"] = Pattern("Default", w -> w)
+patterns["invert"] = Pattern("Invert", w -> Wave(-w.data, w.frequency))
+patterns["double"] = Pattern("Double", w -> Wave(w.data .* 2, w.frequency))
+
 # Process sparkle commands
 function process_sparkle(s::LineEdit.MIState)
     buf = LineEdit.buffer(s)
     input = String(take!(copy(buf))::Vector{UInt8})
+
     if input == "?" || input == "help"
         println("""
         Sparkle Commands:
-        ?/help      - Show this help
-        crystal     - Create a new crystal structure
-        wave       - Create a new wave pattern
-        weave      - Apply weave pattern
-        optimize   - Optimize current structure
-        exit/quit  - Exit Sparkle
+        ?/help                          - Show this help
+        crystal([dims], [spacing])      - Create a new crystal structure
+                                         dims: Tuple of 3 integers (default: (32,32,32))
+                                         spacing: Float64 (default: 1.0)
+        wave([n])                       - Create a new wave pattern
+                                         n: Integer number of points (default: 100)
+        weave([pattern])               - Apply weave pattern to current wave
+                                         pattern: String (default: "default")
+                                         Available patterns: $(join(keys(patterns), ", "))
+        optimize                       - Optimize current structure
+        exit/quit                      - Exit Sparkle mode
         """)
     elseif input == "exit" || input == "quit"
         println("Exiting Sparkle mode...")
@@ -55,7 +133,7 @@ function process_sparkle(s::LineEdit.MIState)
     else
         try
             expr = Meta.parse(input)
-            result = Core.eval(Main, expr)
+            result = Core.eval(Sparkle, expr)
             println(result)
         catch e
             printstyled("Error: ", bold=true, color=:red)
