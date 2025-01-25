@@ -2,7 +2,7 @@
 
 # Sparkle - Spark Runtime Terminal v0.1
 # Author: isdood
-# Created: 2025-01-25 23:27:37 UTC
+# Created: 2025-01-25 23:37:31 UTC
 # Repository: isdood/scribble
 
 set -e
@@ -11,10 +11,25 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Generate a temporary directory for our sandbox
 SANDBOX_DIR=$(mktemp -d)
+PKG_DIR="$SANDBOX_DIR/SparkSandbox"
+mkdir -p "$PKG_DIR/src"
+
+# Create spark config
+cat > "$PKG_DIR/spark.conf" << 'SPARK_EOF'
+~weave~
+~forge~
+
+@seeds@
+REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+@seeds@
+SPARK_EOF
 
 # Create Project.toml
 UUID=$(julia -e 'import UUIDs; println(UUIDs.uuid4())')
-cat > "$SANDBOX_DIR/Project.toml" << EOF
+cat > "$PKG_DIR/Project.toml" << EOF
 name = "SparkSandbox"
 uuid = "$UUID"
 version = "0.1.0"
@@ -23,30 +38,21 @@ version = "0.1.0"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 EOF
 
-# Install required packages
-julia --project="$SANDBOX_DIR" -e '
-    using Pkg
-    Pkg.instantiate()
-    Pkg.add(["UnicodePlots", "Statistics"])
-'
+# Create src/SparkSandbox.jl
+cat > "$PKG_DIR/src/SparkSandbox.jl" << 'JULIA_EOF'
+module SparkSandbox
 
-# Create the Julia initialization script
-cat > "$SANDBOX_DIR/init.jl" << 'JULIA_EOF'
 using REPL
 using REPL.LineEdit
 using UnicodePlots
 using Statistics
+using ColorSchemes
 
-# Create Sparkle module
-module Sparkle
+# Export all the functions we want to make available
 export crystal, wave, weave, optimize, visualize
-
-using REPL
-using REPL.LineEdit
-using UnicodePlots
-using Statistics
 
 # Sparkle types
 struct Crystal
@@ -75,7 +81,18 @@ end
 
 const GLOBAL_STATE = SparkleState(nothing, nothing, patterns)
 
-# Command implementations
+# Register default patterns
+patterns["default"] = Pattern("Default", w -> w)
+patterns["invert"] = Pattern("Invert", w -> Wave(-w.data, w.frequency))
+patterns["double"] = Pattern("Double", w -> Wave(w.data .* 2, w.frequency))
+patterns["smooth"] = Pattern("Smooth", w -> begin
+    data = copy(w.data)
+    for i in 2:length(data)-1
+        data[i] = mean(w.data[i-1:i+1])
+    end
+    Wave(data, w.frequency)
+end)
+
 function crystal(dims=(32,32,32), spacing=1.0)
     data = zeros(dims...)
     center = dims .÷ 2
@@ -121,7 +138,7 @@ function visualize()
         crystal = GLOBAL_STATE.current_crystal
         middle_slice = crystal.data[:,:,crystal.dimensions[3]÷2]
         println("\nCrystal Visualization (middle slice):")
-        display(heatmap(middle_slice, colormap=:ink))
+        display(heatmap(middle_slice, colormap=:viridis))
     end
 
     if !isnothing(GLOBAL_STATE.current_wave)
@@ -159,18 +176,7 @@ function optimize()
     return (crystal=GLOBAL_STATE.current_crystal, wave=GLOBAL_STATE.current_wave)
 end
 
-# Register default patterns
-patterns["default"] = Pattern("Default", w -> w)
-patterns["invert"] = Pattern("Invert", w -> Wave(-w.data, w.frequency))
-patterns["double"] = Pattern("Double", w -> Wave(w.data .* 2, w.frequency))
-patterns["smooth"] = Pattern("Smooth", w -> begin
-    data = copy(w.data)
-    for i in 2:length(data)-1
-        data[i] = mean(w.data[i-1:i+1])
-    end
-    Wave(data, w.frequency)
-end)
-
+# REPL mode handling
 function process_sparkle(s)
     buf = LineEdit.buffer(s)
     input = String(take!(copy(buf)))
@@ -200,7 +206,7 @@ function process_sparkle(s)
             if expr isa Symbol
                 expr = Expr(:call, expr)
             end
-            result = Base.eval(Sparkle, expr)
+            result = Base.eval(SparkSandbox, expr)
             if result !== nothing
                 if result isa NamedTuple  # For optimize results
                     # Results already printed in function
@@ -217,8 +223,8 @@ function process_sparkle(s)
     return nothing
 end
 
-function init()
-    repl = Base.active_repl
+# Initialize REPL mode
+function init_sparkle(repl)
     terminal = repl.t
 
     sparkle = LineEdit.Prompt("sparkle> ";
@@ -258,14 +264,19 @@ function init()
     )
 end
 
-end # module Sparkle
+end # module SparkSandbox
+JULIA_EOF
 
-# Initialize when REPL is ready
+# Create startup script
+cat > "$SANDBOX_DIR/init.jl" << 'INIT_EOF'
+push!(LOAD_PATH, dirname(pwd()))
+using SparkSandbox
+
 atreplinit() do repl
     @async begin
         sleep(0.1)
         try
-            Sparkle.init()
+            SparkSandbox.init_sparkle(repl)
             println("\n✨ Welcome to Sparkle - Spark Runtime Terminal ✨")
             println("Press '*' to enter Sparkle mode, type '?' for help\n")
         catch e
@@ -273,7 +284,14 @@ atreplinit() do repl
         end
     end
 end
-JULIA_EOF
+INIT_EOF
+
+# Install required packages
+cd "$PKG_DIR" && julia --project=. -e '
+    using Pkg
+    Pkg.instantiate()
+    Pkg.add(["UnicodePlots", "Statistics", "ColorSchemes"])
+'
 
 # Show banner
 cat << 'BANNER'
@@ -282,8 +300,8 @@ cat << 'BANNER'
     Version 0.1-alpha
 BANNER
 
-# Start Julia REPL
-julia --project="$SANDBOX_DIR" -i "$SANDBOX_DIR/init.jl"
+# Start Julia REPL with proper environment
+cd "$SANDBOX_DIR" && julia --project="$PKG_DIR" -i init.jl
 
 # Cleanup
 rm -rf "$SANDBOX_DIR"
