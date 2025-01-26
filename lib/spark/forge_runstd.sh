@@ -1,3 +1,61 @@
+#!/usr/bin/env bash
+
+# Sudo Forge RunSTD - Sparkle Standard Library Implementation with Sudo
+# Author: isdood
+# Created: 2025-01-26 12:32:14 UTC
+# Repository: isdood/scribble
+
+# Check if script is run as root
+if [ "$EUID" -ne 0 ]; then
+    echo "🔒 This script requires root permissions to set up the Sparkle environment"
+    echo "Running with sudo..."
+    sudo "$0" "$@"
+    exit $?
+fi
+
+set -e
+
+echo "⚒️ Forge RunSTD - Sparkle Standard Library Implementation"
+echo "Created: 2025-01-26 12:32:14 UTC"
+echo "Author: isdood"
+
+# Get the real user who ran sudo
+REAL_USER="${SUDO_USER:-$USER}"
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+SPARKLE_DIR="$SCRIPT_DIR/.sparkle"
+
+echo "🔑 Running as root, will set permissions for user: $REAL_USER"
+
+# Verify Sparkle installation
+if [ ! -d "$SPARKLE_DIR" ]; then
+    echo "❌ Error: Sparkle not installed. Please run mega_fix.sh first."
+    exit 1
+fi
+
+# Clean up existing directories first
+echo "🧹 Cleaning up existing directories..."
+rm -rf "$SPARKLE_DIR/std" 2>/dev/null || true
+rm -rf "$SPARKLE_DIR/packages" 2>/dev/null || true
+
+# Create all directories first
+echo "📚 Creating directory structure..."
+mkdir -p "$SPARKLE_DIR/std"
+mkdir -p "$SPARKLE_DIR/std/math"
+mkdir -p "$SPARKLE_DIR/std/cubed"
+mkdir -p "$SPARKLE_DIR/std/whisper"
+mkdir -p "$SPARKLE_DIR/std/clone"
+mkdir -p "$SPARKLE_DIR/std/inq"
+mkdir -p "$SPARKLE_DIR/std/align"
+mkdir -p "$SPARKLE_DIR/std/shout"
+mkdir -p "$SPARKLE_DIR/packages"
+
+# Set initial permissions
+chown -R "$REAL_USER:$REAL_USER" "$SPARKLE_DIR"
+find "$SPARKLE_DIR" -type d -exec chmod 755 {} \;
+
+# Update SeedManager.jl
+echo "🔧 Updating SeedManager.jl..."
+cat > "$SPARKLE_DIR/src/SeedManager.jl" << 'EOT'
 # Seed package manager functions
 export seed_plant, seed_unplant, seed_garden, seed_sprout
 
@@ -12,30 +70,10 @@ const STD_PACKAGES = Dict(
         "clone",     # Object cloning
         "inq",       # Inquiry functions
         "align",     # Text alignment
-        "shout",     # Text case manipulation
-        "any",       # Type-agnostic operations
-        "array",     # Array utilities
-        "ascii",     # ASCII text operations
-        "coll",      # Collection utilities
-        "comp",      # Comparison operations
-        "conv",      # Type conversion utilities
-        "def",       # Default value handling
-        "echo",      # Echo utilities
-        "glitch",    # Glitch art effects
-        "history",   # Command history
-        "itex",      # Interactive text manipulation
-        "lend",      # Resource lending utilities
-        "mark",      # Markup processing
-        "murmur",    # Murmur hash implementation
-        "potion",    # Data transformation utilities
-        "rune",      # Symbol and pattern matching
-        "scribe",    # Logging and documentation
-        "shard",     # Data partitioning
-        "shimmer",   # Animation and visual effects
-        "signal",    # Event handling and signals
-        "spell",     # Command execution patterns
-        "thunder"    # Parallel processing utilities
-    ]
+        "shout"      # Text case manipulation
+    ],
+    "shout" => [],
+    "align" => []
 )
 
 function seed_plant(package_spec)
@@ -197,3 +235,130 @@ function _save_config(config)
         TOML.print(io, config)
     end
 end
+EOT
+
+# Create standard library implementations
+echo "📝 Creating standard library implementations..."
+
+# std/math implementation
+cat > "$SPARKLE_DIR/std/math/init.jl" << 'EOT'
+module Math
+
+export add, subtract, multiply, divide
+
+add(a, b) = a + b
+subtract(a, b) = a - b
+multiply(a, b) = a * b
+divide(a, b) = a / b
+
+end
+EOT
+
+# std/cubed implementation
+cat > "$SPARKLE_DIR/std/cubed/init.jl" << 'EOT'
+module Cubed
+
+export cube, uncube
+
+cube(x) = x^3
+uncube(x) = cbrt(x)
+
+end
+EOT
+
+# std/whisper implementation
+cat > "$SPARKLE_DIR/std/whisper/init.jl" << 'EOT'
+module Whisper
+
+export whisper
+
+whisper(text::String) = lowercase(text)
+
+end
+EOT
+
+# std/clone implementation
+cat > "$SPARKLE_DIR/std/clone/init.jl" << 'EOT'
+module Clone
+
+export clone, deep_clone
+
+function clone(obj)
+    copy(obj)
+end
+
+function deep_clone(obj)
+    deepcopy(obj)
+end
+
+end
+EOT
+
+# std/inq implementation
+cat > "$SPARKLE_DIR/std/inq/init.jl" << 'EOT'
+module Inq
+
+export inquire, inspect, describe
+
+function inquire(obj)
+    typeof(obj)
+end
+
+function inspect(obj)
+    fieldnames(typeof(obj))
+end
+
+function describe(obj)
+    println("Type: ", typeof(obj))
+    println("Fields: ", fieldnames(typeof(obj)))
+    println("Methods: ", methods(typeof(obj)))
+end
+
+end
+EOT
+
+# std/align implementation
+cat > "$SPARKLE_DIR/std/align/init.jl" << 'EOT'
+module Align
+
+export align_left, align_right, align_center
+
+function align_left(text::String, width::Integer)
+    rpad(text, width)
+end
+
+function align_right(text::String, width::Integer)
+    lpad(text, width)
+end
+
+function align_center(text::String, width::Integer)
+    padding = width - length(text)
+    left_pad = div(padding, 2)
+    right_pad = padding - left_pad
+    " "^left_pad * text * " "^right_pad
+end
+
+end
+EOT
+
+# std/shout implementation
+cat > "$SPARKLE_DIR/std/shout/init.jl" << 'EOT'
+module Shout
+
+export shout, whisper, toggle_case
+
+shout(text::String) = uppercase(text)
+whisper(text::String) = lowercase(text)
+toggle_case(text::String) = join(islowercase(c) ? uppercase(c) : lowercase(c) for c in text)
+
+end
+EOT
+
+# Final permissions setup
+echo "🔒 Setting final permissions..."
+chown -R "$REAL_USER:$REAL_USER" "$SPARKLE_DIR"
+find "$SPARKLE_DIR" -type d -exec chmod 755 {} \;
+find "$SPARKLE_DIR" -type f -exec chmod 644 {} \;
+
+echo "✨ Standard library and packages have been forged!"
+echo "Try 'seed plant std**whisper' or 'seed plant std**inq' in Sparkle."

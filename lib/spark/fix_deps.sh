@@ -1,3 +1,15 @@
+#!/usr/bin/env bash
+
+# Fix Project.toml for Sparkle
+# Created: 2025-01-26 12:48:50 UTC
+# Author: isdood
+
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+SPARKLE_DIR="$SCRIPT_DIR/.sparkle"
+
+echo "📝 Creating new Project.toml..."
+
+cat > "$SPARKLE_DIR/Project.toml" << 'EOT'
 name = "SparkSandbox"
 uuid = "b03cc3df-2e3a-4564-98fe-76823717dd5f"
 authors = ["isdood <isdood@spark.dev>"]
@@ -16,3 +28,10 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [compat]
 julia = "1.6"
+EOT
+
+echo "🔒 Setting permissions..."
+chmod 644 "$SPARKLE_DIR/Project.toml"
+chown $SUDO_USER:$SUDO_USER "$SPARKLE_DIR/Project.toml"
+
+echo "✨ Project.toml has been fixed!"
