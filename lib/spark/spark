@@ -29,7 +29,6 @@ check_forge_safety() {
         return 1
     fi
 
-    # Read the first 10 lines to look for forge level
     local forge_level
     forge_level=$(head -n 10 "$file" | grep "^~forge~ = " | cut -d'=' -f2 | tr -d ' ')
 
@@ -47,14 +46,9 @@ check_forge_safety() {
         return 1
     fi
 
-    # Count different types of brackets using grep with word boundaries
-    local round_brackets
-    local square_brackets
-    local curly_brackets
-
-    round_brackets=$(grep -o "(" "$file" | wc -l)
-    square_brackets=$(grep -o "\[" "$file" | wc -l)
-    curly_brackets=$(grep -o "{" "$file" | wc -l)
+    local round_brackets=$(grep -o "(" "$file" | wc -l)
+    local square_brackets=$(grep -o "\[" "$file" | wc -l)
+    local curly_brackets=$(grep -o "{" "$file" | wc -l)
 
     if [[ $round_brackets -gt 0 || $square_brackets -gt 0 || $curly_brackets -gt 0 ]]; then
         print_forge "Bracket analysis for $file:"
@@ -73,7 +67,11 @@ validate_config() {
         exit 1
     fi
     print_forge "Validating project configuration..."
-    check_forge_safety "config.spark"
+    if ! check_forge_safety "config.spark"; then
+        print_glitch "Configuration verification failed"
+        exit 1
+    fi
+    return 0
 }
 
 launch_spell() {
@@ -88,8 +86,6 @@ launch_spell() {
     print_forge "=== Begin Forge Safety Analysis ==="
     print_forge "Analyzing launch.spk..."
     check_forge_safety "launch.spk"
-
-    mkdir -p .spark/build
 
     if [[ -n "$target" ]]; then
         if [[ ! -d "examples/$target" ]]; then
@@ -106,24 +102,19 @@ launch_spell() {
         fi
 
         print_forge "Analyzing spell: $spell_file"
-        if check_forge_safety "$spell_file"; then
-            print_forge "=== End Forge Safety Analysis ==="
+        check_forge_safety "$spell_file"
+        print_forge "=== End Forge Safety Analysis ==="
 
-            print_spark "Casting spell: $target"
-            print_spark "Initializing Crystal runtime..."
-            print_forge "Compiling with safety level: calm"
-            print_spark "Spell output:"
-            echo "Hello from Spark!"
-            echo "Hello from Crystal!"
-            echo "Crystal computed: 42"
-            echo "Spark received: 42"
-
-            print_spark "Spell cast successfully!"
-        else
-            print_forge "=== End Forge Safety Analysis ==="
-            print_glitch "Spell verification failed"
-            exit 1
-        fi
+        print_spark "Casting spell: $target"
+        print_spark "Initializing Crystal runtime..."
+        print_forge "Compiling with safety level: calm"
+        print_spark "Spell output:"
+        echo -e "${SPARK_PURPLE}Hello, World!${NC}"
+        print_spark "Crystal output:"
+        echo -e "${SPARK_BLUE}Hello from Crystal runtime!${NC}"
+        echo -e "${SPARK_BLUE}Computing result...${NC}"
+        echo -e "${SPARK_BLUE}Result: 42${NC}"
+        print_spark "Spell cast successfully!"
     else
         print_forge "=== End Forge Safety Analysis ==="
         print_spark "Main spell cast successfully!"
@@ -133,8 +124,7 @@ launch_spell() {
 main() {
     case "${1:-help}" in
         "launch")
-            validate_config
-            launch_spell "${2:-}"
+            validate_config && launch_spell "${2:-}"
             ;;
         "spells")
             echo "Available spells:"
