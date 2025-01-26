@@ -1,0 +1,47 @@
+~forge~ = calm  # Safety level
+~weave~ = 500  # Performance tuning
+
+@seeds@
+use sparkle.core.[Documentation, Enchantment]
+use sparkle.format.[Markdown, Spellbook]
+@seeds@
+
+@spells@
+>>> Core Syntax Documentation
+
+>>> 1. Required Feature Tags
+fn demonstrate_features[] -> Example [
+    ~forge~ = calm    # Safety levels: calm, balanced, wild
+    ~weave~ = 500    # Performance tuning (0-1000)
+]
+
+>>> 2. Function Visibility
+fn private_spell[] -> Example [
+    >>> This is a private spell
+]
+
+pfn public_spell[] -> Example [
+    >>> This is a public spell (p replaces pub)
+]
+
+>>> 3. Magical Blocks
+fn demonstrate_blocks[] -> Example [
+    @seeds@
+    use realm.module.[Component]
+    @seeds@
+
+    @spells@
+    fn inner_spell[] -> Result [
+        >>> Implementation
+    ]
+    @spells@
+]
+
+>>> 4. Method Invocation
+fn show_method_calls[] -> Example [
+    object
+        **first_enchantment()
+        **second_enchantment()
+        **final_seal()
+]
+@spells@

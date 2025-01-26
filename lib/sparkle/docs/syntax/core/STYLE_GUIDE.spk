@@ -1,0 +1,41 @@
+~forge~ = calm
+~weave~ = 500
+
+@seeds@
+use sparkle.style.[Guide, Rules]
+@seeds@
+
+@spells@
+>>> Style Guide for Spark
+
+>>> 1. Naming Conventions
+pfn demonstrate_naming[] [
+    >>> Spell names: descriptive and magical
+    >>> Variables: lowercase_with_underscores
+    >>> Types: PascalCase
+    >>> Constants: UPPERCASE_WITH_UNDERSCORES
+]
+
+>>> 2. Code Organization
+pfn demonstrate_organization[] [
+    >>> Seeds (imports) always come first
+    >>> Feature tags at the top of file
+    >>> Spells grouped by functionality
+    >>> Complex logic broken into smaller spells
+]
+
+>>> 3. Documentation
+pfn demonstrate_documentation[] [
+    >>> Use >>> for comments
+    >>> Document all public spells
+    >>> Explain complex enchantments
+    >>> Include examples for non-obvious magic
+]
+
+>>> 4. Error Handling
+pfn demonstrate_error_handling[] [
+    >>> Use Result types for fallible operations
+    >>> Provide meaningful error messages
+    >>> Handle all error cases gracefully
+]
+@spells@

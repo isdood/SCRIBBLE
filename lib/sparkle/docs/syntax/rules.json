@@ -1,0 +1,33 @@
+{
+    "version": "1.0.0",
+    "last_updated": "2025-01-26 12:21:07",
+    "updated_by": "isdood",
+    "feature_tags": {
+        "forge": {
+            "required": true,
+            "values": ["calm", "balanced", "wild"],
+            "default": "calm"
+        },
+        "weave": {
+            "required": true,
+            "range": [0, 1000],
+            "default": 500
+        }
+    },
+    "blocks": {
+        "seeds": {
+            "required": true,
+            "description": "Import declarations"
+        },
+        "spells": {
+            "required": true,
+            "description": "Function definitions"
+        }
+    },
+    "syntax_rules": {
+        "method_chain": "**",
+        "brackets": "[]",
+        "comments": ">>>",
+        "visibility_prefix": "p"
+    }
+}
