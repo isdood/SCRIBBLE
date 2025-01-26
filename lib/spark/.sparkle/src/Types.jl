@@ -1,4 +1,6 @@
 # Type definitions
+export Crystal, Wave, Pattern, patterns, GLOBAL_STATE
+
 struct Crystal
     dimensions
     spacing

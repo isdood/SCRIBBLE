@@ -1,28 +1,107 @@
 #!/usr/bin/env bash
 
-# Fix Sparkle v3 - Spark Runtime Terminal Repair Script v0.3
+# Mega Fix - Complete Sparkle Environment Setup
 # Author: isdood
-# Created: 2025-01-26 00:24:07 UTC
+# Created: 2025-01-26 11:59:23 UTC
 # Repository: isdood/scribble
 
 set -e
 
-echo "🔧 Fixing Sparkle installation..."
+echo "🌟 Mega Fix - Complete Sparkle Environment Setup"
+echo "Created: 2025-01-26 11:59:23 UTC"
+echo "Author: isdood"
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TEMP_DIR=$(mktemp -d)
 PKG_DIR="$TEMP_DIR/SparkSandbox"
 
-# Create fresh package structure
+# Clean and create directories
+echo "🧹 Cleaning previous installation..."
 rm -rf "$SCRIPT_DIR/.sparkle" 2>/dev/null || true
+rm -f "$SCRIPT_DIR/sparkle.sh" 2>/dev/null || true
+
+echo "📁 Creating directories..."
 mkdir -p "$SCRIPT_DIR/.sparkle"
+mkdir -p "$SCRIPT_DIR/.sparkle/src"
 mkdir -p "$PKG_DIR/src"
 
-# Create consistent Project.toml
-UUID="b03cc3df-2e3a-4564-98fe-76823717dd5f"
-cat > "$PKG_DIR/Project.toml" << EOF
+# Create sparkle.sh
+echo "📝 Creating sparkle.sh..."
+cat > "$SCRIPT_DIR/sparkle.sh" << 'EOT'
+#!/usr/bin/env bash
+
+# Sparkle - Spark Runtime Terminal v0.1
+# Created: 2025-01-26 11:59:23 UTC
+# Author: isdood
+
+set -e
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+TEMP_DIR=$(mktemp -d)
+PKG_DIR="$TEMP_DIR/SparkSandbox"
+
+# Create package structure
+mkdir -p "$PKG_DIR"
+mkdir -p "$PKG_DIR/src"
+
+# Verify .sparkle directory exists
+if [ ! -d "$SCRIPT_DIR/.sparkle" ]; then
+    echo "Error: .sparkle directory not found. Please run mega_fix.sh first."
+    exit 1
+fi
+
+# Verify required template files exist
+required_files=(
+    "Project.toml"
+    "init.jl"
+    "src/SparkSandbox.jl"
+    "src/Types.jl"
+    "src/Crystal.jl"
+    "src/SeedManager.jl"
+    "src/REPL.jl"
+)
+
+for file in "${required_files[@]}"; do
+    if [ ! -f "$SCRIPT_DIR/.sparkle/$file" ]; then
+        echo "Error: Required template file $file not found in .sparkle directory."
+        echo "Please run mega_fix.sh to restore template files."
+        rm -rf "$TEMP_DIR"
+        exit 1
+    fi
+done
+
+# Copy template files with correct permissions
+echo "📦 Setting up Sparkle environment..."
+mkdir -p "$PKG_DIR/src"
+cp -r "$SCRIPT_DIR/.sparkle/src/"* "$PKG_DIR/src/"
+cp "$SCRIPT_DIR/.sparkle/Project.toml" "$PKG_DIR/"
+cp "$SCRIPT_DIR/.sparkle/init.jl" "$PKG_DIR/"
+chmod 644 "$PKG_DIR/src/"*
+chmod 644 "$PKG_DIR/Project.toml"
+chmod 644 "$PKG_DIR/init.jl"
+
+# Show banner
+cat << 'BANNER'
+    ✨ 𝕊𝕡𝕒𝕣𝕜𝕝𝕖 ✨
+    Spark Runtime Terminal
+    Version 0.1-alpha
+BANNER
+
+# Create trap to clean up temporary directory
+trap 'rm -rf "$TEMP_DIR"' EXIT
+
+# Start Julia REPL with proper environment
+cd "$PKG_DIR" || exit 1
+JULIA_PROJECT="." exec julia -i --color=yes init.jl
+EOT
+
+chmod +x "$SCRIPT_DIR/sparkle.sh"
+
+# Create Project.toml
+echo "📝 Creating Project.toml..."
+cat > "$PKG_DIR/Project.toml" << 'EOT'
 name = "SparkSandbox"
-uuid = "$UUID"
+uuid = "b03cc3df-2e3a-4564-98fe-76823717dd5f"
 authors = ["isdood"]
 version = "0.1.0"
 
@@ -38,24 +117,56 @@ Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 julia = "1.11"
 UnicodePlots = "3.7"
 ColorSchemes = "3.28"
-EOF
+EOT
 
-# First ensure all dependencies are available
-echo "📦 Installing global dependencies..."
-julia -e '
-    using Pkg
-    Pkg.add([
-        PackageSpec(name="UnicodePlots", version="3.7.2"),
-        PackageSpec(name="ColorSchemes", version="3.28.0"),
-        PackageSpec(name="TOML"),
-        PackageSpec(name="Statistics")
-    ])
-    Pkg.precompile()
-'
+# Create init.jl
+echo "📝 Creating init.jl..."
+cat > "$PKG_DIR/init.jl" << 'EOT'
+using Pkg
+Pkg.activate(".")
+Pkg.instantiate()
 
-# Create main module file first
+push!(LOAD_PATH, "@v#.#", "@stdlib")
+push!(LOAD_PATH, dirname(pwd()))
+
+try
+    using SparkSandbox
+
+    # Make SparkSandbox functions available in Main without redefining core functions
+    for name in names(SparkSandbox; all=true)
+        if !startswith(string(name), "#") &&
+           name ∉ (:eval, :include, :using, :import) &&
+           !isdefined(Main, name)
+            @eval Main const $name = SparkSandbox.$name
+        end
+    end
+
+    atreplinit() do repl
+        @async begin
+            sleep(0.1)
+            try
+                SparkSandbox.init_sparkle(repl)
+                println("\n✨ Welcome to Sparkle - Spark Runtime Terminal ✨")
+                println("Press '*' to enter Sparkle mode, type '?' for help\n")
+                println("Created: 2025-01-26 11:59:23")
+                println("User: isdood")
+            catch e
+                @warn "Failed to initialize Sparkle mode" exception=e
+            end
+        end
+    end
+catch e
+    @error "Failed to load SparkSandbox" exception=e
+    exit(1)
+end
+EOT
+
+# Create module files
+echo "📝 Creating module files..."
+
+# Create SparkSandbox.jl
 echo "📝 Creating SparkSandbox.jl..."
-cat > "$PKG_DIR/src/SparkSandbox.jl" << 'EOF'
+cat > "$PKG_DIR/src/SparkSandbox.jl" << 'EOT'
 module SparkSandbox
 
 using REPL
@@ -71,18 +182,19 @@ include("Crystal.jl")
 include("SeedManager.jl")
 include("REPL.jl")
 
+# Re-export all public functions
 export crystal, wave, weave, optimize, visualize
 export seed_plant, seed_unplant, seed_garden, seed_sprout
 export init_sparkle
 
 end # module
-EOF
+EOT
 
 # Create Types.jl
 echo "📝 Creating Types.jl..."
-cat > "$PKG_DIR/src/Types.jl" << 'EOF'
+cat > "$PKG_DIR/src/Types.jl" << 'EOT'
 # Type definitions
-export Crystal, Wave, Pattern
+export Crystal, Wave, Pattern, patterns, GLOBAL_STATE
 
 struct Crystal
     dimensions
@@ -121,15 +233,19 @@ patterns["smooth"] = Pattern("Smooth", w -> begin
     end
     Wave(data, w.frequency)
 end)
-EOF
+EOT
 
 # Create Crystal.jl
 echo "📝 Creating Crystal.jl..."
-cat > "$PKG_DIR/src/Crystal.jl" << 'EOF'
+cat > "$PKG_DIR/src/Crystal.jl" << 'EOT'
 # Crystal manipulation functions
 export crystal, wave, weave, optimize, visualize
 
-function crystal(dims=(32,32,32), spacing=1.0)
+using Statistics
+using UnicodePlots
+using ColorSchemes
+
+crystal(dims=(32,32,32), spacing=1.0) = begin
     data = zeros(dims...)
     center = dims .÷ 2
     for i in 1:dims[1], j in 1:dims[2], k in 1:dims[3]
@@ -143,7 +259,7 @@ function crystal(dims=(32,32,32), spacing=1.0)
     return GLOBAL_STATE.current_crystal
 end
 
-function wave(n=100)
+wave(n=100) = begin
     x = range(0, 4π, length=n)
     data = sin.(x) .+ 0.5 .* cos.(2x) .+ 0.2 .* randn(n)
     GLOBAL_STATE.current_wave = Wave(data, 1.0)
@@ -152,7 +268,7 @@ function wave(n=100)
     return GLOBAL_STATE.current_wave
 end
 
-function weave(pattern="default")
+weave(pattern="default") = begin
     if isnothing(GLOBAL_STATE.current_wave)
         println("Error: No wave pattern to weave. Create one first with 'wave'")
         return nothing
@@ -164,12 +280,11 @@ function weave(pattern="default")
     println("Applied $(pattern) weave pattern to wave")
     result = patterns[pattern].transform(GLOBAL_STATE.current_wave)
     GLOBAL_STATE.current_wave = result
-    println("Pattern applied successfully")
     visualize()
     return result
 end
 
-function visualize()
+visualize() = begin
     if !isnothing(GLOBAL_STATE.current_crystal)
         crystal = GLOBAL_STATE.current_crystal
         middle_slice = crystal.data[:,:,crystal.dimensions[3]÷2]
@@ -185,7 +300,7 @@ function visualize()
     end
 end
 
-function optimize()
+optimize() = begin
     if isnothing(GLOBAL_STATE.current_crystal) && isnothing(GLOBAL_STATE.current_wave)
         println("Error: Nothing to optimize. Create a crystal or wave first")
         return nothing
@@ -211,11 +326,11 @@ function optimize()
     visualize()
     return (crystal=GLOBAL_STATE.current_crystal, wave=GLOBAL_STATE.current_wave)
 end
-EOF
+EOT
 
 # Create SeedManager.jl
 echo "📝 Creating SeedManager.jl..."
-cat > "$PKG_DIR/src/SeedManager.jl" << 'EOF'
+cat > "$PKG_DIR/src/SeedManager.jl" << 'EOT'
 # Seed package manager functions
 export seed_plant, seed_unplant, seed_garden, seed_sprout
 
@@ -281,7 +396,7 @@ function seed_sprout()
             "name" => basename(pwd()),
             "version" => "0.1.0",
             "author" => "isdood",
-            "created" => "2025-01-26 00:24:07"
+            "created" => "2025-01-26 11:59:23"
         ),
         "packages" => Dict(),
         "dependencies" => Dict()
@@ -292,34 +407,6 @@ function seed_sprout()
     end
     println("🌱 Initialized new Spark project")
 end
-
-function _load_config()
-    if !isfile("config.spark")
-        error("No config.spark found. Initialize with 'seed sprout' first.")
-    end
-    TOML.parsefile("config.spark")
-end
-
-function _save_config(config)
-    open("config.spark", "w") do io
-        TOML.print(io, config)
-    end
-end
-
-function _install_full_package(package)
-    config = _load_config()
-    if !haskey(config, "packages")
-        config["packages"] = Dict()
-    end
-
-    if !haskey(config["packages"], package)
-        config["packages"][package] = String[]
-    end
-
-    _save_config(config)
-    println("✨ Successfully planted $package")
-end
-
 function _install_package_component(package, component)
     config = _load_config()
     if !haskey(config, "packages")
@@ -365,16 +452,69 @@ function _remove_package_component(package, component)
         println("Package $package is not installed")
     end
 end
-EOF
 
-# Create REPL.jl with init_sparkle function
+function _load_config()
+    if !isfile("config.spark")
+        error("No config.spark found. Initialize with 'seed sprout' first.")
+    end
+    TOML.parsefile("config.spark")
+end
+
+function _save_config(config)
+    open("config.spark", "w") do io
+        TOML.print(io, config)
+    end
+end
+EOT
+
+# Create REPL.jl
 echo "📝 Creating REPL.jl..."
-cat > "$PKG_DIR/src/REPL.jl" << 'EOF'
+cat > "$PKG_DIR/src/REPL.jl" << 'EOT'
 # REPL mode implementation
 using REPL
 using REPL.LineEdit
 
 export init_sparkle
+
+function init_sparkle(repl)
+    terminal = repl.t
+
+    sparkle = LineEdit.Prompt("sparkle> ";
+        prompt_prefix = "\e[35m",
+        prompt_suffix = "\e[0m",
+        on_enter = REPL.return_callback)
+
+    sparkle.on_done = (s, buf, ok) -> begin
+        if !ok
+            LineEdit.transition(s, repl.interface.modes[1])
+            return nothing
+        end
+        REPL.reset(repl)
+        process_sparkle(s)
+        REPL.prepare_next(repl)
+        return nothing
+    end
+
+    push!(repl.interface.modes, sparkle)
+    main_mode = repl.interface.modes[1]
+
+    main_mode.keymap_dict = LineEdit.keymap_merge(
+        main_mode.keymap_dict,
+        Dict{Any,Any}(
+            '*' => function (s,args...)
+                buf = LineEdit.buffer(s)
+                if position(buf) == 0
+                    if !haskey(s.mode_state, sparkle)
+                        s.mode_state[sparkle] = LineEdit.init_state(terminal, sparkle)
+                    end
+                    LineEdit.transition(s, sparkle)
+                else
+                    LineEdit.edit_insert(s, '*')
+                end
+            end
+        )
+    )
+end
 
 function process_sparkle(s)
     buf = LineEdit.buffer(s)
@@ -452,131 +592,47 @@ function process_sparkle(s)
         println(e)
     end
 end
+EOT
 
-function init_sparkle(repl)
-    terminal = repl.t
-
-    sparkle = LineEdit.Prompt("sparkle> ";
-        prompt_prefix = "\e[35m",
-        prompt_suffix = "\e[0m",
-        on_enter = REPL.return_callback)
-
-    sparkle.on_done = (s, buf, ok) -> begin
-        if !ok
-            LineEdit.transition(s, repl.interface.modes[1])
-            return nothing
-        end
-        REPL.reset(repl)
-        process_sparkle(s)
-        REPL.prepare_next(repl)
-        return nothing
-    end
-
-    push!(repl.interface.modes, sparkle)
-    main_mode = repl.interface.modes[1]
-
-    main_mode.keymap_dict = LineEdit.keymap_merge(
-        main_mode.keymap_dict,
-        Dict{Any,Any}(
-            '*' => function (s,args...)
-                buf = LineEdit.buffer(s)
-                if position(buf) == 0
-                    if !haskey(s.mode_state, sparkle)
-                        s.mode_state[sparkle] = LineEdit.init_state(terminal, sparkle)
-                    end
-                    LineEdit.transition(s, sparkle)
-                else
-                    LineEdit.edit_insert(s, '*')
-                end
-            end
-        )
-    )
-end
-EOF
-
-# Create initialization script
-cat > "$PKG_DIR/init.jl" << 'EOF'
-using Pkg
-Pkg.activate(".")
-Pkg.instantiate()
-
-push!(LOAD_PATH, "@v#.#", "@stdlib")
-push!(LOAD_PATH, dirname(pwd()))
-
-try
-    @eval using SparkSandbox
-
-    # Make SparkSandbox functions available in Main
-    for name in names(SparkSandbox; all=true)
-        if !startswith(string(name), "#")
-            @eval Main const $name = SparkSandbox.$name
-        end
-    end
-
-    atreplinit() do repl
-        @async begin
-            sleep(0.1)
-            try
-                SparkSandbox.init_sparkle(repl)
-                println("\n✨ Welcome to Sparkle - Spark Runtime Terminal ✨")
-                println("Press '*' to enter Sparkle mode, type '?' for help\n")
-                println("Created: 2025-01-26 00:25:49")
-                println("User: isdood")
-            catch e
-                @warn "Failed to initialize Sparkle mode" exception=e
-            end
-        end
-    end
-catch e
-    @error "Failed to load SparkSandbox" exception=e
-    exit(1)
-end
-EOF
-
-# Create sparkle.sh
-cat > "$SCRIPT_DIR/sparkle.sh" << 'EOF'
-#!/usr/bin/env bash
-
-# Sparkle - Spark Runtime Terminal v0.1
-# Created: 2025-01-26 00:25:49 UTC
-# Author: isdood
-
-set -e
-
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-TEMP_DIR=$(mktemp -d)
-PKG_DIR="$TEMP_DIR/SparkSandbox"
-
-# Create package structure
-mkdir -p "$PKG_DIR/src"
-
-# Copy template files
-cp -r "$SCRIPT_DIR/.sparkle/"* "$PKG_DIR/src/"
-cp "$SCRIPT_DIR/.sparkle/Project.toml" "$PKG_DIR/"
-
-# Show banner
-cat << 'BANNER'
-    ✨ 𝕊𝕡𝕒𝕣𝕜𝕝𝕖 ✨
-    Spark Runtime Terminal
-    Version 0.1-alpha
-BANNER
-
-# Start Julia REPL with proper environment
-cd "$PKG_DIR" && JULIA_PROJECT=. julia -i init.jl
-
-# Cleanup
-rm -rf "$TEMP_DIR"
-EOF
-
-chmod +x "$SCRIPT_DIR/sparkle.sh"
-
-# Store template files
+# Copy template files to .sparkle directory
 echo "📦 Saving template files..."
-cp -r "$PKG_DIR/src/"* "$SCRIPT_DIR/.sparkle/"
+cp -r "$PKG_DIR/src/"* "$SCRIPT_DIR/.sparkle/src/"
 cp "$PKG_DIR/Project.toml" "$SCRIPT_DIR/.sparkle/"
 cp "$PKG_DIR/init.jl" "$SCRIPT_DIR/.sparkle/"
 
-echo "✨ Sparkle has been fixed! Try running ./sparkle.sh again."
+# Set correct permissions
+chmod 644 "$SCRIPT_DIR/.sparkle/init.jl"
+chmod 644 "$SCRIPT_DIR/.sparkle/Project.toml"
+chmod 644 "$SCRIPT_DIR/.sparkle/src/"*
+chmod 755 "$SCRIPT_DIR/.sparkle"
+chmod 755 "$SCRIPT_DIR/.sparkle/src"
+chmod +x "$SCRIPT_DIR/sparkle.sh"
+
+# Verify template files
+echo "🔍 Verifying template files..."
+required_files=(
+    "Project.toml"
+    "init.jl"
+    "src/SparkSandbox.jl"
+    "src/Types.jl"
+    "src/Crystal.jl"
+    "src/SeedManager.jl"
+    "src/REPL.jl"
+)
+
+for file in "${required_files[@]}"; do
+    if [ ! -f "$SCRIPT_DIR/.sparkle/$file" ]; then
+        echo "❌ Error: Failed to copy $file to template directory"
+        exit 1
+    fi
+    if [ ! -r "$SCRIPT_DIR/.sparkle/$file" ]; then
+        echo "❌ Error: File $file is not readable"
+        exit 1
+    fi
+done
+
+echo "✅ Template files verified successfully"
+echo "✨ Sparkle has been fixed! Try running ./sparkle.sh"
 
 # Cleanup
 rm -rf "$TEMP_DIR"

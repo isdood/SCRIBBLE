@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Sparkle - Spark Runtime Terminal v0.1
-# Created: 2025-01-26 00:14:30 UTC
+# Created: 2025-01-26 11:59:23 UTC
 # Author: isdood
 
 set -e
@@ -11,44 +11,44 @@ TEMP_DIR=$(mktemp -d)
 PKG_DIR="$TEMP_DIR/SparkSandbox"
 
 # Create package structure
+mkdir -p "$PKG_DIR"
 mkdir -p "$PKG_DIR/src"
 
-# Copy template files
-cp -r "$SCRIPT_DIR/.sparkle/"* "$PKG_DIR/src/"
+# Verify .sparkle directory exists
+if [ ! -d "$SCRIPT_DIR/.sparkle" ]; then
+    echo "Error: .sparkle directory not found. Please run mega_fix.sh first."
+    exit 1
+fi
+
+# Verify required template files exist
+required_files=(
+    "Project.toml"
+    "init.jl"
+    "src/SparkSandbox.jl"
+    "src/Types.jl"
+    "src/Crystal.jl"
+    "src/SeedManager.jl"
+    "src/REPL.jl"
+)
+
+for file in "${required_files[@]}"; do
+    if [ ! -f "$SCRIPT_DIR/.sparkle/$file" ]; then
+        echo "Error: Required template file $file not found in .sparkle directory."
+        echo "Please run mega_fix.sh to restore template files."
+        rm -rf "$TEMP_DIR"
+        exit 1
+    fi
+done
+
+# Copy template files with correct permissions
+echo "📦 Setting up Sparkle environment..."
+mkdir -p "$PKG_DIR/src"
+cp -r "$SCRIPT_DIR/.sparkle/src/"* "$PKG_DIR/src/"
 cp "$SCRIPT_DIR/.sparkle/Project.toml" "$PKG_DIR/"
-
-# Create initialization script
-cat > "$PKG_DIR/init.jl" << 'INIT'
-# Set up environment
-using Pkg
-Pkg.activate(".")
-Pkg.instantiate()
-Pkg.precompile()
-
-push!(LOAD_PATH, "@v#.#", "@stdlib")
-push!(LOAD_PATH, dirname(pwd()))
-
-try
-    @eval using SparkSandbox
-    atreplinit() do repl
-        @async begin
-            sleep(0.1)
-            try
-                SparkSandbox.init_sparkle(repl)
-                println("\n✨ Welcome to Sparkle - Spark Runtime Terminal ✨")
-                println("Press '*' to enter Sparkle mode, type '?' for help\n")
-                println("Created: 2025-01-26 00:14:30")
-                println("User: isdood")
-            catch e
-                @warn "Failed to initialize Sparkle mode" exception=e
-            end
-        end
-    end
-catch e
-    @error "Failed to load SparkSandbox" exception=e
-    exit(1)
-end
-INIT
+cp "$SCRIPT_DIR/.sparkle/init.jl" "$PKG_DIR/"
+chmod 644 "$PKG_DIR/src/"*
+chmod 644 "$PKG_DIR/Project.toml"
+chmod 644 "$PKG_DIR/init.jl"
 
 # Show banner
 cat << 'BANNER'
@@ -57,8 +57,9 @@ cat << 'BANNER'
     Version 0.1-alpha
 BANNER
 
-# Start Julia REPL with proper environment
-cd "$PKG_DIR" && julia --project=. -i init.jl
+# Create trap to clean up temporary directory
+trap 'rm -rf "$TEMP_DIR"' EXIT
 
-# Cleanup
-rm -rf "$TEMP_DIR"
+# Start Julia REPL with proper environment
+cd "$PKG_DIR" || exit 1
+JULIA_PROJECT="." exec julia -i --color=yes init.jl

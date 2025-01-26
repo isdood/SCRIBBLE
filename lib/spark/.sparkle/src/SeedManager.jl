@@ -1,4 +1,6 @@
 # Seed package manager functions
+export seed_plant, seed_unplant, seed_garden, seed_sprout
+
 using TOML, Dates
 
 function seed_plant(package_spec)
@@ -61,7 +63,7 @@ function seed_sprout()
             "name" => basename(pwd()),
             "version" => "0.1.0",
             "author" => "isdood",
-            "created" => "2025-01-26 00:18:33"
+            "created" => "2025-01-26 11:59:23"
         ),
         "packages" => Dict(),
         "dependencies" => Dict()
@@ -72,21 +74,6 @@ function seed_sprout()
     end
     println("🌱 Initialized new Spark project")
 end
-
-function _install_full_package(package)
-    config = _load_config()
-    if !haskey(config, "packages")
-        config["packages"] = Dict()
-    end
-
-    if !haskey(config["packages"], package)
-        config["packages"][package] = String[]
-    end
-
-    _save_config(config)
-    println("✨ Successfully planted $package")
-end
-
 function _install_package_component(package, component)
     config = _load_config()
     if !haskey(config, "packages")

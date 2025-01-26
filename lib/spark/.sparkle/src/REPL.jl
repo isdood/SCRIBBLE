@@ -2,7 +2,47 @@
 using REPL
 using REPL.LineEdit
 
-export init_sparkle, process_sparkle
+export init_sparkle
+
+function init_sparkle(repl)
+    terminal = repl.t
+
+    sparkle = LineEdit.Prompt("sparkle> ";
+        prompt_prefix = "\e[35m",
+        prompt_suffix = "\e[0m",
+        on_enter = REPL.return_callback)
+
+    sparkle.on_done = (s, buf, ok) -> begin
+        if !ok
+            LineEdit.transition(s, repl.interface.modes[1])
+            return nothing
+        end
+        REPL.reset(repl)
+        process_sparkle(s)
+        REPL.prepare_next(repl)
+        return nothing
+    end
+
+    push!(repl.interface.modes, sparkle)
+    main_mode = repl.interface.modes[1]
+
+    main_mode.keymap_dict = LineEdit.keymap_merge(
+        main_mode.keymap_dict,
+        Dict{Any,Any}(
+            '*' => function (s,args...)
+                buf = LineEdit.buffer(s)
+                if position(buf) == 0
+                    if !haskey(s.mode_state, sparkle)
+                        s.mode_state[sparkle] = LineEdit.init_state(terminal, sparkle)
+                    end
+                    LineEdit.transition(s, sparkle)
+                else
+                    LineEdit.edit_insert(s, '*')
+                end
+            end
+        )
+    )
+end
 
 function process_sparkle(s)
     buf = LineEdit.buffer(s)
@@ -59,64 +99,24 @@ function process_sparkle(s)
         Seed Package Manager:
         seed ?                         - Show seed package manager help
         """)
+        return
     elseif input == "exit" || input == "quit"
         println("Exiting Sparkle mode...")
         LineEdit.transition(s, Base.active_repl.interface.modes[1])
-    else
-        try
-            expr = Meta.parse(input)
-            if expr isa Symbol
-                expr = Expr(:call, expr)
-            end
-            result = Base.eval(Main, expr)
-            if result !== nothing
-                if !(result isa Union{Crystal,Wave}) # Only print if not already handled
-                    println(result)
-                end
-            end
-        catch e
-            printstyled("Error: ", bold=true, color=:red)
-            println(e)
-        end
-    end
-end
-
-function init_sparkle(repl)
-    terminal = repl.t
-
-    sparkle = LineEdit.Prompt("sparkle> ";
-        prompt_prefix = "\e[35m",
-        prompt_suffix = "\e[0m",
-        on_enter = REPL.return_callback)
-
-    sparkle.on_done = (s, buf, ok) -> begin
-        if !ok
-            LineEdit.transition(s, repl.interface.modes[1])
-            return nothing
-        end
-        REPL.reset(repl)
-        process_sparkle(s)
-        REPL.prepare_next(repl)
-        return nothing
+        return
     end
 
-    push!(repl.interface.modes, sparkle)
-    main_mode = repl.interface.modes[1]
-
-    main_mode.keymap_dict = LineEdit.keymap_merge(
-        main_mode.keymap_dict,
-        Dict{Any,Any}(
-            '*' => function (s,args...)
-                buf = LineEdit.buffer(s)
-                if position(buf) == 0
-                    if !haskey(s.mode_state, sparkle)
-                        s.mode_state[sparkle] = LineEdit.init_state(terminal, sparkle)
-                    end
-                    LineEdit.transition(s, sparkle)
-                else
-                    LineEdit.edit_insert(s, '*')
-                end
-            end
-        )
-    )
+    try
+        expr = Meta.parse(input)
+        if expr isa Symbol
+            expr = Expr(:call, expr)
+        end
+        result = Core.eval(Main.SparkSandbox, expr)
+        if result !== nothing && !(result isa Union{Crystal,Wave})
+            println(result)
+        end
+    catch e
+        printstyled("Error: ", bold=true, color=:red)
+        println(e)
+    end
 end
