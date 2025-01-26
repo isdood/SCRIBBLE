@@ -1,0 +1,22 @@
+import core::io
+import crystal::runtime
+
+spell HelloWorld {
+    init() {
+        io::println("Hello from Spark!")
+
+        crystal::eval("""
+            puts "Hello from Crystal!"
+            x = 21
+            result = x * 2
+            puts "Crystal computed: #{result}"
+        """)
+
+        let result = crystal::get_int("result")
+        io::println("Spark received: {result}")
+    }
+
+    cast() {
+        self::init()
+    }
+}

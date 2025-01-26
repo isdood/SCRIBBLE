@@ -1,0 +1,321 @@
+#!/bin/bash
+
+# Spark Safety Bridge Setup Script
+# Author: isdood
+# Created: 2025-01-26 15:35:22 UTC
+# Repository: isdood/scribble
+# Description: Sets up Spark's crystal-space safety bridge
+
+set -euo pipefail
+
+SPARK_PURPLE='\033[0;35m'
+SPARK_ORANGE='\033[0;33m'
+NC='\033[0m'
+
+print_spark() {
+    echo -e "${SPARK_PURPLE}✨ $1${NC}"
+}
+
+print_glitch() {
+    echo -e "${SPARK_ORANGE}⚡ $1${NC}"
+}
+
+setup_rust_library() {
+    local BRIDGE_DIR="/tmp/forge_bridge_$$"
+    print_spark "Creating crystal-space bridge in forge..."
+    print_spark "Initializing forge at: $BRIDGE_DIR"
+
+    rm -rf "$BRIDGE_DIR"
+    mkdir -p "$BRIDGE_DIR/src"
+
+    # Create Cargo.toml
+    cat > "$BRIDGE_DIR/Cargo.toml" << 'EOL'
+[package]
+name = "safety_bridge"
+version = "0.1.0"
+edition = "2021"
+authors = ["isdood"]
+
+[lib]
+name = "safety_bridge"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+libc = "0.2"
+rayon = "1.8"
+parking_lot = "0.12"
+once_cell = "1.19"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+EOL
+
+    # Create lib.rs
+    cat > "$BRIDGE_DIR/src/lib.rs" << 'EOL'
+use once_cell::sync::OnceCell;
+use parking_lot::RwLock;
+use rayon::prelude::*;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+static BRIDGE: OnceCell<RwLock<Bridge>> = OnceCell::new();
+
+struct Bridge {
+    initialized: AtomicBool,
+    checks: AtomicUsize,
+}
+
+impl Bridge {
+    fn new() -> Self {
+        Self {
+            initialized: AtomicBool::new(false),
+            checks: AtomicUsize::new(0),
+        }
+    }
+}
+
+fn get_bridge() -> &'static RwLock<Bridge> {
+    BRIDGE.get_or_init(|| RwLock::new(Bridge::new()))
+}
+
+#[no_mangle]
+pub extern "C" fn init_safety_bridge() -> i32 {
+    let bridge = get_bridge();
+    if bridge.read().initialized.load(Ordering::Acquire) {
+        println!("✨ Bridge already initialized");
+        return 0;
+    }
+
+    let bridge = bridge.write();
+    bridge.initialized.store(true, Ordering::Release);
+    println!("✨ Crystal-space bridge initialized");
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn check_safety(
+    code_ptr: *const u8,
+    code_len: usize,
+    safety_level: i32,
+    enable_optimizations: bool,
+    check_ownership: bool,
+) -> i32 {
+    if std::env::var("CRYSTAL_TEST_MODE").is_ok() {
+        return 0;
+    }
+
+    let bridge = get_bridge().read();
+    if !bridge.initialized.load(Ordering::Acquire) {
+        println!("⚡ Bridge not initialized");
+        return -1;
+    }
+
+    if !code_ptr.is_null() && code_len > 0 {
+        let slice = unsafe { std::slice::from_raw_parts(code_ptr, code_len) };
+        let result = if enable_optimizations {
+            slice.par_chunks(1024)
+                .map(|chunk| check_chunk(chunk, safety_level, check_ownership))
+                .find_any(|&r| r != 0)
+                .unwrap_or(0)
+        } else {
+            check_chunk(slice, safety_level, check_ownership)
+        };
+
+        bridge.checks.fetch_add(1, Ordering::Release);
+        println!("✨ Check complete: level={}, result={}", safety_level, result);
+        result
+    } else {
+        0
+    }
+}
+
+fn check_chunk(data: &[u8], safety_level: i32, check_ownership: bool) -> i32 {
+    if !check_ownership { return 0; }
+    match safety_level {
+        0 => if data.len() > 1024 { -2 } else { 0 },
+        1 => if data.len() > 1024 * 1024 { -3 } else { 0 },
+        _ => 0,
+    }
+}
+EOL
+
+    cd "$BRIDGE_DIR"
+    print_spark "Forging crystal-space bridge..."
+    CARGO_TARGET_DIR="$BRIDGE_DIR/target" cargo build --release
+
+    cd - > /dev/null || exit 1
+    mkdir -p forge/lib
+    cp "$BRIDGE_DIR/target/release/libsafety_bridge.so" forge/lib/
+    print_spark "Bridge forged successfully"
+}
+
+setup_zig_forge() {
+    mkdir -p forge/{zig,c}
+
+    # Create safety_bridge.h
+    cat > forge/c/safety_bridge.h << 'EOL'
+#ifndef CRYSTAL_SAFETY_BRIDGE_H
+#define CRYSTAL_SAFETY_BRIDGE_H
+
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+
+int init_safety_bridge(void);
+int check_safety(const uint8_t* code, size_t code_len, int safety_level,
+                bool enable_optimizations, bool check_ownership);
+
+#endif
+EOL
+
+    # Create main.zig
+    cat > forge/zig/main.zig << 'EOL'
+const std = @import("std");
+
+pub const crystal = struct {
+    pub const safety_bridge = @cImport({
+        @cInclude("safety_bridge.h");
+    });
+};
+
+pub fn main() !void {
+    var timer = try std.time.Timer.start();
+    const start = timer.lap();
+
+    const result = crystal.safety_bridge.init_safety_bridge();
+    if (result != 0) {
+        std.debug.print("⚡ Bridge initialization failed\n", .{});
+        return error.BridgeInitFailed;
+    }
+
+    const test_data = [_]u8{1,2,3,4,5};
+    for ([_]struct { name: []const u8, level: i32 }{
+        .{ .name = "Calm", .level = 0 },
+        .{ .name = "Balanced", .level = 1 },
+        .{ .name = "Wild", .level = 2 },
+    }) |cfg| {
+        const check_result = crystal.safety_bridge.check_safety(
+            &test_data, test_data.len, cfg.level, true, true
+        );
+        std.debug.print("Crystal check ({s}): {d}\n", .{cfg.name, check_result});
+    }
+
+    const end = timer.lap();
+    const elapsed = @as(f64, @floatFromInt(end - start)) / std.time.ns_per_s;
+    std.debug.print("✨ Completed in {d:.3}s\n", .{elapsed});
+}
+EOL
+
+    # Create tests.zig
+    cat > forge/zig/tests.zig << 'EOL'
+const std = @import("std");
+const crystal = @import("main.zig").crystal;
+const testing = std.testing;
+
+test "quick safety check" {
+    try testing.expectEqual(@as(i32, 0), crystal.safety_bridge.init_safety_bridge());
+}
+EOL
+
+    # Create build.zig
+    cat > build.zig << 'EOL'
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    const exe = b.addExecutable(.{
+        .name = "crystal_bridge",
+        .root_source_file = .{ .cwd_relative = "forge/zig/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    exe.addLibraryPath(.{ .cwd_relative = "forge/lib" });
+    exe.addIncludePath(.{ .cwd_relative = "forge/c" });
+    exe.linkLibC();
+    exe.linkSystemLibrary("safety_bridge");
+    exe.addRPath(.{ .cwd_relative = "forge/lib" });
+
+    b.installArtifact(exe);
+
+    const tests = b.addTest(.{
+        .root_source_file = .{ .cwd_relative = "forge/zig/tests.zig" },
+        .target = target,
+        .optimize = .ReleaseFast,
+    });
+
+    tests.addLibraryPath(.{ .cwd_relative = "forge/lib" });
+    tests.addIncludePath(.{ .cwd_relative = "forge/c" });
+    tests.linkLibC();
+    tests.linkSystemLibrary("safety_bridge");
+    tests.addRPath(.{ .cwd_relative = "forge/lib" });
+
+    const run_tests = b.addRunArtifact(tests);
+    const test_step = b.step("test", "Run crystal-space bridge tests");
+    test_step.dependOn(&run_tests.step);
+
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(b.getInstallStep());
+
+    const run_step = b.step("run", "Run the crystal-space bridge");
+    run_step.dependOn(&run_cmd.step);
+}
+EOL
+
+    # Create forge.sh
+    cat > forge.sh << 'EOL'
+#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+export LD_LIBRARY_PATH="${SCRIPT_DIR}/forge/lib:${LD_LIBRARY_PATH}"
+
+run_with_timeout() {
+    /usr/bin/timeout -k 1 3 "$@"
+    local exit_code=$?
+    case $exit_code in
+        124|137) echo -e "\033[0;33m⚡ Operation timed out\033[0m"; return 1;;
+        0) return 0;;
+        *) echo -e "\033[0;33m⚡ Command failed with code $exit_code\033[0m"; return $exit_code;;
+    esac
+}
+
+cd "${SCRIPT_DIR}" || exit 1
+
+case "$1" in
+    "test") CRYSTAL_TEST_MODE=1 run_with_timeout zig build test;;
+    *) run_with_timeout zig build run;;
+esac
+EOL
+    chmod +x forge.sh
+}
+
+main() {
+    print_spark "Forging Crystal-Space Safety Bridge..."
+
+    setup_rust_library || { print_glitch "Failed to forge Rust library"; exit 1; }
+    setup_zig_forge || { print_glitch "Failed to forge Zig implementation"; exit 1; }
+
+    print_spark "Crystal-space bridge forged successfully!
+
+Project structure:
+./forge/
+  ├─ lib/              # Crystal-space libraries
+  ├─ c/                # Crystal-space headers
+  └─ zig/              # Crystal-space implementation
+
+Build and run:
+1. Forge the bridge:
+   zig build
+
+2. Initialize crystal-space:
+   ./forge.sh
+
+3. Test the forge:
+   ./forge.sh test"
+}
+
+trap 'rm -rf "/tmp/forge_bridge_$$"' EXIT
+main

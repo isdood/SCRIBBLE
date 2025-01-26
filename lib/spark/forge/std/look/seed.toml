@@ -1,0 +1,14 @@
+[package]
+name = "look"
+version = "0.1.0"
+description = "Directory listing utility"
+author = "isdood"
+created = "2025-01-26 14:56:30"
+
+[deps]
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+
+[sparkle]
+commands = ["look"]
+command_module = "Look"

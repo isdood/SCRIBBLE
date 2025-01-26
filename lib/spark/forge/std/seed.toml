@@ -1,0 +1,8 @@
+[look]
+name = "look"
+version = "0.1.0"
+description = "Directory listing utility"
+author = "isdood"
+created = "2025-01-26 13:39:50"
+dependencies = ["Printf", "Dates"]
+commands = ["look"]

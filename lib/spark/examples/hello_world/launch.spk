@@ -1,0 +1,19 @@
+@seeds@
+name = "hello_world_example"
+type = "binary"
+@seeds@
+
+@spells@
+import core::build
+
+spell ExampleConfig {
+    src = "hello_world.spk"
+    deps = ["core::io", "crystal::runtime"]
+}
+
+spell Builder {
+    init() {
+        build::configure(ExampleConfig)
+    }
+}
+@spells@

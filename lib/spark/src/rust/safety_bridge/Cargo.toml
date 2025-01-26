@@ -1,0 +1,11 @@
+[package]
+name = "safety_bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "safety_bridge"
+crate-type = ["cdylib"]
+
+[dependencies]
+libc = "0.2"

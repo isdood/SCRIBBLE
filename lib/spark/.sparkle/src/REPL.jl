@@ -56,6 +56,8 @@ function process_sparkle(s)
         try
             if cmd == "plant" && !isempty(args)
                 seed_plant(join(args, " "))
+                # Reload components after planting
+                SparkSandbox.load_components()
             elseif cmd == "unplant" && !isempty(args)
                 seed_unplant(join(args, " "))
             elseif cmd == "garden"
@@ -94,6 +96,9 @@ function process_sparkle(s)
                                          Available patterns: $(join(keys(patterns), ", "))
         optimize                       - Optimize current structure
         visualize                      - Show current structures
+        look                          - List directory contents
+        look -l                       - Long format listing
+        look --help                   - Show look command help
         exit/quit                      - Exit Sparkle mode
 
         Seed Package Manager:

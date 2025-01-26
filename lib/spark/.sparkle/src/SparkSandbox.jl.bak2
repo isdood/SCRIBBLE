@@ -1,0 +1,57 @@
+module SparkSandbox
+
+using REPL
+using REPL.LineEdit
+using Statistics
+using Dates
+using TOML
+using UnicodePlots
+using ColorSchemes
+using LinearAlgebra
+
+# Include core types and modules
+include("Types.jl")
+include("Crystal.jl")
+include("SeedManager.jl")
+include("REPL.jl")
+
+# Function to load a component
+function load_component(package::String, component::String)
+    path = joinpath(@__DIR__, "..", "std", component, "init.jl")
+    if isfile(path)
+        include(path)
+        return true
+    end
+    false
+end
+
+# Load all components from config.spark
+function load_components()
+    if !isfile("config.spark")
+        return
+    end
+
+    config = TOML.parsefile("config.spark")
+    if haskey(config, "packages")
+        for (pkg, components) in config["packages"]
+            for comp in components
+                load_component(pkg, comp)
+            end
+        end
+    end
+end
+
+# Initialize
+function __init__()
+    load_components()
+end
+
+# Re-export all public functions
+export crystal, wave, weave, optimize, visualize
+export seed_plant, seed_unplant, seed_garden, seed_sprout
+export init_sparkle
+
+# Export module loading
+export load_component, load_components
+
+end # module

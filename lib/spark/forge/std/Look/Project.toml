@@ -1,0 +1,8 @@
+name = "Look"
+uuid = "a2cc0d24-734a-4b9f-b01c-fd6899bc8e12"
+authors = ["isdood"]
+version = "0.1.0"
+
+[deps]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"

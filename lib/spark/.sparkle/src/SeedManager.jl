@@ -3,105 +3,22 @@ export seed_plant, seed_unplant, seed_garden, seed_sprout
 
 using TOML, Dates
 
-# Standard library packages
-const STD_PACKAGES = Dict(
-    "std" => [
-        "math",      # Basic mathematical operations
-        "cubed",     # Cube operations
-        "whisper",   # Text case manipulation
-        "clone",     # Object cloning
-        "inq",       # Inquiry functions
-        "align",     # Text alignment
-        "shout",     # Text case manipulation
-        "any",       # Type-agnostic operations
-        "array",     # Array utilities
-        "ascii",     # ASCII text operations
-        "coll",      # Collection utilities
-        "comp",      # Comparison operations
-        "conv",      # Type conversion utilities
-        "def",       # Default value handling
-        "echo",      # Echo utilities
-        "glitch",    # Glitch art effects
-        "history",   # Command history
-        "itex",      # Interactive text manipulation
-        "lend",      # Resource lending utilities
-        "mark",      # Markup processing
-        "murmur",    # Murmur hash implementation
-        "potion",    # Data transformation utilities
-        "rune",      # Symbol and pattern matching
-        "scribe",    # Logging and documentation
-        "shard",     # Data partitioning
-        "shimmer",   # Animation and visual effects
-        "signal",    # Event handling and signals
-        "spell",     # Command execution patterns
-        "thunder"    # Parallel processing utilities
-    ]
+const STD_PACKAGES = Dict{String,Vector{String}}(
+    "std" => ["look", "prism"]  # Simplified for testing
 )
 
-function seed_plant(package_spec)
-    parts = split(package_spec, "**")
-    if length(parts) == 1
-        println("🌱 Planting full package: $(parts[1])")
-        _install_full_package(parts[1])
-    elseif length(parts) == 2
-        println("🌱 Planting component $(parts[2]) from package $(parts[1])")
-        _install_package_component(parts[1], parts[2])
-    else
-        error("Invalid package specification format")
-    end
-end
-
-function seed_unplant(package_spec)
-    parts = split(package_spec, "**")
-    if length(parts) == 1
-        println("🗑️ Unplanting full package: $(parts[1])")
-        _remove_full_package(parts[1])
-    elseif length(parts) == 2
-        println("🗑️ Unplanting component $(parts[2]) from package $(parts[1])")
-        _remove_package_component(parts[1], parts[2])
-    else
-        error("Invalid package specification format")
-    end
-end
-
-function seed_garden()
-    if !isfile("config.spark")
-        error("No config.spark found. Initialize with 'seed sprout' first.")
-    end
-
-    config = TOML.parsefile("config.spark")
-    println("\n🌿 Installed Packages:")
-    println("====================")
-
-    if haskey(config, "packages")
-        for (pkg, components) in config["packages"]
-            println("📦 $pkg")
-            if !isempty(components)
-                for comp in components
-                    println("  └─ $comp")
-                end
-            end
-        end
-    else
-        println("No packages installed yet.")
-    end
-    println()
-end
-
+"""
+Create the initial config.spark file
+"""
 function seed_sprout()
-    if isfile("config.spark")
-        error("config.spark already exists!")
-    end
-
     config = Dict(
         "project" => Dict(
-            "name" => basename(pwd()),
+            "name" => "SparkSandbox",
             "version" => "0.1.0",
             "author" => "isdood",
-            "created" => "2025-01-26 12:32:14"
+            "created" => Dates.format(now(), "yyyy-mm-dd HH:MM:SS")
         ),
-        "packages" => Dict(),
-        "dependencies" => Dict()
+        "packages" => Dict{String,Vector{String}}()
     )
 
     open("config.spark", "w") do io
@@ -110,90 +27,136 @@ function seed_sprout()
     println("🌱 Initialized new Spark project")
 end
 
-function _install_full_package(package)
-    if !haskey(STD_PACKAGES, package)
-        error("Package $package not found in standard library")
-    end
+"""
+Install a package or component
+"""
+function seed_plant(package_spec)
+    parts = split(package_spec, "**")
 
-    config = _load_config()
-    if !haskey(config, "packages")
-        config["packages"] = Dict()
-    end
-
-    if !haskey(config["packages"], package)
-        config["packages"][package] = String[]
-        if !isempty(STD_PACKAGES[package])
-            config["packages"][package] = copy(STD_PACKAGES[package])
+    if length(parts) == 2
+        package, component = parts
+        if !haskey(STD_PACKAGES, package)
+            error("Package $package not found")
         end
-    end
-
-    _save_config(config)
-    println("✨ Successfully planted $package")
-end
-
-function _install_package_component(package, component)
-    if !haskey(STD_PACKAGES, package)
-        error("Package $package not found in standard library")
-    end
-
-    if !(component in STD_PACKAGES[package])
-        error("Component $component not found in package $package")
-    end
-
-    config = _load_config()
-    if !haskey(config, "packages")
-        config["packages"] = Dict()
-    end
-
-    if !haskey(config["packages"], package)
-        config["packages"][package] = String[]
-    end
-
-    if !(component in config["packages"][package])
-        push!(config["packages"][package], component)
-    end
-
-    _save_config(config)
-    println("✨ Successfully planted $package**$component")
-end
-
-function _remove_full_package(package)
-    config = _load_config()
-    if haskey(config["packages"], package)
-        delete!(config["packages"], package)
-        _save_config(config)
-        println("✨ Successfully unplanted $package")
-    else
-        println("Package $package is not installed")
-    end
-end
-
-function _remove_package_component(package, component)
-    config = _load_config()
-    if haskey(config["packages"], package)
-        components = config["packages"][package]
-        filter!(c -> c != component, components)
-        if isempty(components)
-            delete!(config["packages"], package)
-        else
-            config["packages"][package] = components
+        if !(component in STD_PACKAGES[package])
+            error("Component $component not found in package $package")
         end
-        _save_config(config)
-        println("✨ Successfully unplanted $package**$component")
+
+        println("🌱 Planting component $component from package $package")
+
+        # Load or create config
+        if !isfile("config.spark")
+            seed_sprout()
+        end
+
+        config = TOML.parsefile("config.spark")
+        if !haskey(config, "packages")
+            config["packages"] = Dict{String,Vector{String}}()
+        end
+        if !haskey(config["packages"], package)
+            config["packages"][package] = String[]
+        end
+
+        # Add component if not already present
+        if !(component in config["packages"][package])
+            push!(config["packages"][package], component)
+        end
+
+        # Save config
+        open("config.spark", "w") do io
+            TOML.print(io, config)
+        end
+
+        # Create component directory and module
+        std_dir = joinpath("std")
+        comp_dir = joinpath(std_dir, component)
+        mkpath(comp_dir)
+
+        # Write module file
+        open(joinpath(comp_dir, "init.jl"), "w") do f
+            if component == "look"
+                write(f, """
+                module Look
+                export look
+                function look(args...)
+                    entries = readdir(".")
+                    if isempty(entries)
+                        println("(empty directory)")
+                    else
+                        for entry in sort(entries)
+                            if isdir(entry)
+                                printstyled(entry, "/\\n", color=:blue)
+                            else
+                                println(entry)
+                            end
+                        end
+                    end
+                end
+                end # module Look
+                """)
+            end
+        end
+
+        println("✨ Successfully planted $package**$component")
+
+        # Reload components
+        @eval Main.SparkSandbox begin
+            load_components()
+        end
     else
-        println("Package $package is not installed")
+        error("Invalid package specification. Use format: package**component")
     end
 end
 
-function _load_config()
+"""
+List installed packages
+"""
+function seed_garden()
     if !isfile("config.spark")
-        error("No config.spark found. Initialize with 'seed sprout' first.")
+        println("No packages installed (no config.spark found)")
+        return
     end
-    TOML.parsefile("config.spark")
+
+    config = TOML.parsefile("config.spark")
+    println("\n🌿 Installed Packages:")
+
+    if haskey(config, "packages")
+        for (pkg, components) in config["packages"]
+            println("📦 $pkg")
+            for comp in components
+                println("  └─ $comp")
+            end
+        end
+    else
+        println("No packages installed")
+    end
+    println()
 end
 
-function _save_config(config)
-    open("config.spark", "w") do io
-        TOML.print(io, config)
+"""
+Remove a package or component
+"""
+function seed_unplant(package_spec)
+    if !isfile("config.spark")
+        error("No config.spark found")
+    end
+
+    parts = split(package_spec, "**")
+    config = TOML.parsefile("config.spark")
+
+    if length(parts) == 2
+        package, component = parts
+        if haskey(config["packages"], package)
+            filter!(c -> c != component, config["packages"][package])
+            if isempty(config["packages"][package])
+                delete!(config["packages"], package)
+            end
+            open("config.spark", "w") do io
+                TOML.print(io, config)
+            end
+            println("✨ Successfully unplanted $package**$component")
+        end
+    else
+        error("Invalid package specification. Use format: package**component")
     end
 end

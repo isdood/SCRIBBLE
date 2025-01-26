@@ -1,0 +1,14 @@
+[package]
+name = "prism"
+version = "0.1.0"
+description = "3D Memory Resonance Filesystem"
+author = "isdood"
+created = "2025-01-26 15:34:22"
+
+[deps]
+LinearAlgebra = "*"
+Statistics = "*"
+
+[sparkle]
+core_module = "Prism"
+exports = ["init_prism", "mount_prism", "unmount_prism"]
