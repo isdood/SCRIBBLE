@@ -1,3 +1,19 @@
+#!/usr/bin/env bash
+
+# Fix Sparkle seed initialization
+# Created: 2025-01-26 18:55:24 UTC
+# Author: isdood
+
+set -e
+
+BASE_DIR="/home/guavabot1/scribble/scribble/lib/sparkle/spark"
+SPARKLE_DIR="$BASE_DIR/.sparkle"
+SANDBOX_FILE="$SPARKLE_DIR/src/SparkSandbox.jl"
+
+echo "📝 Fixing Sparkle seed initialization..."
+
+# Update SparkSandbox.jl to create default config
+cat > "$SANDBOX_FILE" << 'EOT'
 module SparkSandbox
 
 using REPL
@@ -144,3 +160,26 @@ export init_sparkle
 export load_component, load_components
 
 end # module
+EOT
+
+echo "✨ Fixed Sparkle seed initialization"
+echo ""
+echo "Changes made:"
+echo "1. Added ensure_config() function"
+echo "2. Created default config.spark with look component"
+echo "3. Added automatic config creation on startup"
+echo "4. Added component initialization"
+echo "5. Updated paths for new directory structure"
+echo ""
+echo "Please try again:"
+echo "1. Clean up:"
+echo "   ./clean_sandbox.sh"
+echo ""
+echo "2. Restart Sparkle:"
+echo "   ./sparkle.sh"
+echo ""
+echo "3. The look command should be available immediately"
+
+# Set permissions
+chown guavabot1:guavabot1 "$SANDBOX_FILE"
+chmod 644 "$SANDBOX_FILE"
