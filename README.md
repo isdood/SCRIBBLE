@@ -151,7 +151,7 @@ Contributions welcome! Please ensure your changes maintain:
 - Performance metrics within 5% of baseline
 
 ## 📜 License
-MIT - See LICENSE for details
+GNU - See LICENSE for details
 
 ---
 *"In the crystal lattice of possibility, every vector finds its perfect place."* - isdood
